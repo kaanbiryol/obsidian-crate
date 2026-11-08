@@ -11,6 +11,7 @@ export function bindCommittedText(
 	currentValue: () => string,
 	save: (value: string) => Promise<void>,
 	validate: (value: string) => boolean = () => true,
+	failureMessage: (error: unknown) => string = () => 'Could not save this setting. Please try again.',
 ): void {
 	let saving = false;
 	const commit = async () => {
@@ -26,8 +27,8 @@ export function bindCommittedText(
 		text.setDisabled(true);
 		try {
 			await save(value);
-		} catch {
-			new Notice('Could not save this setting. Please try again.');
+		} catch (error) {
+			new Notice(failureMessage(error));
 		} finally {
 			text.setValue(currentValue());
 			text.setDisabled(false);

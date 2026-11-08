@@ -276,7 +276,7 @@ function library(notes: Array<Awaited<ReturnType<typeof note>>>) {
 	const api = new EncryptedReadingApi({ folderPath: 'Reading', wireFolder, paths, generation: 1, authority, request,
 		readAttempt: async () => undefined, writeAttempt: async () => {}, error: (message, status, code) => Object.assign(new Error(message), { status, code }) });
 	const commits = () => request.mock.calls.filter(([path]) => path === '/reading/encrypted-commit').length;
-	return { api, state, commits };
+	return { api, state, commits, request };
 }
 const favorite = (id: string, operationId: string) => JSON.stringify({ id, operationId, changes: { favorite: true }, before: { favorite: false } });
 const save = (url: string, operationId: string) => JSON.stringify({ url, operationId, fetchArticle: false });
@@ -351,6 +351,22 @@ it('refuses edits with the wording and status the plaintext Worker sends', async
 	expect(commits()).toBe(0);
 	// The case the two clients used to word differently: both now settle it for review with status 400.
 	expect(refused('not-empty', 'retry')).toEqual({ message: 'Only URL captures with an unchanged article section can be extracted.', status: 400 });
+});
+
+it('rejects a commit refused with a non-JSON body with its status and a short message', async () => {
+	const kept = await note(readingId(241), 'Kept', 'https://example.com/kept');
+	const { api, request } = library([kept]);
+	const serve = request.getMockImplementation()!;
+	// A reverse proxy refuses the body before it reaches the Worker.
+	request.mockImplementation(async (path, body) => path === '/reading/encrypted-commit'
+		? new Response('<html><body>413 Request Entity Too Large</body></html>', { status: 413, headers: { 'content-type': 'text/html' } })
+		: serve(path, body));
+	await expect(api.request('/reading/update', favorite(readingId(241), 'edit-too-large'))).rejects.toMatchObject({ status: 413, message: 'Reading request failed.' });
+	// So does a proxy's conflict page, which is not the Worker's version conflict.
+	request.mockImplementation(async (path, body) => path === '/reading/encrypted-commit'
+		? new Response('<html>Conflict</html>', { status: 409, headers: { 'content-type': 'text/html' } })
+		: serve(path, body));
+	await expect(api.request('/reading/update', favorite(readingId(241), 'edit-proxy-conflict'))).rejects.toMatchObject({ status: 409, message: 'Reading request failed.' });
 });
 
 it('names a failed note by its plaintext path and retries it at the same sequence', async () => {

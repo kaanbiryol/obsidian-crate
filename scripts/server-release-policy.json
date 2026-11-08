@@ -1,5 +1,0 @@
-{
-  "baselineCommit": "cd636efa86a28a65da2c32947c1ee0143704bf7d",
-  "reason": "Pre-launch: no servers are upgrade sources yet. Schema 1 may change in place for server revision 3; servers deployed by earlier betas must be deleted and recreated.",
-  "initialRevision": 3
-}

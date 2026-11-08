@@ -3,6 +3,7 @@ import { webkit, expect } from '@playwright/test';
 import sharp from 'sharp';
 import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { previewAuthToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 // Settled iOS list screens scroll the document so the status-bar tap reaches
 // them. Desktop WebKit cannot tap the status bar; these checks cover the
@@ -11,7 +12,7 @@ const assets = await buildPwaPreviewAssets();
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const DESKTOP = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
-const readingSession = { token: 'document-scroll', id: 'document-scroll', folderPath: 'Reading', generation: 'document-scroll', expiresAt: Date.now() + 86400000 };
+const readingSession = { token: previewAuthToken, id: 'document-scroll', folderPath: 'Reading', generation: 'document-scroll', expiresAt: Date.now() + 86400000 };
 const articles = Array.from({ length: 30 }, (_, index) => ({
   crate_reading_version: 1, crate_reading_id: `67de6c50-c70c-4c85-93f2-${String(index + 1).padStart(12, '0')}`,
   title: `Document scroll article ${index}`, source_url: 'https://example.com/article', saved_at: '2026-09-21T10:00:00.000Z',

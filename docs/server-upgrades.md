@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The current candidate uses server revision 4 and schema 1, with no registered migrations. Revision 3 (0.11.0) changed the schema 1 definition in place (Reading list paging and deltas), so servers deployed by earlier betas, including 0.9.0 (revision 1) and 0.10.0 (revision 2), cannot be upgraded; the update reports this and asks users to delete and recreate the server. `scripts/server-release-policy.json` pins the 0.10.0 release as the pre-launch baseline that allows this. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The current candidate uses server revision 4 and schema 1, with no registered migrations. Every installation starts at revision 4 (0.12.0), the first supported upgrade source; servers from earlier betas are not supported. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 
@@ -68,7 +68,7 @@ Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. H
 
 ## Release evidence
 
-`npm run check:server-revision` runs the server revision gate; CI verification and `npm run release:check` run it after the `check:source` commands, while `npm run check` does not. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. The committed `scripts/server-release-policy.json` pins the source baseline and initial public revision 1. Later published releases define the baseline for subsequent candidates. Until the first publication, schema 1 may change in place; after publication, migration immutability and schema/revision checks apply normally. The 0.9.0 beta is the first upgrade source, so its release commit must be reachable from the release branch for the gate to select it as the baseline. Keep the baseline fixed after launch. Repositories without an explicit baseline use their earliest manifest commit before first publication. `--base <git-ref>` explicitly overrides baseline selection for audits.
+`npm run check:server-revision` runs the server revision gate; CI verification and `npm run release:check` run it after the `check:source` commands, while `npm run check` does not. Local checks and CI compare the complete server input graph with the latest reachable published GitHub release (including published prereleases), ignoring drafts. GitHub CLI access and full Git/tag history are required. Release runs exclude the tag being packaged. No release policy is committed, so the latest published release is the baseline. An optional `scripts/server-release-policy.json` can pin a source baseline (`baselineCommit`); only published releases after that commit then count, and while the pinned commit is the baseline its optional `initialRevision` sets the required revision and skips schema and released-migration checks. Repositories without a published release or policy use their earliest manifest commit. `--base <git-ref>` explicitly overrides baseline selection for audits.
 
 A changed server requires exactly the next public revision; skipped numbers, decreases, schema edits without a schema version increase, and edits/removal of released migrations fail, except deleting SQL retired below the floor. Worker, PWA, provisioner, shared UI, Sass, build configuration and dependency-lock inputs are covered. Plugin package version and descriptive metadata changes alone do not require a server revision.
 
@@ -134,9 +134,8 @@ with the token. Local enabled flags cache the
 server state rather than overwriting it. The policy never starts a feature in a
 vault that has not confirmed it: the plugin keeps the local flag off, shows a notice
 once per load, and records `confirmed` only when the feature is turned on in that
-vault's settings after a prompt naming its folder. Plugin data without the flag,
-including data saved by the 0.9.0 beta, counts as unconfirmed, and a vault without
-plugin data starts with both off.
+vault's settings after a prompt naming its folder. Plugin data without the flag
+counts as unconfirmed, and a vault without plugin data starts with both off.
 
 Pausing stops server APIs and background work without deleting sources, indexes,
 credentials, or queued work. Reading checks before fetching and publication;

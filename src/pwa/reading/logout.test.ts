@@ -79,14 +79,3 @@ it('reports incomplete erasure when removing encryption keys fails', async () =>
 	expect(test.reportError.mock.lastCall?.[0]?.message).toContain('could not be removed');
 	expect(clearReminderOutbox).toHaveBeenCalledOnce();
 });
-
-it('revokes a Reading-only connection without attempting a missing app credential', async () => {
-	localStorage.removeItem(AUTH_TOKEN_KEY);
-	localStorage.setItem(READING_SESSION_KEY, JSON.stringify({ token: 'reading-only', id: 'device', folderPath: 'Reading', generation: 'one', expiresAt: 1 }));
-	const test = lifecycle();
-	await act(async () => { await test.hook.current.logOut(); });
-	expect(test.options.apiFetch).not.toHaveBeenCalled();
-	expect(fetch).toHaveBeenCalledOnce();
-	expect(new Headers(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).get('Authorization')).toBe('Bearer reading-only');
-	expect(test.reportError).toHaveBeenLastCalledWith(null);
-});

@@ -188,14 +188,14 @@ for(const browserType of [chromium,webkit]) {
    assert.equal(await previewPane.evaluate(el=>el.scrollTop),0,'The version pane itself does not scroll');
    assert.deepEqual(await fixedHeader.boundingBox(),headerBeforeScroll,'Version metadata stays fixed while the changes scroll');
    await expect(page.getByRole('button',{name:'Restore this version',exact:true})).toBeInViewport();
-   if(width<700) await expect(page.getByRole('button',{name:'← Versions',exact:true})).toBeInViewport();
+   if(width<700) await expect(page.getByRole('button',{name:'Back to versions',exact:true})).toBeInViewport();
    await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-scrolled.png'});
    await page.evaluate(()=>window.longDiff=false);
    await openFile('Notes/New.md');
    await page.getByRole('button',{name:'Current local file',exact:true}).click();
    await expect(page.getByLabel('Current local file contents')).toContainText('Local contents');
    await expect(page.getByRole('button',{name:'Restore this version',exact:true})).toHaveCount(0);
-   if(width<700) await page.getByRole('button',{name:'← Versions',exact:true}).click();
+   if(width<700) await page.getByRole('button',{name:'Back to versions',exact:true}).click();
    await expect(page.locator('.crate-history-list-pane')).toContainText('No earlier versions retained');
    await page.getByRole('button',{name:'Current local file',exact:true}).click();
    await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-files.png'});

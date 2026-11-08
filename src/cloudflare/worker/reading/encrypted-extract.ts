@@ -1,5 +1,5 @@
 import { readingUrl } from '@/reading/core/model';
-import { parseJsonObject } from '../http/request-validation';
+import { parseJsonObject, SMALL_JSON_BODY_BYTES } from '../http/request-validation';
 import type { Env } from '../types';
 import { ReadingError, readingResponse } from './common';
 import { fetchReadingCapture } from './extraction/transport';
@@ -9,7 +9,7 @@ import { fetchReadingCapture } from './extraction/transport';
  * never the URL, and neither it nor the article is stored, queued or logged. */
 export async function extractForEncryptedReading(request: Request, env: Env): Promise<Response> {
 	// Room for the longest saved link (8,192 characters), as Reading capture allows.
-	const parsed = await parseJsonObject(request, 24_576);
+	const parsed = await parseJsonObject(request, SMALL_JSON_BODY_BYTES);
 	if (!parsed.ok) return parsed.response;
 	let url: string; try { url = readingUrl(parsed.value.url); } catch { throw new ReadingError('Enter a complete HTTP or HTTPS link without credentials.'); }
 	try {

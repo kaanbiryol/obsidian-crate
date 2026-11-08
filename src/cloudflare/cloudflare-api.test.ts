@@ -2,6 +2,7 @@ import serverRelease from './server-release.json';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { HttpTransport } from './http';
+import { verifyWorkerDeployment } from './deployment/verify-worker';
 
 const fingerprint = 'f'.repeat(64);
 
@@ -250,7 +251,7 @@ it('probes the exact Worker release without forwarding management credentials', 
 	const metadata = { service: 'crate', serverRevision: serverRelease.revision, schemaVersion: serverRelease.schemaVersion, deploymentFingerprint: fingerprint };
 	const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify(metadata) }));
 	const client = new CloudflareApiClient('management-secret', transport);
-	await client.verifyWorkerDeployment('https://crate.example.workers.dev', fingerprint);
+	await verifyWorkerDeployment(client.transport, 'https://crate.example.workers.dev', fingerprint, false, client.sleep);
 	expect(transport).toHaveBeenCalledWith('https://crate.example.workers.dev/.well-known/crate', { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
 	expect(JSON.stringify(transport.mock.calls)).not.toContain('management-secret');
 });

@@ -15,7 +15,7 @@ import { isGeneratedCapturePath } from '@/reading/core/filename';
 import type { extractDocument } from '@/reading/extraction/document';
 import { publishReading, wakeReading } from '@/cloudflare/worker/coordinator/coordinator';
 import { sha256Hex } from '@/platform/sha256';
-import { DEPLOYMENT_FENCE_KEY } from '@/protocol/deployment-fence';
+import { deploymentFenceHeld } from '../../d1/db';
 
 /** Fetch and publication attempts per article job, like the other durable queues. */
 export const MAX_JOB_ATTEMPTS = 8;
@@ -73,7 +73,7 @@ export async function armReadingCoordinator(state: DurableObjectState): Promise<
 export async function runReadingExtraction(state: DurableObjectState, env: Env): Promise<void> {
 	if (await readEncryptionState(env.DB)) return ;
 	// A persisted maintenance fence stops new network work during backup/upgrade.
-	if (await env.DB.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) { await state.storage.setAlarm(Date.now() + 60_000); return; }
+	if (await deploymentFenceHeld(env.DB)) { await state.storage.setAlarm(Date.now() + 60_000); return; }
 	if (!await featureEnabled(env.DB, 'reading')) return;
 	const current = await policy(env.DB);
 	if (!current) return;

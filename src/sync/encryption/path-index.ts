@@ -20,6 +20,23 @@ export function distinctLocalName(path: string, wire: string): string {
 	return insertBeforeExtension(path, ` - ${wire.slice(name, name + 8)}`);
 }
 
+/** Gives each decrypted server file a unique plaintext path, in the order they should
+ * be recorded. Files stored at their name's own tag claim it first; a later file
+ * claiming the same name gets a distinct local name from its server path. */
+export function assignPlainPaths(entries: ReadonlyArray<{ path: string; wire: string }>, tagged: readonly boolean[]): Array<{ index: number; path: string }> {
+	const claimed = new Set<string>();
+	const order = entries.map((_, index) => index).sort((a, b) => Number(tagged[b]) - Number(tagged[a]));
+	return order.map(index => {
+		const { wire } = entries[index]!;
+		let { path } = entries[index]!;
+		if (claimed.has(portablePathKey(path))) {
+			path = distinctLocalName(path, wire);
+		}
+		claimed.add(portablePathKey(path));
+		return { index, path };
+	});
+}
+
 /** Maps plaintext paths to their server paths and back. Tags are recomputed;
  * only notes created without the path key need their server name remembered. */
 export class PathIndex {

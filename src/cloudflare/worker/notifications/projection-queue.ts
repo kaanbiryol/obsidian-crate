@@ -6,9 +6,20 @@ import { summarizeReminderSources } from '../reminders/source-summary';
 import { recordReminderSourceState } from '../reminders/source-state';
 import { getReminderFolder, isReminderPath } from '../reminders/scope';
 
+export interface FileProjectionOptions {
+	/** Keep the file's notification retry record instead of clearing it. */
+	preserveRetries?: boolean;
+	/** Whether the vault is encrypted; read when omitted. */
+	encrypted?: boolean;
+	/** The current reminders folder; read when omitted. */
+	reminderFolder?: string | null;
+	size?: number;
+}
+
 /** File bytes, identity ownership and first observation share one commit. */
-export async function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null, preserveRetries = false, encrypted?: boolean, knownFolder?: string | null, size?: number): Promise<D1PreparedStatement[]> {
-	const folder = knownFolder === undefined ? await getReminderFolder(db) : knownFolder;
+export async function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null,
+	{ preserveRetries = false, encrypted, reminderFolder, size }: FileProjectionOptions = {}): Promise<D1PreparedStatement[]> {
+	const folder = reminderFolder === undefined ? await getReminderFolder(db) : reminderFolder;
 	if (!isReminderPath(path, folder)) return [];
 	const { sql: guard, args } = storageKey === null
 		? { sql: `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`, args: filePathArgs(path) }

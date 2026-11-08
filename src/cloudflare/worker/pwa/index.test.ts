@@ -3,15 +3,17 @@ import { Script } from 'node:vm';
 import {
 	OPEN_OBSIDIAN_HTML,
 	OPEN_OBSIDIAN_JS,
-	PWA_THEME_BOOTSTRAP_JS,
 	SERVICE_WORKER_JS,
 	createManifestJson,
 	createPwaHtml,
 	createPwaVersionJson,
 } from './index';
+import { PWA_THEME_INIT_JS, PWA_THEME_STYLES_JS } from './theme-bootstrap';
 import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from '../../../pwa/shell/pwa-params';
 import statusStyles from '../../../../site/assets/status.css?raw-css';
+
+const PWA_THEME_SCRIPTS_JS = PWA_THEME_INIT_JS + PWA_THEME_STYLES_JS;
 
 describe('PWA activation metadata', () => {
 	it('uses the plain notifications route when no activation params are present', () => {
@@ -152,16 +154,15 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('<script nonce="');
 		expect(html).toContain('id="pwa-theme-init"');
 		expect(html).toContain('id="pwa-theme-styles"');
-		expect(html).not.toContain('src="/notifications/theme-bootstrap.js');
 		expect(html).not.toContain('<script>');
-		expect(PWA_THEME_BOOTSTRAP_JS).toContain('localStorage.getItem("crate-reminders-theme")');
-		expect(PWA_THEME_BOOTSTRAP_JS).toContain("lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':\"(prefers-color-scheme: light)\"");
-		expect(PWA_THEME_BOOTSTRAP_JS).toContain("themeColor.setAttribute('media','all')");
+		expect(PWA_THEME_SCRIPTS_JS).toContain('localStorage.getItem("crate-reminders-theme")');
+		expect(PWA_THEME_SCRIPTS_JS).toContain("lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':\"(prefers-color-scheme: light)\"");
+		expect(PWA_THEME_SCRIPTS_JS).toContain("themeColor.setAttribute('media','all')");
 		expect(html).toContain('<link rel="icon" type="image/png" sizes="256x256" href="/notifications/crate-mark-256.png?v=');
 		expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=');
 		expect(html).not.toContain('apple-touch-startup-image');
-		expect(PWA_THEME_BOOTSTRAP_JS).toContain('(prefers-color-scheme: light)');
-		expect(PWA_THEME_BOOTSTRAP_JS).toContain("preference==='dark'?'not all'");
+		expect(PWA_THEME_SCRIPTS_JS).toContain('(prefers-color-scheme: light)');
+		expect(PWA_THEME_SCRIPTS_JS).toContain("preference==='dark'?'not all'");
 		expect(html.indexOf('<script nonce=')).toBeLessThan(html.indexOf('<body>'));
 		expect(html.indexOf('<script nonce=')).toBeLessThan(html.indexOf('<div id="app"><div class="pwa-launch-splash"'));
 		expect(html).toContain('--pwa-launch-bg:#f7f7f8;');
@@ -198,7 +199,7 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('name="apple-mobile-web-app-status-bar-style" content="default"');
 		expect(html).not.toContain('--pwa-safe-area-top-floor');
 		expect(html).not.toContain('--pwa-status-bar-clearance');
-		expect(PWA_THEME_BOOTSTRAP_JS).not.toContain('pwaIosScrollEdge');
+		expect(PWA_THEME_SCRIPTS_JS).not.toContain('pwaIosScrollEdge');
 		expect(html).toContain('--pwa-safe-area-bottom:env(safe-area-inset-bottom)');
 		expect(html).toContain(':is(.pwa-reminders-view,.pwa-opening-screen) .view-header{max-width:100vw;overflow:hidden;padding:calc(var(--pwa-safe-area-top) + var(--pwa-header-top-gap))');
 		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(var(--pwa-safe-area-top) + 12px)}');
@@ -368,7 +369,8 @@ describe('PWA activation metadata', () => {
 	});
 
 	it('ships parseable external scripts under the strict PWA CSP', () => {
-		expect(() => new Script(PWA_THEME_BOOTSTRAP_JS)).not.toThrow();
+		expect(() => new Script(PWA_THEME_INIT_JS)).not.toThrow();
+		expect(() => new Script(PWA_THEME_STYLES_JS)).not.toThrow();
 		expect(() => new Script(OPEN_OBSIDIAN_JS)).not.toThrow();
 		expect(OPEN_OBSIDIAN_HTML.endsWith('`')).toBe(false);
 	});

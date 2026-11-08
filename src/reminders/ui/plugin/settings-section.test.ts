@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { FakeElement, MockSetting, createObsidianUiModule, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
+import { FakeElement, MockSetting, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
 
 async function flush(): Promise<void> {
 	for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -76,4 +76,37 @@ it('changes no notes until this vault confirms turning reminders on with their f
 		vi.doUnmock('../../../ui/plugin/confirmation-modal');
 		vi.doUnmock('../../plugin-integration');
 	}
+});
+
+it('changes the reminders folder once per commit and explains a failure', async () => {
+	vi.doMock('obsidian', async () => ({ ...createObsidianUiModule(), Platform: { isMobile: false },
+		normalizePath: (await vi.importActual<typeof import('../../../test/mocks/obsidian')>('../../../test/mocks/obsidian')).normalizePath }));
+	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
+	let finish!: (error?: Error) => void;
+	const changeReminderFolder = vi.fn((target: { remindersSettings: { remindersFolderPath: string } }, folder: string) => new Promise<void>((resolve, reject) => {
+		finish = error => { if (error) reject(error); else { target.remindersSettings.remindersFolderPath = folder; resolve(); } };
+	}));
+	vi.doMock('../../plugin-integration', () => ({ changeReminderFolder }));
+	const { renderRemindersSettings } = await import('./settings-section');
+	const plugin = { app: {}, settings: { workerUrl: '' }, remindersSettings: { enabled: false, confirmed: true, remindersFolderPath: 'Reminders' } };
+	const rerender = vi.fn();
+	renderRemindersSettings({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender });
+	const input = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Reminders folder')!.texts[0]!.inputEl;
+
+	input.value = 'Tasks/';
+	input.blur();
+	expect(input.disabled).toBe(true);
+	input.blur(); // Before: a second blur started another folder change.
+	finish();
+	await flush();
+	expect(changeReminderFolder).toHaveBeenCalledExactlyOnceWith(plugin, 'Tasks');
+	expect(input).toMatchObject({ value: 'Tasks', disabled: false });
+	expect(rerender).toHaveBeenCalledOnce();
+
+	input.value = 'Archive';
+	input.blur();
+	finish(new Error('Invalid reminders folder'));
+	await flush();
+	expect(noticeMessages).toContain('Failed to update reminders folder: Invalid reminders folder');
+	expect(input.value).toBe('Tasks');
 });

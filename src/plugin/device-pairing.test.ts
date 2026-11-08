@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
 	requests: [] as Array<{ path: string; body: string }>,
 	exchange: vi.fn<() => Promise<unknown>>(),
-	capabilities: ['device-pairing-v1'],
 	configure: vi.fn(async () => ({ success: true })),
 	encryption: vi.fn(async (): Promise<{ mode: string } | null> => null),
 	confirm: vi.fn(async () => true),
@@ -28,7 +27,6 @@ vi.mock('../sync/worker-api/http', () => {
 		HttpError,
 		WorkerApiHttpClient: class {
 			setAbortSignal() {}
-			async getServerInfo() { return { capabilities: mocks.capabilities }; }
 			async requestJson(path: string, options: { body: string }) { mocks.requests.push({ path, body: options.body }); return mocks.exchange(); }
 		},
 	};
@@ -56,7 +54,6 @@ let plugin = createPlugin();
 beforeEach(() => {
 	plugin = createPlugin();
 	mocks.requests.length = 0; mocks.notices.length = 0;
-	mocks.capabilities = ['device-pairing-v1'];
 	mocks.exchange.mockReset().mockResolvedValue({ tokenId: 'token-id', deployment });
 	mocks.configure.mockClear(); mocks.encryption.mockReset().mockResolvedValue(null); mocks.confirm.mockClear(); mocks.keysModal.mockClear();
 	mocks.replacement.mockReset().mockReturnValue(false);
@@ -80,7 +77,6 @@ describe('redeemDevicePairing', () => {
 
 	it.each([
 		['an already connected vault', () => { plugin = createPlugin(true); }, 'already connected'],
-		['a server without pairing', () => { mocks.capabilities = []; }, 'Update the server'],
 		['a different server identity', () => { mocks.exchange.mockResolvedValue({ tokenId: 'id', deployment: { ...deployment, workerName: 'crate-fedcba9876543210' } }); }, 'unexpected identity'],
 	])('refuses %s without saving a connection', async (_label, arrange, message) => {
 		arrange();

@@ -11,7 +11,6 @@ import {
 	PAIR_DEVICE_JS,
 	PWA_APP_JS,
 	PWA_CLIENT_ASSETS,
-	PWA_THEME_BOOTSTRAP_JS,
 	SERVICE_WORKER_JS,
 	createManifestJson,
 	createPwaHtml,
@@ -105,10 +104,6 @@ export function handlePwaClientAsset(request: Request, fileName: string): Respon
 	return source === undefined
 		? new Response('Not found', { status: 404, headers: staticAssetHeaders() })
 		: javascriptAssetResponse(request, source);
-}
-
-export function handlePwaThemeBootstrap(request: Request): Response {
-	return javascriptAssetResponse(request, PWA_THEME_BOOTSTRAP_JS);
 }
 
 export function handleManifest(request: Request): Response {

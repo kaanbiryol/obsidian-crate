@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { assignPlainPaths } from './sync';
+import { assignPlainPaths } from './path-index';
 
 it('keeps distinct names and their server order', () => {
 	expect(assignPlainPaths([{ path: 'a.md', wire: 'w/1' }, { path: 'b.md', wire: 'w/2' }], [false, true]))

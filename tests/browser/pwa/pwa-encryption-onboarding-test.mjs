@@ -32,11 +32,10 @@ await mkdir('.generated/encryption-onboarding', { recursive: true });
 async function contextFor(browser, { installed = false, reading = false, mobile = true, cookies = [], userAgent = iphone } = {}) {
   const context = await browser.newContext({ serviceWorkers: 'block', reducedMotion: 'reduce', viewport: { width: 390, height: 844 }, ...(mobile ? { userAgent, hasTouch: true } : {}) });
   if (installed) await context.addInitScript(() => Object.defineProperty(navigator, 'standalone', { value: true }));
-  if (reading) await context.addInitScript(folderPath => {
-    if (!localStorage.getItem('crate-reading-session-v1')) localStorage.setItem('crate-reading-session-v1', JSON.stringify({
-      token: 'preview-reading-token', id: 'reading-test', folderPath, generation: 'policy', expiresAt: Date.now() + 600000,
-    }));
-  }, readingFolder.wire);
+  // Reading signs in with the app credential that the install handoff provides.
+  if (reading) await context.route('**/reading/session', route => route.fulfill({ json: {
+    id: 'reading-test', folderPath: readingFolder.wire, generation: 'policy', expiresAt: Date.now() + 600000,
+  } }));
   await context.addCookies(cookies);
   await context.route('**/notifications/preview-session.js', route => route.fulfill({ contentType: 'application/javascript', body: '' }));
   await context.route('**/encryption', route => route.fulfill({ json: remindersEncryption }));
@@ -97,7 +96,7 @@ try {
       } finally { await safari.close(); }
 
       for (const reading of [false, true]) {
-        const context = await contextFor(browser, { installed: true, reading, cookies: reading ? [] : installCookies });
+        const context = await contextFor(browser, { installed: true, reading, cookies: installCookies });
         try {
           const page = await context.newPage();
           const url = `${origin}/notifications?${reading ? 'section=reading' : 'tab=inbox'}`;

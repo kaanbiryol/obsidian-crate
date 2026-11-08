@@ -85,7 +85,8 @@ export class SyncTransportError extends Error {
 function throwForErrorResponse(response: ApiHttpResponse, method: string, path: string): void {
 	if (response.status < 400) return;
 	const details = parseErrorDetails(response.status, response.text);
-	logger.error(`Request failed: ${method} ${path} -> ${details.message}`);
+	// Error logs are always on, and a query can carry a plaintext vault path.
+	logger.error(`Request failed: ${method} ${path.split('?')[0]} -> ${details.message}`);
 	throw new HttpError(
 		details.message,
 		response.status,
@@ -378,7 +379,7 @@ export class WorkerApiHttpClient {
 	private async requestChecked(path: string, options: ApiRequestOptions, timeout: number, logSuffix = ''): Promise<ApiHttpResponse> {
 		const generation = this.requestGeneration;
 		const method = options.method ?? 'GET';
-		logger.info(`${method} ${path}${logSuffix}`);
+		logger.info(`${method} ${path.split('?')[0]}${logSuffix}`);
 		const response = await this.runRequest(path, options, timeout);
 		this.assertRequestCurrent(generation);
 		throwForErrorResponse(response, method, path);

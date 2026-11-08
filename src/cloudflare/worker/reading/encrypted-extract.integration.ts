@@ -12,7 +12,7 @@ const article = '<!doctype html><html><head><title>Confidential title</title></h
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 
-async function setup(encrypted = true, scope = 'reading', fetching = true) {
+async function setup(encrypted = true, scope = 'reminders', fetching = true) {
 	const { state } = await createEncryptionFixture('active');
 	await env.DB.batch([
 		...(encrypted ? [env.DB.prepare('INSERT INTO server_state(id,encryption) VALUES (1,?)').bind(JSON.stringify(state))] : []),
@@ -75,7 +75,7 @@ it('stays closed to unencrypted folders, capture-only credentials and invalid li
 });
 
 it('refuses to download while article fetching is off, so the web app keeps a bookmark', async () => {
-	const { fetch, extract } = await setup(true, 'reading', false);
+	const { fetch, extract } = await setup(true, 'reminders', false);
 	const response = await extract(link);
 	expect(response.status).toBe(403);
 	expect(await response.json()).toMatchObject({ code: 'reading_fetching_off' });

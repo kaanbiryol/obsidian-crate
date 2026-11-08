@@ -1,7 +1,7 @@
 import { capturePath } from './captures';
 import { updatePolicy } from './access';
 import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
-import { readingUrl, readingUrlIdentity } from '@/reading/core/model';
+import { MAX_READING_TITLE_LENGTH, readingUrl, readingUrlIdentity } from '@/reading/core/model';
 import { planReadingFileCommand, readingFileCommandRefusal } from '@/reading/core/reading-file-command';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { sha256Hex } from '@/platform/sha256';
@@ -23,7 +23,7 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	if (action === 'capture') {
 		if (body.destinationFolder !== undefined && body.destinationFolder !== current.folder_path) throw new ReadingError('The Reading folder changed. Restore the original destination to finish this save.', 409);
 		let url: string; try { url = readingUrl(body.url); } catch { throw new ReadingError('Enter a complete HTTP or HTTPS link without credentials.'); }
-		if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 1000)) throw new ReadingError('Use a title shorter than 1,000 characters.');
+		if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > MAX_READING_TITLE_LENGTH)) throw new ReadingError('Use a title shorter than 1,000 characters.');
 		// Saving a full article is the library user's explicit request to download its text.
 		if (!current.enabled && body.fetchArticle === true && principal.scope !== 'reading_capture') {
 			await updatePolicy(env.DB, { enabled: true, folderPath: current.folder_path, revision: current.revision });

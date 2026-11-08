@@ -16,6 +16,8 @@ interface ApiRoutePolicy {
 	readonly duringEncryptionReset?: true;
 	/** A GET an encrypted vault serves without its keys: public feature state, not vault content. */
 	readonly keylessEncryptedRead?: true;
+	/** Rejected, for any method on this path, in an encrypted vault: encrypted clients use other routes. */
+	readonly plaintextOnly?: true;
 	/** Answered before authentication by `routes/public.ts`, so no token scope applies. */
 	readonly public?: true;
 }
@@ -29,8 +31,8 @@ const READING_GRANT = { kind: 'reading-grant' } as const;
 
 const VAULT: readonly Scope[] = ['vault'];
 const REMINDERS: readonly Scope[] = ['vault', 'reminders'];
-const LIBRARY: readonly Scope[] = ['vault', 'reminders', 'reading'];
-const ALL_SCOPES: readonly Scope[] = ['vault', 'reminders', 'reading', 'reading_capture'];
+const LIBRARY: readonly Scope[] = ['vault', 'reminders'];
+const ALL_SCOPES: readonly Scope[] = ['vault', 'reminders', 'reading_capture'];
 const PUBLIC = { scopes: [], public: true } as const;
 
 /** Worker-local admission, token scope and execution policy. Dispatch, folder
@@ -75,18 +77,18 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /sync/version-preview': { scopes: VAULT },
 	'GET /sync/versions': { scopes: VAULT },
 	'POST /sync/checkpoints': { scopes: VAULT, execution: COORDINATOR_READ },
-	'POST /sync/import': { scopes: VAULT },
-	'POST /sync/import/complete': { scopes: VAULT, execution: COORDINATOR },
-	'POST /sync/import/readiness': { scopes: VAULT },
-	'POST /sync/import/prune': { scopes: VAULT, execution: COORDINATOR },
-	'POST /sync/import/upload': { scopes: VAULT },
+	'POST /sync/import': { scopes: VAULT, plaintextOnly: true },
+	'POST /sync/import/complete': { scopes: VAULT, execution: COORDINATOR, plaintextOnly: true },
+	'POST /sync/import/readiness': { scopes: VAULT, plaintextOnly: true },
+	'POST /sync/import/prune': { scopes: VAULT, execution: COORDINATOR, plaintextOnly: true },
+	'POST /sync/import/upload': { scopes: VAULT, plaintextOnly: true },
 	'POST /sync/metadata': { scopes: VAULT },
 	'POST /sync/batch-upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncBatchUpload } },
 	'POST /sync/batch-download': { scopes: VAULT },
 	'POST /sync/batch-delete': { scopes: VAULT, execution: COORDINATOR },
 	'POST /sync/restore-version': { scopes: VAULT, execution: COORDINATOR },
 	'PUT /sync/upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncUpload } },
-	'PUT /sync/import/upload': { scopes: VAULT },
+	'PUT /sync/import/upload': { scopes: VAULT, plaintextOnly: true },
 	'POST /notifications/reminders-exchange': { ...PUBLIC, rateLimit: 10 },
 	'POST /auth/device-pairing': { ...PUBLIC, rateLimit: 10 },
 	'POST /notifications/reminders-enrollment-token': { scopes: VAULT, execution: COORDINATOR_READ, rateLimit: 10 },
@@ -96,29 +98,29 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'GET /notifications/vapid-public-key': { ...PUBLIC },
 	'GET /notifications/subscriptions': { scopes: VAULT },
 	'DELETE /notifications/subscribe': { scopes: REMINDERS, execution: COORDINATOR_READ, rateLimit: 30 },
-	'GET /reminders/list': { scopes: REMINDERS, initializeProjection: true },
-	'DELETE /reminders/delete': { scopes: REMINDERS, execution: COORDINATOR },
-	'POST /reminders/create': { scopes: REMINDERS, execution: COORDINATOR },
-	'POST /reminders/update': { scopes: REMINDERS, execution: COORDINATOR },
-	'POST /reminders/set-completed': { scopes: REMINDERS, execution: COORDINATOR },
-	'POST /reminders/reorder': { scopes: REMINDERS, execution: COORDINATOR },
+	'GET /reminders/list': { scopes: REMINDERS, initializeProjection: true, plaintextOnly: true },
+	'DELETE /reminders/delete': { scopes: REMINDERS, execution: COORDINATOR, plaintextOnly: true },
+	'POST /reminders/create': { scopes: REMINDERS, execution: COORDINATOR, plaintextOnly: true },
+	'POST /reminders/update': { scopes: REMINDERS, execution: COORDINATOR, plaintextOnly: true },
+	'POST /reminders/set-completed': { scopes: REMINDERS, execution: COORDINATOR, plaintextOnly: true },
+	'POST /reminders/reorder': { scopes: REMINDERS, execution: COORDINATOR, plaintextOnly: true },
 	'GET /reminders/notification-policy': { scopes: VAULT },
 	'POST /reminders/notification-policy': { scopes: VAULT, execution: COORDINATOR },
 	'PUT /reminders/notification-policy': { scopes: VAULT, execution: COORDINATOR },
-	'POST /reading/handoff': { scopes: VAULT, execution: READING_GRANT, rateLimit: 30 },
+	'POST /reading/handoff': { scopes: VAULT, execution: READING_GRANT, rateLimit: 30, plaintextOnly: true },
 	'POST /reading/shortcut-pairing': { scopes: LIBRARY, execution: COORDINATOR_READ, rateLimit: 5 },
-	'POST /reading/capture': { scopes: ALL_SCOPES, execution: COORDINATOR, rateLimit: 30 },
-	'POST /reading/update': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 60 },
-	'POST /reading/retry': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 10 },
-	'POST /reading/delete': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 30 },
+	'POST /reading/capture': { scopes: ALL_SCOPES, execution: COORDINATOR, rateLimit: 30, plaintextOnly: true },
+	'POST /reading/update': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 60, plaintextOnly: true },
+	'POST /reading/retry': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 10, plaintextOnly: true },
+	'POST /reading/delete': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 30, plaintextOnly: true },
 	'POST /reading/policy': { scopes: VAULT, execution: COORDINATOR, rateLimit: 10 },
 	'GET /reading/policy': { scopes: VAULT },
 	'GET /reading/session': { scopes: LIBRARY, keylessEncryptedRead: true },
 	// Plaintext list and item reads authenticate here and answer a complete index from one D1
 	// snapshot. An index rebuild, which writes, and full list pages run under the coordinator
 	// lock (see `reading/library-read.ts`); they wake notification processing only when a rebuild ran.
-	'GET /reading/list': { scopes: LIBRARY },
-	'GET /reading/item': { scopes: LIBRARY },
+	'GET /reading/list': { scopes: LIBRARY, plaintextOnly: true },
+	'GET /reading/item': { scopes: LIBRARY, plaintextOnly: true },
 	[`POST ${shortcut.preparePath}`]: { scopes: ['reading_capture'], execution: COORDINATOR, rateLimit: 30 },
 	[`POST ${shortcut.exchangePath}`]: { scopes: VAULT, execution: READING_GRANT, rateLimit: 10 },
 };
@@ -127,6 +129,7 @@ const flaggedPaths = (flag: (policy: ApiRoutePolicy) => unknown): readonly strin
 	[...new Set(Object.entries(routes).flatMap(([key, policy]) => policy && flag(policy) ? [key.split(' ')[1]!] : []))];
 export const ENCRYPTION_RESET_PATHS = flaggedPaths(policy => policy.duringEncryptionReset);
 export const KEYLESS_ENCRYPTED_READ_PATHS = flaggedPaths(policy => policy.keylessEncryptedRead);
+export const PLAINTEXT_ONLY_PATHS = flaggedPaths(policy => policy.plaintextOnly);
 export const rateLimitedActions: ReadonlyMap<string, number> = new Map(Object.entries(routes)
 	.flatMap(([key, policy]) => policy?.rateLimit ? [[key, policy.rateLimit] as const] : []));
 

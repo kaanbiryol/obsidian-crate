@@ -28,7 +28,7 @@ async function setup(mode: 'active' | 'resetting' = 'active') {
 		env.DB.prepare('INSERT INTO server_state(id,encryption) VALUES (1,?)').bind(JSON.stringify(state)),
 		env.DB.prepare('INSERT INTO maintenance_state(key,value) VALUES (?,?)').bind(`e2ee:folder:${folder.wire}`, folder.label),
 		env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,?,'policy','revision')").bind(folder.wire),
-		env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES ('reader',?,'reading',?,'policy')").bind(await sha256Hex('reader-token'), folder.wire),
+		env.DB.prepare("INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES ('reader',?,'reminders',?,'policy')").bind(await sha256Hex('reader-token'), folder.wire),
 	]);
 	const headers = { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '1', 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) };
 	const request = (path: string, body?: string) => worker.fetch(new Request('https://test' + path, { method: body ? 'POST' : 'GET', headers, body }), env);

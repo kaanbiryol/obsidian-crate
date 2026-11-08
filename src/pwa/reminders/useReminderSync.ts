@@ -185,6 +185,8 @@ export function useReminderSync({
 			const sessionCurrent = () => lifetime.active && session();
 			if (!sessionCurrent()) return;
 			const readToken = requestCoordinatorRef.current.beginRead();
+			// A local change, an invalidation or a newer read leaves this one unusable for good.
+			const readApplies = () => sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken);
 			if (options.silent) setRefreshing(true);
 			else setLoading(true);
 			setError(null);
@@ -196,16 +198,15 @@ export function useReminderSync({
 					path,
 					headers,
 					(remaining, total) => {
-						if (sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken)) {
-							setIndexingProgress({ indexedFiles: Math.max(0, total - remaining), totalFiles: total });
-						}
+						if (readApplies()) setIndexingProgress({ indexedFiles: Math.max(0, total - remaining), totalFiles: total });
 					},
 					// Only the first read after startup waits here; others dispatch at once.
 					startupRef.current ? await takeStartupRead(requestKey, path, headers) : undefined,
+					readApplies,
 				);
 				if (response.status !== 304 && !response.ok) throw new Error((await responseError(response, 'Could not load reminders.')).message);
 				const body: unknown = response.status === 304 ? undefined : await response.json().catch(() => null);
-				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				if (!readApplies()) return;
 				const outcome = decideReminderListResponse({ status: response.status, headers: response.headers, body },
 					{ folderPath: config.folderPath, confirmed: snapshotRef.current.reminders, since, lastCheckedAt: cursor.lastCheckedAt });
 				if (outcome.kind === 'not-modified') {
@@ -232,9 +233,9 @@ export function useReminderSync({
 				setIssues(outcome.result.issues);
 				void commitConfirmedSnapshot(outcome.result.reminders, outcome.result.projects, { etag: outcome.etag, deltaBase: outcome.deltaBase });
 			} catch (loadError) {
-				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				if (!readApplies()) return;
 				const cached = needsDiskFallback(cursor.lastCheckedAt) ? await loadCachedReminderSnapshot(config.folderPath) : undefined;
-				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				if (!readApplies()) return;
 				const outcome = decideReminderListFailure(loadError, { lastCheckedAt: cursor.lastCheckedAt, cached });
 				if (outcome.kind === 'keep-stale') setDataMode('cached');
 				else if (outcome.kind === 'hydrate-cache') hydrateCachedSnapshot(outcome.cached);

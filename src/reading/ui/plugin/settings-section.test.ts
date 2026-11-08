@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { FakeElement, MockSetting, openSettingsDisclosures, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
 
 const request = vi.fn();
-const validate = vi.fn();
+const changeReadingFolder = vi.fn();
 const confirm = vi.fn(async (_app: unknown, _options: { message: string }) => true);
 const policy = { enabled: 1, folder_path: 'Articles', generation: 'g', revision: 'r' };
 
@@ -10,7 +10,7 @@ beforeEach(() => {
 	vi.doMock('../../../ui/settings/folder-suggest', () => ({ FolderSuggest: class { close() {} } }));
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isDesktopApp: true } }));
 	vi.doMock('../../../plugin/server-request', async () => ({ ...await vi.importActual<typeof import('../../../plugin/server-request')>('../../../plugin/server-request'), serverRequest: request }));
-	vi.doMock('../../runtime', () => ({ restartReading: vi.fn(), validateReadingConfiguration: validate }));
+	vi.doMock('../../runtime', () => ({ restartReading: vi.fn(), changeReadingFolder }));
 	vi.doMock('../../../ui/plugin/confirmation-modal', () => ({ openConfirmationModal: confirm }));
 	request.mockImplementation(async () => ({ policy }));
 });
@@ -24,7 +24,7 @@ afterEach(() => {
 	vi.doUnmock('../../../ui/plugin/confirmation-modal');
 	request.mockReset();
 	confirm.mockClear();
-	validate.mockReset();
+	changeReadingFolder.mockReset();
 });
 
 async function setup(connected = true, enabled = true, confirmed = true) {
@@ -105,38 +105,21 @@ it('keeps the feature enabled if saving its preference fails', async () => {
  expect(noticeMessages).toContain('Disk unavailable');
 });
 
-it.each(['read', 'pause', 'update'])('does not continue a folder change after switching servers during %s', async step => {
- const { plugin } = await setup();
- const calls = { read: 1, pause: 2, update: 3 };
- request.mockImplementation(async () => {
-	if (request.mock.calls.length === calls[step as keyof typeof calls]) plugin.settings.workerUrl = 'https://replacement.example';
-	return { policy: { ...policy } };
- });
+// The folder change sequence itself is covered with changeReadingFolder in reading/runtime.test.ts.
+it('commits the Reading folder through the shared folder change and shows why one fails', async () => {
+ const { plugin, rerender } = await setup();
  const folder = MockSetting.instances.find(row => row.nameEl.textContent === 'Reading folder')!.texts[0]!;
+ changeReadingFolder.mockImplementationOnce(async (_plugin: unknown, folderPath: string) => { plugin.settings.reading = { ...plugin.settings.reading, folderPath }; });
  folder.inputEl.value = 'New reading';
  folder.inputEl.blur();
- await vi.waitFor(() => expect(noticeMessages.some(message => message.includes('connection changed'))).toBe(true));
- expect(request).toHaveBeenCalledTimes(calls[step as keyof typeof calls]);
- expect(plugin.writeSettings).not.toHaveBeenCalled();
- const { restartReading } = await import('../../runtime');
- expect(restartReading).not.toHaveBeenCalled();
-});
+ await vi.waitFor(() => expect(rerender).toHaveBeenCalledOnce());
+ expect(changeReadingFolder).toHaveBeenCalledExactlyOnceWith(plugin, 'New reading');
+ expect(folder.inputEl.value).toBe('New reading');
 
-it('keeps a pause made while a folder change waits for the server', async () => {
- const { plugin, toggle } = await setup();
- let release = () => {};
- request.mockImplementation(async (_plugin: unknown, path: string, body?: unknown) => {
-	if (path === '/features') return body ? { reading: false, reminders: true, revision: 'f2' } : { reading: true, reminders: true, revision: 'f1' };
-	if (!body) return new Promise(resolve => { release = () => resolve({ policy: { ...policy } }); });
-	return { policy: { ...policy } };
- });
- const folder = MockSetting.instances.find(row => row.nameEl.textContent === 'Reading folder')!.texts[0]!;
- folder.inputEl.value = 'New reading';
+ changeReadingFolder.mockRejectedValueOnce(new Error('The server connection changed. Reopen settings and try again.'));
+ folder.inputEl.value = 'Other';
  folder.inputEl.blur();
- await vi.waitFor(() => expect(request).toHaveBeenCalledWith(plugin, '/reading/policy'));
- toggle.change(false);
- await vi.waitFor(() => expect(plugin.settings.reading.enabled).toBe(false));
- release();
- await vi.waitFor(() => expect(plugin.settings.reading.folderPath).toBe('New reading'));
- expect(plugin.settings.reading).toEqual({ enabled: false, folderPath: 'New reading', confirmed: true });
+ await vi.waitFor(() => expect(noticeMessages).toContain('The server connection changed. Reopen settings and try again.'));
+ expect(folder.inputEl).toMatchObject({ value: 'New reading', disabled: false });
+ expect(rerender).toHaveBeenCalledOnce();
 });

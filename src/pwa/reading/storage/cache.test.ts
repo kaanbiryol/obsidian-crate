@@ -4,6 +4,7 @@ import { cacheReadingArticle, commitReadingCache, readingArticlesToPrefetch } fr
 import { isReadingCache } from './storage-validation';
 import { decodeReadingValue } from './private-storage';
 import { READING_SESSION_KEY, type ReadingSession } from '../session/session';
+import { AUTH_TOKEN_KEY } from '../../config';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('./private-storage', async importOriginal => {
@@ -35,7 +36,7 @@ const articleDecodes = () => vi.mocked(decodeReadingValue).mock.calls.filter(([k
 
 beforeEach(() => {
 	values.clear(); vi.mocked(decodeReadingValue).mockClear(); vi.mocked(isReadingCache).mockClear();
-	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : null });
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : key === AUTH_TOKEN_KEY ? session.token : null });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 

@@ -4,8 +4,6 @@ import { BACKUPS_PREFIX } from '../protocol/storage-keys';
 import { isCrateResourceName } from '../protocol/server-build';
 import { BACKUP_OBJECT } from './restore/archive';
 export { CloudflareApiError } from './cloudflare-api-error';
-import { verifyWorkerDeployment } from './deployment/verify-worker';
-import { deleteResetWorkerObjects, verifyResetWorker } from './server-reset/reset-worker-client';
 import type { CloudflareDeploymentArtifacts } from './deployment/artifacts';
 import { API_BASE_URL, parseJsonObject, wait, type HttpRequest, type HttpTransport, type Sleep } from './http';
 
@@ -117,12 +115,14 @@ export interface CloudflareApiOptions {
 }
 
 export class CloudflareApiClient {
-	private readonly sleep: Sleep;
+	/** Waits used by this client; requests to deployed Workers reuse it with `transport`. */
+	readonly sleep: Sleep;
 	private nextBulkRequestAt = 0;
 
 	constructor(
 		private readonly accessToken: string,
-		private readonly transport: HttpTransport,
+		/** Carries Cloudflare API requests and, without the access token, requests to deployed Workers. */
+		readonly transport: HttpTransport,
 		options: CloudflareApiOptions = {},
 	) {
 		this.sleep = options.sleep ?? wait;
@@ -288,14 +288,6 @@ export class CloudflareApiClient {
 		});
 	}
 
-	async deleteR2Objects(origin: string, resetId: string, token: string, keys: string[]): Promise<void> {
-		await deleteResetWorkerObjects(this.transport, origin, resetId, token, keys);
-	}
-
-	async verifyResetWorker(origin: string, resetId: string, requireRecoveryObjects = false, uploadTag?: string): Promise<boolean> {
-		return verifyResetWorker(this.transport, origin, resetId, requireRecoveryObjects, uploadTag, this.sleep);
-	}
-
 	async deleteR2Bucket(accountId: string, bucketName: string): Promise<void> {
 		await this.request(apiPath`/accounts/${accountId}/r2/buckets/${bucketName}`, { method: 'DELETE' });
 	}
@@ -349,14 +341,6 @@ export class CloudflareApiClient {
 			headers: { 'Content-Type': multipart.contentType },
 			body: multipart.body,
 		}, false);
-	}
-
-	async verifyWorkerDeployment(origin: string, fingerprint: string): Promise<void> {
-		await verifyWorkerDeployment(this.transport, origin, fingerprint, false, this.sleep);
-	}
-
-	async verifyPublishedWorkerDeployment(origin: string, fingerprint: string): Promise<{ revision: number; schemaVersion: number; developmentBuild?: import('../protocol/server-build').DevelopmentBuild }> {
-		return verifyWorkerDeployment(this.transport, origin, fingerprint, true, this.sleep);
 	}
 
 	async updateWorkerSchedules(accountId: string, workerName: string, crons: string[]): Promise<void> {

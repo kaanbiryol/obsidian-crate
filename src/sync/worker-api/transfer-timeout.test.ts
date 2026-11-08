@@ -25,7 +25,7 @@ function json(value: unknown, headers: Record<string, string> = {}): ApiHttpResp
 function slowHttp(seconds: number, answer: (url: string) => ApiHttpResponse) {
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		if (request.url.endsWith('/.well-known/crate')) {
-			return json({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
+			return json({ service: 'crate', serverVersion: 'test', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
 		}
 		await new Promise(resolve => setTimeout(resolve, seconds * 1000));
 		return answer(request.url);

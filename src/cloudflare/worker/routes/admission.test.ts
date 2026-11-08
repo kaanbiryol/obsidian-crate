@@ -6,7 +6,7 @@ import { isAuthenticatedRouteAllowed } from '../router';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 import { requestAdmissionKind } from './admission';
 
-const scopes: AuthPrincipal['scope'][] = ['vault', 'reminders', 'reading', 'reading_capture'];
+const scopes: AuthPrincipal['scope'][] = ['vault', 'reminders', 'reading_capture'];
 
 it.each([
 	['GET', '/sync/manifest', ['vault'], undefined],
@@ -15,8 +15,8 @@ it.each([
 	['PUT', '/sync/upload', ['vault'], { kind: 'transfer', path: '/sync-upload' }],
 	['PUT', '/settings', ['vault'], { kind: 'coordinator', wake: false }],
 	['GET', '/encryption', ['vault', 'reminders'], undefined],
-	['GET', '/encryption/pairing', ['vault', 'reminders', 'reading'], undefined],
-	['POST', '/encryption/pairing', ['vault', 'reminders', 'reading'], undefined],
+	['GET', '/encryption/pairing', ['vault', 'reminders'], undefined],
+	['POST', '/encryption/pairing', ['vault', 'reminders'], undefined],
 	['GET', '/encryption/reset', ['vault'], { kind: 'coordinator', wake: false }],
 	['POST', '/encryption/reset', ['vault'], { kind: 'coordinator', wake: true }],
 	['POST', '/reminders/encrypted-commit', ['vault', 'reminders'], { kind: 'coordinator', wake: true }],
@@ -28,16 +28,16 @@ it.each([
 	['POST', '/notifications/subscribe', ['vault', 'reminders'], { kind: 'coordinator', wake: false }],
 	['DELETE', '/notifications/subscribe', ['vault', 'reminders'], { kind: 'coordinator', wake: false }],
 	['POST', '/notifications/reminders-enrollment-token', ['vault'], { kind: 'coordinator', wake: false }],
-	['GET', '/features', ['vault', 'reminders', 'reading'], undefined],
+	['GET', '/features', ['vault', 'reminders'], undefined],
 	['POST', '/features', ['vault'], { kind: 'coordinator', wake: true }],
 	['DELETE', '/auth/tokens', ['vault'], { kind: 'coordinator', wake: false }],
-	['DELETE', '/auth/session', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
-	['GET', '/reading/list', ['vault', 'reminders', 'reading'], undefined],
-	['GET', '/reading/encrypted-file', ['vault', 'reminders', 'reading'], undefined],
-	['GET', '/reading/session', ['vault', 'reminders', 'reading'], undefined],
+	['DELETE', '/auth/session', ['vault', 'reminders'], { kind: 'coordinator', wake: false }],
+	['GET', '/reading/list', ['vault', 'reminders'], undefined],
+	['GET', '/reading/encrypted-file', ['vault', 'reminders'], undefined],
+	['GET', '/reading/session', ['vault', 'reminders'], undefined],
 	['GET', '/reading/policy', ['vault'], undefined],
 	['POST', '/reading/capture', scopes, { kind: 'coordinator', wake: true }],
-	['POST', '/reading/shortcut-pairing', ['vault', 'reminders', 'reading'], { kind: 'coordinator', wake: false }],
+	['POST', '/reading/shortcut-pairing', ['vault', 'reminders'], { kind: 'coordinator', wake: false }],
 	['POST', shortcut.preparePath, ['reading_capture'], { kind: 'coordinator', wake: true }],
 ] as const)('%s %s enforces admission, scopes and execution', (method, path, allowed, execution) => {
 	const request = new Request(`https://test${path}`, { method });

@@ -1,6 +1,11 @@
 import type { SettingsSnapshot } from '../settings/settings-store';
 import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 
+/** A paused feature's label: the work it keeps on this device, if any. */
+export function pausedFeatureLabel(pendingCount: number): string {
+	return pendingCount ? `Paused: ${pendingCount} ${pendingCount === 1 ? 'change' : 'changes'} saved on this device` : 'Paused';
+}
+
 /** Readiness is about durable data, including paused features, never screen mounting. */
 export function pwaSyncState(snapshot: Pick<SettingsSnapshot, 'reading' | 'reminders'>) {
 	const entries = [ ['reminders', snapshot.reminders], ['reading', snapshot.reading] ] as const;

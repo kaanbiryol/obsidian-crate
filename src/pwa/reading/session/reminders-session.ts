@@ -53,10 +53,9 @@ export async function connectReadingFromReminders(): Promise<{ session: ReadingS
 	}
 	const day = typeof data.day === 'number' && Number.isSafeInteger(data.day) && data.day >= 0 ? data.day : undefined;
 	const existing = readingSession();
-	if (existing && existing.source !== 'reminders') return { session: existing };
 	if (existing?.token === token && existing.generation === data.generation) return { session: existing, day };
 	const next: ReadingSession = { token, id: `reminders:${data.id}:${data.generation}`, folderPath: data.folderPath,
-		generation: data.generation, expiresAt: data.expiresAt, source: 'reminders' };
+		generation: data.generation, expiresAt: data.expiresAt };
 	localStorage.setItem(READING_SESSION_KEY, JSON.stringify(next));
 	window.dispatchEvent(new Event(READING_CHANGED_EVENT));
 	return { session: next, day };

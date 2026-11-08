@@ -28,8 +28,8 @@ marker resumes this phase after a restart without uploading unchanged files.
 Reminder errors keep setup incomplete and are surfaced to the user; reminders
 already overdue when first indexed do not receive catch-up notifications. Later
 syncs use the normal change history and recovery receipts. Late import requests
-cannot change a completed vault. Existing vaults and older servers retain the
-normal upload path.
+cannot change a completed vault. Existing vaults and encrypted servers, which do
+not offer the import, use the normal upload path.
 
 Reminder settings retry in the background during established file syncs and periodic
 checks; a failed or slow settings request does not block file transfers. First-time
@@ -138,26 +138,26 @@ write during other phases.
 
 Request statistics include all requests in that sync, including failures, rather
 than only the last 50 diagnostic records. Combined request durations include
-concurrent waiting and must not be added to elapsed phase times. Updated servers
-report request handling duration using `Server-Timing`; older servers leave that
-measurement unavailable. This measures server elapsed time, not CPU time. The
+concurrent waiting and must not be added to elapsed phase times. The Worker
+reports request handling duration using `Server-Timing`; a response without it
+leaves that measurement unavailable. This measures server elapsed time, not CPU time. The
 client does not claim to measure pure network transit time separately.
 
 These summaries are stored in local sync history and add no telemetry requests.
 
-Updated servers also return `X-Crate-D1-Usage` with D1's `rows_read` and
+Servers also return `X-Crate-D1-Usage` with D1's `rows_read` and
 `rows_written` metadata and the number of D1 queries, counted as Cloudflare's
 per-invocation limit counts them (a `db.batch()` is one query). Local history and
 exported diagnostics aggregate these as `timings.requests.d1`: `rowsRead`,
 `rowsWritten`, `reportedRequests`, `completeRequests` and `queries`, and each
 logged request records its own `d1Queries`. Internal synchronous coordinator
-requests are included once, so a request's count can span two invocations. Older
-servers omit the query count. The meter wraps the existing statements; it adds no
+requests are included once, so a request's count can span two invocations. A header
+without the query count is ignored. The meter wraps the existing statements; it adds no
 database operations.
 
 These are observed request costs, not the account's billing total. Background
-reminder processing and maintenance run separately. Lost responses, older servers,
-or database failures can leave usage unreported; compare `completeRequests` with
+reminder processing and maintenance run separately. Lost responses or database
+failures can leave usage unreported; compare `completeRequests` with
 the request count before treating a sync's request coverage as complete. Even with
 complete request coverage, background work and other devices remain outside it.
 

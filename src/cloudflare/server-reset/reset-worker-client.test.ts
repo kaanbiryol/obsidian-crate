@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CloudflareApiClient } from '../cloudflare-api';
 import type { HttpTransport } from '../http';
 import { sha256Hex } from '../../platform/sha256';
+import { deleteResetWorkerObjects, verifyResetWorker } from './reset-worker-client';
 
 const origin = 'https://crate-0123456789abcdef.example.workers.dev';
 const resetId = 'a'.repeat(32), token = 'b'.repeat(64);
@@ -13,7 +14,7 @@ const metadata = { service: 'crate-reset', protocol: 1, resetId };
 it('sends a single bulk request with a cleanup credential and preserves exact keys', async () => {
 	const response = { ...metadata, batchHash: await sha256Hex(JSON.stringify(keys)), deleted: keys.length };
 	const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify(response) }));
-	await new CloudflareApiClient('account-management-secret', transport).deleteR2Objects(origin, resetId, token, keys);
+	await deleteResetWorkerObjects(new CloudflareApiClient('account-management-secret', transport).transport, origin, resetId, token, keys);
 	expect(transport).toHaveBeenCalledExactlyOnceWith(`${origin}/__crate__/reset/objects`, {
 		method: 'POST', body: JSON.stringify(keys), headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
 	});
@@ -24,7 +25,7 @@ it('passes opaque keys unchanged to the terminal deletion helper, including dot 
 	const target = `https://crate-delete-${resetId}.example.workers.dev`, keys = ['../opaque', '__crate__/future/data'];
 	const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ ...metadata,
 		batchHash: await sha256Hex(JSON.stringify(keys)), deleted: keys.length }) }));
-	await new CloudflareApiClient('account-secret', transport).deleteR2Objects(target, resetId, token, keys);
+	await deleteResetWorkerObjects(transport, target, resetId, token, keys);
 	expect(transport.mock.calls[0]![1].body).toBe(JSON.stringify(keys));
 });
 
@@ -33,7 +34,7 @@ it('requires whole-bucket cleanup capability from the terminal helper', async ()
 	const transport = vi.fn<HttpTransport>()
 		.mockResolvedValueOnce({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true }) })
 		.mockResolvedValue({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true, deleteAll: true }) });
-	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(`https://crate-delete-${resetId}.example.workers.dev`, resetId, true);
+	const operation = verifyResetWorker(transport, `https://crate-delete-${resetId}.example.workers.dev`, resetId, true);
 	await vi.runAllTimersAsync(); await expect(operation).resolves.toBe(true);
 	expect(transport).toHaveBeenCalledTimes(2);
 });
@@ -41,25 +42,25 @@ it('requires whole-bucket cleanup capability from the terminal helper', async ()
 it.each([{ deleted: 1 }, { batchHash: 'wrong' }, { resetId: 'other' }, { protocol: 2 }, { service: 'other' }])('rejects mismatched bulk receipts: %j', async changed => {
 	const response = { ...metadata, batchHash: await sha256Hex(JSON.stringify(keys)), deleted: keys.length, ...changed };
 	const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify(response) }));
-	await expect(new CloudflareApiClient('account-secret', transport).deleteR2Objects(origin, resetId, token, keys)).rejects.toThrow('could not be verified');
+	await expect(deleteResetWorkerObjects(transport, origin, resetId, token, keys)).rejects.toThrow('could not be verified');
 	expect(transport).toHaveBeenCalledOnce();
 });
 
 it.each(['https://attacker.example', 'http://crate-0123456789abcdef.example.workers.dev', `${origin}/other`, `${origin}?query=yes`])('never sends credentials to an invalid origin: %s', async target => {
 	const transport = vi.fn<HttpTransport>();
-	await expect(new CloudflareApiClient('account-secret', transport).deleteR2Objects(target, resetId, token, keys)).rejects.toThrow('address');
+	await expect(deleteResetWorkerObjects(transport, target, resetId, token, keys)).rejects.toThrow('address');
 	expect(transport).not.toHaveBeenCalled();
 });
 
 it.each([[], ['../../other'], ['duplicate', 'duplicate'], Array.from({ length: 1001 }, (_, i) => String(i))].map(keys => ({ keys })))('rejects invalid batches before dispatch (%#)', async ({ keys: batch }) => {
 	const transport = vi.fn<HttpTransport>();
-	await expect(new CloudflareApiClient('account-secret', transport).deleteR2Objects(origin, resetId, token, batch)).rejects.toThrow('Invalid cleanup batch');
+	await expect(deleteResetWorkerObjects(transport, origin, resetId, token, batch)).rejects.toThrow('Invalid cleanup batch');
 	expect(transport).not.toHaveBeenCalled();
 });
 
 it('does not retry an uncertain bulk request', async () => {
 	const transport = vi.fn<HttpTransport>().mockRejectedValue(new Error('lost response'));
-	await expect(new CloudflareApiClient('account-secret', transport).deleteR2Objects(origin, resetId, token, keys)).rejects.toThrow('lost response');
+	await expect(deleteResetWorkerObjects(transport, origin, resetId, token, keys)).rejects.toThrow('lost response');
 	expect(transport).toHaveBeenCalledOnce();
 });
 
@@ -69,7 +70,7 @@ it('waits for the matching retirement Worker without forwarding any credentials'
 		.mockResolvedValueOnce({ status: 503, text: 'old retirement Worker' })
 		.mockResolvedValueOnce({ status: 200, text: JSON.stringify({ ...metadata, resetId: 'old' }) })
 		.mockResolvedValue({ status: 200, text: JSON.stringify(metadata) });
-	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(origin, resetId);
+	const operation = verifyResetWorker(transport, origin, resetId);
 	await vi.runAllTimersAsync();
 	await operation;
 	expect(transport).toHaveBeenCalledTimes(3);
@@ -82,7 +83,7 @@ it('waits for the matching retirement Worker without forwarding any credentials'
 it('bounds readiness retries when the old Worker keeps answering', async () => {
 	vi.useFakeTimers();
 	const transport = vi.fn<HttpTransport>().mockResolvedValue({ status: 503, text: 'old retirement Worker' });
-	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(origin, resetId);
+	const operation = verifyResetWorker(transport, origin, resetId);
 	const rejection = expect(operation).rejects.toThrow('not ready yet');
 	await vi.runAllTimersAsync();
 	await rejection;
@@ -94,7 +95,7 @@ it('waits for upgraded cleanup capabilities after refreshing an old retirement W
 	const transport = vi.fn<HttpTransport>()
 		.mockResolvedValueOnce({ status: 200, text: JSON.stringify(metadata) })
 		.mockResolvedValue({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true }) });
-	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(origin, resetId, true);
+	const operation = verifyResetWorker(transport, origin, resetId, true);
 	await vi.runAllTimersAsync();
 	await expect(operation).resolves.toBe(true);
 	expect(transport).toHaveBeenCalledTimes(2);
@@ -106,7 +107,7 @@ it('waits for the exact helper publication after rotating its cleanup configurat
 	const transport = vi.fn<HttpTransport>()
 		.mockResolvedValueOnce({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true, deleteAll: true, uploadTag: 'previous-publication' }) })
 		.mockResolvedValue({ status: 200, text: JSON.stringify({ ...metadata, recoveryObjects: true, deleteAll: true, uploadTag: tag }) });
-	const operation = new CloudflareApiClient('account-secret', transport).verifyResetWorker(`https://crate-delete-${resetId}.example.workers.dev`, resetId, true, tag);
+	const operation = verifyResetWorker(transport, `https://crate-delete-${resetId}.example.workers.dev`, resetId, true, tag);
 	await vi.runAllTimersAsync(); await expect(operation).resolves.toBe(true);
 	expect(transport).toHaveBeenCalledTimes(2);
 });

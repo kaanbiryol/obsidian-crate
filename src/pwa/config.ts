@@ -17,7 +17,7 @@ const defaultConfig: StoredConfig = {
 	allDayNotificationTime: null,
 };
 
-function parseStartTab(value: unknown): StartTab | null {
+export function parseStartTab(value: unknown): StartTab | null {
 	return value === 'inbox' || value === 'today' || value === 'upcoming' || value === 'browse'
 		? value
 		: null;

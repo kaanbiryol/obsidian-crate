@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { capturePwaSession } from '../connection/session-generation';
 import { newReminderOperationId } from './outbox/reminder-operation-id';
 import { applyReminderChanges, predictReminderCompletion } from './outbox/reminder-optimistic-state';
@@ -8,6 +8,7 @@ import type { ApiFetch, ShowToast, StoredConfig } from '../types';
 import type { ModalState, ReminderRecord, ReminderSyncHost } from './types';
 import { createSaveReminderChange } from './outbox/save-reminder-command';
 import { projectReminderOrder } from '../../reminders/core/reminder-list';
+import { usePreparationGuard } from '../update/usePreparationGuard';
 
 export function useReminderMutations(options: {
 	enabled?: boolean;
@@ -31,16 +32,7 @@ export function useReminderMutations(options: {
 	});
 	const { ensureCanMutate, projects, selectedProject, refreshPresentation, showToast } = options;
 	const { getSnapshot } = sync;
-	const pendingPreparations = useRef(0);
-	const [, setPreparationCount] = useState(0);
-	const beginPreparation = () => {
-		pendingPreparations.current += 1;
-		setPreparationCount(pendingPreparations.current);
-		return () => {
-			pendingPreparations.current -= 1;
-			setPreparationCount(pendingPreparations.current);
-		};
-	};
+	const { track: trackPreparation, isPreparing } = usePreparationGuard();
 	const report = (error: unknown) => showToast('error', error instanceof Error ? error.message : String(error));
 	const enqueue = (change: PendingReminderChange) => {
 		if (!ready || !outboxRef.current) throw new Error('Pending changes are still loading. Reopen Crate if this continues.');
@@ -52,16 +44,16 @@ export function useReminderMutations(options: {
 	const saveReminder = async (modal: ModalState): Promise<boolean> => {
 		if (!ensureCanMutate()) return false;
 		const sessionCurrent = capturePwaSession();
-		const finishPreparation = beginPreparation();
-		try {
-			if (!sessionCurrent()) return false;
-			const previous = getSnapshot().reminders.find(item => item.id === modal.reminderId);
-			const change = await createSaveReminderChange(modal, config, projects, selectedProject, previous);
-			if (!sessionCurrent()) return false;
-			enqueue(change);
-			return true;
-		} catch (error) { if (sessionCurrent()) report(error); return false; }
-		finally { finishPreparation(); }
+		return trackPreparation(async () => {
+			try {
+				if (!sessionCurrent()) return false;
+				const previous = getSnapshot().reminders.find(item => item.id === modal.reminderId);
+				const change = await createSaveReminderChange(modal, config, projects, selectedProject, previous);
+				if (!sessionCurrent()) return false;
+				enqueue(change);
+				return true;
+			} catch (error) { if (sessionCurrent()) report(error); return false; }
+		});
 	};
 
 	const recordChange = async (id: string, kind: 'delete' | 'complete', extra: Record<string, unknown>, optimistic?: ReminderRecord, expectedRevision?: string, filePath?: string): Promise<PendingReminderChange> => {
@@ -81,46 +73,46 @@ export function useReminderMutations(options: {
 	const toggleReminderCompleted = async (id: string, completed: boolean) => {
 		if (!ensureCanMutate()) return;
 		const current = capturePwaSession();
-		const finishPreparation = beginPreparation();
-		try {
-			const previous = getSnapshot().reminders.find(item => item.id === id);
-			if (!previous) throw new Error('Refresh reminders before changing this reminder.');
-			const change = await recordChange(id, 'complete', { completed: !completed }, predictReminderCompletion(previous, !completed));
-			if (current()) {
-				enqueue(change);
-				showToast('success', completed ? 'Reminder reopened' : 'Reminder completed');
-			}
-		} catch (error) { if (current()) report(error); }
-		finally { finishPreparation(); }
+		await trackPreparation(async () => {
+			try {
+				const previous = getSnapshot().reminders.find(item => item.id === id);
+				if (!previous) throw new Error('Refresh reminders before changing this reminder.');
+				const change = await recordChange(id, 'complete', { completed: !completed }, predictReminderCompletion(previous, !completed));
+				if (current()) {
+					enqueue(change);
+					showToast('success', completed ? 'Reminder reopened' : 'Reminder completed');
+				}
+			} catch (error) { if (current()) report(error); }
+		});
 	};
 	const deleteReminder = async (id: string, expectedRevision?: string, filePath?: string): Promise<boolean> => {
 		if (!ensureCanMutate()) return false;
 		const current = capturePwaSession();
-		const finishPreparation = beginPreparation();
-		try {
-			const change = await recordChange(id, 'delete', {}, undefined, expectedRevision, filePath);
-			if (!current()) return false;
-			enqueue(change);
-			showToast('success', 'Reminder deleted');
-			return true;
-		} catch (error) { if (current()) report(error); return false; }
-		finally { finishPreparation(); }
+		return trackPreparation(async () => {
+			try {
+				const change = await recordChange(id, 'delete', {}, undefined, expectedRevision, filePath);
+				if (!current()) return false;
+				enqueue(change);
+				showToast('success', 'Reminder deleted');
+				return true;
+			} catch (error) { if (current()) report(error); return false; }
+		});
 	};
 	const persistReorder = async (project: string, orderedIds: string[]) => {
 		if (!ensureCanMutate()) { refreshPresentation(); return; }
 		const current = capturePwaSession();
-		const finishPreparation = beginPreparation();
-		try {
-			const operationId = await newReminderOperationId();
-			if (!current()) return;
-			enqueue({
-				operationId, kind: 'reorder', project, orderedIds: [...orderedIds], path: '/reminders/reorder', method: 'POST',
-				body: JSON.stringify({ folderPath: config.folderPath, project, orderedIds,
-					expectedOrder: projectReminderOrder(getSnapshot().reminders, project), operationId }),
-				status: 'pending', attempts: 0, retryAt: 0,
-			});
-		} catch (error) { if (current()) { refreshPresentation(); report(error); } }
-		finally { finishPreparation(); }
+		await trackPreparation(async () => {
+			try {
+				const operationId = await newReminderOperationId();
+				if (!current()) return;
+				enqueue({
+					operationId, kind: 'reorder', project, orderedIds: [...orderedIds], path: '/reminders/reorder', method: 'POST',
+					body: JSON.stringify({ folderPath: config.folderPath, project, orderedIds,
+						expectedOrder: projectReminderOrder(getSnapshot().reminders, project), operationId }),
+					status: 'pending', attempts: 0, retryAt: 0,
+				});
+			} catch (error) { if (current()) { refreshPresentation(); report(error); } }
+		});
 	};
 	const resumeChanges = () => {
 		try { void outboxRef.current?.resume(); }
@@ -156,5 +148,5 @@ export function useReminderMutations(options: {
 	const stableToggleCompleted = useCallback((id: string, completed: boolean) => latest.current.toggleReminderCompleted(id, completed), []);
 	const stablePersistReorder = useCallback((project: string, orderedIds: string[]) => latest.current.persistReorder(project, orderedIds), []);
 	const visible = useMemo(() => applyReminderChanges(options.reminders, projects, changes), [options.reminders, projects, changes]);
-	return { isPreparingMutation: () => pendingPreparations.current > 0, saveReminder, toggleReminderCompleted: stableToggleCompleted, deleteReminder, persistReorder: stablePersistReorder, ...visible, changes, ready, resumeChanges, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
+	return { isPreparingMutation: isPreparing, saveReminder, toggleReminderCompleted: stableToggleCompleted, deleteReminder, persistReorder: stablePersistReorder, ...visible, changes, ready, resumeChanges, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
 }

@@ -18,7 +18,7 @@ async function persistentHarness(lastSeq = 0) {
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		const url = new URL(request.url);
 		let value: unknown;
-		if (url.pathname === '/.well-known/crate') value = { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) };
+		if (url.pathname === '/.well-known/crate') value = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) };
 		else if (url.pathname === '/sync/manifest') value = { version: 1, files: { [path]: entry }, lastSeq: 100, snapshotSeq: 100, hasMore: false };
 		else if (url.pathname === '/sync/changes') value = { cursorExpired: url.searchParams.get('since') === '5', changes: [], lastSeq: 100, hasMore: false };
 		else throw new Error(`Unexpected request: ${request.url}`);

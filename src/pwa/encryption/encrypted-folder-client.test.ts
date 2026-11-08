@@ -25,3 +25,11 @@ it('sends the stored attempt and tells a version conflict from other failures', 
 	send.mockResolvedValueOnce(Response.json({ error: 'Not confirmed' }));
 	await expect(postEncryptedCommit(send, '/reading', 'body')).resolves.toMatchObject({ kind: 'failed', answer: { error: 'Not confirmed' } });
 });
+
+it('treats a non-JSON 409, such as a proxy page, as a failure with its body unread', async () => {
+	const send = vi.fn<(path: string, body: string) => Promise<Response>>();
+	send.mockResolvedValueOnce(new Response('<html>Conflict</html>', { status: 409, headers: { 'content-type': 'text/html' } }));
+	const failed = await postEncryptedCommit(send, '/reminders', 'body');
+	expect(failed).toMatchObject({ kind: 'failed', response: { status: 409, bodyUsed: false } });
+	expect(failed.kind === 'failed' && failed.answer).toBe(undefined);
+});

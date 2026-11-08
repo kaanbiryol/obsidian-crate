@@ -1,6 +1,6 @@
 import { assertReadingUpdateBase, coalesceReadingUpdate } from './coalesce-update';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
-import { readingUrl, type ReadingChanges } from '@/reading/core/model';
+import { MAX_READING_TITLE_LENGTH, readingUrl, type ReadingChanges } from '@/reading/core/model';
 import { loadReading, readingRequest, reloadReadingAfterWrites, type ReadingWrite } from './api';
 import { ReadingApiError } from './session/api-error';
 import { readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, readReadingCache, savePendingReading, type ReadingCache } from './storage/storage';
@@ -38,7 +38,7 @@ function canDispatch(op: PendingReading, mode: ReadingRetryMode): boolean {
 export async function queueReading(session: ReadingSession, input: ReadingCommand) {
 	const command = input.action === 'capture' ? { ...input, intent: { ...input.intent, url: readingUrl(input.intent.url) } } : input;
 	if (command.action === 'capture') {
-		if (command.intent.title !== undefined && (typeof command.intent.title !== 'string' || command.intent.title.length > 1000)) throw new Error('Use a title shorter than 1,000 characters.');
+		if (command.intent.title !== undefined && (typeof command.intent.title !== 'string' || command.intent.title.length > MAX_READING_TITLE_LENGTH)) throw new Error('Use a title shorter than 1,000 characters.');
 	}
 	if (!isReadingCommand(command)) throw new Error('Invalid Reading change. Reopen this article before editing.');
 	return readingLock(async () => {

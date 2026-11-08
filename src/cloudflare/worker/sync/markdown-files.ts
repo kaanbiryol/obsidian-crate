@@ -3,7 +3,7 @@ import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
 import { queryRows } from '../d1/db';
 import { stageMarkdownFile } from './markdown-file-staging';
-import { commitStagedFile, type StagedFileCommitInput } from './mutations';
+import { commitStagedFile, type CommitContext } from './mutations';
 import {
 	getStoredFileRow,
 	MAX_FILE_BYTES,
@@ -96,7 +96,7 @@ export async function writeCommittedMarkdownFile(
 	content: string,
 	expectedHash: string | null,
 	effects?: CommitEffects,
-	context?: Pick<StagedFileCommitInput, 'encryptionState' | 'reminderFolder' | 'readingPolicy'>,
+	context?: CommitContext,
 ): Promise<{ hash: string; size: number }> {
 	const staged = await stageMarkdownFile(bucket, db, path, content, expectedHash);
 

@@ -1,5 +1,6 @@
 import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 import type { PendingReading } from '../reading/outbox';
+import { pausedFeatureLabel } from './state';
 
 interface ReadingSyncIndicatorProps {
 	pending: PendingReading[];
@@ -24,4 +25,22 @@ export function readingSyncStatus({ pending, isOffline, loading, refreshing, con
 	// startup stays yellow until this session has a confirmed server result.
 	if (!confirmed) return { state: 'syncing', label: 'Checking Reading' };
 	return { state: 'synced', label: 'All changes synced' };
+}
+
+/** Feature-level status: a paused feature reports saved work instead of sync progress.
+ * `disabled` means Reading is paused or not configured on the server and has no session,
+ * so its connection error needs no attention. */
+export function readingFeatureStatus({ enabled, syncStatus, pendingCount, recovery, error, disabled }: {
+	enabled: boolean;
+	syncStatus: { state: SyncIndicatorState; label: string };
+	pendingCount: number;
+	recovery: boolean;
+	error: string | null;
+	disabled: boolean;
+}) {
+	return {
+		status: enabled ? syncStatus : { state: recovery ? 'error' as const : 'cached' as const, label: pausedFeatureLabel(pendingCount) },
+		attention: syncStatus.state === 'error' && !disabled ? error || syncStatus.label : null,
+		unsynced: pendingCount > 0 || recovery || Boolean(error && !disabled),
+	};
 }

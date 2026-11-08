@@ -1,4 +1,5 @@
 import type { AuthenticatedRouteContext } from '../router';
+import type { Env } from '../types';
 import {
 	handleCreateRemindersEnrollmentToken,
 } from '../notifications/enrollment-handlers';
@@ -11,9 +12,10 @@ import {
 
 export async function handleNotificationsRoute(
 	request: Request,
-	db: D1Database,
+	env: Env,
 	{ path, method, principal }: Pick<AuthenticatedRouteContext, 'path' | 'method' | 'principal'>,
 ): Promise<Response | null> {
+	const db = env.DB;
 	if (path === '/notifications/subscribe' && method === 'POST') {
 		return await handleSubscribe(request, db, principal.tokenId);
 	}

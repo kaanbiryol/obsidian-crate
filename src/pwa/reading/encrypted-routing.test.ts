@@ -6,7 +6,8 @@ const encrypted = vi.hoisted(() => vi.fn(async () => ({ deleted: true })));
 vi.mock('./session/encryption-session', () => ({
 	prepareReadingEncryption: async () => ({ vaultId: 'vault', generation: 1, folderPath: 'Reading', wireFolder: 'tagged-folder', paths: {}, vault: {}, seal: {} }),
 	readingEncryptionHeaders: () => ({}),
-	readingKeys: () => ({ folderPath: 'Reading' }),
+	readingEncryptionKeys: () => ({ folderPath: 'Reading' }),
+	readingNoteFolder: () => 'Reading',
 }));
 vi.mock('./session/session', async importOriginal => ({ ...await importOriginal<typeof import('./session/session')>(), assertReadingSession: vi.fn() }));
 vi.mock('./encrypted-api', async importOriginal => ({ ...await importOriginal<typeof import('./encrypted-api')>(),

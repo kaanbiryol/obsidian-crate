@@ -15,7 +15,7 @@ function response(value: unknown) {
 it.each(['/sync/upload?path=private.md', '/sync/batch-upload', '/settings', '/reading/capture', '/reading/update', '/reminders/create', '/reminders/update', '/notifications/reminders-enrollment-token'])('never dispatches plaintext to %s after another device enables encryption', async path => {
 	let enabled = false;
 	const transport = vi.fn<ApiHttpTransport>(async request => {
-		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
 		if (request.url.endsWith('/encryption')) return response({ encryption: enabled ? { mode: 'active' } : null });
 		return response({ success: true });
 	});
@@ -55,7 +55,7 @@ it('skips the encryption probe while server responses confirm the vault is unenc
 	let enabled = false;
 	const state = () => ({ 'X-Crate-Encryption-State': enabled ? 'on' : 'off' });
 	const transport = vi.fn<ApiHttpTransport>(async request => {
-		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
 		if (request.url.endsWith('/encryption')) return { ...response({ encryption: enabled ? { mode: 'active' } : null }), headers: state() };
 		// The server rejects plaintext once encryption is enabled.
 		if (enabled) return { ...response({ error: 'Unlock this vault', code: 'encryption_required' }), status: 428, headers: state() };
@@ -76,7 +76,7 @@ it('skips the encryption probe while server responses confirm the vault is unenc
 function unencryptedServer(refuse: () => number | null) {
 	const off = { 'X-Crate-Encryption-State': 'off' };
 	return vi.fn<ApiHttpTransport>(async request => {
-		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
 		// A revoked or locked credential gets a refusal without the encryption state.
 		const status = refuse();
 		if (status) return { ...response({ error: 'Refused' }), status };
@@ -104,7 +104,7 @@ it('trusts an unencrypted response only briefly before sending plaintext', async
 	vi.spyOn(performance, 'now').mockImplementation(() => now);
 	let enabled = false;
 	const transport = vi.fn<ApiHttpTransport>(async request => {
-		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
 		if (request.url.endsWith('/encryption')) return { ...response({ encryption: enabled ? { mode: 'active' } : null }), headers: { 'X-Crate-Encryption-State': enabled ? 'on' : 'off' } };
 		return { ...response({ success: true }), headers: { 'X-Crate-Encryption-State': 'off' } };
 	});
@@ -147,7 +147,7 @@ it('does not let a response already in flight restore a dropped unencrypted verd
 it.each([['an unencrypted', ['e2ee-v1']], ['an encryption-incapable', []]])('refuses plaintext to %s server while this vault last synced encrypted', async (_kind, capabilities) => {
 	const off = { 'X-Crate-Encryption-State': 'off' };
 	const transport = vi.fn<ApiHttpTransport>(async request => {
-		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities });
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities });
 		if (request.url.endsWith('/encryption')) return { ...response({ encryption: null }), headers: off };
 		return { ...response({ success: true }), headers: off };
 	});
@@ -165,7 +165,7 @@ it.each([['an unencrypted', ['e2ee-v1']], ['an encryption-incapable', []]])('ref
 it.each([['/sync/metadata', 'POST'], ['/sync/batch-download', 'POST'], ['/sync/versions?path=private.md', 'GET']])('does not send paths in %s to an unencrypted server while this vault last synced encrypted', async (path, method) => {
 	const off = { 'X-Crate-Encryption-State': 'off' };
 	const transport = vi.fn<ApiHttpTransport>(async request => {
-		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
+		if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['e2ee-v1'] });
 		if (request.url.endsWith('/encryption')) return { ...response({ encryption: null }), headers: off };
 		return { ...response({ files: {} }), headers: off };
 	});

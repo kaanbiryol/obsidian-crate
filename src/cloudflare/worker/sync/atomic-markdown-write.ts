@@ -7,6 +7,7 @@ import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads'
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements } from '../reading/library-index';
 import type { CommitEffects } from './commit-effects';
+import type { CommitContext } from './mutations';
 import { changedRows } from '../d1/db';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-staging';
@@ -110,6 +111,8 @@ export async function writeCommittedMarkdownFilePair(
 		source: { path: string; content: string; expectedHash: string; expectedRevision?: string };
 		effects?: CommitEffects;
 		destination: { path: string; content: string; expectedHash: string | null; expectedRevision?: string };
+		/** Server state the caller already read under the coordinator lock. */
+		context?: CommitContext;
 	},
 ): Promise<{
 	source: { hash: string; size: number };
@@ -118,8 +121,9 @@ export async function writeCommittedMarkdownFilePair(
 	if (params.source.path === params.destination.path) {
 		throw new Error('Atomic reminder move requires two distinct files');
 	}
-	const sourceEncryption = await prepareEncryptedFileCommit(db, params.source.path, params.source.content);
-	const destinationEncryption = await prepareEncryptedFileCommit(db, params.destination.path, params.destination.content);
+	const { context } = params;
+	const sourceEncryption = await prepareEncryptedFileCommit(db, params.source.path, params.source.content, context?.encryptionState);
+	const destinationEncryption = await prepareEncryptedFileCommit(db, params.destination.path, params.destination.content, context?.encryptionState);
 
 	const [previousSource, previousDestination] = await Promise.all([
 		getReplacedFileRow(db, params.source.path),
@@ -166,12 +170,12 @@ export async function writeCommittedMarkdownFilePair(
 			publishedChangelogStatement(db, destination),
 			publishedChangelogStatement(db, source),
 			...previousVersions.flatMap(previous => retainReplacedVersionStatements(db, previous, [source, destination])),
-			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content, false, Boolean(sourceEncryption.state)),
-			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, false, Boolean(destinationEncryption.state)),
+			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content, { encrypted: Boolean(sourceEncryption.state), reminderFolder: context?.reminderFolder }),
+			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, { encrypted: Boolean(destinationEncryption.state), reminderFolder: context?.reminderFolder }),
 			...await readingIndexStatements(db, [
 				{ path: source.path, storageKey: source.objectKey, hash: source.hash, size: source.size, content: params.source.content },
 				{ path: destination.path, storageKey: destination.objectKey, hash: destination.hash, size: destination.size, content: params.destination.content },
-			], { encrypted: Boolean(sourceEncryption.state || destinationEncryption.state) }),
+			], { policy: context?.readingPolicy, encrypted: Boolean(sourceEncryption.state || destinationEncryption.state) }),
 			finishStagedUpload(db, source.objectKey, source.path),
 			finishStagedUpload(db, destination.objectKey, destination.path),
 			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),

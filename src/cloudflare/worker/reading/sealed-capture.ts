@@ -1,11 +1,11 @@
 import { assembleReadingArticle } from '@/reading/core/article';
-import { readingUrl } from '@/reading/core/model';
+import { MAX_READING_TITLE_LENGTH, readingUrl } from '@/reading/core/model';
 import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import type { EncryptionServerState } from '@/encryption/server-state';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { commitSealedReading } from '../coordinator/coordinator';
 import { chargeRouteAction } from '../admission/rate-limit';
-import { parseJsonObject } from '../http/request-validation';
+import { parseJsonObject, SMALL_JSON_BODY_BYTES } from '../http/request-validation';
 import type { Env } from '../types';
 import { authority, ReadingError, readingResponse } from './common';
 import { fetchReadingCapture } from './extraction/transport';
@@ -18,13 +18,13 @@ export async function captureSealedReading(request: Request, env: Env, principal
 	if (encryption.mode !== 'active') throw new ReadingError('An encryption reset is in progress. Resume it in Obsidian.', 423);
 	const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
 	const current = await authority(env.DB, principal);
-	const parsed = await parseJsonObject(request, 24_576);
+	const parsed = await parseJsonObject(request, SMALL_JSON_BODY_BYTES);
 	if (!parsed.ok) return parsed.response;
 	validateShortcutBody(parsed.value, 'prepare');
 	let url: string;
 	try { url = readingUrl(parsed.value.url); } catch { throw new ReadingError('Share a complete HTTP or HTTPS link.'); }
 	const id = crypto.randomUUID();
-	const note = createReadingNote({ id, url, title: typeof parsed.value.title === 'string' ? parsed.value.title.slice(0, 1000) : undefined, savedAt: new Date().toISOString() });
+	const note = createReadingNote({ id, url, title: typeof parsed.value.title === 'string' ? parsed.value.title.slice(0, MAX_READING_TITLE_LENGTH) : undefined, savedAt: new Date().toISOString() });
 	const item = parseReadingNote(note)!;
 	let content: string | undefined;
 	// With article fetching off, the link is saved without its article, as in unencrypted vaults.

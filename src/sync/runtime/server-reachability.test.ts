@@ -3,7 +3,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { createDeferred, createRuntimeHarness, initializeRuntime } from './runtime-test-harness';
 import type { SyncState } from '../types';
 
-const serverInfo = { service: 'crate', serverVersion: 'dev', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['sync-v1'] };
+const serverInfo = { service: 'crate', serverVersion: 'dev', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: ['sync-v1'] };
 
 describe('manual sync server status', () => {
 	beforeEach(() => {

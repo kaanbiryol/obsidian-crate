@@ -135,7 +135,6 @@ export async function checkLaunchThemes(browser, origin) {
    assert.ok(nonce);
    await route.fulfill({ response, body, headers: { ...response.headers(), 'Content-Security-Policy': `script-src 'self' 'nonce-${nonce}'` } });
   });
-  await page.route('**/notifications/theme-bootstrap.js*', route => route.abort());
   await page.route('**/notifications/app.js*', async route => { await app.promise; await route.continue(); });
   await page.route('**/notifications/reminders-exchange', async route => { await enrollment.promise; await route.continue(); });
   await page.route('**/notifications/version.json*', async route => { await version.promise; await route.continue(); });

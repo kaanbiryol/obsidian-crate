@@ -1,5 +1,5 @@
 import { EncryptionTransitionError, EncryptionVerificationUnavailableError } from '../../encryption/encryption-verification';
-import { connectionIssue, SESSION_RECOVERY_ISSUE, type ConnectionIssue } from '../../connection/issues';
+import { connectionIssue, type ConnectionIssue } from '../../connection/issues';
 import { EncryptionKeyRequiredError } from '../../encryption/encryption-onboarding';
 import { resetReadingEncryption } from './encryption-lifecycle';
 import { prepareReadingEncryption } from './encryption-session';
@@ -8,6 +8,7 @@ import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT } from '../../config';
 import { connectReadingFromReminders, prefetchReadingSession } from './reminders-session';
 import { readingConnectionState, type ReadingConnectionState } from './api-error';
 import { READING_SESSION_KEY, assertReadingSession, readingSession, type ReadingSession } from './session';
+import { onAppResume } from '../../shell/app-resume';
 
 /** App-owned Reading connection; no article, draft or queue hydration. */
 export function useReadingConnection(enabled: boolean, startupReady: boolean, authority?: object) {
@@ -32,7 +33,6 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 		generation.current++; resetReadingEncryption();
 		setSession(null); setLockedSession(null); setVerificationUnavailable(false); setOfflineCopy(false); setEncryptionSetupRequired(false); setConverting(false);
 	}, []);
-	const expire = useCallback(() => { resetSession(); setIssue(SESSION_RECOVERY_ISSUE); }, [resetSession]);
 	const hydrate = useCallback(async (current: ReadingSession, prefetchSession = false) => {
 		const revision = generation.current;
 		const currentRequest = () => {
@@ -41,7 +41,7 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 		};
 		if (!currentRequest()) return;
 		// The first refresh checks the session next; ask now, alongside the encryption check.
-		if (prefetchSession && current.source === 'reminders' && navigator.onLine) prefetchReadingSession();
+		if (prefetchSession && navigator.onLine) prefetchReadingSession();
 		try { await prepareReadingEncryption(current); } catch (cause) {
 			if (!currentRequest()) return;
 			setConverting(cause instanceof EncryptionTransitionError);
@@ -97,15 +97,12 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 		if (!startupReady || !ready || session || lockedSession) return;
 		const changed = (event: StorageEvent) => { if (event.key === AUTH_TOKEN_KEY || event.key === READING_SESSION_KEY || event.key === null) void connect(); };
 		const retry = () => { void connect(); };
-		const resume = () => { if (document.visibilityState === 'visible') retry(); };
-		window.addEventListener('online', retry); window.addEventListener('pageshow', retry);
+		const stopResume = onAppResume(retry);
 		window.addEventListener('storage', changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, retry);
-		document.addEventListener('visibilitychange', resume);
 		retry();
 		return () => {
-			window.removeEventListener('online', retry); window.removeEventListener('pageshow', retry);
+			stopResume();
 			window.removeEventListener('storage', changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, retry);
-			document.removeEventListener('visibilitychange', resume);
 		};
 	}, [startupReady, ready, session, lockedSession, connect]);
 	const retryVerification = useCallback(async () => {
@@ -114,16 +111,9 @@ export function useReadingConnection(enabled: boolean, startupReady: boolean, au
 	useEffect(() => {
 		// An unavailable check retries in place, like Reminders' foreground refresh.
 		if (!lockedSession || !verificationUnavailable) return;
-		const retry = () => { void retryVerification(); };
-		const resume = () => { if (document.visibilityState === 'visible') retry(); };
-		window.addEventListener('online', retry); window.addEventListener('pageshow', retry);
-		document.addEventListener('visibilitychange', resume);
-		return () => {
-			window.removeEventListener('online', retry); window.removeEventListener('pageshow', retry);
-			document.removeEventListener('visibilitychange', resume);
-		};
+		return onAppResume(() => { void retryVerification(); });
 	}, [lockedSession, verificationUnavailable, retryVerification]);
-	return { session, lockedSession, verificationUnavailable, offlineCopy, retryVerification, encryptionSetupRequired, converting, expire, ready, connecting, connect, resetSession, issue, error: issue?.message ?? null, connectionState };
+	return { session, lockedSession, verificationUnavailable, offlineCopy, retryVerification, encryptionSetupRequired, converting, ready, connecting, connect, resetSession, issue, error: issue?.message ?? null, connectionState };
 }
 
 export type ReadingConnection = ReturnType<typeof useReadingConnection>;

@@ -46,7 +46,7 @@ it('walks the vault twice at startup and still syncs an edit made during the sta
 	const uploaded: string[] = [];
 	requestUrl.mockImplementation(async ({ url, body }: RequestUrlParam) => {
 		const route = new URL(url).pathname;
-		if (route === '/.well-known/crate') return reply({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
+		if (route === '/.well-known/crate') return reply({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
 		if (route === '/sync/import') return reply({ import: null });
 		if (route === '/sync/changes') return reply(new URL(url).searchParams.get('since') === '42'
 			? { changes: [{ seq: 43, path: downloaded, action: 'put', hash: remoteHash, size: remote.byteLength, created_at: new Date(2).toISOString(), revision: 'remote' }], lastSeq: 43, hasMore: false }

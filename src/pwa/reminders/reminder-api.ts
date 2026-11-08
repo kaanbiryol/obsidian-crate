@@ -82,14 +82,18 @@ function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-/** `first` is a response to the same request already in flight. */
+/** `first` is a response to the same request already in flight. While the server is
+ * indexing, polling stops before and after each wait once `applies` reports that the
+ * caller can no longer use this read. */
 export async function fetchReadyReminderList(
 	apiFetch: ApiFetch,
 	path: string,
 	headers: Headers,
 	onProgress?: (remaining: number, total: number) => void,
 	first?: Response | Promise<Response>,
+	applies: () => boolean = () => true,
 ): Promise<Response> {
+	const superseded = () => new Error('Reminder list request was superseded.');
 	let previousRemaining: number | undefined;
 	for (let totalWaitMs = 0; ;) {
 		const response = await (first ?? apiFetch(path, { headers }));
@@ -101,8 +105,10 @@ export async function fetchReadyReminderList(
 		const advancing = typeof progress.remainingFiles === 'number' && (previousRemaining === undefined || remaining < previousRemaining);
 		previousRemaining = remaining;
 		const waitMs = advancing ? PROGRESS_REMINDER_INDEX_RETRY_DELAY_MS : retryDelayMs(response);
+		if (!applies()) throw superseded();
 		if (totalWaitMs + waitMs > MAX_REMINDER_INDEX_TOTAL_WAIT_MS) break;
 		await delay(waitMs);
+		if (!applies()) throw superseded();
 		totalWaitMs += waitMs;
 	}
 	throw new Error('Reminder index is still preparing. Try again in a moment.');

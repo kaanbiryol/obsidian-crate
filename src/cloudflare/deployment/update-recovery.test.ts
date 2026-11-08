@@ -178,7 +178,8 @@ it('accepts every published update that recovery offers to verify', async () => 
 				getWorkerSettings: vi.fn(async () => { throw pastPrecondition; }),
 				getWorkerSubdomain: vi.fn(async () => { throw pastPrecondition; }),
 				queryD1: vi.fn(async () => { throw pastPrecondition; }),
-				verifyPublishedWorkerDeployment: vi.fn(async () => { throw pastPrecondition; }),
+				transport: vi.fn(async () => { throw pastPrecondition; }),
+				sleep: vi.fn(async () => {}),
 		};
 		const artifacts = { version: '0.1.0', fingerprint: 'a'.repeat(64) } as CloudflareDeploymentArtifacts;
 		let offered = 0;

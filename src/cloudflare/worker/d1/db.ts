@@ -1,3 +1,5 @@
+import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
+
 const CHANGELOG_RETENTION_DAYS = 30;
 
 /** A SQL condition and its bound values, composed into larger statements. */
@@ -46,6 +48,11 @@ export async function pruneChangelog(db: D1Database, alongside?: (expired: SqlGu
 /** The stored value for `key`, or null when no row exists. */
 export async function readMaintenanceValue(db: D1Database, key: string): Promise<string | null> {
 	return (await db.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(key).first<{ value: string }>())?.value ?? null;
+}
+
+/** A deployment, upgrade or server deletion holds the fence, so background work waits. */
+export async function deploymentFenceHeld(db: D1Database): Promise<boolean> {
+	return Boolean(await db.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first());
 }
 
 export function putMaintenanceValue(db: D1Database, key: string, value: string): D1PreparedStatement {

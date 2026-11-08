@@ -310,7 +310,8 @@ that applies its result.
 
 `ui/activity/activity-modal.ts` owns the Activity view's subscriptions and rendering.
 `ui/activity/activity-header.ts` renders its sync status, sync/stop control and sync
-error notice; the modal keeps the sync and stop actions.
+error notice. `openSyncActivity` in `plugin/sync-integration.ts` gives the modal the same
+Sync now and Stop sync actions as the commands; the modal keeps only the stopping state.
 `ui/activity/shared-history-loader.ts` owns request coalescing and disposal for each
 open view, keeping available history on failure and ignoring late responses after
 close. `ui/activity/activity-status.ts` derives labels, indicators and button state
@@ -555,8 +556,9 @@ hydrated device identity and the existing shared settings object.
 `cloudflare/deployment/state.ts` validates persisted deployment and deletion
 state; plugin settings compose that domain normalizer. `cloudflare/restore/workflow.ts`
 keeps restore checkpoint selection, destination creation and persist-before-remote
-ordering together. `CloudflareDeploymentService` retains authorization, operation
-exclusion, lifetime guards and guarded settings/transport access.
+ordering together. `cloudflare/deployment/preconditions.ts` holds the saved-server
+checks an operation runs before and during authorization. `CloudflareDeploymentService`
+retains authorization, operation exclusion, lifetime guards and guarded settings/transport access.
 
 ## Worker and PWA build
 
@@ -667,11 +669,11 @@ specialized SQL.
 `cloudflare/worker/routes/policy.ts` declares API methods, paths, token scopes and
 execution, notification wakeup and projection initialization requirements.
 Admission, scope authorization and the request handler's execution choice consume
-that policy; dispatch does not. `router.ts` checks the Reminders pause and a web
-session's enrolled folder, sends `/reading/` paths to `routes/reading.ts`, and
-otherwise tries each domain dispatcher in `routes/` in turn. Each dispatcher
-matches its own methods and paths and returns null for others; an unmatched
-request receives 404. Route modules hold no SQL. `routes/sync.ts` owns `/settings`
+that policy; dispatch does not. `router.ts` sends `/reading/` paths to
+`routes/reading.ts` and otherwise tries each domain dispatcher in `routes/` in
+turn; `routes/reminders.ts` checks the Reminders pause and a web session's
+enrolled folder. Each dispatcher matches its own methods and paths and returns
+null for others; an unmatched request receives 404. Route modules hold no SQL. `routes/sync.ts` owns `/settings`
 and selects the encrypted or plaintext store from the current encryption state.
 
 The request handler retains authentication and guard ordering, including public

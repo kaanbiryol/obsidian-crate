@@ -42,7 +42,7 @@ it('binds reads, source edits, and enrollment permissions to the original folder
 	expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(403);
 });
 it('moves web app sessions, their push subscriptions and setup links with the reminders folder', async () => {
-	await token('vault', 'vault', null); await token('browser'); await token('stale', 'reminders', 'Old'); await token('reading', 'reading', 'Reminders');
+	await token('vault', 'vault', null); await token('browser'); await token('stale', 'reminders', 'Old'); await token('capture', 'reading_capture', 'Reminders');
 	await handleSubscribe(request('/notifications/subscribe', 'browser', subscription('moved')), env.DB, 'browser');
 	await env.DB.prepare("INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES ('link', ?, 'Reminders')").bind(Date.now() + 60_000).run();
 	const policy = { timezone: 'UTC', allDayTime: null };
@@ -52,7 +52,7 @@ it('moves web app sessions, their push subscriptions and setup links with the re
 	expect(await env.DB.prepare("SELECT folder_path FROM auth_tokens WHERE id = 'browser'").first()).toEqual({ folder_path: 'Reminders' });
 	expect((await worker.fetch(request('/reminders/notification-policy', 'vault', { ...policy, folderPath: 'Tasks', expectedRevision: revision }, 'PUT'), env)).status).toBe(200);
 	const folders = async (sql: string) => (await env.DB.prepare(sql).all<{ folder_path: string }>()).results.map(row => row.folder_path);
-	expect(await folders("SELECT folder_path FROM auth_tokens WHERE id IN ('browser', 'stale', 'reading') ORDER BY id")).toEqual(['Tasks', 'Reminders', 'Old']);
+	expect(await folders("SELECT folder_path FROM auth_tokens WHERE id IN ('browser', 'stale', 'capture') ORDER BY id")).toEqual(['Tasks', 'Reminders', 'Old']);
 	expect(await folders('SELECT folder_path FROM push_subscriptions')).toEqual(['Tasks']);
 	expect(await folders('SELECT folder_path FROM web_enrollment_tokens')).toEqual(['Tasks']);
 	const moved = await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env);

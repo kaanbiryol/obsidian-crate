@@ -82,9 +82,9 @@ describe('PWA reminder refresh around local writes', () => {
 		expect(reminderSyncStatus({ ...rendered.current, changes: [], storageError: null }).state).toBe('error');
 	});
 
-	it.each(['reset', 'replacement', 'mutation'] as const)('clears indexing progress on %s and ignores the old response', async change => {
+	it.each(['reset', 'replacement', 'mutation'] as const)('clears indexing progress on %s and stops polling for the old response', async change => {
 		vi.useFakeTimers();
-		const { rendered, options, load, settle, warming } = harness();
+		const { rendered, options, requests, load, warming } = harness();
 		const pending = load();
 		await warming(0, 3);
 		let finish: (() => void) | undefined;
@@ -98,7 +98,9 @@ describe('PWA reminder refresh around local writes', () => {
 		expect(rendered.current.indexingProgress).toBeNull();
 		await warming(1, 1);
 		expect(rendered.current.indexingProgress).toBeNull();
-		await settle(2, response([]), pending);
+		// The old read can never apply, so it stops instead of polling until the index is ready.
+		await act(async () => { await vi.advanceTimersByTimeAsync(10_000); await pending; });
+		expect(requests).toHaveLength(2);
 		finish?.();
 		expect(rendered.current.indexingProgress).toBeNull();
 	});

@@ -10,7 +10,7 @@ const entry: FileEntry = { hash: 'a'.repeat(64), size: 1, modified: '2026-01-01'
 function clientWithResponses(...responses: Response[]) {
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		const response = request.url.endsWith('/.well-known/crate')
-			? Response.json({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] })
+			? Response.json({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] })
 			: responses.shift();
 		if (!response) throw new Error(`Unexpected request ${request.url}`);
 		const arrayBuffer = await response.arrayBuffer();

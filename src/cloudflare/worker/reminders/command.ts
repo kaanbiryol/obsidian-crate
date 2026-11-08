@@ -82,7 +82,7 @@ export async function commitReminderCommand(env: Env, operation: ReminderOperati
 	const [source, destination] = files;
 	const hashes = destination
 		? await writeCommittedMarkdownFilePair(env.BUCKET, env.DB, {
-			effects,
+			effects, context,
 			source: { path: source!.path, content: source!.content, expectedHash: expectedHash(source!.path)! },
 			destination: { path: destination.path, content: destination.content, expectedHash: expectedHash(destination.path) },
 		}).then(writes => [writes.source.hash, writes.destination.hash])

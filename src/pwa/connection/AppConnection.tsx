@@ -3,8 +3,7 @@ import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { makeApiFetch } from './api-fetch';
 import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';
-import { READING_SESSION_KEY, readingSession } from '../reading/session/session';
-import { AUTH_TOKEN_KEY, PWA_FOLDER_CHANGED_EVENT, loadStoredConfig } from '../config';
+import { AUTH_TOKEN_KEY, PWA_FOLDER_CHANGED_EVENT, loadStoredConfig, parseStartTab } from '../config';
 import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
 import { usePwaBootstrap } from './usePwaBootstrap';
 import { usePwaSessionLifecycle } from './usePwaSessionLifecycle';
@@ -28,7 +27,7 @@ function useConnection() {
 	const [error, reportError] = useState<ConnectionIssue | null>(null);
 	const [selectedProject, setSelectedProject] = useState<string | null>(null);
 	const { preferences } = usePwaPreferences();
-	const [startTab, setStartTab] = useState<StartTab>(() => ['today', 'inbox', 'upcoming', 'browse'].includes(preferences.defaultScreen) ? preferences.defaultScreen as StartTab : 'today');
+	const [startTab, setStartTab] = useState<StartTab>(() => parseStartTab(preferences.defaultScreen) ?? 'today');
 	const [launchReminderId, setLaunchReminderId] = useState<string | null>(null);
 	const [, setSettingsOpen] = useSettingsOpen();
 	const showToast = useSyncFeedback();
@@ -57,11 +56,9 @@ function useConnection() {
 	// Finish app enrollment before Reading uses its credential.
 	const reading = useReadingConnection(useSharedFeatures().reading, enrolled, authority);
 
-	const expireReading = reading.expire;
 	useEffect(() => onConnectionExpired(token => {
 		if (localStorage.getItem(AUTH_TOKEN_KEY) === token) handleUnauthorizedRef.current();
-		else if (readingSession()?.token === token) { localStorage.removeItem(READING_SESSION_KEY); expireReading(); }
-	}), [expireReading]);
+	}), []);
 
 	useEffect(() => {
 		if (!bootstrapped) return;

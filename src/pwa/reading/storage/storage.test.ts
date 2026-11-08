@@ -3,6 +3,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from '../outbox';
 import { adoptEarlierReadingCaptures, clearReadingData, earlierReadingChanges, exportReadingData, newestReadingShare, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex } from './storage';
 import { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from '../session/session';
+import { AUTH_TOKEN_KEY } from '../../config';
 import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
 
@@ -26,7 +27,7 @@ const command = () => ({ id: 'queued', sessionId: session.id, action: 'update', 
 	body: JSON.stringify({ ...intent, operationId: createReminderOperationId(20_000) }, null, 2), queuedAt: '2026-09-20T10:00:00Z' });
 beforeEach(() => {
 	values.clear(); download.mockClear(); abort.mockClear();
-	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : null });
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : key === AUTH_TOKEN_KEY ? session.token : null });
 	vi.stubGlobal('navigator', { onLine: true, locks: { request: async (_name: string, action: () => Promise<unknown>) => action() } });
 	vi.stubGlobal('location', { origin: 'https://crate.example' });
 	vi.stubGlobal('fetch', vi.fn());
@@ -35,7 +36,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 it('rejects stale folder authority even when the saved credential and generation are unchanged', () => {
 	expect(() => assertReadingSession(session)).not.toThrow();
-	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify({ ...session, folderPath: 'Other reading' }) : null });
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify({ ...session, folderPath: 'Other reading' }) : key === AUTH_TOKEN_KEY ? session.token : null });
 	expect(() => assertReadingSession(session)).toThrow('Reading sign-in changed');
 });
 
@@ -159,8 +160,8 @@ it('removes queues from earlier sign-ins only while they match the reviewed expo
 });
 
 it('moves unsent captures of an earlier sign-in to the same folder into the current queue', async () => {
-	const current: ReadingSession = { ...session, id: 'reminders:new-token:generation', source: 'reminders' };
-	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(current) : key === 'crate-reminders-auth-token' ? current.token : null });
+	const current: ReadingSession = { ...session, id: 'reminders:new-token:generation' };
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(current) : key === AUTH_TOKEN_KEY ? current.token : null });
 	const earlier = 'reminders:old-token:generation';
 	const unsent = { id: 'unsent', sessionId: earlier, action: 'capture', intent: { url: 'https://example.com/unsent' }, queuedAt: '2026-10-01T12:00:00Z' };
 	const capture = { url: 'https://example.com/sent' };

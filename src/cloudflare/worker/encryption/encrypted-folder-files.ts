@@ -117,11 +117,11 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 			const result = await commitFileDelete(env.DB, { ...removed, previousFile: await getStoredFileRow(env.DB, removed.path), effects });
 			if (!result.committed) throw new FileVersionConflictError(removed.path, result.currentHash);
 		} else if (removed) {
-			await writeCommittedMarkdownMove(env.BUCKET, env.DB, { source: removed, destination: files[0]!, effects });
+			await writeCommittedMarkdownMove(env.BUCKET, env.DB, { source: removed, destination: files[0]!, effects, context: { encryptionState: state } });
 		} else if (files.length === 2) {
 			const [source, destination] = files;
 			if (!source?.expectedHash) return corsResponse({ error: 'A move requires an existing source note' }, 400);
-			await writeCommittedMarkdownFilePair(env.BUCKET, env.DB, { source: { ...source, expectedHash: source.expectedHash }, destination: destination!, effects });
+			await writeCommittedMarkdownFilePair(env.BUCKET, env.DB, { source: { ...source, expectedHash: source.expectedHash }, destination: destination!, effects, context: { encryptionState: state } });
 		} else {
 			const file = files[0]!;
 			const staged = await stageMarkdownFile(env.BUCKET, env.DB, file.path, file.content, file.expectedHash, true);

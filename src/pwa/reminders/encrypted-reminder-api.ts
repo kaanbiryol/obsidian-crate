@@ -219,7 +219,7 @@ export class EncryptedReminderApi {
 		this.lastCleanup = now;
 		this.cleanupRunning = true;
 		void requireCompatibleServer().then(info => navigator.locks.request(REMINDER_OUTBOX_LOCK, { ifAvailable: true }, async lock => {
-			if (lock && info.reminderOperationDay !== undefined) this.cleanupCursor = await this.store.pruneAttempts(this.keys, info.reminderOperationDay, this.current, this.cleanupCursor);
+			if (lock) this.cleanupCursor = await this.store.pruneAttempts(this.keys, info.reminderOperationDay, this.current, this.cleanupCursor);
 		})).catch(() => { /* Cleanup failure never blocks reminders or changes pending work. */ })
 			.finally(() => { this.cleanupRunning = false; });
 	}

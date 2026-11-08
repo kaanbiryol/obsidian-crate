@@ -27,7 +27,7 @@ export function renderSelfHostedUpdateNotice({ containerEl, plugin }: SettingsSe
 	let active = true;
 	void serverInfo(plugin, url).then(info => {
 		if (!active || !info || url !== plugin.settings.workerUrl || !isBundledServerNewer(info)) return;
-		const current = info.serverRevision ? serverBuildLabel(info.serverRevision, info.developmentBuild) : 'Unknown';
+		const current = serverBuildLabel(info.serverRevision, info.developmentBuild);
 		new Setting(slot).setName('Server update available')
 			.setDesc(`Current version: ${current} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}. Update Crate on the computer running your server, then restart it.`);
 	});

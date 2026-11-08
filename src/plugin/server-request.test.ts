@@ -27,7 +27,7 @@ function harness(capabilities = ['reading-v1', 'shared-features-v1']) {
 		settings: { workerUrl: 'https://old.example' },
 		secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? token : null },
 	} as unknown as CratePlugin;
-	const info = response({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities });
+	const info = response({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities });
 	transport.mockImplementation(async request => {
 		const url = typeof request === 'string' ? request : request.url;
 		return url.endsWith('/.well-known/crate') ? info : response({ success: true });

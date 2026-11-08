@@ -80,9 +80,6 @@ try {
 		if ((await chunkResponse.text()) !== source) throw new Error(`PWA chunk response did not match ${fileName}`);
 	}
 
-	const themeResponse = await fetchOk(`${origin}/notifications/theme-bootstrap.js?v=smoke`);
-	new Script(await themeResponse.text());
-
 	const serviceWorkerResponse = await fetchOk(`${origin}/notifications/sw.js`);
 	if (serviceWorkerResponse.headers.get('service-worker-allowed') !== '/notifications') {
 		throw new Error('Service worker scope header is missing');

@@ -4,6 +4,7 @@ import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentR
 import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './types';
 import { workersDevOrigin } from './worker-origin';
+import { verifyWorkerDeployment } from './verify-worker';
 import { CloudflareApiClient, CloudflareApiError, queryD1Rows } from '../cloudflare-api';
 import { isDefinitiveRejection, isNotFound } from '../cloudflare-api-error';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
@@ -216,7 +217,7 @@ export async function provisionCloudflareDeployment(input: {
 		const versions = await queryD1Rows(input.api, input.accountId, databaseId, 'SELECT version FROM crate_schema WHERE id = 1;');
 		if (versions.length !== 1 || versions[0]?.version !== SERVER_RELEASE.schemaVersion) throw new Error('The updated database could not be verified.');
 		await input.api.queryD1(input.accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
-		await input.api.verifyWorkerDeployment(workersDevOrigin(input.metadata.workerName, workersSubdomain), input.artifacts.fingerprint);
+		await verifyWorkerDeployment(input.api.transport, workersDevOrigin(input.metadata.workerName, workersSubdomain), input.artifacts.fingerprint, false, input.api.sleep);
 		await releaseUpgradeGuards(input.api, input.accountId, databaseId, fence);
 		await recordDeploymentRelease(schemaInput, fence);
 		await fence.completeVerification();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiRoutePolicy, ENCRYPTION_RESET_PATHS, KEYLESS_ENCRYPTED_READ_PATHS, rateLimitedActions } from './policy';
+import { apiRoutePolicy, apiRoutes, ENCRYPTION_RESET_PATHS, KEYLESS_ENCRYPTED_READ_PATHS, PLAINTEXT_ONLY_PATHS, rateLimitedActions } from './policy';
 import { PUBLIC_ASSET_PATHS, requestAdmissionKind } from './admission';
 import { isCrateMutation, READ_ONLY_POST_PATHS } from '../../../protocol/server-info';
 
@@ -28,6 +28,15 @@ describe('worker route tables', () => {
 	it('derives the encryption guards and rate limits from the policy table', () => {
 		expect([...ENCRYPTION_RESET_PATHS].sort()).toEqual(['/encryption', '/encryption/reset', '/health']);
 		expect([...KEYLESS_ENCRYPTED_READ_PATHS].sort()).toEqual(['/features', '/reading/encryption', '/reading/session']);
+		expect([...PLAINTEXT_ONLY_PATHS].sort()).toEqual([
+			'/reading/capture', '/reading/delete', '/reading/handoff', '/reading/item', '/reading/list', '/reading/retry', '/reading/update',
+			'/reminders/create', '/reminders/delete', '/reminders/list', '/reminders/reorder', '/reminders/set-completed', '/reminders/update',
+			'/sync/import', '/sync/import/complete', '/sync/import/prune', '/sync/import/readiness', '/sync/import/upload',
+		]);
+		// Every method on a plaintext-only path is declared plaintext-only.
+		for (const { method, path } of apiRoutes()) {
+			if (PLAINTEXT_ONLY_PATHS.includes(path)) expect(apiRoutePolicy(path, method)?.plaintextOnly, `${method} ${path}`).toBe(true);
+		}
 		expect(Object.fromEntries(rateLimitedActions)).toEqual({
 			'POST /reading/shortcut-pairing': 5, 'POST /reading/shortcut/v1/exchange': 10,
 			'POST /notifications/share/reading': 30, 'POST /reading/handoff': 30,

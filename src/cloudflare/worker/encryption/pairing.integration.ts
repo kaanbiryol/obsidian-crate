@@ -17,8 +17,8 @@ async function configure() {
 	const { bundle, recovery, state } = await createEncryptionFixture('active');
 	await storeEncryptionState(env.DB, state);
 	await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-generation','revision')").run();
-	for (const [token, scope, folder] of [['vault', 'vault', null], ['other-vault', 'vault', null], ['app', 'reminders', 'Reminders'], ['other-app', 'reminders', 'Reminders'], ['reader','reading','Reading'], ['capture','reading_capture','Reading']] as const) {
-		await env.DB.prepare('INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES (?,?,?,?,?)').bind(token, await sha256Hex(token), scope, folder, scope.startsWith('reading') ? 'reading-generation' : null).run();
+	for (const [token, scope, folder] of [['vault', 'vault', null], ['other-vault', 'vault', null], ['app', 'reminders', 'Reminders'], ['other-app', 'reminders', 'Reminders'], ['capture','reading_capture','Reading']] as const) {
+		await env.DB.prepare('INSERT INTO auth_tokens(id,token_hash,scope,folder_path,reading_generation) VALUES (?,?,?,?,?)').bind(token, await sha256Hex(token), scope, folder, scope === 'reading_capture' ? 'reading-generation' : null).run();
 	}
 	const context = (): PairingContext => ({ version: 1, id: crypto.randomUUID(), origin: 'https://test', vaultId: bundle.vaultId, generation: bundle.generation });
 	return { bundle, recovery, state, context };
@@ -33,8 +33,8 @@ const transport = (token: string): PairingTransport => ({
 	async write(body) { const r = await send(token, body); const data = await r.json() as { request: never; error?: string }; if (!r.ok) throw new Error(data.error); return data; },
 });
 
-it.each(['reminders', 'reading'])('transfers only encrypted browser keys after approval, including retry after a lost response (%s)', async feature => {
-	const f = await configure(); const web = transport(feature === 'reading' ? 'reader' : 'app'), mac = transport('vault');
+it('transfers only encrypted browser keys after approval, including retry after a lost response', async () => {
+	const f = await configure(); const web = transport('app'), mac = transport('vault');
 	const app = await requestAppPairing(f.context(), web, current);
 	expect(await app.poll()).toEqual({});
 	const pending = (await mac.read()).requests[0]!;
@@ -81,8 +81,6 @@ it('admits only enrolled sessions and devices and binds attempts to the current 
 	for (const changed of [{ generation: f.state.generation + 1 }, { vaultId: crypto.randomUUID() }]) {
 		expect((await send('app', { action: 'start', ...(await createPairingRequester({ ...f.context(), ...changed })).request })).status).toBe(409);
 	}
-	await env.DB.prepare("UPDATE reading_policy SET generation='new' WHERE id=1").run();
-	expect((await send('reader', { action: 'start', ...(await createPairingRequester(f.context())).request })).status).toBe(401);
 });
 
 it('allows only one responder and refuses changed commitments and replayed approvals', async () => {

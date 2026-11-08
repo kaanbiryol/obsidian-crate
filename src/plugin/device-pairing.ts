@@ -10,7 +10,7 @@ import { normalizeCloudflareDeployment } from '../cloudflare/deployment/state';
 import { workersDevOrigin } from '../cloudflare/deployment/worker-origin';
 import { HttpError, WorkerApiHttpClient } from '../sync/worker-api/http';
 import { readServerEncryption } from '../sync/encryption/server-encryption';
-import { DEVICE_PAIRING_CAPABILITY, DEVICE_PAIRING_PATH, parseDevicePairingLink, parseDevicePairingTarget } from '../protocol/device-pairing';
+import { DEVICE_PAIRING_PATH, parseDevicePairingLink, parseDevicePairingTarget } from '../protocol/device-pairing';
 import { openConfirmationModal } from '../ui/plugin/confirmation-modal';
 import { DeviceKeyPairingModal } from '../ui/settings/device-key-pairing-modal';
 import { errorMessage } from '../platform/logger';
@@ -24,7 +24,6 @@ export async function redeemDevicePairing(plugin: CratePlugin, target: { origin:
 	if (plugin.syncRuntime.isConfigured()) throw new Error('This vault is already connected. Disconnect it in Crate settings first.');
 	const http = new WorkerApiHttpClient(target.origin, '');
 	http.setAbortSignal(signal);
-	if (!(await http.getServerInfo()).capabilities.includes(DEVICE_PAIRING_CAPABILITY)) throw new Error('Update the server from Crate settings on your desktop, then create a new code.');
 	const token = generateSecureToken();
 	const body = JSON.stringify({ code: target.code, tokenHash: await hashToken(token), deviceId: plugin.settings.deviceId,
 		deviceName: getCurrentDeviceName(plugin.settings.deviceId), platform: getCurrentPlatformCode() });

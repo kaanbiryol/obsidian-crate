@@ -2,7 +2,7 @@ import type { PendingReading, ReadingCommand } from '../outbox';
 import { isRecord, isSha256Hex } from '@/platform/validation';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { readingHighlights } from '@/reading/core/highlights';
-import { readingTimestamp, readingUrl } from '@/reading/core/model';
+import { MAX_READING_TITLE_LENGTH, readingTimestamp, readingUrl } from '@/reading/core/model';
 import { isReadingItem, isReadingArticle, type ReadingArticle } from './record-validation';
 import type { ReadingCache } from './cache';
 import type { ReadingSession } from '../session/session';
@@ -12,8 +12,7 @@ const nonNegativeNumber = (value: unknown): value is number => typeof value === 
 
 export function isReadingSession(value: unknown): value is ReadingSession {
 	return isRecord(value) && nonEmptyString(value.token) && nonEmptyString(value.id)
-		&& nonEmptyString(value.folderPath) && nonEmptyString(value.generation) && nonNegativeNumber(value.expiresAt)
-		&& (value.source === undefined || value.source === 'reminders');
+		&& nonEmptyString(value.folderPath) && nonEmptyString(value.generation) && nonNegativeNumber(value.expiresAt);
 }
 
 export function isReadingCache(value: unknown, folder: string): value is ReadingCache {
@@ -59,7 +58,7 @@ export function isReadingCommand(command: unknown): command is ReadingCommand {
 	if (!isRecord(value) || 'operationId' in value) return false;
 	if (action === 'capture') {
 		try { readingUrl(value.url); } catch { return false; }
-		return (value.title === undefined || typeof value.title === 'string' && value.title.length <= 1000)
+		return (value.title === undefined || typeof value.title === 'string' && value.title.length <= MAX_READING_TITLE_LENGTH)
 			&& (value.fetchArticle === undefined || typeof value.fetchArticle === 'boolean');
 	}
 	if (!nonEmptyString(value.id)) return false;

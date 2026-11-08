@@ -63,7 +63,7 @@ function allowedReadingPath(plugin: ReadingRuntimeHost, path: string): boolean {
 		[`${plugin.app.vault.configDir}/`], plugin.settings.ignorePatterns, readingPatternCache));
 }
 
-export function validateReadingConfiguration(plugin: ReadingRuntimeHost, settings: ReadingSettings): string {
+function validateReadingConfiguration(plugin: ReadingRuntimeHost, settings: ReadingSettings): string {
 	const folder = validateReadingFolder(settings.folderPath, plugin.remindersSettings.remindersFolderPath, plugin.app.vault.configDir);
 	if (!allowedReadingPath(plugin, `${folder}/reading.md`)) throw new Error('The reading folder is excluded from sync. Choose a folder that can sync.');
 	const existing = plugin.app.vault.getAbstractFileByPath(folder);
@@ -173,4 +173,28 @@ export function restartReading(plugin: ReadingRuntimeHost, start = true): void {
 	stopReading(plugin);
 	plugin.app.workspace.detachLeavesOfType(READING_VIEW_TYPE);
 	if (start) startReading(plugin);
+}
+
+/** Moves Reading to another folder on the server, then on this device, and restarts it
+ * there. The server changes the folder only while Reading is off, so an enabled server
+ * policy is paused first. Every step stops once the server connection changes. */
+export async function changeReadingFolder(plugin: ReadingRuntimeHost, folderPath: string): Promise<void> {
+	const { assertCurrent } = captureServerConnection(plugin);
+	validateReadingConfiguration(plugin, { ...plugin.settings.reading, folderPath });
+	if (plugin.settings.workerUrl) {
+		const policy = await readReadingPolicy(plugin);
+		assertCurrent();
+		if (policy?.enabled && policy.folder_path !== folderPath) {
+			const paused = await writeReadingPolicy(plugin, { enabled: false, folderPath: policy.folder_path, revision: policy.revision });
+			assertCurrent();
+			policy.revision = paused.revision;
+			policy.enabled = 0;
+		}
+		await writeReadingPolicy(plugin, { enabled: Boolean(policy?.enabled), folderPath, revision: policy?.revision ?? null });
+	}
+	assertCurrent();
+	// Read after the requests, so a pause made meanwhile stays in place.
+	await plugin.writeSettings({ reading: { ...plugin.settings.reading, folderPath } }, assertCurrent);
+	assertCurrent();
+	restartReading(plugin);
 }

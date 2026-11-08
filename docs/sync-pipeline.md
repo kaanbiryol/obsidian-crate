@@ -34,6 +34,8 @@ With automatic sync off, removing or editing an exclusion pattern runs the same
 local scan, so files the old pattern hid appear as pending changes. Unchanged
 files fire no vault events, so without this scan they would only surface at the
 next full sync. With automatic sync on, the next periodic check finds them.
+Adding an exclusion drops queued uploads and deletes for the paths it covers. A
+transfer already in flight finishes, but a failed one is not queued again.
 
 ## Sync Modes
 

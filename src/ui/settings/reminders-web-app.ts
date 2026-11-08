@@ -3,11 +3,9 @@ import type CratePlugin from '../../plugin/CratePlugin';
 import { errorMessage } from '../../platform/logger';
 import { QRModal } from './qr-modal';
 import { openExternalBrowserModal } from './external-browser-modal';
-import { loadEncryptionKeys } from '../../sync/encryption/key-storage';
-import { SECRET_KEYS } from '../../platform/secret-keys';
+import { buildEnrollmentUrl } from '../../plugin/web-app-enrollment';
+import { runButtonTask } from './action-helpers';
 import type { SettingsSectionContext } from './section-helpers';
-
-const CONNECTION_CHANGED = 'The connection changed. Create a new setup link.';
 
 export function renderCrateWebApp({ containerEl, plugin }: Omit<SettingsSectionContext, 'rerender'>): void {
 	if (!plugin.syncRuntime.getApiClient()) return;
@@ -17,11 +15,10 @@ export function renderCrateWebApp({ containerEl, plugin }: Omit<SettingsSectionC
 		.setClass('crate-web-app-setting')
 		.addButton(button => {
 			button.setButtonText('Open app');
-			button.onClick(async () => {
-				button.setDisabled(true);
-				button.setButtonText('Creating...');
-				try {
-					const url = await buildEnrollmentUrl(plugin);
+			button.onClick(() => runButtonTask({
+				button, idleText: 'Open app', runningText: 'Creating...',
+				task: () => buildEnrollmentUrl(plugin),
+				onSuccess: url => {
 					// Mobile webviews can block window.open once the tap's gesture has passed.
 					if (Platform.isMobile) {
 						openExternalBrowserModal(plugin.app, url, {
@@ -30,69 +27,24 @@ export function renderCrateWebApp({ containerEl, plugin }: Omit<SettingsSectionC
 							linkText: 'Open app',
 						});
 					} else window.open(url, '_blank', 'noopener,noreferrer');
-				} catch (error) {
-					new Notice(`Could not create app link: ${errorMessage(error)}`, 10000);
-				} finally {
-					button.setButtonText('Open app');
-					button.setDisabled(false);
-				}
-			});
+				},
+				onError: error => { new Notice(`Could not create app link: ${errorMessage(error)}`, 10000); },
+			}));
 		})
 		.addButton(button => {
 			button.setButtonText('Connect another device');
-			button.onClick(async () => {
-				button.setDisabled(true);
-				button.setButtonText('Creating...');
-				try {
-					const url = await buildEnrollmentUrl(plugin);
-					new QRModal(plugin.app, url).open();
-				} catch (error) {
-					new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
-				} finally {
-					button.setButtonText('Connect another device');
-					button.setDisabled(false);
-				}
-			});
+			button.onClick(() => runButtonTask({
+				button, idleText: 'Connect another device', runningText: 'Creating...',
+				task: () => showWebAppCode(plugin),
+			}));
 		});
 }
 
-export async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
-	if (!plugin.syncRuntime.getApiClient()) {
-		throw new Error('Sync API is unavailable');
+/** Opens the QR code and setup link for another device; a failure shows a notice. */
+export async function showWebAppCode(plugin: CratePlugin): Promise<void> {
+	try {
+		new QRModal(plugin.app, await buildEnrollmentUrl(plugin)).open();
+	} catch (error) {
+		new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
 	}
-	const tokenBefore = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
-	const keys = loadEncryptionKeys(plugin.secretStorage);
-	const folder = plugin.remindersSettings.remindersFolderPath;
-	const readingFolder = plugin.settings.reading.folderPath;
-	return plugin.syncRuntime.withCurrentApi(async (apiClient, isCurrentApi) => {
-		const assertCurrent = () => {
-			if (!isCurrentApi() || plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) !== tokenBefore
-				|| plugin.remindersSettings.remindersFolderPath !== folder || plugin.settings.reading.folderPath !== readingFolder) {
-				throw new Error(CONNECTION_CHANGED);
-			}
-		};
-
-		if (plugin.settings.pushEnabled) {
-			await apiClient.ensureNotificationPolicy({ folderPath: folder,
-				timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, allDayTime: plugin.remindersSettings.allDayNotificationTime });
-		}
-		assertCurrent();
-		const { token, browserToken } = await apiClient.createRemindersEnrollmentToken(folder);
-		assertCurrent();
-		const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
-		if (keys) {
-			// The link never carries the recovery key: links land in browser history and
-			// sync, and the key cannot be rotated. The app unlocks by pairing instead.
-			// The fragment never reaches the server, so the folder's plaintext name can travel in it.
-			subscribeUrl.hash = new URLSearchParams({ crateFolder: folder }).toString();
-		}
-		subscribeUrl.searchParams.set('token', token);
-		if (browserToken) subscribeUrl.searchParams.set('browserToken', browserToken);
-		if (!keys) subscribeUrl.searchParams.set('folder', folder);
-		subscribeUrl.searchParams.set('upcomingDays', String(plugin.remindersSettings.upcomingDaysDefault ?? 7));
-		if (plugin.remindersSettings.allDayNotificationTime) {
-			subscribeUrl.searchParams.set('allDayTime', plugin.remindersSettings.allDayNotificationTime);
-		}
-		return subscribeUrl.toString();
-	}, CONNECTION_CHANGED);
 }

@@ -8,7 +8,7 @@ import { unlockLocalState, type FeatureKeys } from '../../encryption/encryption-
 import { pendingReadingKey, forgetReadingKey } from '../../encryption/encryption-fragments';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from '../storage/private-storage';
-import { assertReadingSession, type ReadingSession } from './session';
+import { assertReadingSession, isReadingSessionCurrent, type ReadingSession } from './session';
 import { readingDatabase } from '../storage/database';
 import { isSessionReadingKey } from '@/pwa/reading/storage/storage-keys';
 import { rememberRecoveryKey } from '../../encryption/web-app-unlock';
@@ -32,7 +32,7 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 	const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath]);
 	if (refresh || beforePlaintextBody && !currentKeys && verifiedIdentity === identity) pending = undefined;
 	if (pending?.identity === identity) return pending.promise;
-	const current = () => { try { assertReadingSession(session); return pending?.promise === work; } catch { return false; } };
+	const current = () => isReadingSessionCurrent(session) && pending?.promise === work;
 	const work = (async () => {
 		const verified = await loadEncryptionState({ token: session.token, purpose: 'reading', fragment: pendingReadingKey(), current,
 			request: () => fetch('/reading/encryption', { cache: 'no-store', signal: AbortSignal.timeout(ENCRYPTION_CHECK_TIMEOUT_MS), headers: crateRequestHeaders(session.token) }) });
@@ -85,7 +85,9 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 export async function unlockReadingWithCode(code: string, session: ReadingSession): Promise<void> {
 	if (!expected) throw new Error('Verify the Reading connection first.');
 	const state = expected;
-	await rememberRecoveryKey(code, state, () => { try { assertReadingSession(session); return expected === state; } catch { return false; } });
+	await rememberRecoveryKey(code, state, () => isReadingSessionCurrent(session) && expected === state);
 	location.reload();
 }
-export function readingKeys(): FeatureKeys | null { return currentKeys; }
+export function readingEncryptionKeys(): FeatureKeys | null { return currentKeys; }
+/** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
+export function readingNoteFolder(session: ReadingSession): string { return currentKeys?.folderPath ?? session.folderPath; }

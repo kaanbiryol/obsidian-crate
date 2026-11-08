@@ -62,6 +62,23 @@ export async function readStoredFence(api: FenceApi, accountId: string, database
 	return rows.length === 1 && typeof rows[0]?.value === 'string' ? { state: 'held', value: rows[0].value } : { state: 'invalid' };
 }
 
+/** Compare-and-set of the held fence; true when `from` was replaced by `to`. Deletion
+ * leaves `updated_at` alone, so it never depends on the shape of the database it removes. */
+export async function replaceFenceValue(api: FenceApi, accountId: string, databaseId: string,
+	{ kind, from, to }: { kind: DeploymentFenceRecord['kind']; from: string; to: string }): Promise<boolean> {
+	const rows = await queryD1Rows(api, accountId, databaseId,
+		`UPDATE maintenance_state SET value = ?${kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
+		[to, DEPLOYMENT_FENCE_KEY, from]);
+	return rows.length === 1 && rows[0]?.value === to;
+}
+
+/** Releases the fence only while it still holds `value`; true when it did. */
+export async function removeFenceValue(api: FenceApi, accountId: string, databaseId: string, value: string): Promise<boolean> {
+	const rows = await queryD1Rows(api, accountId, databaseId,
+		'DELETE FROM maintenance_state WHERE key = ? AND value = ? RETURNING key;', [DEPLOYMENT_FENCE_KEY, value]);
+	return rows.length === 1 && rows[0]?.key === DEPLOYMENT_FENCE_KEY;
+}
+
 /** The stored record as a plain object, or undefined when it is unreadable. */
 export function parseFenceRecord(value: string): Record<string, unknown> | undefined {
 	try {
@@ -146,10 +163,7 @@ export class DeploymentFence {
 		const record = JSON.parse(this.value) as DeploymentFenceRecord;
 		const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(uploadTag ? { uploadTag } : {}), ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
 		try {
-			const rows = await queryD1Rows(this.api, this.account, this.database,
-				`UPDATE maintenance_state SET value = ?${record.kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
-				[next, DEPLOYMENT_FENCE_KEY, this.value]);
-			if (rows.length !== 1 || rows[0]?.value !== next) throw new Error('Deployment ownership changed');
+			if (!await replaceFenceValue(this.api, this.account, this.database, { kind: record.kind, from: this.value, to: next })) throw new Error('Deployment ownership changed');
 			this.value = next;
 		} catch (error) {
 			this.uncertain = true;
@@ -180,8 +194,7 @@ export class DeploymentFence {
 		if (this.uncertain) throw new DeploymentRecoveryRequiredError('A Cloudflare mutation has an uncertain outcome. The deployment fence remains held. See docs/deployment.md and scripts/crate-deployment-fence.py before retrying.');
 		if (this.deletionPending) throw new DeploymentRecoveryRequiredError('Server deletion is incomplete. The deployment fence remains held until the original server storage is removed. Retry server deletion.');
 		try {
-			await this.api.queryD1(this.account, this.database,
-				'DELETE FROM maintenance_state WHERE key = ? AND value = ?;', [DEPLOYMENT_FENCE_KEY, this.value]);
+			await removeFenceValue(this.api, this.account, this.database, this.value);
 		} catch (error) {
 			throw new DeploymentRecoveryRequiredError('Could not confirm release of the deployment fence. Inspect it with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.', { cause: error });
 		}
@@ -202,13 +215,13 @@ export async function withDeploymentFence<T>(input: {
 	const value = JSON.stringify({ ...input.record, recoveryProtocol: 1, owner: crypto.randomUUID(), startedAt: new Date().toISOString(),
 		step: 'acquire-deployment', stepState: 'confirmed' });
 	await createFenceTable(input.api, input.accountId, input.databaseId);
-	let acquired: Array<Record<string, unknown>>;
+	let acquired: boolean;
 	try {
-		acquired = await queryD1Rows(input.api, input.accountId, input.databaseId,
-			recoveredValue === undefined
-				? 'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;'
-				: `UPDATE maintenance_state SET value = ?${input.record.kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
-			recoveredValue === undefined ? [DEPLOYMENT_FENCE_KEY, value] : [value, DEPLOYMENT_FENCE_KEY, recoveredValue]);
+		if (recoveredValue === undefined) {
+			const rows = await queryD1Rows(input.api, input.accountId, input.databaseId,
+				'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;', [DEPLOYMENT_FENCE_KEY, value]);
+			acquired = rows.length === 1 && rows[0]?.value === value;
+		} else acquired = await replaceFenceValue(input.api, input.accountId, input.databaseId, { kind: input.record.kind, from: recoveredValue, to: value });
 	} catch (error) {
 		// A definite rejection (quota, permissions, or invalid SQL) did not
 		// acquire ownership. Preserve the provider's actionable error instead
@@ -216,7 +229,7 @@ export async function withDeploymentFence<T>(input: {
 		if (isDefinitiveRejection(error)) throw error;
 		throw new DeploymentRecoveryRequiredError('Could not confirm deployment ownership. Inspect the deployment fence with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
 	}
-	if (acquired.length !== 1 || acquired[0]?.value !== value) {
+	if (!acquired) {
 		throw new DeploymentRecoveryRequiredError('Another deployment or server deletion is active or needs recovery. Wait for it to finish; for an abandoned operation see docs/deployment.md and scripts/crate-deployment-fence.py.');
 	}
 	const fence = new DeploymentFence(input.api, input.accountId, input.databaseId, value);

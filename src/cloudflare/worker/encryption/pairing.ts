@@ -5,7 +5,7 @@ import { ENCRYPTION_STATE_SQL } from './state';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../http/cors';
 import { readMaintenanceValue } from '../d1/db';
-import { parseJsonObject } from '../http/request-validation';
+import { parseJsonObject, SMALL_JSON_BODY_BYTES } from '../http/request-validation';
 import { ReadingError } from '../reading/common';
 
 const PREFIX = 'crate_web_pairing:', END = 'crate_web_pairing;';
@@ -16,8 +16,7 @@ const visible = (r: Stored): PairingRecord => ({ context: r.context, commitment:
 	...(r.responderKey ? { responderKey: r.responderKey } : {}), ...(r.requesterKey ? { requesterKey: r.requesterKey } : {}),
 	...(r.payload ? { payload: r.payload } : {}), ...(r.closed ? { closed: true } : {}) });
 const ownerValid = `EXISTS (SELECT 1 FROM auth_tokens a WHERE a.id = json_extract(maintenance_state.value, '$.owner')
-  AND a.scope IN ('reminders','reading','vault') AND (a.expires_at IS NULL OR a.expires_at > ?)
-  AND (a.scope != 'reading' OR a.reading_generation = (SELECT generation FROM reading_policy WHERE id=1)))`;
+  AND a.scope IN ('reminders','vault') AND (a.expires_at IS NULL OR a.expires_at > ?))`;
 const stateValid = `(json_extract(${ENCRYPTION_STATE_SQL},'$.mode')='active' AND json_extract(${ENCRYPTION_STATE_SQL},'$.vaultId')=?
   AND json_extract(${ENCRYPTION_STATE_SQL},'$.generation')=?)`;
 
@@ -29,8 +28,7 @@ export async function pruneEncryptionPairings(db: D1Database): Promise<void> {
 export async function handleEncryptionPairing(request: Request, db: D1Database, principal: AuthPrincipal, state: EncryptionServerState | null): Promise<Response> {
 	if (!state || state.mode !== 'active') return failure('Finish encryption setup in Obsidian before connecting an app.');
 	const vault = principal.scope === 'vault';
-	if (!vault && !['reminders', 'reading'].includes(principal.scope)) return failure('App access is required.', 403);
-	if (principal.scope === 'reading' && !await db.prepare('SELECT 1 FROM reading_policy WHERE id=1 AND generation=? AND folder_path=?').bind(principal.readingGeneration ?? '', principal.folderPath ?? '').first()) return failure('Reconnect this app first.', 401);
+	if (!vault && principal.scope !== 'reminders') return failure('App access is required.', 403);
 	if (request.method === 'GET') {
 		const id = new URL(request.url).searchParams.get('id');
 		if ((!id && !vault) || id && !isEncryptionId(id)) return failure('Choose a pairing request.', 400);
@@ -43,7 +41,7 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
 			.filter(row => id || row.owner !== principal.tokenId && !row.closed && !row.payload && (!row.approver || row.approver === principal.tokenId));
 		return response({ requests: records.map(visible) });
 	}
-	const parsed = await parseJsonObject(request, 24576);
+	const parsed = await parseJsonObject(request, SMALL_JSON_BODY_BYTES);
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
 	try {

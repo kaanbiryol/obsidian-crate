@@ -7,7 +7,8 @@ import { type ReadingSession } from './session/session';
 vi.mock('./session/encryption-session', () => ({
 	prepareReadingEncryption: async () => null,
 	readingEncryptionHeaders: () => ({}),
-	readingKeys: () => null,
+	readingEncryptionKeys: () => null,
+	readingNoteFolder: ({ folderPath }: { folderPath: string }) => folderPath,
 }));
 vi.mock('./session/session', async importOriginal => ({ ...await importOriginal<typeof import('./session/session')>(), assertReadingSession: vi.fn() }));
 vi.mock('./storage/storage', () => ({

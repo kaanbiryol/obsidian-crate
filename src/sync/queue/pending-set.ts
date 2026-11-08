@@ -82,6 +82,13 @@ export class PendingSet {
 		this.times.delete(key);
 	}
 
+	/** Drops a queued key whatever its revision. A batch in flight keeps its own copy. */
+	drop(key: string): void {
+		this.queued.delete(key);
+		this.revisions.delete(key);
+		this.times.delete(key);
+	}
+
 	/** Moves every queued key `ready` accepts into flight. */
 	takeBatch(ready: (key: string) => boolean): QueueFlushBatch {
 		const paths = [...this.queued].filter(ready);

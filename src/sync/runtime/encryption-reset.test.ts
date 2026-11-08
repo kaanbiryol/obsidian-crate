@@ -16,7 +16,7 @@ const remote = vi.hoisted(() => vi.fn<(_reset: EncryptionReset) => Promise<void>
 vi.mock('../encryption/reset', async importOriginal => ({ ...await importOriginal<typeof import('../encryption/reset')>(), resetRemoteEncryption: remote }));
 beforeEach(() => {
 	remote.mockReset().mockResolvedValue(undefined);
-	vi.spyOn(WorkerApiHttpClient.prototype, 'getServerInfo').mockResolvedValue({ service: 'crate', serverVersion: 'test', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['e2ee-reset-v1'] });
+	vi.spyOn(WorkerApiHttpClient.prototype, 'getServerInfo').mockResolvedValue({ service: 'crate', serverVersion: 'test', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['e2ee-reset-v1'], serverRevision: 4, reminderOperationDay: 20_000 });
 	vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 	vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValue(createEmptySyncResult());
 	vi.spyOn(SyncEngine.prototype, 'untrackedServerPaths').mockResolvedValue([]);

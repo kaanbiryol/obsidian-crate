@@ -18,7 +18,7 @@ interface UploadTransport {
 	/** Resolve encrypted preconditions for a batch in one request instead of one per file. */
 	preloadUploadPreconditions?(files: Array<{ path: string; expectedHash: string | null }>): Promise<UploadPreconditions | undefined>;
 	assertPreparedUpload(file: JournalUpload): Promise<void>;
-	getServerInfo(): Promise<{ reminderOperationDay?: number }>;
+	getServerInfo(): Promise<{ reminderOperationDay: number }>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
 	uploadFile(path: string, content: ArrayBuffer, hash: string, size: number, contentType: string, expectedHash: string | null, operationId?: string): Promise<UploadResult>;
 }
@@ -123,8 +123,7 @@ export class DurableUploads {
 	private async prepare(files: IntendedUpload[], preconditions?: UploadPreconditions): Promise<JournalUpload[]> {
 		if (!this.serverDay || this.serverDay.expires <= performance.now()) {
 			const info = await this.transport.getServerInfo();
-			if (!Number.isInteger(info.reminderOperationDay)) throw new Error('Server did not provide an upload retry window. Update the server before syncing.');
-			this.serverDay = { day: info.reminderOperationDay!, expires: performance.now() + 60_000 };
+			this.serverDay = { day: info.reminderOperationDay, expires: performance.now() + 60_000 };
 		}
 		const transport = this.transport;
 		const prepared = await this.manifest.uploadJournal.prepare(files, this.serverDay.day, this.clientSession,

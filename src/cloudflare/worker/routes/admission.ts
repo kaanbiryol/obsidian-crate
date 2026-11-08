@@ -5,7 +5,7 @@ import { DEVELOPMENT_SHORTCUT } from '../reading/development-shortcut';
 /** Public assets admitted before authentication, database metering or coordinator work. */
 export const PUBLIC_ASSET_PATHS: ReadonlySet<string> = new Set([
 	'/', '/.well-known/crate', '/notifications',
-	...['app.js', 'theme-bootstrap.js', 'sw.js', 'manifest.json', 'version.json', 'icon.svg',
+	...['app.js', 'sw.js', 'manifest.json', 'version.json', 'icon.svg',
 		'crate-icon-192.png', 'crate-icon-512.png', 'crate-mark-256.png', 'apple-touch-icon-180.png',
 		'open-obsidian', 'open-obsidian.js', 'pair', 'pair.js', 'save-reading', 'save-reading.js'].map(name => `/notifications/${name}`),
 	// Only development Workers embed a locally signed shortcut.

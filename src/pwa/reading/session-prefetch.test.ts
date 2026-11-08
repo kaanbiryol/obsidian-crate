@@ -3,7 +3,7 @@ import { connectReadingFromReminders, prefetchReadingSession } from './session/r
 import { AUTH_TOKEN_KEY } from '../config';
 import { READING_SESSION_KEY } from './session/session';
 
-vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: async () => null, readingEncryptionHeaders: () => ({}), readingKeys: () => null }));
+vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: async () => null, readingEncryptionHeaders: () => ({}), readingEncryptionKeys: () => null, readingNoteFolder: ({ folderPath }: { folderPath: string }) => folderPath }));
 
 const values = new Map<string, string>();
 const network = vi.fn<typeof fetch>();

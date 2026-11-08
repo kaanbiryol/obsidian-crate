@@ -4,6 +4,7 @@ import { DeploymentRecoveryRequiredError, newUploadTag, withDeploymentFence, typ
 import type { CloudflareDeploymentMetadata } from '../deployment/types';
 import { workersDevOrigin } from '../deployment/worker-origin';
 import { clearBucketObjects } from './reset-objects';
+import { deleteResetWorkerObjects, verifyResetWorker } from './reset-worker-client';
 import { inspectTerminalDeletionFence } from './delete-fence';
 import { assertDeletionHelper, assertDeletionIdentity, deletionWorkerSettings, inspectDeletionResources, type DeleteApi } from './delete-ownership';
 import { sha256Hex } from '../../platform/sha256';
@@ -90,7 +91,7 @@ export async function deleteCrateServer(input: {
 			if (!subdomain || !/^[a-z0-9-]+$/.test(subdomain)) throw new Error('Deletion paused: the cleanup Worker address is unavailable.');
 			await mutate('enable-deletion-address', () => api.enableWorkerSubdomain(accountId, job.helperName));
 			const origin = workersDevOrigin(job.helperName, subdomain);
-			await api.verifyResetWorker(origin, job.id, true, uploadTag);
+			await verifyResetWorker(api.transport, origin, job.id, true, uploadTag, api.sleep);
 			const verify = async () => {
 				const resources = await inspectDeletionResources(api, metadata);
 				if (resources.worker || resources.namespaces.length) throw new Error('Deletion paused: the original server was recreated.');
@@ -103,7 +104,7 @@ export async function deleteCrateServer(input: {
 			// The entire selected bucket is authorized for deletion. Never consult
 			// application tables or interpret object keys as paths or file formats.
 			await clearBucketObjects(api, accountId, metadata.r2BucketName, verify,
-				async keys => mutate('deleteR2Objects', () => api.deleteR2Objects(origin, job.id, cleanupToken, keys), await sha256Hex(JSON.stringify(keys))),
+				async keys => mutate('deleteR2Objects', () => deleteResetWorkerObjects(api.transport, origin, job.id, cleanupToken, keys), await sha256Hex(JSON.stringify(keys))),
 				onProgress);
 			await verify();
 			onProgress?.('Removing the empty file bucket…');

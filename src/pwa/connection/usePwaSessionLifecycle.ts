@@ -11,7 +11,6 @@ import { captureEncryptionCleanupAuthority } from '../encryption/encryption-clea
 import { resetReminderEncryption } from '../reminders/encryption-session';
 import { resetReadingEncryption } from '../reading/session/encryption-lifecycle';
 import { clearLocalData } from './local-data-cleanup';
-import { crateProtocol, crateRequestHeaders } from './request-headers';
 
 interface PwaLogoutOperations {
 	apiFetch: ApiFetch;
@@ -32,11 +31,9 @@ export async function performPwaLogout({
 	const start = (operation: () => Promise<unknown>) => {
 		try { return Promise.resolve(operation()); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); }
 	};
-	let reading: ReturnType<typeof readingSession> = null;
 	let unreadableCredential = false;
-	try { if (typeof localStorage !== 'undefined') reading = readingSession(); } catch { unreadableCredential = true; }
+	try { if (typeof localStorage !== 'undefined') readingSession(); } catch { unreadableCredential = true; }
 	const cleanup = Promise.allSettled([
-	...(reading && reading.source !== 'reminders' ? [start(async () => { const response = await fetch('/auth/session', { method: 'DELETE', signal: AbortSignal.timeout(10000), headers: crateRequestHeaders(reading.token, await crateProtocol('/auth/session', 'DELETE')) }); if (!response.ok) throw new Error('Reading session revocation failed'); })] : []),
 		start(disablePushNotifications),
 		...(revokeAppSession ? [start(() => apiFetch('/auth/session', { method: 'DELETE' }).then(response => {
 			if (!response.ok) throw new Error('Session revocation failed');
@@ -81,8 +78,7 @@ export function usePwaSessionLifecycle({
 
 	const resetLocalSession = useCallback(async (nextToken: string | null, discardPrivateData = false) => {
 		cleanupWarning.current = null;
-		// Unified settings lazily mount Reminders while a Reading-only session is
-		// open. Initializing that unauthenticated feature must not close the sheet.
+		// Resetting a connection that has no sign-in yet must not close the settings sheet.
 		let closeSettings = discardPrivateData;
 		try { closeSettings ||= localStorage.getItem(AUTH_TOKEN_KEY) !== null; } catch { closeSettings = true; }
 		invalidatePwaSession();
@@ -95,7 +91,7 @@ export function usePwaSessionLifecycle({
 		// its sign-in on expiry/replacement, preserving durable drafts and queues.
 		try {
 			const reading = readingSession();
-			if (reading?.source === 'reminders' && reading.token !== nextToken) localStorage.removeItem(READING_SESSION_KEY);
+			if (reading && reading.token !== nextToken) localStorage.removeItem(READING_SESSION_KEY);
 		} catch { /* Remaining storage cleanup reports failures below. */ }
 		// Revoke in-memory authority before touching fallible browser storage.
 		try { if (nextToken === null) localStorage.removeItem(AUTH_TOKEN_KEY); }

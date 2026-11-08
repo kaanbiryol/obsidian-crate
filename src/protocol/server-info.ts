@@ -12,8 +12,8 @@ export interface CrateServerInfo {
 	readonly serverVersion: string;
 	readonly protocol: CrateProtocolRange;
 	readonly capabilities: readonly string[];
-	readonly reminderOperationDay?: number;
-	readonly serverRevision?: number;
+	readonly reminderOperationDay: number;
+	readonly serverRevision: number;
 	readonly developmentBuild?: DevelopmentBuild;
 	readonly pwaAssetVersion?: string;
 	readonly deploymentFingerprint?: string;
@@ -62,6 +62,8 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 		|| info.serverVersion.trim().length === 0
 		|| !isValidProtocolRange(info.protocol)
 		|| !isNonEmptyStringArray(info.capabilities)
+		|| !isPositiveInteger(info.serverRevision)
+		|| !isPositiveInteger(info.reminderOperationDay)
 	) {
 		return null;
 	}
@@ -76,9 +78,9 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 		capabilities: [...info.capabilities],
 		...(typeof info.pwaAssetVersion === 'string' && /^[a-zA-Z0-9._-]{1,128}$/.test(info.pwaAssetVersion) ? { pwaAssetVersion: info.pwaAssetVersion } : {}),
 		...(parseDevelopmentBuild(info.developmentBuild) ? { developmentBuild: parseDevelopmentBuild(info.developmentBuild) } : {}),
-		...(isPositiveInteger(info.serverRevision) ? { serverRevision: info.serverRevision } : {}),
+		serverRevision: info.serverRevision,
 		...(isSha256Hex(info.deploymentFingerprint) ? { deploymentFingerprint: info.deploymentFingerprint } : {}),
-		...(isPositiveInteger(info.reminderOperationDay) ? { reminderOperationDay: info.reminderOperationDay } : {}),
+		reminderOperationDay: info.reminderOperationDay,
 	};
 }
 

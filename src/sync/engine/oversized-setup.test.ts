@@ -32,7 +32,7 @@ function createServer(capabilities: string[]) {
 			return response({ success: true, results: files.map(file => ({ path: file.path, success: true, hash: file.hash, revision: remote[file.path]!.revision })) });
 		};
 		switch (route) {
-			case '/.well-known/crate': return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities, reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
+			case '/.well-known/crate': return response({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities, reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
 			case '/sync/manifest': return response({ version: 1, files: remote, lastSeq: 10, snapshotSeq: 10, hasMore: false });
 			case '/sync/changes': return response({ changes: [], lastSeq: 10, hasMore: false });
 			case '/sync/import': return response({ import: { token: 'import-1', state: 'importing' } });

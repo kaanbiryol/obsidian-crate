@@ -53,16 +53,16 @@ export function recordRequestDiagnostic(
 
 	const usage = response ? parseD1Usage(response.header(D1_USAGE_HEADER)) : undefined;
 	if (usage) {
-		const d1 = timings.d1 ??= { rowsRead: 0, rowsWritten: 0, reportedRequests: 0, completeRequests: 0 };
+		const d1 = timings.d1 ??= { rowsRead: 0, rowsWritten: 0, reportedRequests: 0, completeRequests: 0, queries: 0 };
 		d1.rowsRead += usage.rowsRead; d1.rowsWritten += usage.rowsWritten;
 		d1.reportedRequests++; if (usage.complete) d1.completeRequests++;
-		if (usage.queries !== undefined) d1.queries = (d1.queries ?? 0) + usage.queries;
+		d1.queries += usage.queries;
 	}
 
 	log.requests.push({ at: new Date().toISOString(), operationId: request.operationId, method: request.method,
 		...(request.uploadOperationIds.length ? { uploadOperationIds: request.uploadOperationIds } : {}), route: diagnosticRoute(request.path),
 		status: response?.status ?? 0, outcome, requestId: response?.header(REQUEST_ID_HEADER) ?? undefined,
-		...(usage?.queries !== undefined ? { d1Queries: usage.queries } : {}) });
+		...(usage ? { d1Queries: usage.queries } : {}) });
 	if (log.requests.length > MAX_REQUEST_DIAGNOSTICS) log.requests.shift();
 }
 

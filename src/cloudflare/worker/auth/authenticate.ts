@@ -5,7 +5,7 @@ import { validateEncryptionState, type EncryptionServerState } from '../../../en
 import { sha256Hex } from '../../../platform/sha256';
 import { isD1DailyLimitError } from '../d1/d1-usage';
 
-type AuthScope = 'vault' | 'reminders' | 'reading' | 'reading_capture';
+type AuthScope = 'vault' | 'reminders' | 'reading_capture';
 
 export interface AuthPrincipal {
 	tokenId: string;
@@ -56,7 +56,7 @@ export async function authenticateWorkerRequest(
 		if (!row?.id) {
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
-		if (row.scope !== 'vault' && row.scope !== 'reminders' && row.scope !== 'reading' && row.scope !== 'reading_capture') {
+		if (row.scope !== 'vault' && row.scope !== 'reminders' && row.scope !== 'reading_capture') {
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
 

@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from './local-server-backup.mjs';
 import { closeLocalServerResources } from './local-server-lifecycle.mjs';
+import { resolveServerOrigin, resolveStartMode, validateCommandOptions } from './local-server-options.mjs';
 
 const help = `Crate local server
 
@@ -85,7 +86,7 @@ async function administer(dataDir, method, path, body, offline) {
 
 function printDevices(devices) {
 	if (!devices.length) { console.log('No devices are connected.'); return; }
-	const labels = { vault: 'Obsidian', reminders: 'Reminders web app', reading: 'Reading web app', reading_capture: 'Reading shortcut' };
+	const labels = { vault: 'Obsidian', reminders: 'Reminders web app', reading_capture: 'Reading shortcut' };
 	for (const device of devices) {
 		console.log(`${device.id}  ${device.name || 'Unnamed'} · ${labels[device.scope] ?? device.scope}${device.platform ? ` (${device.platform})` : ''} · last seen ${device.lastSeenAt ?? 'never'} UTC`);
 	}
@@ -105,14 +106,7 @@ try {
 	let command = positionals[0];
 	if (values.help || !command) console.log(help);
 	else {
-		if (positionals.length !== 1 || !['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'backup', 'restore', 'check-upgrade', 'upgrade'].includes(command)) throw new Error('Unknown command. Use --help for usage.');
-		if (command === 'setup' && (values.local || values.host || values.origin)) throw new Error('Setup uses a loopback listener and --hostname for the public address.');
-		if (values.quick && (values.hostname || values.local || values.origin || values.host || command === 'add-device')) throw new Error('--quick cannot be combined with hostname, local, origin, host, or add-device.');
-		if (command !== 'setup' && values.hostname) throw new Error('--hostname belongs to setup. Use --origin for an external reverse proxy.');
-		if (values.tailscale && (command !== 'setup' || values.hostname || values.quick)) throw new Error('--tailscale belongs to setup and cannot be combined with --hostname or --quick. Later starts reuse it.');
-		if (values.tailscale && docker && !tailscaleSocket()) throw new Error('In Docker, start Tailscale Funnel with compose.tailscale.yaml. See docs/self-hosting.md.');
-		if (command === 'add-device' && !values.name?.trim()) throw new Error('Provide --name for this device.');
-		if (values.name !== undefined && (!values.name.trim() || values.name.trim().length > 128)) throw new Error('Provide a device name between 1 and 128 characters.');
+		validateCommandOptions(positionals, values, { dockerWithoutTailscale: () => docker && !tailscaleSocket() });
 		process.umask(0o077);
 		const dataDir = resolve(values['data-dir'] ?? join(homedir(), '.crate', 'server'));
 		if (command === 'backup') {
@@ -144,14 +138,7 @@ try {
 			printPairing(pairing);
 		} else {
 		let remote = command !== 'add-device' && !values.local ? await readRemoteSettings(dataDir) : null;
-		const quick = values.quick || remote?.mode === 'quick' || (command === 'setup' && !remote && !values.hostname && !values.tailscale);
-		if (values.tailscale && remote && remote.mode !== 'tailscale') throw new Error('This directory already uses another remote access setup. Keep it or choose another data directory.');
-		const tailscale = values.tailscale || remote?.mode === 'tailscale';
-		if (tailscale && command === 'setup' && values.hostname) throw new Error('This directory uses Tailscale Funnel. Its address comes from Tailscale, not --hostname.');
-		if (quick && (values.hostname || values.origin || values.host || (remote && remote.mode !== 'quick'))) throw new Error('Quick Tunnel and named tunnel settings cannot be combined.');
-		const port = values.port === undefined ? remote?.port ?? (quick ? 0 : 8787) : Number(values.port);
-		if (!Number.isInteger(port) || port < (quick ? 0 : 1) || port > 65535) throw new Error('Port must be between 1 and 65535 (or 0 for an automatic Quick Tunnel port).');
-		const host = values.host ?? '127.0.0.1';
+		const { quick, tailscale, port, host } = resolveStartMode(command, values, remote);
 		if (quick) {
 			console.log('Starting Crate with a Cloudflare Quick Tunnel. Files stay on this computer; public HTTPS traffic passes through Cloudflare.');
 			console.log('This temporary address changes on restart. Keep the server computer awake and online.');
@@ -165,9 +152,6 @@ try {
 			const result = await Promise.race([stopped.then(() => null), quickServer.tunnel.exited]);
 			if (result && !shutdown.signal.aborted) throw new Error(`Cloudflare Quick Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Restart Crate to get a new address.`);
 		} else {
-			if (remote && (port !== remote.port || host !== '127.0.0.1' || (values.origin && values.origin !== `https://${remote.hostname}`))) {
-				throw new Error('Saved tunnel settings require their original hostname, port, and loopback listener. Use --local for an independent reverse proxy.');
-			}
 			if (command === 'setup' && tailscale) {
 				console.log('Setting up Tailscale Funnel. Files stay on this computer; public HTTPS traffic passes through Tailscale.');
 				await buildIfSource();
@@ -201,11 +185,7 @@ try {
 				command = 'start';
 			}
 			shutdown.signal.throwIfAborted();
-			if (remote && !tailscale && !remote.ready) throw new Error('Remote setup is incomplete. Run npm run server -- setup again.');
-			const origin = remote ? `https://${remote.hostname}` : values.origin ?? `http://localhost:${port}`;
-			if (!['127.0.0.1', '::1', 'localhost'].includes(host) && !origin.startsWith('https://')) {
-				throw new Error('Listening beyond localhost requires --origin with the HTTPS address of your reverse proxy.');
-			}
+			const origin = resolveServerOrigin({ remote, tailscale, origin: values.origin, port, host });
 			runtime = await openLocalRuntime({ dataDir, origin, administrative: command === 'add-device', handleSignals: false });
 			shutdown.signal.throwIfAborted();
 			if (command === 'add-device') printDevice(values.name, await issueLocalDevice(runtime.db, values.name));

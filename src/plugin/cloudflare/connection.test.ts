@@ -11,7 +11,7 @@ vi.mock('obsidian', async importOriginal => ({
 	requestUrl: async (request: { url: string; method?: string; body?: unknown }) => {
 		sent.push(request);
 		const text = JSON.stringify(request.url.endsWith('/.well-known/crate')
-			? { service: 'crate', serverVersion: 'test', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['e2ee-v1', 'settings-v1'] }
+			? { service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['e2ee-v1', 'settings-v1'] }
 			: request.url.endsWith('/encryption') ? { encryption: null } : { success: true, settingsVersion: 'seeded' });
 		return { status: 200, headers: { 'X-Crate-Encryption-State': 'off' }, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 	},

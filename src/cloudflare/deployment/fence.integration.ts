@@ -10,12 +10,17 @@ import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare
 import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { SERVER_RELEASE } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './types';
+import type { DevelopmentBuild } from '../../protocol/server-build';
 
 // Recovery tests exercise an older publication, independently of the launch revision.
 vi.mock('../server-release.json', async importOriginal => {
 	const { default: release } = await importOriginal<{ default: typeof import('../server-release.json') }>();
 	return { default: { ...release, revision: 2 } };
 });
+
+// Live Worker checks go through the guarded transport; each harness answers them.
+const live = vi.hoisted(() => ({ check: (_published: boolean, _origin: string, _fingerprint: string): Promise<unknown> => Promise.reject(new Error('No harness')) }));
+vi.mock('./verify-worker', () => ({ verifyWorkerDeployment: (_transport: unknown, origin: string, fingerprint: string, published = false) => live.check(published, origin, fingerprint) }));
 
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 function deferred() {
@@ -51,20 +56,23 @@ async function harness(empty = false) {
 			for (const statement of sql.split(';').map(value => value.trim()).filter(Boolean)) results.push(await env.DB.prepare(statement).bind(...params ?? []).all());
 			return results;
 		}),
-		verifyWorkerDeployment: vi.fn(async () => {}), verifyResetWorker: vi.fn(async () => true),
-		verifyPublishedWorkerDeployment: vi.fn(async () => ({ revision: SERVER_RELEASE.revision - 1, schemaVersion: SERVER_RELEASE.schemaVersion })),
+		transport: vi.fn(), sleep: vi.fn(async () => {}),
 		uploadWorker: vi.fn(async (input: { artifacts: ReturnType<typeof artifact> }) => { state.worker = { annotations: { 'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}` }, bindings }; }),
 		updateWorkerSchedules: vi.fn(async () => {}), getWorkersSubdomain: vi.fn(async (): Promise<string | null> => 'test'),
 		createWorkersSubdomain: vi.fn(async () => 'test'), enableWorkerSubdomain: vi.fn(async () => {}),
 		getWorkerSubdomain: vi.fn(async () => ({ enabled: true, previews_enabled: false })),
 		listWorkers: vi.fn(async () => [{ id: metadata.workerName }]),
 		listDurableObjectNamespaces: vi.fn(async () => state.worker?.bindings?.some(binding => binding.type === 'durable_object_namespace') ? [{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' }] : []),
-		listR2Objects: vi.fn(async () => ({ keys: [] })), deleteR2Objects: vi.fn(async () => {}),
+		listR2Objects: vi.fn(async () => ({ keys: [] })),
 		deleteR2Bucket: vi.fn(async () => { state.bucket = false; }), deleteD1Database: vi.fn(async () => { state.database = false; }),
 	};
+	const verifyWorkerDeployment = vi.fn(async (_origin: string, _fingerprint: string) => {});
+	const verifyPublishedWorkerDeployment = vi.fn(async (_origin: string, _fingerprint: string): Promise<{ revision: number; schemaVersion: number; developmentBuild?: DevelopmentBuild }> =>
+		({ revision: SERVER_RELEASE.revision - 1, schemaVersion: SERVER_RELEASE.schemaVersion }));
+	live.check = (published, origin, fingerprint) => published ? verifyPublishedWorkerDeployment(origin, fingerprint) : verifyWorkerDeployment(origin, fingerprint);
 	const deploy = (build = artifact(), client = api, saved = { ...structuredClone(metadata), d1DatabaseId: empty ? null : metadata.d1DatabaseId }) => provisionCloudflareDeployment({ api: client as never,
 		accountId: metadata.accountId!, metadata: saved, artifacts: build, onMetadataChanged: async () => {} });
-	return { api, state, metadata, deploy };
+	return { api, state, metadata, deploy, verifyWorkerDeployment, verifyPublishedWorkerDeployment };
 }
 async function held() { return env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(DEPLOYMENT_FENCE_KEY).first<{ value: string }>(); }
 
@@ -197,12 +205,12 @@ it('preserves existing file references and never reapplies fresh DDL during an u
 	expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: SERVER_RELEASE.schemaVersion });
 	expect(await env.DB.prepare('SELECT path, storage_key FROM files').first()).toEqual({ path: 'Notes/École.md', storage_key: 'existing-key' });
 	expect(h.api.queryD1.mock.calls.some(call => call[2] === schema)).toBe(false);
-	expect(h.api.verifyWorkerDeployment).toHaveBeenCalledOnce();
+	expect(h.verifyWorkerDeployment).toHaveBeenCalledOnce();
 });
 
 it('keeps a failed live check locked until the published build is verified', async () => {
 	const h = await harness();
-	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
+	h.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
 	await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
 	const record = JSON.parse((await held())!.value) as Record<string, unknown>;
 	expect(record).toMatchObject({ verificationPending: true, step: 'enable-server-address', stepState: 'confirmed' });
@@ -298,7 +306,7 @@ it.each([false, true])('recovers a lost acquisition response before any provider
 
 it('keeps repeated lost takeover responses recoverable without ever unlocking pending writes', async () => {
 	const h = await harness();
-	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
+	h.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
 	await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
 	const query = h.api.queryD1.getMockImplementation()!;
 	const resume = (resumeUpdateValue: string | undefined) => completePublishedDeployment(h.api, h.metadata, artifact(), resumeUpdateValue!);
@@ -358,7 +366,7 @@ it('refuses a schema edit hidden inside a code-only release and preserves storag
 	const h = await harness();
 	await h.deploy();
 	const changed = { ...artifact(), d1SchemaSha256: 'changed-schema' };
-	await expect(h.deploy(changed)).rejects.toThrow('earlier beta');
+	await expect(h.deploy(changed)).rejects.toThrow('different schema at the same schema version');
 	expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
 	expect(await held()).toBeNull();
 });
@@ -382,7 +390,7 @@ it('refuses a missing file bucket instead of substituting empty storage', async 
 it('finishes a confirmed older publication from a newer plugin without uploading or changing vault data', async () => {
 	const h = await harness();
 	await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/Keep.md', 'notes/keep.md', 'existing-key')").run();
-	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	h.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
 	await expect(h.deploy()).rejects.toThrow('fence remains held');
 	const value = (await held())!.value;
 	const newer = artifact('0.2.0', 'e'.repeat(64));
@@ -399,10 +407,10 @@ it('finishes a confirmed older publication from a newer plugin without uploading
 
 it('keeps failed publication verification locked and permits checking it again', async () => {
 	const h = await harness();
-	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	h.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
 	await expect(h.deploy()).rejects.toThrow('fence remains held');
 	const newer = artifact('0.2.0', 'e'.repeat(64));
-	h.api.verifyPublishedWorkerDeployment.mockRejectedValueOnce(new Error('Public fingerprint mismatch'));
+	h.verifyPublishedWorkerDeployment.mockRejectedValueOnce(new Error('Public fingerprint mismatch'));
 	await expect(completePublishedDeployment(h.api, h.metadata, newer, (await held())!.value)).rejects.toThrow('Public fingerprint mismatch');
 	expect(JSON.parse((await held())!.value)).toMatchObject({ completionOnly: true, verificationPending: true, step: 'acquire-deployment', stepState: 'confirmed' });
 	const recovery = await recoverDeployment(h.api, h.metadata, newer.fingerprint);
@@ -414,23 +422,23 @@ it('keeps failed publication verification locked and permits checking it again',
 
 it('does not take ownership if the old updater advances after inspection', async () => {
 	const h = await harness();
-	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	h.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
 	await expect(h.deploy()).rejects.toThrow('fence remains held');
 	const value = (await held())!.value;
 	const advanced = JSON.stringify({ ...JSON.parse(value), step: 'record-release', stepState: 'started' });
 	await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(advanced, DEPLOYMENT_FENCE_KEY).run();
 	await expect(completePublishedDeployment(h.api, h.metadata, artifact('0.2.0', 'e'.repeat(64)), value)).rejects.toThrow('Another deployment');
 	expect((await held())!.value).toBe(advanced);
-	expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
+	expect(h.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
 });
 
 it.each(['storage', 'schema', 'release'])('retains the publication lock when %s verification fails', async problem => {
 	const h = await harness();
-	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	h.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
 	await expect(h.deploy()).rejects.toThrow('fence remains held');
 	if (problem === 'storage') h.state.worker!.bindings![0]!.id = 'different-database';
 	if (problem === 'schema') await env.DB.prepare('UPDATE crate_schema SET version = 999').run();
-	if (problem === 'release') h.api.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision + 1, schemaVersion: SERVER_RELEASE.schemaVersion });
+	if (problem === 'release') h.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision + 1, schemaVersion: SERVER_RELEASE.schemaVersion });
 	await expect(completePublishedDeployment(h.api, h.metadata, artifact('0.2.0', 'e'.repeat(64)), (await held())!.value)).rejects.toThrow('fence remains held');
 	expect(await held()).not.toBeNull();
 	expect(await env.DB.prepare('SELECT * FROM crate_release').first()).toBeNull();
@@ -438,7 +446,7 @@ it.each(['storage', 'schema', 'release'])('retains the publication lock when %s 
 
 it('never retries an unconfirmed release-record write during publication recovery', async () => {
 	const h = await harness();
-	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+	h.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
 	await expect(h.deploy()).rejects.toThrow('fence remains held');
 	const query = h.api.queryD1.getMockImplementation()!;
 	h.api.queryD1.mockImplementation(async (...args) => {
@@ -487,7 +495,7 @@ it.each([{ enabled: false, previews_enabled: false }, { enabled: true, previews_
 	const original = (await held())!.value;
 	await expect(completePublishedDeployment(h.api, h.metadata, artifact(), original)).rejects.toThrow('address settings');
 	expect((await held())!.value).toBe(original);
-	expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
+	expect(h.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
 });
 
  it('replaces a rejected upload with a corrected artifact while preserving the fence and vault data', async () => {
@@ -512,7 +520,7 @@ it.each([{ enabled: false, previews_enabled: false }, { enabled: true, previews_
 		artifacts: fixed, resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
 	expect(await held()).toBeNull();
 	expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'retained-test'").first()).toEqual({ value: 'retained' });
-	expect(h.api.verifyWorkerDeployment).toHaveBeenCalledWith(expect.any(String), fixed.fingerprint);
+	expect(h.verifyWorkerDeployment).toHaveBeenCalledWith(expect.any(String), fixed.fingerprint);
  });
 
 it('deploys successive development builds, promotes to stable, and rejects reuse or rollback', async () => {
@@ -542,9 +550,9 @@ it('retains a development identity when an interrupted publication is completed 
 	const h = await harness();
 	const development = { number: 7, worker: h.metadata.workerName };
 	const build = { ...artifact('0.1.0', 'a'.repeat(64)), development };
-	h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('route not ready'));
+	h.verifyWorkerDeployment.mockRejectedValueOnce(new Error('route not ready'));
 	await expect(h.deploy(build)).rejects.toThrow();
-	h.api.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision, schemaVersion: SERVER_RELEASE.schemaVersion, developmentBuild: development } as Awaited<ReturnType<typeof h.api.verifyPublishedWorkerDeployment>>);
+	h.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision, schemaVersion: SERVER_RELEASE.schemaVersion, developmentBuild: development });
 	const pending = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
 	await completePublishedDeployment(h.api, h.metadata, artifact(), pending.resumeValue!);
 	const saved = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_development_build'").first<{ value: string }>();

@@ -2,12 +2,10 @@ import { ButtonComponent, Notice, Setting, setIcon } from 'obsidian';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { errorMessage } from '../../platform/logger';
 import { writeSyncSettings } from '../../plugin/sync-connection';
-import { QRModal } from './qr-modal';
 import { AddDeviceModal, canAddDeviceWithCode } from './add-device-modal';
 import { loadConnectedDevices } from '../../plugin/settings-ui-state';
-import { buildEnrollmentUrl } from './reminders-web-app';
-import { openSyncActivity } from '../activity/activity-modal';
-import { runSyncNow } from '../../plugin/sync-integration';
+import { showWebAppCode } from './reminders-web-app';
+import { openSyncActivity, runSyncNow } from '../../plugin/sync-integration';
 import type { SettingsSectionContext } from './section-helpers';
 
 interface GetStartedStep {
@@ -140,13 +138,7 @@ function buildSteps({ containerEl, plugin }: SettingsSectionContext, devices: Re
 			name: 'Install the web app',
 			desc: 'Reminder notifications and Reading, from your home screen.',
 			done: connectedDeviceKinds(devices).webApp,
-			action: { label: 'Show code', run: async () => {
-				try {
-					new QRModal(plugin.app, await buildEnrollmentUrl(plugin)).open();
-				} catch (error) {
-					new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
-				}
-			} },
+			action: { label: 'Show code', run: () => showWebAppCode(plugin) },
 		},
 	];
 }

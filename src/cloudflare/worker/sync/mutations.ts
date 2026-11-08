@@ -145,7 +145,9 @@ export const COMMIT_CONTEXT_COLUMNS = `${ENCRYPTION_STATE_SQL} AS encryption,
     (SELECT folder_path FROM notification_policy WHERE id = 1) AS reminderFolder,
     (SELECT folder_path FROM reading_policy WHERE id = 1) AS readingFolder`;
 export interface CommitContextRow { encryption: string | null; reminderFolder: string | null; readingFolder: string | null }
-export function parseCommitContext(row: CommitContextRow | null): Pick<StagedFileCommitInput, 'encryptionState' | 'reminderFolder' | 'readingPolicy'> {
+/** Server state a Markdown writer otherwise reads for each file it commits. */
+export type CommitContext = Pick<StagedFileCommitInput, 'encryptionState' | 'reminderFolder' | 'readingPolicy'>;
+export function parseCommitContext(row: CommitContextRow | null): CommitContext {
 	return { encryptionState: parseEncryptionState(row?.encryption ?? null), reminderFolder: row?.reminderFolder ?? null,
 		readingPolicy: row?.readingFolder ? { folder_path: row.readingFolder } : null };
 }
@@ -169,7 +171,7 @@ export async function commitStagedFile(
 		uploadMutation(db, upload),
 		...recordEncryptedFile(db, params.path, params.objectKey, encryption.descriptor),
 		publishedChangelogStatement(db, params),
-		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, false, Boolean(encryption.state), params.reminderFolder, params.size),
+		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, { encrypted: Boolean(encryption.state), reminderFolder: params.reminderFolder, size: params.size }),
 		...await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
 			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state), revision: params.readingRevision }),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
@@ -244,7 +246,7 @@ export async function commitFileDelete(
 		...recorded,
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
-		...await enqueueFileProjection(db, params.path, null, null, false, undefined, params.reminderFolder),
+		...await enqueueFileProjection(db, params.path, null, null, { reminderFolder: params.reminderFolder }),
 		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }], { policy: params.readingPolicy, revision: params.readingRevision }),
 		...(params.effects?.([{ path: params.path, storageKey: null }]) ?? []),
 	]);

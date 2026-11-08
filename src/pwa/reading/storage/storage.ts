@@ -110,8 +110,7 @@ export async function pendingReading(session: ReadingSession): Promise<PendingRe
  * session's queue. Without a body a capture has no operation ID or receipt, so sending
  * it now cannot repeat a write. Sent and other changes stay for review and export. */
 export function adoptEarlierReadingCaptures(session: ReadingSession): Promise<void> {
-	// Session IDs linked to Reminders end with the folder generation, which changes with the folder.
-	if (session.source !== 'reminders') return Promise.resolve();
+	// Session IDs end with the folder generation, which changes with the folder.
 	const own = readingKeys.pending(session.id);
 	const sameFolder = (key: string) => key !== own && key.startsWith(readingKeys.pending('reminders:')) && key.endsWith(`:${session.generation}`);
 	return readingLock(async () => {

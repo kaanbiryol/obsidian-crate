@@ -6,7 +6,8 @@ import { Notice, Platform, TFile, type Events, type TAbstractFile } from 'obsidi
 import type CratePlugin from './CratePlugin';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import { notifyConflicts } from '../sync/conflict/conflict';
-import { openSyncActivity } from '../ui/activity/activity-modal';
+import { ActivityModal } from '../ui/activity/activity-modal';
+import type { ActivityTab } from '../ui/activity/ActivityTabs';
 import { errorMessage } from '../platform/logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from './lifecycle-state';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
@@ -28,7 +29,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		configDir: plugin.app.vault.configDir,
 		isMobile: Platform.isMobile,
 		register: cleanup => plugin.register(cleanup),
-		showSyncError: message => showSyncErrorNotice(plugin, message),
+		showSyncError: message => showSyncError(plugin, message),
 	}, plugin.syncRuntime);
 	let serverUnavailable = false;
 	plugin.syncRuntime.addStateChangeListener(state => {
@@ -96,6 +97,19 @@ function openFileHistoryWhenReady(plugin: CratePlugin, path: string): void {
 	});
 }
 
+/** Opens sync activity. Its Sync and Stop buttons run the same actions as the commands. */
+export function openSyncActivity(plugin: CratePlugin, tab?: ActivityTab): void {
+	new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime, {
+		sync: () => runSyncNow(plugin),
+		stop: () => stopSyncNow(plugin),
+	}, tab).open();
+}
+
+/** A sync failure notice whose link opens the errors in sync activity. */
+export function showSyncError(plugin: CratePlugin, message: string): void {
+	showSyncErrorNotice(message, () => openSyncActivity(plugin, 'history'));
+}
+
 /** A confirmed vault replacement waits for the first sync. Start it now and show its
  * progress, so selecting Replace visibly replaces the vault. Resolves whether it started. */
 export function startVaultReplacement(plugin: CratePlugin): boolean {
@@ -115,7 +129,7 @@ export async function runSyncNow(plugin: CratePlugin): Promise<void> {
 		const result = await plugin.syncRuntime.sync();
 		if (result.outcome === 'cancelled') return;
 		if (!result.success) {
-			showSyncErrorNotice(plugin, 'Sync completed with errors.');
+			showSyncError(plugin, 'Sync completed with errors.');
 		}
 		notifyConflicts(result.conflicts);
 	} catch (error) {

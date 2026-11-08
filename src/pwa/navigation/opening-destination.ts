@@ -1,6 +1,7 @@
 import type { StartTab } from '../types';
 
-/** No account data: safe to use before enrollment or the cached shell loads. */
+/** No account data: safe to use before enrollment or the cached shell loads.
+ * Self-contained, since opening-dock.ts inlines its source: it repeats `parseStartTab` instead of importing it. */
 export function resolvePwaOpeningDestination(search: string, defaultScreen: unknown = 'today') {
 	const tabs = ['inbox', 'today', 'upcoming', 'browse'];
 	const params = new URLSearchParams(search);

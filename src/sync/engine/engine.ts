@@ -35,9 +35,9 @@ import { runForceFullSyncWorkflow } from './force-sync-workflow';
 import { runSyncWorkflow } from './standard-sync-workflow';
 import { AUTH_ERROR_MESSAGE, ReconnectNotice } from '../sync-outcome';
 import { SyncEngineContexts } from './contexts';
-import { runReconcileWorkflow } from './reconcile-paths';
+import { runReconcileWorkflow } from './reconcile-workflow';
 import { SyncEngineLifecycle } from './lifecycle';
-import { createEmptySyncResult } from '../sync-result';
+import { createEmptySyncResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { mergeSyncResults } from '../sync-result';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { LocalContentVerifier } from './content-verifier';
@@ -186,7 +186,13 @@ export class SyncEngine {
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			retryReminderScope: () => this.retryReminderScope(),
 			verifyPendingPaths: (keys, isCurrent) => this.verifyPendingPaths(keys, isCurrent),
-			reconcileQueue: queueKeys => this.reconcileFromQueue(queueKeys),
+			reconcileQueue: async queueKeys => {
+				const result = await this.reconcileFromQueue(queueKeys);
+				// A refusal because another sync is running is not an attempt; that sync covers these keys.
+				const busy = result.errors.length === 1 && result.errors[0] === SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS;
+				if (!busy && !this.lifecycle.isDestroyed) await this.onAutomaticSyncResult?.(result);
+				return result;
+			},
 			onFlushResult: result => this.onAutomaticSyncResult?.(result),
 		});
 		this.queueController = new SyncQueueController(this.contexts.queue);

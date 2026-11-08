@@ -324,11 +324,12 @@ it('sends an unupgradable server to deletion instead of suggesting a retry', asy
 	const { startCloudflareDeployment } = await loadPluginIntegration();
 	const { UnupgradableServerError } = await import('../../cloudflare/deployment/database');
 	const plugin = createPlugin(true);
-	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new UnupgradableServerError());
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(
+		new UnupgradableServerError('This server’s database is too old for this version of Crate to upgrade.'));
 	await startCloudflareDeployment(plugin as never, 'update');
 	const [title, message, steps, options] = progress.fail.mock.lastCall as [string, string, string[], { action: { label: string; onClick: unknown } }];
 	expect([title, message, steps]).toEqual(['This server can’t be updated',
-		'This server was created by an earlier beta and its database cannot be upgraded.',
+		'This server’s database is too old for this version of Crate to upgrade.',
 		['Open Crate settings → Advanced server actions and select Delete server and all data, then connect again to create a new server. Your local vault files are kept.']]);
 	expect(options.action.label).toBe('Open settings');
 	expect(options.action.onClick).toBeTypeOf('function');

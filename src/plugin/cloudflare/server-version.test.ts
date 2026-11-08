@@ -6,7 +6,6 @@ vi.mock('../../cloudflare/deployment/embedded-artifacts', () => ({ EMBEDDED_CLOU
 
 it('offers the bundled server for an older revision or a development build it can replace', () => {
 	const development = { worker: 'crate-0123456789abcdef', number: 3 };
-	expect(isBundledServerNewer({})).toBe(false);
 	expect(isBundledServerNewer({ serverRevision: release.revision - 1 })).toBe(true);
 	expect(isBundledServerNewer({ serverRevision: release.revision })).toBe(false);
 	expect(isBundledServerNewer({ serverRevision: release.revision, deploymentFingerprint: 'a'.repeat(64), developmentBuild: development })).toBe(false);

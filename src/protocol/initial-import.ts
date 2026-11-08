@@ -34,7 +34,8 @@ export interface ReminderSetupStatus {
 	ready: boolean;
 	error?: string;
 	progress?: ReminderSetupProgress;
-	/** `code` and the one-based source `line` are additive; older servers send neither. */
+	/** The Worker sets `code`, and the one-based source `line` where known, only for issues it
+	 * recognizes; others, such as transient storage errors, have neither. */
 	issues?: Array<{ path: string; message: string; code?: SyncIssueCode; line?: number }>;
 	moreIssues?: boolean;
 }

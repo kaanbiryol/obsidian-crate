@@ -295,17 +295,16 @@ it('reports active keys and offers recovery when this device has damaged keys', 
 	expect(body.collectText()).toContain('Unlock vault');
 });
 
-it.each([true, false])('lets a locked device request keys from an unlocked one when the server supports it (%s)', async supported => {
+it('lets a locked device request keys from an unlocked one', async () => {
 	const keysModal = vi.fn();
 	vi.doMock('../device-key-pairing-modal', () => ({ DeviceKeyPairingModal: class { open = keysModal; } }));
-	if (supported) capabilities = ['device-pairing-v1'];
 	await configure('active'); values.delete(SECRET_KEYS.ENCRYPTION_KEYS);
 	await open();
 	await vi.waitFor(() => expect(body.collectText()).toContain('Unlock vault'));
 	const request = MockSetting.instances.flatMap(item => item.buttons).find(button => button.buttonEl.textContent === 'Request keys');
-	expect(Boolean(request)).toBe(supported);
+	expect(request).toBeDefined();
 	request?.click();
-	expect(keysModal).toHaveBeenCalledTimes(supported ? 1 : 0);
+	expect(keysModal).toHaveBeenCalledOnce();
 });
 
 

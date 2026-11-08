@@ -32,7 +32,7 @@ import type { ForceSyncWorkflowContext } from './force-sync-workflow';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
 import { createPathRecord } from '../../protocol/path-record';
-import { moveVaultToTrash } from '../local/vault-replacement';
+import { replaceVaultBeforeFirstSync } from '../local/vault-replacement';
 import type { SyncQueueControllerContext } from '../queue/controller';
 
 const VAULT_REPLACEMENT_UNFINISHED = 'Select Sync now to finish replacing this vault with your Crate server’s contents.';
@@ -281,16 +281,12 @@ export class SyncEngineContexts {
 	}
 
 	/** Runs before anything else in a standard sync. The runtime saves the cleared flag with the sync's progress. */
-	readonly replaceLocalVault = async (): Promise<void> => {
+	readonly replaceLocalVault = (): Promise<void> => {
 		const d = this.dependencies;
-		const settings = d.getSettings();
-		if (!settings.replaceVault) return;
-		// Once a file has synced, moving the vault again would trash the server's copies.
-		if (settings.lastSeq === 0 && !Object.keys(d.localManifest.getManifest().files).length) {
-			d.updateState({ work: { phase: 'applying' } });
-			await moveVaultToTrash(d.vault, d.pluginDir, d.throwIfDestroyed);
-		}
-		settings.replaceVault = false;
+		return replaceVaultBeforeFirstSync({
+			settings: d.getSettings(), manifest: d.localManifest, vault: d.vault, pluginDir: d.pluginDir,
+			reportWork: this.reportWork, throwIfDestroyed: d.throwIfDestroyed,
+		});
 	};
 
 	readonly finishInitialSetup = (): Promise<void> => {

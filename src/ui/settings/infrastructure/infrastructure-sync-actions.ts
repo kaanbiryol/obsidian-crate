@@ -1,4 +1,4 @@
-import { showSyncErrorNotice } from '../../sync-error-notice';
+import { showSyncError } from '../../../plugin/sync-integration';
 import { Notice, Setting } from 'obsidian';
 import { openConfirmationModal } from '../../plugin/confirmation-modal';
 import { errorMessage } from '../../../platform/logger';
@@ -55,7 +55,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 						if (result.success) {
 							new Notice(`Server files replaced: ${result.uploaded} uploaded, ${result.deleted} deleted`);
 						} else {
-							showSyncErrorNotice(plugin, 'Server file replacement completed with errors.');
+							showSyncError(plugin, 'Server file replacement completed with errors.');
 						}
 					},
 					onError: (error) => {

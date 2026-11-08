@@ -2,6 +2,7 @@ import type { SyncIndicatorState } from '../../ui/shared/SyncIndicator';
 import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
 import type { DataMode } from '../types';
 import type { ReminderIndexingProgress } from '../reminders/reminder-api';
+import { pausedFeatureLabel } from './state';
 
 interface PwaSyncIndicatorProps {
 	changes: PendingReminderChange[];
@@ -48,9 +49,8 @@ export function reminderFeatureStatus({ enabled, syncStatus, pendingCount, needs
 	needsRecovery: boolean;
 	storageError: string | null;
 }) {
-	const pausedLabel = pendingCount ? `Paused: ${pendingCount} ${pendingCount === 1 ? 'change' : 'changes'} saved on this device` : 'Paused';
 	return {
-		status: enabled ? syncStatus : { state: needsRecovery || storageError ? 'error' as const : 'cached' as const, label: pausedLabel },
+		status: enabled ? syncStatus : { state: needsRecovery || storageError ? 'error' as const : 'cached' as const, label: pausedFeatureLabel(pendingCount) },
 		attention: needsRecovery ? 'Saved reminder changes need review.' : syncStatus.state === 'error' ? syncStatus.label : null,
 		unsynced: pendingCount > 0 || needsRecovery || Boolean(storageError),
 	};

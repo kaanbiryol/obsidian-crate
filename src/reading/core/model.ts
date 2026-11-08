@@ -28,6 +28,8 @@ export interface ReadingItem extends ReadingMetadata { path: string }
 export const ARTICLE_START = '<!-- crate:article:start -->';
 export const ARTICLE_END = '<!-- crate:article:end -->';
 export const MAX_READING_BYTES = 1024 * 1024;
+/** Longest Reading title, in UTF-16 code units, that notes and captures accept. */
+export const MAX_READING_TITLE_LENGTH = 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function readingUrl(value: unknown): string {
@@ -76,7 +78,7 @@ export function validateReadingMetadata(value: Record<string, unknown>): Reading
 	if (value.highlight_format !== undefined && value.highlight_format !== 'markdown-v1') throw new Error('Unsupported highlight format.');
 	if (value.crate_reading_version !== 1) throw new Error('Unsupported reading note version.');
 	if (typeof value.crate_reading_id !== 'string' || !UUID.test(value.crate_reading_id)) throw new Error('Reading note needs a valid ID.');
-	if (typeof value.title !== 'string' || !value.title.trim() || value.title.length > 1000) throw new Error('Reading note needs a title of at most 1,000 characters.');
+	if (typeof value.title !== 'string' || !value.title.trim() || value.title.length > MAX_READING_TITLE_LENGTH) throw new Error('Reading note needs a title of at most 1,000 characters.');
 	if (value.reading_status !== 'inbox' && value.reading_status !== 'archived') throw new Error('Reading status must be inbox or archived.');
 	if (typeof value.favorite !== 'boolean') throw new Error('Favorite must be true or false.');
 	if (!Array.isArray(value.tags) || value.tags.length > 50 || value.tags.some(tag => typeof tag !== 'string' || !tag.trim() || tag.length > 100)) throw new Error('Use up to 50 text tags of at most 100 characters.');

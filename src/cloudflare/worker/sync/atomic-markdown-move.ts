@@ -6,6 +6,7 @@ import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads'
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements } from '../reading/library-index';
 import type { CommitEffects } from './commit-effects';
+import type { CommitContext } from './mutations';
 import { changedRows } from '../d1/db';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { stageMarkdownFile } from './markdown-file-staging';
@@ -25,11 +26,13 @@ export async function writeCommittedMarkdownMove(
 		destination: { path: string; content: string };
 		effects?: CommitEffects;
 		audit?: MutationAuditContext;
+		/** Server state the caller already read under the coordinator lock. */
+		context?: CommitContext;
 	},
 ): Promise<{ hash: string; size: number; revision: string; deletion: FileDeletionReceipt }> {
-	const { source } = params;
+	const { source, context } = params;
 	if (portablePathKey(source.path) === portablePathKey(params.destination.path)) throw new Error('A move requires two distinct paths');
-	const encryption = await prepareEncryptedFileCommit(db, params.destination.path, params.destination.content);
+	const encryption = await prepareEncryptedFileCommit(db, params.destination.path, params.destination.content, context?.encryptionState);
 	const destination = await stageMarkdownFile(bucket, db, params.destination.path, params.destination.content, null, Boolean(encryption.state));
 	const audit = params.audit ?? { requestId: crypto.randomUUID(), deviceId: null, clientSession: null, operationId: null };
 	const deletion = `__crate__/deletions/${crypto.randomUUID()}`;
@@ -48,7 +51,7 @@ export async function writeCommittedMarkdownMove(
 				...sourceArgs, ...namespace.args, ...lease.args, ...guard.args),
 		...recordEncryptedFile(db, destination.path, destination.objectKey, encryption.descriptor),
 		publishedChangelogStatement(db, destination),
-		...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, false, Boolean(encryption.state)),
+		...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, { encrypted: Boolean(encryption.state), reminderFolder: context?.reminderFolder }),
 		finishStagedUpload(db, destination.objectKey, destination.path),
 		...deletedFileStatements(db, `${sourceMatch} AND ${published.sql}`, [...sourceArgs, ...published.args], deletion),
 	];
@@ -57,10 +60,10 @@ export async function writeCommittedMarkdownMove(
 		sourceStatement('DELETE FROM files'),
 		// Must directly follow the delete's changelog row.
 		recordFileDeletion(db, source.path, source.expectedHash, source.expectedRevision, deletion, audit),
-		...await enqueueFileProjection(db, source.path, null, null),
+		...await enqueueFileProjection(db, source.path, null, null, { reminderFolder: context?.reminderFolder }),
 		...await readingIndexStatements(db, [{ path: source.path, storageKey: null },
 			{ path: destination.path, storageKey: destination.objectKey, hash: destination.hash, size: destination.size, content: params.destination.content }],
-			{ encrypted: Boolean(encryption.state) }),
+			{ policy: context?.readingPolicy, encrypted: Boolean(encryption.state) }),
 		...(params.effects?.([{ path: destination.path, storageKey: destination.objectKey }]) ?? []),
 	]);
 	const inserted = changedRows(results[0]) === 1, removed = changedRows(results[beforeDelete.length]) === 1;

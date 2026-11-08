@@ -30,12 +30,9 @@ export class DurableRestores {
 		let intent = this.manifest.getRestoreIntents().find(item => item.request.storageKey === version.storage_key);
 		if (intent?.phase === 'committed') return;
 		const info = await this.transport.getServerInfo();
-		if (info.reminderOperationDay === undefined) {
-			throw new Error('Update the Crate server before restoring files. This server cannot safely confirm restore retries.');
-		}
 		if (!intent) {
 			const current = getPathEntry((await this.transport.getFileMetadata([version.path])).files, version.path);
-			if (current && !current.revision) throw new Error('The server did not return the current file revision. Update it before restoring.');
+			if (current && !current.revision) throw new Error('The server did not return the current file revision. No files were changed.');
 			intent = { version, phase: 'pending', request: { operationId: createReminderOperationId(info.reminderOperationDay),
 				path: version.path, storageKey: version.storage_key, expectedHash: current?.hash ?? null, expectedRevision: current?.revision ?? null } };
 			const wire = await this.transport.prepareRestoreWire?.(intent);

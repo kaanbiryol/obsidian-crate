@@ -1,7 +1,6 @@
 import { Setting } from 'obsidian';
 import type { SettingsSectionContext } from '../section-helpers';
-import { openSyncActivity } from '../../activity/activity-modal';
-import { runSyncNow, stopSyncNow } from '../../../plugin/sync-integration';
+import { openSyncActivity, runSyncNow, stopSyncNow } from '../../../plugin/sync-integration';
 import { syncConnectionFailureMessage } from './self-hosted-errors';
 
 export function renderConnectionStatus({ containerEl, plugin }: Omit<SettingsSectionContext, 'rerender'>): () => void {

@@ -22,13 +22,14 @@ const { outputFiles } = await build({
       getState: () => ({ status, initializing, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 }),
       getPendingKeys: () => [], getPendingChangeCount: () => 0, hasPendingKey: () => false, getActiveConflicts: () => [],
       getActivityProgress: () => null, addProgressListener: () => {}, removeProgressListener: () => {},
-      sync: async () => window.setSyncing(true), stopSync: async () => window.setSyncing(false),
       addStateChangeListener: fn => listeners.add(fn), removeStateChangeListener: fn => listeners.delete(fn),
       listSharedCheckpoints: async () => [], loadHistoryComparison: unused, createHistoryRestore: unused,
       loadPendingDiff: unused, syncSelected: unused, createPendingDiscard: unused, createConflictReview: unused,
       listRecentFileVersions: unused, getPendingRestores: () => [], loadFileHistoryPreview: unused,
       restoreRecentFileVersion: unused, loadCurrentSyncedPreview: unused,
     };
+    // The plugin's Sync now and Stop sync actions.
+    const actions = { sync: async () => window.setSyncing(true), stop: async () => window.setSyncing(false) };
     const app = { vault: { configDir: '.obsidian' } };
     window.setSyncing = syncing => { status = syncing ? 'syncing' : 'idle'; for (const fn of listeners) fn(); };
     window.finishStartup = () => { initializing = false; for (const fn of listeners) fn(); };
@@ -46,8 +47,8 @@ const { outputFiles } = await build({
       }, { ...deps, listSharedCheckpoints: () => new Promise((resolve, reject) => {
         window.resolveSharedHistory = () => resolve([]);
         window.rejectSharedHistory = () => reject(new Error('Offline'));
-      }) }, 'history').open();
-      else new ActivityModal(app, { syncHistory: [], workerUrl: 'https://crate.example' }, deps).open();
+      }) }, actions, 'history').open();
+      else new ActivityModal(app, { syncHistory: [], workerUrl: 'https://crate.example' }, deps, actions).open();
     };
     window.mount('activity');
   ` },

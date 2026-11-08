@@ -10,7 +10,7 @@ function response(value: unknown) {
 }
 function harness() {
 	const transport = vi.fn<ApiHttpTransport>(async () => response({
-		service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [],
+		service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [],
 	}));
 	return { transport, http: new WorkerApiHttpClient('https://old.example', 'old-token', transport) };
 }

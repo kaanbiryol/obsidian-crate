@@ -5,9 +5,10 @@ import { renderHook } from '../../test/react-hooks';
 import { loadReadingArticle } from './api';
 import { cacheReadingArticle, readReadingArticle, type ReadingCache } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
+import { AUTH_TOKEN_KEY } from '../config';
 import { useReadingArticle } from './useReadingArticle';
 
-vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, readingEncryptionHeaders: () => ({}) }));
+vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingEncryptionKeys: () => null, readingNoteFolder: ({ folderPath }: { folderPath: string }) => folderPath, readingEncryptionHeaders: () => ({}) }));
 vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),
 	readReadingArticle: vi.fn(), cacheReadingArticle: vi.fn(async () => {}),
@@ -37,7 +38,7 @@ const malformed = [
 beforeEach(() => {
 	vi.clearAllMocks(); network.mockReset();
 	vi.mocked(readReadingArticle).mockReset().mockResolvedValue(saved);
-	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : null });
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : key === AUTH_TOKEN_KEY ? session.token : null });
 	vi.stubGlobal('location', { href: 'https://example.test/notifications?section=reading' });
 	vi.stubGlobal('navigator', { onLine: true });
 	vi.stubGlobal('fetch', network);

@@ -83,8 +83,7 @@ retain their identity and exact bytes. Metadata is normalized before queuing so
 JSON key order cannot cause false conflicts. Server projections are rebuilt from
 Markdown without changing the database schema. Old projections refresh on their
 next library read. A saved highlight's response carries the committed item, so the
-web app updates its library and offline copy without downloading the article again;
-an older server's response falls back to reading the edited items, three at a time.
+web app updates its library and offline copy without downloading the article again.
 
 The implementation follows Web Clipper's ideas of contextual anchors and grouped
 selections, but does not import extension internals or copy its source. Defuddle

@@ -23,6 +23,7 @@ export class SyncIssueError extends Error {
 }
 
 export const OVERSIZED_LOCAL_FILE_MESSAGE = 'Skipped local file larger than 25MB; this file is not synced';
+export const OVERSIZED_REMOTE_FILE_MESSAGE = 'Skipped remote file larger than 25MB';
 
 /** A file sync deliberately leaves out. It is reported as an issue, but it is not a
  * failure: it must not block the sync cursor, the queue or a completed sync. */
@@ -31,7 +32,7 @@ export class SkippedFileError extends Error {
 }
 
 export const skippedFileIssue = (path: string): SyncIssue => ({ path, message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' });
-export const oversizedRemoteFileIssue = (path: string): SyncIssue => ({ path, message: 'Skipped remote file larger than 25MB', code: 'file-too-large' });
+export const oversizedRemoteFileIssue = (path: string): SyncIssue => ({ path, message: OVERSIZED_REMOTE_FILE_MESSAGE, code: 'file-too-large' });
 /** The server may only create sealed notes; one that would replace or take the name of a synced file is not applied. */
 export const rejectedSealedNoteIssue = (path: string): SyncIssue => ({ path,
 	message: 'Skipped a note the server created because it would replace or take the name of a note already synced here. The local copy is unchanged.' });

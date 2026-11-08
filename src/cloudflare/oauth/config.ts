@@ -19,6 +19,18 @@ export const CLOUDFLARE_OAUTH_SCOPES = [
 	CLOUDFLARE_ANALYTICS_SCOPE,
 ] as const;
 
+/** Whether a token's space-separated `granted` scopes include each `required` one. */
+export function hasOAuthScopes(granted: string, required: readonly string[] = CLOUDFLARE_OAUTH_SCOPES): boolean {
+	const scopes = granted.split(/\s+/);
+	return required.every(scope => scopes.includes(scope));
+}
+
+/** Whether a token's space-separated `granted` scopes are all ones Crate requests. */
+export function hasOnlyRequestedOAuthScopes(granted: string): boolean {
+	const requested: readonly string[] = [...CLOUDFLARE_OAUTH_SCOPES, 'offline_access'];
+	return granted.split(/\s+/).every(scope => requested.includes(scope));
+}
+
 export function isCloudflareOAuthConfigured(): boolean {
 	return CLOUDFLARE_OAUTH_CLIENT_ID !== 'not-configured'
 		&& /^[a-f0-9]{32}$/i.test(CLOUDFLARE_OAUTH_CLIENT_ID);

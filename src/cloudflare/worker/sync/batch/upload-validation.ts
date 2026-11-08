@@ -1,7 +1,7 @@
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { BatchUploadResponse } from '../../../../protocol/sync-types';
 import { corsResponse } from '../../http/cors';
-import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath } from '../../http/request-validation';
+import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath, UPLOAD_BATCH_JSON_BODY_BYTES } from '../../http/request-validation';
 import {
 	formatMutationError, MAX_BATCH_UPLOAD_FILES, MAX_BATCH_TOTAL_BYTES,
 	parseExpectedFileHash, type ExpectedFileHash,
@@ -13,7 +13,7 @@ import { sha256Hex } from '../../../../platform/sha256';
 
 /** Validate and decode the complete request before receipts, staging or commits. */
 export async function prepareBatchUpload(request: Request, expectedEncryption?: EncryptionServerState | null) {
-	const parsedBody = await parseJsonObject(request, 15 * 1024 * 1024);
+	const parsedBody = await parseJsonObject(request, UPLOAD_BATCH_JSON_BODY_BYTES);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}

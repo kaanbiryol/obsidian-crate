@@ -21,7 +21,7 @@ async function fixture() {
 	const hash = await sha256Hex(content);
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		if (!request.url.endsWith('/.well-known/crate')) throw new Error('Lost response');
-		const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL,
+		const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL,
 			reminderOperationDay: Math.floor(Date.now() / 86_400_000), capabilities: [] });
 		return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 	});

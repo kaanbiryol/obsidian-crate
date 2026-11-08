@@ -1,6 +1,6 @@
 import type { ConnectionTestResult } from '../types';
 import type { EncryptedFiles, UploadPreconditions } from '../encryption/encrypted-files';
-import { distinctLocalName, type WireStore } from '../encryption/path-index';
+import { assignPlainPaths, type WireStore } from '../encryption/path-index';
 import type { JournalUpload } from '../durability/upload-intent';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
 import { base64ToArrayBuffer } from '../encoding';
@@ -38,7 +38,6 @@ import {
 } from '../../protocol/server-info';
 import { assertPortablePathNames, assertPortablePaths } from '../../protocol/portable-path';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
-import { portablePathKey } from '../../protocol/portable-path';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, REVISION_HEADER } from '../../protocol/http-headers';
 import {
@@ -65,21 +64,9 @@ export interface DownloadedBatch { files: DownloadedBatchFile[] }
 /** Encrypted pages leave out deletes this device never synced, so `nextSince` is the raw page's last sequence. */
 export type ChangesPage = ChangesResponse & { nextSince?: number };
 
-/** Gives each decrypted server file a unique plaintext path, in the order they should
- * be recorded. Files stored at their name's own tag claim it first; a later file
- * claiming the same name gets a distinct local name from its server path. */
-export function assignPlainPaths(entries: ReadonlyArray<{ path: string; wire: string }>, tagged: readonly boolean[]): Array<{ index: number; path: string }> {
-	const claimed = new Set<string>();
-	const order = entries.map((_, index) => index).sort((a, b) => Number(tagged[b]) - Number(tagged[a]));
-	return order.map(index => {
-		const { wire } = entries[index]!;
-		let { path } = entries[index]!;
-		if (claimed.has(portablePathKey(path))) {
-			path = distinctLocalName(path, wire);
-		}
-		claimed.add(portablePathKey(path));
-		return { index, path };
-	});
+/** Upload operation IDs carry the server's reminder operation day. */
+function createUploadOperationId(info: CrateServerInfo): string {
+	return createReminderOperationId(info.reminderOperationDay);
 }
 
 export class SyncWorkerApi {
@@ -267,9 +254,7 @@ export class SyncWorkerApi {
 	}
 
 	private async newUploadOperationId(): Promise<string> {
-		const day = (await this.getServerInfo()).reminderOperationDay;
-		if (day === undefined) throw new Error('Update the Crate server before uploading');
-		return createReminderOperationId(day);
+		return createUploadOperationId(await this.getServerInfo());
 	}
 
 	/** `size`, when known, extends the timeout for a large file. */
@@ -347,9 +332,7 @@ export class SyncWorkerApi {
 		}
 		const info = await this.getServerInfo();
 		if (files.some(file => !file.operationId)) {
-			const day = info.reminderOperationDay;
-			if (day === undefined) throw new Error('Update the Crate server before uploading');
-			files = files.map(file => ({ ...file, operationId: file.operationId ?? createReminderOperationId(day) }));
+			files = files.map(file => ({ ...file, operationId: file.operationId ?? createUploadOperationId(info) }));
 		}
 		if (files.length > BATCH_UPLOAD_MAX_FILES) {
 			const results: BatchUploadResponse['results'] = [];

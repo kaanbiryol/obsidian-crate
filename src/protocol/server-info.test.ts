@@ -19,6 +19,8 @@ describe('Crate protocol contract', () => {
 			serverVersion: '1.2.3',
 			protocol: { ...CRATE_PLUGIN_PROTOCOL },
 			capabilities: ['sync-v1'],
+			serverRevision: 4,
+			reminderOperationDay: 20_000,
 		});
 
 		expect(info).not.toBeNull();
@@ -47,11 +49,15 @@ describe('Crate protocol contract', () => {
 	});
 });
 
+const base = { service: 'crate', serverVersion: 'crate', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], serverRevision: 43, reminderOperationDay: 20_000 };
+
 it('preserves valid server identity while ignoring malformed optional version fields', () => {
-	const base = { service: 'crate', serverVersion: 'crate', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] };
-	expect(parseCrateServerInfo({ ...base, serverRevision: 43, deploymentFingerprint: 'a'.repeat(64) }))
-		.toMatchObject({ serverRevision: 43, deploymentFingerprint: 'a'.repeat(64) });
-	const invalid = parseCrateServerInfo({ ...base, serverRevision: -1, deploymentFingerprint: 'private data' });
-	expect(invalid?.serverRevision).toBeUndefined();
-	expect(invalid?.deploymentFingerprint).toBeUndefined();
+	expect(parseCrateServerInfo({ ...base, deploymentFingerprint: 'a'.repeat(64) }))
+		.toMatchObject({ serverRevision: 43, reminderOperationDay: 20_000, deploymentFingerprint: 'a'.repeat(64) });
+	expect(parseCrateServerInfo({ ...base, deploymentFingerprint: 'private data' })?.deploymentFingerprint).toBeUndefined();
+});
+
+it.each([undefined, 0, -1, 1.5])('rejects metadata whose server revision or operation day is %s', value => {
+	expect(parseCrateServerInfo({ ...base, serverRevision: value })).toBeNull();
+	expect(parseCrateServerInfo({ ...base, reminderOperationDay: value })).toBeNull();
 });

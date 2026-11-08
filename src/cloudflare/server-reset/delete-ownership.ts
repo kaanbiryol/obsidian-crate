@@ -6,8 +6,8 @@ import { deletionWorkerMessage } from '../deployment/discovery';
 
 export type DeleteApi = Pick<CloudflareApiClient,
 	'getWorkerSettings' | 'listWorkers' | 'listDurableObjectNamespaces' | 'deleteWorker'
-	| 'getD1Database' | 'queryD1' | 'deleteD1Database' | 'getR2Bucket' | 'listR2Objects' | 'deleteR2Objects' | 'deleteR2Bucket'
-	| 'uploadServerDeletionWorker' | 'getWorkersSubdomain' | 'enableWorkerSubdomain' | 'verifyResetWorker'>;
+	| 'getD1Database' | 'queryD1' | 'deleteD1Database' | 'getR2Bucket' | 'listR2Objects' | 'deleteR2Bucket'
+	| 'uploadServerDeletionWorker' | 'getWorkersSubdomain' | 'enableWorkerSubdomain' | 'transport' | 'sleep'>;
 
 export function assertDeletionIdentity(accountId: string, metadata: CloudflareDeploymentMetadata): asserts metadata is CloudflareDeploymentMetadata & { d1DatabaseId: string } {
 	const name = `crate-${metadata.deploymentId}`;

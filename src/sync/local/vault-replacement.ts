@@ -1,4 +1,6 @@
 import type { Vault } from 'obsidian';
+import type { SyncSettings } from '../settings';
+import type { SyncWork } from '../types';
 
 const TRASH_FOLDER = '.trash';
 
@@ -25,4 +27,24 @@ export async function moveVaultToTrash(vault: Vault, pluginDir: string, throwIfD
 		}
 	};
 	await moveChildren('');
+}
+
+/** Carries out a confirmed vault replacement before the first sync with a joined server,
+ * then clears the confirmation; the caller saves the cleared flag. Once a file has
+ * synced, moving the vault again would trash the server's copies, so a vault with a
+ * file baseline or a changelog cursor keeps its files. */
+export async function replaceVaultBeforeFirstSync({ settings, manifest, vault, pluginDir, reportWork, throwIfDestroyed }: {
+	settings: Pick<SyncSettings, 'replaceVault' | 'lastSeq'>;
+	manifest: { getManifest(): { readonly files: Readonly<Record<string, unknown>> } };
+	vault: Vault;
+	pluginDir: string;
+	reportWork: (work: SyncWork) => void;
+	throwIfDestroyed: () => void;
+}): Promise<void> {
+	if (!settings.replaceVault) return;
+	if (settings.lastSeq === 0 && !Object.keys(manifest.getManifest().files).length) {
+		reportWork({ phase: 'applying' });
+		await moveVaultToTrash(vault, pluginDir, throwIfDestroyed);
+	}
+	settings.replaceVault = false;
 }

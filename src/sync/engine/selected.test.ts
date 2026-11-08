@@ -30,7 +30,7 @@ async function harness(paths = ['a.md', 'b.md']) {
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		const url = new URL(request.url);
 		switch (url.pathname) {
-			case '/.well-known/crate': return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
+			case '/.well-known/crate': return response({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
 			case '/sync/metadata': return response(await remote.metadata((JSON.parse(request.body as string) as { paths: string[] }).paths));
 			case '/sync/batch-upload': return response(await remote.batchUpload((JSON.parse(request.body as string) as { files: BatchUploadFile[] }).files));
 			case '/sync/upload': return response(await remote.upload(url.searchParams.get('path')!));

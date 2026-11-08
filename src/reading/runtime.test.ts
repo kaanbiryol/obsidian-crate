@@ -5,7 +5,7 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
-import { getReadingLibrary, restartReading, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
+import { changeReadingFolder, getReadingLibrary, restartReading, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
 import { readReadingPolicy, writeReadingPolicy } from './server';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { DEFAULT_READING_SETTINGS } from './settings';
@@ -281,5 +281,85 @@ describe('Reading runtime lifecycle', () => {
 		h.plugin.settings.ignorePatterns = []; h.plugin.settings.reading.folderPath = 'Reminders/Reading';
 		expect(() => startReading(h.plugin)).toThrow('separate');
 		expect(h.vault.read).not.toHaveBeenCalled(); expect(h.vault.process).not.toHaveBeenCalled();
+	});
+});
+
+describe('Reading folder change', () => {
+	const policy = { enabled: 1, folder_path: 'Reading', generation: 'g', revision: 'r1' };
+	afterEach(() => { vi.mocked(readReadingPolicy).mockReset(); vi.mocked(writeReadingPolicy).mockReset(); });
+	function connected() {
+		const h = harness();
+		h.plugin.settings.workerUrl = 'https://server.example';
+		const writeSettings = vi.fn(async (update: object) => { Object.assign(h.plugin.settings, update); });
+		const detachLeavesOfType = vi.fn();
+		Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, writeSettings });
+		Object.assign(h.workspace, { detachLeavesOfType });
+		return { ...h, writeSettings, detachLeavesOfType };
+	}
+
+	it('pauses the running server policy, moves it, then saves the folder and restarts Reading there', async () => {
+		const h = connected();
+		vi.mocked(readReadingPolicy).mockResolvedValueOnce({ ...policy });
+		vi.mocked(writeReadingPolicy).mockResolvedValueOnce({ ...policy, enabled: 0, revision: 'r2' })
+			.mockResolvedValueOnce({ ...policy, enabled: 0, folder_path: 'Articles', revision: 'r3' });
+		try {
+			await changeReadingFolder(h.plugin, 'Articles');
+			expect(vi.mocked(writeReadingPolicy).mock.calls).toEqual([
+				[h.plugin, { enabled: false, folderPath: 'Reading', revision: 'r1' }],
+				[h.plugin, { enabled: false, folderPath: 'Articles', revision: 'r2' }],
+			]);
+			expect(h.writeSettings).toHaveBeenCalledOnce();
+			expect(h.writeSettings.mock.calls[0]![0]).toMatchObject({ reading: { enabled: true, folderPath: 'Articles' } });
+			const order = [
+				vi.mocked(readReadingPolicy).mock.invocationCallOrder[0]!, ...vi.mocked(writeReadingPolicy).mock.invocationCallOrder,
+				h.writeSettings.mock.invocationCallOrder[0]!, h.detachLeavesOfType.mock.invocationCallOrder[0]!,
+			];
+			expect(order).toEqual([...order].sort((a, b) => a - b));
+			expect(getReadingLibrary(h.plugin)).toBeDefined();
+		} finally { stopReading(h.plugin); }
+	});
+
+	it.each([['read', 1], ['pause', 2], ['update', 3]] as const)('stops after switching servers during the %s request', async (_step, request) => {
+		const h = connected();
+		let requests = 0;
+		const respond = () => { if (++requests === request) h.plugin.settings.workerUrl = 'https://replacement.example'; };
+		vi.mocked(readReadingPolicy).mockImplementationOnce(async () => { respond(); return { ...policy }; });
+		vi.mocked(writeReadingPolicy).mockImplementation(async () => { respond(); return { ...policy, enabled: 0, revision: 'r2' }; });
+		await expect(changeReadingFolder(h.plugin, 'Articles')).rejects.toThrow('connection changed');
+		expect(requests).toBe(request);
+		expect(h.writeSettings).not.toHaveBeenCalled();
+		expect(h.detachLeavesOfType).not.toHaveBeenCalled();
+	});
+
+	it('keeps a pause made while the server request runs', async () => {
+		const h = connected();
+		let release!: () => void;
+		vi.mocked(readReadingPolicy).mockImplementationOnce(() => new Promise(resolve => { release = () => resolve({ ...policy }); }));
+		vi.mocked(writeReadingPolicy).mockResolvedValue({ ...policy, enabled: 0, revision: 'r2' });
+		const change = changeReadingFolder(h.plugin, 'Articles');
+		h.plugin.settings.reading = { ...h.plugin.settings.reading, enabled: false };
+		release();
+		await change;
+		expect(h.plugin.settings.reading).toMatchObject({ enabled: false, folderPath: 'Articles' });
+		expect(getReadingLibrary(h.plugin)).toBeUndefined();
+	});
+
+	it('only saves and restarts without a server', async () => {
+		const h = connected();
+		h.plugin.settings.workerUrl = '';
+		try {
+			await changeReadingFolder(h.plugin, 'Articles');
+			expect(readReadingPolicy).not.toHaveBeenCalled();
+			expect(writeReadingPolicy).not.toHaveBeenCalled();
+			expect(h.plugin.settings.reading.folderPath).toBe('Articles');
+			expect(getReadingLibrary(h.plugin)).toBeDefined();
+		} finally { stopReading(h.plugin); }
+	});
+
+	it('rejects a folder Reading cannot use before any request', async () => {
+		const h = connected();
+		await expect(changeReadingFolder(h.plugin, 'Reminders/Reading')).rejects.toThrow('separate');
+		expect(readReadingPolicy).not.toHaveBeenCalled();
+		expect(h.writeSettings).not.toHaveBeenCalled();
 	});
 });

@@ -19,18 +19,19 @@ export function nextD1DailyReset(now = Date.now()): number {
 
 /** In-memory accounting of returned billing metadata; never queries or writes a log table. */
 export function meterD1Usage(database: D1Database) {
-	const usage: D1Usage & { queries: number } = { rowsRead: 0, rowsWritten: 0, complete: true, queries: 0 };
+	const usage: D1Usage = { rowsRead: 0, rowsWritten: 0, complete: true, queries: 0 };
 	const statements = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
 	function add(value?: D1Usage) {
 		if (!value) { usage.complete = false; return; }
 		usage.rowsRead += value.rowsRead;
 		usage.rowsWritten += value.rowsWritten;
-		usage.queries += value.queries ?? 0;
+		usage.queries += value.queries;
 		usage.complete &&= value.complete;
 	}
 	function record<T>(result: T): T {
 		const meta = (result as { meta?: { rows_read?: number; rows_written?: number } } | null)?.meta;
-		add(parseD1Usage(`${meta?.rows_read}:${meta?.rows_written}:1`));
+		// execute() has already counted this query.
+		add(parseD1Usage(`${meta?.rows_read}:${meta?.rows_written}:1:0`));
 		return result;
 	}
 	// One query per first/run/all, exec or batch, as the per-invocation limit counts.

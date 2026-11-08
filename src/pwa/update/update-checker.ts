@@ -1,29 +1,24 @@
-const MIN_FOREGROUND_GAP_MS = 30_000;
+import { FOREGROUND_REFRESH_GAP_MS, onAppResume, type AppResumeReason } from '../shell/app-resume';
 
 /** One check at a time, on launch, foreground and reconnect; never on a timer. */
 export function startUpdateChecks(check: () => Promise<void>): () => void {
 	let disposed = false;
 	let checking = false;
 	let lastCheck = -Infinity;
-	const run = async (event?: Event) => {
+	const run = async (reason?: AppResumeReason) => {
 		if (disposed || checking || !navigator.onLine || document.visibilityState !== 'visible') return;
 		// pageshow and visibilitychange both fire on one resume. Reconnection always checks.
-		if (event?.type !== 'online' && Date.now() - lastCheck < MIN_FOREGROUND_GAP_MS) return;
+		if (reason !== 'online' && Date.now() - lastCheck < FOREGROUND_REFRESH_GAP_MS) return;
 		lastCheck = Date.now();
 		checking = true;
 		try { await check(); } catch { lastCheck = -Infinity; /* Opportunistic checks never interrupt app use. */ }
 		finally { checking = false; }
 	};
-	const resume = (event?: Event) => { void run(event); };
-	window.addEventListener('pageshow', resume);
-	window.addEventListener('online', resume);
-	document.addEventListener('visibilitychange', resume);
-	resume();
+	const stop = onAppResume(reason => { void run(reason); });
+	void run();
 	return () => {
 		disposed = true;
-		window.removeEventListener('pageshow', resume);
-		window.removeEventListener('online', resume);
-		document.removeEventListener('visibilitychange', resume);
+		stop();
 	};
 }
 

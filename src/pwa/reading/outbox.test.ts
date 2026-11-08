@@ -8,7 +8,7 @@ import { sha256Hex } from '@/platform/sha256';
 vi.mock('../connection/server-compatibility', () => ({ requireCompatibleProtocol: vi.fn().mockResolvedValue(1), forgetCompatibleProtocol: vi.fn() }));
 
 const storage = vi.hoisted(() => ({ values: new Map<string, unknown>(), current: true }));
-vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
+vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingEncryptionKeys: () => null, readingNoteFolder: ({ folderPath }: { folderPath: string }) => folderPath, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('./session/session', () => ({
 	READING_SESSION_KEY: 'reading-session',
 	assertReadingSession: () => { if (!storage.current) throw new Error('Reading sign-in changed.'); },
@@ -243,20 +243,21 @@ it('settles an in-flight receipt after pause without sending the remaining comma
 	expect(await pendingReading(session)).toMatchObject([{ intent: { url: 'https://example.com/second' } }]);
 });
 
-it('re-reads only the edited item when the edit chains from the cached library', async () => {
+it('reloads the library when an update returns no committed item', async () => {
 	const item = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000001', title: 'Article', path: 'Reading/article.md',
 		source_url: 'https://example.com/article', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
 	storage.values.set('cache', { items: [item], issues: [], savedAt: 1, revision: '"r1"' });
 	network.mockImplementation(async path => {
 		if (path === '/reading/session') return response({ day: 20_000, generation: session.generation });
 		if (path === '/reading/update') return response({ saved: true, id: item.crate_reading_id, library: { before: '"r1"', after: '"r2"' } });
-		if (typeof path === 'string' && path.startsWith('/reading/item')) return response({ item: { ...item, favorite: true }, markdown: 'Body' });
-		return response({ items: [], issues: [], cursor: null });
+		return response({ items: [{ ...item, favorite: true }], issues: [], cursor: null });
 	});
 	await queueReading(session, { action: 'update', intent: { id: item.crate_reading_id, before: { favorite: false }, changes: { favorite: true } } });
 	const cache = await drainReading(session);
-	expect(cache).toMatchObject({ revision: '"r2"', items: [{ crate_reading_id: item.crate_reading_id, favorite: true }] });
-	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/list');
+	expect(cache).toMatchObject({ items: [{ crate_reading_id: item.crate_reading_id, favorite: true }] });
+	const paths = network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path);
+	expect(paths).toContain('/reading/list');
+	expect(paths).not.toContain('/reading/item');
 });
 
 it('applies the committed item an update returns, without reading the item again', async () => {

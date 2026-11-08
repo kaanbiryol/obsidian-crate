@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { WorkerApiHttpClient } from '../sync/worker-api/http';
 
 // Frozen launch protocol-1 wire metadata: do not derive this fixture from current code.
-const baselineServer = { service: 'crate' as const, serverVersion: '0.1.0', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['sync-v1'], reminderOperationDay: 20707 };
+const baselineServer = { service: 'crate' as const, serverVersion: '0.1.0', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['sync-v1'], serverRevision: 4, reminderOperationDay: 20707 };
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 it('the current plugin negotiates protocol 1 for an ordinary mutation on the baseline server', async () => {

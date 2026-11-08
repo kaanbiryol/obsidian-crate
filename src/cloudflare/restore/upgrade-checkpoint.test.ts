@@ -2,8 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createUpgradeCheckpoint } from './upgrade-checkpoint';
-import { releaseUpgradeGuards, removeUpgradeGuards, upgradeGuards } from '../deployment/database';
-import { migrationTransaction, SERVER_RELEASE } from '../deployment/database-upgrades';
+import { prepareDeploymentDatabase, releaseUpgradeGuards } from '../deployment/database';
+import * as upgrades from '../deployment/database-upgrades';
+import { SERVER_RELEASE } from '../deployment/database-upgrades';
 import { CloudflareApiClient, CloudflareApiError } from '../cloudflare-api';
 import type { HttpTransport } from '../http';
 import type { DeploymentFence } from '../deployment/fence';
@@ -104,10 +105,26 @@ it('copies files before pausing writers, then exports a paused database that res
 	expect(restored.prepare('SELECT device_name FROM auth_tokens').get()).toMatchObject({ device_name: 'Copying' });
 	expect(restored.prepare('SELECT storage_key FROM files').get()).toMatchObject({ storage_key: 'existing-object' });
 
-	const sql = 'ALTER TABLE auth_tokens ADD COLUMN example TEXT;';
+	// The migration writes one guarded table and rebuilds another, through the provisioner's runner.
+	const sql = `ALTER TABLE auth_tokens ADD COLUMN example TEXT;
+UPDATE files SET size = size;
+CREATE TABLE request_rate_limits_next (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+INSERT INTO request_rate_limits_next SELECT * FROM request_rate_limits;
+DROP TABLE request_rate_limits;
+ALTER TABLE request_rate_limits_next RENAME TO request_rate_limits;`;
 	const step = { id: 'example', file: 'example.sql', from: SERVER_RELEASE.schemaVersion, to: SERVER_RELEASE.schemaVersion + 1, checksum: await sha256Hex(sql) };
-	h.db.exec(`BEGIN; ${removeUpgradeGuards('auth_tokens')} ${await migrationTransaction(step, sql)} ${upgradeGuards('auth_tokens')} COMMIT;`);
+	const transaction = upgrades.migrationTransaction;
+	const plan = vi.spyOn(upgrades, 'planDatabaseUpgrade').mockReturnValue([step]);
+	const bundled = vi.spyOn(upgrades, 'migrationTransaction').mockImplementation(migration => transaction(migration, sql));
+	const artifacts = { version: '0.1.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' };
+	try {
+		await prepareDeploymentDatabase({ api: h.api, accountId: 'account', databaseId: 'database', artifacts }, SERVER_RELEASE.schemaVersion,
+			h.fence as unknown as DeploymentFence, () => h.run());
+	} finally { plan.mockRestore(); bundled.mockRestore(); }
 	expect(h.db.prepare('SELECT version FROM crate_schema').get()).toMatchObject({ version: step.to });
+	expect(h.fence.mutate.mock.calls.at(-1)?.[1]).toBe('migrate-example');
+	expect(() => h.db.exec('UPDATE files SET size = size')).toThrow('upgrade in progress');
+	expect(() => h.db.exec("INSERT INTO request_rate_limits VALUES ('rebuilt', 1, 1)")).toThrow('upgrade in progress');
 	// A retried migration reuses the backup taken before it started.
 	h.api.putRecoveryObject.mockClear();
 	await h.run();
@@ -116,6 +133,22 @@ it('copies files before pausing writers, then exports a paused database that res
 	await releaseUpgradeGuards(h.api, 'account', 'database', h.fence as unknown as DeploymentFence);
 	expect(() => h.db.exec("UPDATE auth_tokens SET device_name='Updated'")).not.toThrow();
 	expect(h.progress()).toBeNull();
+});
+
+it('stops an update whose migration leaves a new table writable', async () => {
+	const h = await harness();
+	await h.run();
+	const sql = 'CREATE TABLE example (id TEXT PRIMARY KEY);';
+	const step = { id: 'example', file: 'example.sql', from: SERVER_RELEASE.schemaVersion, to: SERVER_RELEASE.schemaVersion + 1, checksum: await sha256Hex(sql) };
+	const transaction = upgrades.migrationTransaction;
+	const plan = vi.spyOn(upgrades, 'planDatabaseUpgrade').mockReturnValue([step]);
+	const bundled = vi.spyOn(upgrades, 'migrationTransaction').mockImplementation(migration => transaction(migration, sql));
+	const artifacts = { version: '0.1.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' };
+	try {
+		await expect(prepareDeploymentDatabase({ api: h.api, accountId: 'account', databaseId: 'database', artifacts }, SERVER_RELEASE.schemaVersion,
+			h.fence as unknown as DeploymentFence, () => h.run())).rejects.toThrow('left server writes unpaused');
+	} finally { plan.mockRestore(); bundled.mockRestore(); }
+	expect(() => h.db.exec('DELETE FROM files')).toThrow('upgrade in progress');
 });
 
 it('resumes copying files without pausing writers or repeating verified copies', async () => {

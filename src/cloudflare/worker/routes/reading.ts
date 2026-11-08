@@ -7,13 +7,14 @@ import { chargeRouteAction } from '../admission/rate-limit';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { parseJsonObject } from '../http/request-validation';
+import { parseJsonObject, READING_EDIT_JSON_BODY_BYTES, SMALL_JSON_BODY_BYTES } from '../http/request-validation';
 import { policy, authority, readingResponse, ReadingError } from '../reading/common';
 import { prepareHandoff, updatePolicy, handoffAuthority, labelledPolicy } from '../reading/access';
 import { readFolderLabel } from '../encryption/folder-labels';
 import { mutateReading } from '../reading/mutations';
 import { extractForEncryptedReading } from '../reading/encrypted-extract';
 import { isLibraryRead, loadLibraryRead, readLibrary } from '../reading/library-read';
+import { PLAINTEXT_ONLY_PATHS } from './policy';
 
 export interface ReadingRouteOptions {
 	/** The coordinator's state, when the request runs under its lock. */
@@ -45,13 +46,13 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		}
 		return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
 	}
-	if (encryption && (shortcut?.kind === 'prepare' || ['/reading/handoff', '/reading/capture', '/reading/update', '/reading/retry', '/reading/delete', '/reading/list', '/reading/item'].includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
+	if (encryption && (shortcut?.kind === 'prepare' || PLAINTEXT_ONLY_PATHS.includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
 	if (path === '/reading/encryption' && request.method === 'GET' && principal) {
 		const current = await authority(env.DB, principal, featurePolicyValue); // Reading access only.
 		// The web app recovers the plaintext folder name from this label with the vault key.
 		return readingResponse({ encryption, ...(encryption ? { folderLabel: await readFolderLabel(env.DB, current.folder_path) } : {}) });
 	}
-	const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' || path === '/reading/delete' ? 262_144 : 24_576);
+	const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' || path === '/reading/delete' ? READING_EDIT_JSON_BODY_BYTES : SMALL_JSON_BODY_BYTES);
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
 	if (shortcut) validateShortcutBody(body, shortcut.kind);

@@ -12,30 +12,46 @@ import { openFeatureChoiceModal, type FeatureChoice } from '../ui/settings/featu
 
 type Feature = keyof SharedFeatures;
 
-/** Whether this vault agreed to let Crate change notes in the feature's folder. */
-function featureConfirmed(plugin: CratePlugin, feature: Feature): boolean {
-	return feature === 'reading' ? plugin.settings.reading.confirmed : plugin.remindersSettings.confirmed;
+interface FeatureDefinition {
+	/** Whether this vault agreed to let Crate change notes in the feature's folder. */
+	confirmed(plugin: CratePlugin): boolean;
+	/** Records that agreement in this vault's settings. */
+	confirm(plugin: CratePlugin, assertCurrent: () => void): Promise<void>;
+	/** The folder this device's settings name. */
+	localFolder(plugin: CratePlugin): string;
+	confirmation: { title: string; message: (folder: string) => string };
+	/** Shown once when the server runs the feature and this vault has not confirmed it. */
+	waitingNotice: string;
 }
 
-const CONFIRMATIONS: Record<Feature, { title: string; message: (folder: string) => string }> = {
-	reading: { title: 'Turn on reading', message: folder => `Crate will add reading properties to every Markdown note in "${folder}". Notes outside this folder are not changed.` },
-	reminders: { title: 'Turn on reminders', message: folder => `Crate will add hidden tracking IDs to checkbox lines in "${folder}" and turn dates like "tomorrow" into real dates. Notes outside this folder are not changed.` },
+const FEATURES: Record<Feature, FeatureDefinition> = {
+	reading: {
+		confirmed: plugin => plugin.settings.reading.confirmed,
+		confirm: (plugin, assertCurrent) => plugin.writeSettings({ reading: { ...plugin.settings.reading, confirmed: true } }, assertCurrent),
+		localFolder: plugin => plugin.settings.reading.folderPath,
+		confirmation: { title: 'Turn on reading', message: folder => `Crate will add reading properties to every Markdown note in "${folder}". Notes outside this folder are not changed.` },
+		waitingNotice: 'Reading is on for your Crate server. To use it in this vault, turn it on in Crate settings.',
+	},
+	reminders: {
+		confirmed: plugin => plugin.remindersSettings.confirmed,
+		confirm: (plugin, assertCurrent) => plugin.writeRemindersSettings({ confirmed: true }, assertCurrent),
+		localFolder: plugin => plugin.remindersSettings.remindersFolderPath,
+		confirmation: { title: 'Turn on reminders', message: folder => `Crate will add hidden tracking IDs to checkbox lines in "${folder}" and turn dates like "tomorrow" into real dates. Notes outside this folder are not changed.` },
+		waitingNotice: 'Reminders are on for your Crate server. To use them in this vault, turn them on in Crate settings.',
+	},
 };
 
 /** Before a feature first changes notes in this vault, asks with the folder it will use.
  * Connected, Reading uses the folder its server names. */
 export async function confirmFeatureFolder(plugin: CratePlugin, feature: Feature): Promise<boolean> {
-	if (featureConfirmed(plugin, feature)) return true;
+	if (FEATURES[feature].confirmed(plugin)) return true;
 	const folder = await featureFolder(plugin, feature);
-	const { title, message } = CONFIRMATIONS[feature];
+	const { title, message } = FEATURES[feature].confirmation;
 	return openConfirmationModal(plugin.app, { title, message: message(folder), confirmText: 'Turn on' });
 }
 
-function localFolder(plugin: CratePlugin, feature: Feature): string {
-	return feature === 'reading' ? plugin.settings.reading.folderPath : plugin.remindersSettings.remindersFolderPath;
-}
 async function featureFolder(plugin: CratePlugin, feature: Feature): Promise<string> {
-	const folder = localFolder(plugin, feature);
+	const folder = FEATURES[feature].localFolder(plugin);
 	if (feature !== 'reading' || !plugin.settings.workerUrl) return folder;
 	const { assertCurrent } = captureServerConnection(plugin);
 	const policy = await readReadingPolicy(plugin);
@@ -61,7 +77,7 @@ function countNotes(plugin: CratePlugin, folder: string): number {
  * take it without asking. Finish turns the selected ones on as the settings toggle does;
  * closing changes nothing. */
 export async function offerFeatureChoice(plugin: CratePlugin): Promise<void> {
-	const features = (['reminders', 'reading'] as const).filter(feature => !featureConfirmed(plugin, feature));
+	const features = (['reminders', 'reading'] as const).filter(feature => !FEATURES[feature].confirmed(plugin));
 	if (!features.length) return;
 	// Offline, the step still opens with this device's folders.
 	const policy = await requestFeatures(plugin).catch(() => null);
@@ -72,7 +88,7 @@ export async function offerFeatureChoice(plugin: CratePlugin): Promise<void> {
 	}
 	const choices: FeatureChoice[] = [];
 	for (const feature of features) {
-		const folder = await featureFolder(plugin, feature).catch(() => localFolder(plugin, feature));
+		const folder = await featureFolder(plugin, feature).catch(() => FEATURES[feature].localFolder(plugin));
 		choices.push({ feature, folder, notes: countNotes(plugin, folder) });
 	}
 	const selected = await openFeatureChoiceModal(plugin.app, choices);
@@ -102,19 +118,15 @@ async function adoptSharedChoice(plugin: CratePlugin, policy: FeaturePolicy, fea
 	}
 }
 
-const WAITING_NOTICES: Record<Feature, string> = {
-	reading: 'Reading is on for your Crate server. To use it in this vault, turn it on in Crate settings.',
-	reminders: 'Reminders are on for your Crate server. To use them in this vault, turn them on in Crate settings.',
-};
 const announced = new WeakMap<CratePlugin, Set<Feature>>();
 /** Once per load, points out a server feature this vault has not confirmed. */
 function announceUnconfirmed(plugin: CratePlugin, policy: SharedFeatures): void {
 	let features = announced.get(plugin);
 	if (!features) { features = new Set(); announced.set(plugin, features); }
 	for (const feature of ['reminders', 'reading'] as const) {
-		if (!policy[feature] || featureConfirmed(plugin, feature) || features.has(feature)) continue;
+		if (!policy[feature] || FEATURES[feature].confirmed(plugin) || features.has(feature)) continue;
 		features.add(feature);
-		new Notice(WAITING_NOTICES[feature]);
+		new Notice(FEATURES[feature].waitingNotice);
 	}
 }
 
@@ -167,9 +179,8 @@ export function refreshSharedFeatures(plugin: CratePlugin, activate = true): Pro
 	});
 }
 async function confirmFeature(plugin: CratePlugin, feature: Feature, assertCurrent: () => void): Promise<void> {
-	if (featureConfirmed(plugin, feature)) return;
-	if (feature === 'reading') await plugin.writeSettings({ reading: { ...plugin.settings.reading, confirmed: true } }, assertCurrent);
-	else await plugin.writeRemindersSettings({ confirmed: true }, assertCurrent);
+	if (FEATURES[feature].confirmed(plugin)) return;
+	await FEATURES[feature].confirm(plugin, assertCurrent);
 	assertCurrent();
 }
 /** Turning a feature on here confirms it for this vault; ask first with `confirmFeatureFolder`. */

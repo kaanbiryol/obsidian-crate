@@ -50,6 +50,7 @@ for (const engine of [chromium, webkit]) {
       const folder = await t.sealFolderLabel('Reading', await t.PathTags.fromSecret(bundle.vaultId, bundle.vault), await t.importEncryptionSecret(bundle.vault), bundle.vaultId);
       const session = { id: 'reader', token: 'token', folderPath: folder.wire, generation: 'policy', expiresAt: Date.now() + 100000 };
       localStorage.setItem(t.READING_SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem('crate-reminders-auth-token', session.token);
       const state = { ...t.createEncryptionState(bundle, await t.sealRecoveryBundle(bundle, recovery)), mode: 'active' };
       window.fetch = async path => Response.json(String(path).startsWith('/reading/encrypted-files')
         ? { files: [], sequence: 1, generation: bundle.generation, nextCursor: null } : { encryption: state, folderLabel: folder.label });
@@ -146,6 +147,7 @@ for (const engine of [chromium, webkit]) {
         const t = readingEncryption;
         const session = { id: 'reader', token: 'token', folderPath: 'Reading', generation: 'policy', expiresAt: Date.now() + 100000 };
         localStorage.setItem(t.READING_SESSION_KEY, JSON.stringify(session));
+        localStorage.setItem('crate-reminders-auth-token', session.token);
         const secret = crypto.getRandomValues(new Uint8Array(32)), vault = crypto.randomUUID(), scope = crypto.randomUUID();
         const unlock = () => t.unlockReadingStorage(new t.LocalStateCipher(vault, scope, secret));
         unlock();

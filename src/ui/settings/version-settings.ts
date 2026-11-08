@@ -24,7 +24,7 @@ export function renderVersionSettings(container: HTMLElement, plugin: CratePlugi
 		server.setDesc('Checking version…');
 		try {
 			const info = await checkServerVersion(plugin);
-			const version = info.serverRevision ? `Revision ${serverBuildLabel(info.serverRevision, info.developmentBuild)}` : 'Revision unknown';
+			const version = `Revision ${serverBuildLabel(info.serverRevision, info.developmentBuild)}`;
 			const comparison = info.deploymentFingerprint
 				? info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint
 					? 'Matches the bundled server.' : 'Differs from the bundled server.'
@@ -93,7 +93,7 @@ export function renderUpdateVersions(setting: Setting, plugin: CratePlugin, onMa
 		if (!info.deploymentFingerprint) {
 			setAvailability(false);
 			setting.setName('Check server version');
-			saved = `Current version: ${info.serverRevision ? serverBuildLabel(info.serverRevision, info.developmentBuild) : 'Unknown'} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}. Build unverified. Retry when connected.`;
+			saved = `Current version: ${serverBuildLabel(info.serverRevision, info.developmentBuild)} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}. Build unverified. Retry when connected.`;
 		}
 		setting.setDesc(saved);
 	};

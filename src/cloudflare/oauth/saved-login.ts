@@ -1,7 +1,7 @@
 import type { UsageSnapshot } from '../usage/snapshot';
 import type { HttpTransport } from '../http';
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from './client';
-import { CLOUDFLARE_ANALYTICS_SCOPE, CLOUDFLARE_OAUTH_SCOPES } from './config';
+import { CLOUDFLARE_ANALYTICS_SCOPE, hasOAuthScopes, hasOnlyRequestedOAuthScopes } from './config';
 import { fetchCloudflareUsage } from '../usage/service';
 import type { SecretKey } from '../../platform/secret-keys';
 
@@ -136,11 +136,8 @@ export class CloudflareSavedLogin {
 		return credentials;
 	}
 	private validateScope(tokens: CloudflareOAuthTokens): void {
-		if (tokens.scope !== undefined) {
-			const scopes = tokens.scope.split(/\s+/);
-			if (!scopes.includes(USAGE_SCOPE) || scopes.some(s => ![...CLOUDFLARE_OAUTH_SCOPES, 'offline_access'].includes(s))) {
-				throw new Error('Cloudflare returned unexpected permissions. Authorize Crate’s configured permissions and try again.');
-			}
+		if (tokens.scope !== undefined && (!hasOAuthScopes(tokens.scope, [USAGE_SCOPE]) || !hasOnlyRequestedOAuthScopes(tokens.scope))) {
+			throw new Error('Cloudflare returned unexpected permissions. Authorize Crate’s configured permissions and try again.');
 		}
 	}
 	private check(accountId: string, revision: number): void {

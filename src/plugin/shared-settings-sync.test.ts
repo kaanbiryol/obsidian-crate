@@ -22,7 +22,7 @@ function settingsServer(settings: SharedSettings | null) {
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		const path = new URL(request.url).pathname;
 		if (path === '/.well-known/crate') {
-			return respond(200, { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
+			return respond(200, { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
 		}
 		if (path !== '/settings') throw new Error(`Unexpected request: ${path}`);
 		if (request.method !== 'PUT') {

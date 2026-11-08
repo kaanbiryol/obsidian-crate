@@ -3,6 +3,13 @@ import { getSyncPathIssue } from '../../../protocol/portable-path';
 import { readLimitedRequestBody } from './body-reader';
 import { containsControlCharacters, isRecord } from '../../../platform/validation';
 
+/** A link, a short command or a pairing message, with room for an 8,192-character link. */
+export const SMALL_JSON_BODY_BYTES = 24_576;
+/** Reading edits and deletions, which carry highlights and notes. */
+export const READING_EDIT_JSON_BODY_BYTES = 262_144;
+/** Batch and initial-import uploads, whose files travel as base64 inside the JSON. */
+export const UPLOAD_BATCH_JSON_BODY_BYTES = 15 * 1024 * 1024;
+
 export async function parseJsonObject(
 	request: Request,
 	maxBytes = 1024 * 1024,

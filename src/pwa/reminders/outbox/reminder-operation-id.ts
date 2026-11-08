@@ -19,7 +19,6 @@ function confirmedOperationDay(): number | undefined {
 
 async function fetchOperationDay(): Promise<number> {
 	const info = await requireCompatibleServer();
-	if (info.reminderOperationDay === undefined) throw new Error('Update the Crate server before saving this change. Your draft is kept on this device.');
 	try { localStorage.setItem(OPERATION_DAY_KEY, JSON.stringify({ day: info.reminderOperationDay, fetchedAt: Date.now() })); }
 	catch { /* The next change fetches the day again. */ }
 	return info.reminderOperationDay;

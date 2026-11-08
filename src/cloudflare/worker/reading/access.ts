@@ -41,12 +41,12 @@ export async function labelledPolicy(db: D1Database, current: ReadingPolicy | nu
 export async function prepareHandoff(db: D1Database, principal: AuthPrincipal, body: Record<string, unknown>, origin: string) {
 	if (!canPrepareReadingHandoff(principal.scope)) throw new ReadingError('Reading access is required.', 403);
 	const current = await authority(db, principal);
-	const { readingUrl } = await import('@/reading/core/model');
+	const { MAX_READING_TITLE_LENGTH, readingUrl } = await import('@/reading/core/model');
 	const { createReminderOperationId } = await import('@/protocol/reminder-operation');
 	// The Shortcut persists this exact prepared operation in the capability. Reopening it is an exact retry.
 	let url: string;
 	try { url = readingUrl(body.url); } catch { throw new ReadingError('Share a complete HTTP or HTTPS link.'); }
-	const prepared = { url, ...(typeof body.title === 'string' ? { title: body.title.slice(0, 1000) } : {}),
+	const prepared = { url, ...(typeof body.title === 'string' ? { title: body.title.slice(0, MAX_READING_TITLE_LENGTH) } : {}),
 		operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)) };
 	const token = createRandomHexToken(), expiresAt = Date.now() + 5 * 60_000;
 	await db.prepare('INSERT INTO reading_handoffs(token_hash, principal_id, generation, body, expires_at) VALUES (?, ?, ?, ?, ?)')

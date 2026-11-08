@@ -3,7 +3,12 @@ import type { EncryptionServerState } from '../../encryption/server-state';
 import { corsResponse } from './http/cors';
 import { EncryptionStateError, hasEncryptionAuthority } from './encryption/state';
 import { shortcutCompatibility, shortcutTransport, type ShortcutTransport } from './reading/shortcut-transport';
-import { ENCRYPTION_RESET_PATHS, KEYLESS_ENCRYPTED_READ_PATHS } from './routes/policy';
+import { ENCRYPTION_RESET_PATHS, KEYLESS_ENCRYPTED_READ_PATHS, PLAINTEXT_ONLY_PATHS } from './routes/policy';
+
+function hasCompatibleProtocol(request: Request): boolean {
+	const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
+	return Number.isInteger(protocol) && protocol >= CRATE_PLUGIN_PROTOCOL.oldestCompatible && protocol <= CRATE_PLUGIN_PROTOCOL.current;
+}
 
 /** Runs after admission, before public grants or authenticated route handling. */
 export function checkRequestProtocol(request: Request, shortcut: ShortcutTransport | null): Response | null {
@@ -11,11 +16,8 @@ export function checkRequestProtocol(request: Request, shortcut: ShortcutTranspo
 	const method = request.method;
 	const compatibility = shortcut && shortcutCompatibility(shortcut);
 	if (compatibility) return corsResponse({ error: compatibility.message, code: compatibility.code }, compatibility.status);
-	if (isCrateMutation(path, method) && path !== '/notifications/share/reading' && !shortcut) {
-		const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
-		if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
-			return corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: CRATE_PLUGIN_PROTOCOL }, 428);
-		}
+	if (isCrateMutation(path, method) && path !== '/notifications/share/reading' && !shortcut && !hasCompatibleProtocol(request)) {
+		return corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: CRATE_PLUGIN_PROTOCOL }, 428);
 	}
 	return null;
 }
@@ -33,15 +35,13 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 		return;
 	}
 	if (encryption && !(KEYLESS_ENCRYPTED_READ_PATHS.includes(path) && method === 'GET') && path !== '/health' && !path.startsWith('/encryption') && !path.startsWith('/auth/')) {
-		const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
-		if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
-			throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
-		}
+		if (!hasCompatibleProtocol(request)) throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
 		if (!hasEncryptionAuthority(request, encryption)) {
 			throw new EncryptionStateError('Unlock this vault with its current encryption keys before syncing', 428);
 		}
 		if (encryption.mode !== 'active') throw new EncryptionStateError('An encryption reset is in progress. Resume it on the device that started it.', 423);
-		if ((path.startsWith('/reminders/') && path !== '/reminders/notification-policy' && !path.startsWith('/reminders/encrypted')) || path.startsWith('/sync/import')) {
+		// Reading rejects its own plaintext routes, including grant redemption, which skips this guard.
+		if (PLAINTEXT_ONLY_PATHS.includes(path) && !path.startsWith('/reading/')) {
 			throw new EncryptionStateError('This operation requires the encrypted client workflow', 428);
 		}
 	}

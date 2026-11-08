@@ -20,7 +20,6 @@ import {
 	handlePairDeviceScript,
 	handlePwaApp,
 	handlePwaClientAsset,
-	handlePwaThemeBootstrap,
 	handlePwaVersion,
 	handleServiceWorker,
 } from '../pwa/asset-handlers';
@@ -49,7 +48,6 @@ export async function handlePublicRoute(
 	if (path.startsWith('/notifications/assets/') && method === 'GET') {
 		return handlePwaClientAsset(request, path.slice('/notifications/assets/'.length));
 	}
-	if (path === '/notifications/theme-bootstrap.js' && method === 'GET') return handlePwaThemeBootstrap(request);
 	if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 	if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);
 	if (path === '/notifications/version.json' && method === 'GET') return handlePwaVersion();

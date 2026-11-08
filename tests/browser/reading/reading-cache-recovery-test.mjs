@@ -117,6 +117,7 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: Reading source 
       const api = readingRecovery;
       const session = { id: 'recovery-session', token: 'test-token', generation: 'generation', folderPath: 'Reading', expiresAt: Date.now() + 86400000 };
       localStorage.setItem(api.READING_SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem('crate-reminders-auth-token', session.token);
       const id = crypto.randomUUID();
       const item = { ...api.parseReadingNote(api.createReadingNote({ id, url: 'https://example.invalid/read', savedAt: new Date().toISOString() })), path: 'Reading/Note.md' };
       const key = `article:${session.id}:${id}`, listKey = `list:${session.id}`;
@@ -187,6 +188,7 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: invalid Reading
       const api = readingRecovery;
       const session = { id: 'pagination-session', token: 'test-token', generation: 'generation', folderPath: 'Reading', expiresAt: Date.now() + 86400000 };
       localStorage.setItem(api.READING_SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem('crate-reminders-auth-token', session.token);
       const id = crypto.randomUUID();
       const item = { ...api.parseReadingNote(api.createReadingNote({ id, url: 'https://example.invalid/read', savedAt: new Date().toISOString() })), path: 'Reading/Saved.md' };
       const intent = { id, changes: { favorite: true }, before: { favorite: false } };
@@ -216,7 +218,7 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: invalid Reading
         let lists = 0, mutations = 0;
         window.fetch = async path => {
           if (path === '/reading/encryption') return Response.json({ encryption: null });
-          if (path === '/.well-known/crate') return Response.json({ service: 'crate', serverVersion: 'test', protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['reading'] });
+          if (path === '/.well-known/crate') return Response.json({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['reading'] });
           if (path === '/reading/session') return Response.json({ day: 20_000, generation: session.generation });
           if (path === '/reading/update') { mutations++; return Response.json({ saved: true }); }
           const response = scenario.pages[lists++];

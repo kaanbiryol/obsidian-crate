@@ -169,12 +169,26 @@ export class SyncQueueController {
 		const now = Date.now();
 		const batch = this.pending.takeBatch(key => this.largeUploadReadyAt(key, now) === null);
 		this.scheduleHeldUploads(now);
-		return batch;
+		// A transfer begun before an exclusion was added runs to its end, but a failed one
+		// does not return to the queue once its path is excluded.
+		return { ...batch, requeue: keys => batch.requeue([...keys].filter(key => !this.isIgnoredKey(key))) };
 	}
 
+	/** Drops queued changes to paths a new exclusion covers, so no later flush uploads or
+	 * deletes them. Keys in flight stay with their batch. */
 	settingsChanged(): void {
 		this.clearDebounceTimer();
+		const ignored = [...this.pending.queuedKeys()].filter(key => this.isIgnoredKey(key));
+		for (const key of ignored) {
+			this.pending.drop(key);
+			this.verificationKeys.delete(key);
+		}
 		if (this.pending.queuedCount > 0) this.debouncedSync();
+		else if (ignored.length > 0) this.context.updateState({ pendingChanges: 0 });
+	}
+
+	private isIgnoredKey(key: string): boolean {
+		return this.context.shouldIgnore(decodePendingChange(key).path);
 	}
 
 	/** Re-saving an already pending file only restarts the countdown. */

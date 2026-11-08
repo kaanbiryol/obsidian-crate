@@ -30,15 +30,15 @@ it('does not attribute an earlier in-flight request to the next measurement', as
 	expect(http.getRequestTimings().count).toBe(0);
 });
 
-it('reports observed D1 usage with coverage for failures, partial metadata and older servers', async () => {
-	const values = ['10:4:1', '20:7:0', undefined, '-1:20:1', '9007199254740992:0:1'];
+it('reports observed D1 usage with coverage for failures and partial metadata', async () => {
+	const values = ['10:4:1:2', '20:7:0:3', undefined, '-1:20:1:0', '9007199254740992:0:1:0'];
 	const http = new WorkerApiHttpClient('https://test', 'token', async () => {
 		const value = values.shift();
 		const headers: Record<string, string> = value ? { 'X-Crate-D1-Usage': value } : {};
 		return { status: 200, headers, text: '{}', arrayBuffer: new ArrayBuffer(0) };
 	});
 	for (let i = 0; i < 5; i++) await http.requestJson('/health');
-	const d1 = { rowsRead: 30, rowsWritten: 11, reportedRequests: 2, completeRequests: 1 };
+	const d1 = { rowsRead: 30, rowsWritten: 11, reportedRequests: 2, completeRequests: 1, queries: 5 };
 	expect(http.getRequestTimings()).toMatchObject({ count: 5, d1 });
 	const snapshot = http.getRequestTimings(); snapshot.d1!.rowsWritten = 99;
 	expect(http.getRequestTimings().d1).toEqual(d1);
@@ -47,15 +47,15 @@ it('reports observed D1 usage with coverage for failures, partial metadata and o
 });
 
 it('sums the D1 queries servers report and records them on each request', async () => {
-	const values = ['10:4:1:7', '20:7:0:5', '1:1:1', '1:1:1:x'];
+	const values = ['10:4:1:7', '20:7:0:5', '1:1:1:x'];
 	const http = new WorkerApiHttpClient('https://test', 'token', async () => {
 		const value = values.shift()!;
 		return { status: 200, headers: { 'X-Crate-D1-Usage': value }, text: '{}', arrayBuffer: new ArrayBuffer(0) };
 	});
-	for (let i = 0; i < 4; i++) await http.requestJson('/health');
-	// An older server omits the count; a malformed header reports nothing.
-	expect(http.getRequestTimings().d1).toEqual({ rowsRead: 31, rowsWritten: 12, reportedRequests: 3, completeRequests: 2, queries: 12 });
+	for (let i = 0; i < 3; i++) await http.requestJson('/health');
+	// A malformed header reports nothing.
+	expect(http.getRequestTimings().d1).toEqual({ rowsRead: 30, rowsWritten: 11, reportedRequests: 2, completeRequests: 1, queries: 12 });
 	expect(normalizeSyncTimings({ totalMs: 1, phases: {}, requests: http.getRequestTimings() })?.requests?.d1?.queries).toBe(12);
-	expect(http.getRequestDiagnostics().requests.map(request => request.d1Queries)).toEqual([7, 5, undefined, undefined]);
-	expect(normalizeRequestDiagnostics(http.getRequestDiagnostics())?.requests.map(request => request.d1Queries)).toEqual([7, 5, undefined, undefined]);
+	expect(http.getRequestDiagnostics().requests.map(request => request.d1Queries)).toEqual([7, 5, undefined]);
+	expect(normalizeRequestDiagnostics(http.getRequestDiagnostics())?.requests.map(request => request.d1Queries)).toEqual([7, 5, undefined]);
 });

@@ -9,7 +9,7 @@ function mockTransport(...responses: Response[]) {
 	let responseIndex = 0;
 	return vi.fn<ApiHttpTransport>(async request => {
 		if (request.url.endsWith('/.well-known/crate') && !explicitMetadata) {
-			const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
+			const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
 			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 		}
 		const response = responses[responseIndex++];
@@ -62,7 +62,7 @@ describe('SyncApiClient', () => {
 			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer };
 		};
 		const transport: ApiHttpTransport = async request => {
-			if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
+			if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
 			if (request.url.includes('/sync/upload')) {
 				return new Promise(resolve => {
 					commit = () => {
@@ -319,6 +319,8 @@ describe('SyncApiClient', () => {
 		const transport = mockTransport(new Response(JSON.stringify({
 			service: 'crate',
 			serverVersion: '9.0.0',
+			serverRevision: 4,
+			reminderOperationDay: 20_000,
 			protocol: { current: 99, oldestCompatible: 99 },
 			capabilities: ['sync-v1'],
 		}), { headers: { 'X-Test-Metadata': 'true' } }));
@@ -390,7 +392,7 @@ it.each([true, 'bulk'] as const)('splits uploads at the batch limit and requests
 	const transport: ApiHttpTransport = async request => {
 		let value: unknown;
 		if (request.url.endsWith('/.well-known/crate')) {
-			value = { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL,
+			value = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL,
 				reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['sync-v1', 'bulk-new-file-uploads-v1'] : supported ? ['sync-v1'] : [] };
 		} else {
 			const { files, bulkNewFiles } = JSON.parse(request.body as string) as { files: Array<{ path: string; operationId: string }>; bulkNewFiles?: boolean };

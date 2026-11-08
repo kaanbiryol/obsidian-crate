@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReadingConnection } from './session/useReadingConnection';
 import type { PendingReading } from './outbox';
 import { adoptEarlierReadingCaptures, hasEarlierReadingChanges, newestReadingShare, pendingReading, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, saveReadingDraft, type ReadingCache } from './storage/storage';
-import { assertReadingSession, type ReadingSession } from './session/session';
+import { assertReadingSession, isReadingSessionCurrent, type ReadingSession } from './session/session';
 import { sameReadingSession } from './session/session';
 
 interface ReadingSyncPublication {
@@ -22,8 +22,7 @@ export function useReadingSession(connection: ReadingConnection) {
 	const alive = useRef(true), generation = useRef(0);
 	const authority = useRef<ReadingSession | null>(null);
 	const isCurrentSession = useCallback((expected: ReadingSession) => {
-		if (!alive.current || !sameReadingSession(authority.current, expected)) return false;
-		try { assertReadingSession(expected); return true; } catch { return false; }
+		return alive.current && sameReadingSession(authority.current, expected) && isReadingSessionCurrent(expected);
 	}, []);
 	const publishPending = useCallback((expected: ReadingSession, next: PendingReading[]) => {
 		if (!isCurrentSession(expected)) return false;

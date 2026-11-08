@@ -9,9 +9,7 @@ import { prefetchReadingArticles } from './prefetch';
 import type { useReadingSession } from './useReadingSession';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-
-// Foregrounding shortly after a completed refresh reuses it, like Reminders.
-const FOREGROUND_MAX_AGE_MS = 30_000;
+import { FOREGROUND_REFRESH_GAP_MS, onAppResume, type AppResumeReason } from '../shell/app-resume';
 
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
 export function useReadingSync({ session, ready, readOnly, pending, publishSyncResult, publishPartialCache, isCurrentSession, run, resetSession, retryVerification }: Pick<ReturnType<typeof useReadingSession>,
@@ -41,7 +39,7 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 			// Enrollment checks share the refresh lock. Foreground and cross-tab
 			// events can arrive together while the previous check is still pending.
 			let verified: { day: number; generation: string } | undefined;
-			if (current.source === 'reminders' && navigator.onLine) {
+			if (navigator.onLine) {
 				const connected = await connectReadingFromReminders();
 				if (!isCurrentSession(current)) return;
 				if (!sameReadingSession(connected?.session, current)) {
@@ -101,9 +99,11 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 	useEffect(() => {
 		if (!session || !ready) return;
 		const reload = () => { if (enabledRef.current && document.visibilityState === 'visible') void run(() => refresh(session)); };
-		const foreground = () => {
+		// Foregrounding during or shortly after a refresh reuses it, like Reminders. One
+		// resume can fire both pageshow and visibilitychange; reconnecting always reloads.
+		const resume = (reason: AppResumeReason) => {
 			const completed = completedAt.current;
-			if (completed?.session === session && Date.now() - completed.at < FOREGROUND_MAX_AGE_MS) return;
+			if (reason === 'foreground' && (refreshing.current || completed?.session === session && Date.now() - completed.at < FOREGROUND_REFRESH_GAP_MS)) return;
 			reload();
 		};
 		const changed = () => {
@@ -121,9 +121,10 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 		// A read-only copy appears after its encryption check just failed.
 		if (!readOnly) reload();
 		// Refresh on open, foreground, reconnect and explicit refresh; never on a timer.
-		window.addEventListener('online', reload); window.addEventListener('storage', storageChanged); window.addEventListener(READING_CHANGED_EVENT, changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.addEventListener('visibilitychange', foreground);
-		return () => { window.removeEventListener('online', reload); window.removeEventListener('storage', storageChanged); window.removeEventListener(READING_CHANGED_EVENT, changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); document.removeEventListener('visibilitychange', foreground); };
+		const stopResume = onAppResume(resume);
+		window.addEventListener('storage', storageChanged); window.addEventListener(READING_CHANGED_EVENT, changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed);
+		return () => { stopResume(); window.removeEventListener('storage', storageChanged); window.removeEventListener(READING_CHANGED_EVENT, changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); };
 	}, [enabled, session, ready, readOnly, refresh, run, resetSession]);
 	const refreshManually = useCallback(() => refresh(session, 'manual'), [refresh, session]);
-	return { refresh, refreshManually, syncing, syncedSession, isOffline };
+	return { refresh, refreshManually, syncing, syncedSession, isOffline, retryAt };
 }

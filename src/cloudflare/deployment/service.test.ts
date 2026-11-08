@@ -57,7 +57,8 @@ vi.mock('../cloudflare-api', () => ({
 
 vi.mock('./provisioner', () => ({ provisionCloudflareDeployment }));
 
-import { blockingServerOperation, CloudflareDeploymentService, type CloudflareDeploymentServiceOptions } from './service';
+import { CloudflareDeploymentService, type CloudflareDeploymentServiceOptions } from './service';
+import { blockingServerOperation } from './preconditions';
 import { authorizedBy, testAuthorization } from './authorization-test-harness';
 import type { CloudflareDeploymentMetadata, DeploymentIntent } from './types';
 import { DesktopOnlyServerChangeError } from './server-changes';

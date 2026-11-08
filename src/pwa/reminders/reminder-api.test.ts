@@ -87,6 +87,28 @@ describe('fetchReadyReminderList', () => {
 		await expect(result).resolves.toMatchObject({ status: 200 });
 	});
 
+	it('stops polling once the read can no longer apply, before and after each wait', async () => {
+		vi.useFakeTimers();
+		const apiFetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ warming: true }), { status: 202 }));
+		let applies = true;
+		const superseded = fetchReadyReminderList(apiFetch, '/reminders/list', new Headers(), undefined, undefined, () => applies);
+		const rejection = expect(superseded).rejects.toThrow('superseded');
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(apiFetch).toHaveBeenCalledTimes(2);
+		// A local change or a newer read starts during the wait.
+		applies = false;
+		await vi.advanceTimersByTimeAsync(600_000);
+		await rejection;
+		expect(apiFetch).toHaveBeenCalledTimes(2);
+
+		apiFetch.mockClear();
+		const stale = fetchReadyReminderList(apiFetch, '/reminders/list', new Headers(), undefined, undefined, () => false);
+		const staleRejection = expect(stale).rejects.toThrow('superseded');
+		await vi.advanceTimersByTimeAsync(600_000);
+		await staleRejection;
+		expect(apiFetch).toHaveBeenCalledOnce();
+	});
+
 	it('uses a response already in flight for the first request', async () => {
 		const apiFetch = vi.fn();
 		const first = new Response(JSON.stringify({ reminders: [] }), { status: 200 });

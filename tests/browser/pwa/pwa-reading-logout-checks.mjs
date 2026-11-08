@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { previewAuthToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 export async function checkReadingLogoutCorruption(browser, origin) {
   const page = await browser.newPage({ serviceWorkers: 'block' });
@@ -8,7 +9,8 @@ export async function checkReadingLogoutCorruption(browser, origin) {
       if (sessionStorage.getItem('reading-logout-seeded')) return;
       sessionStorage.setItem('reading-logout-seeded', 'yes');
       localStorage.setItem('crate-reading-session-v1', JSON.stringify(session));
-    }, { id: 'logout-reading', token: 'reading-test-token', folderPath: 'Reading', generation: 'logout-generation', expiresAt: Date.now() + 86400000 });
+    }, { id: 'logout-reading', token: previewAuthToken, folderPath: 'Reading', generation: 'logout-generation', expiresAt: Date.now() + 86400000 });
+    await page.route('**/reading/session', route => route.fulfill({ json: { id: 'logout-reading', folderPath: 'Reading', generation: 'logout-generation', expiresAt: Date.now() + 86400000 } }));
     await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
     await page.route('**/auth/session', route => route.fulfill({ status: 204 }));
     await page.goto(`${origin}/notifications?section=reading`);

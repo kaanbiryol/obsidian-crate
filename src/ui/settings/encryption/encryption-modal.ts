@@ -15,7 +15,6 @@ import { renderEncryptionLoading, renderEncryptionSetup } from './encryption-set
 import { renderEncryptionManagement } from './encryption-manage-ui';
 import { WebAppPairingModal } from '../web-app-pairing-modal';
 import { DeviceKeyPairingModal } from '../device-key-pairing-modal';
-import { DEVICE_PAIRING_CAPABILITY } from '../../../protocol/device-pairing';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 
 export function encryptionModalTitle(state: EncryptionServerState | null): string {
@@ -68,9 +67,8 @@ export class EncryptionModal extends SharedModal {
 		switch (view.kind) {
 			case 'resetting': this.clearContent(); this.bodyEl.createEl('p', { text: 'An encryption reset is in progress. Resume it on the Obsidian device that started it.' }); return;
 			case 'locked': {
-				// Servers that pair devices also accept key requests from a device without keys.
-				const pairing = view.state.mode === 'active' && (await this.http.getServerInfo()).capabilities.includes(DEVICE_PAIRING_CAPABILITY);
-				this.assertConnection();
+				// An active vault accepts key requests from a device without keys.
+				const pairing = view.state.mode === 'active';
 				this.clearContent(); this.status(); this.recover(view.state, pairing); return;
 			}
 			case 'ready': this.clearContent(); this.ready(view.keys, view.state); return;

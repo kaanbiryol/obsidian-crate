@@ -7,12 +7,13 @@ import { deletePathLocallyIfUnchanged, isVaultTFileLike } from "../local/local-d
 import { hasUnresolvedConflict, recordResolvedRace, recordUnresolvedConflict } from "../sync-result";
 import { awaitingReview, downloadAndSaveFile, validateDownloadedContent } from "./download";
 import { prepareUploadFromPath } from "./prepare";
+import { acknowledgeUpload } from "./upload";
 import type { DiffApplyOutcome, TransferContext } from "./types";
 import type { ConflictDiff, FileDiff, SyncResult } from '../types';
 import type { FileEntry, MutationFailure, UploadResult } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
-import { recordDeferredChange, recordSyncError } from '../issues';
+import { OVERSIZED_REMOTE_FILE_MESSAGE, recordDeferredChange, recordSyncError } from '../issues';
 import { errorMessage } from '../../platform/logger';
 import { isAbortError } from '../abort';
 import { fileFailure, uploadResultError } from '../failures';
@@ -46,21 +47,7 @@ export async function processDiff(
 				uploadFile.expectedHash ?? null,
 			);
 			assertAcceptedUpload(uploadResult, uploadFile.hash);
-
-			result.uploaded++;
-			result.uploadedPaths.push(uploadFile.path);
-			const modified = await context.getModifiedIso(uploadFile.path, uploadFile.mtime);
-			const entry: FileEntry = {
-				hash: uploadFile.hash,
-				revision: uploadResult.revision,
-				size: uploadFile.size,
-				modified,
-			};
-			context.localManifest.setEntry(uploadFile.path, entry);
-			if (isMarkdownPath(uploadFile.path)) {
-				await context.markdownBaseCache.putBase(uploadFile.path, uploadFile.hash, uploadFile.content);
-			}
-			localFiles[uploadFile.path] = entry;
+			localFiles[uploadFile.path] = await acknowledgeUpload(context, result, uploadFile, uploadResult);
 			if (diff.cause === "remote-deleted") {
 				recordResolvedRace(result, diff.path, "kept-local-edit");
 			}
@@ -92,7 +79,7 @@ export async function processDiff(
 			const response = await context.files.downloadFile(diff.path);
 			const remoteContent = response.content;
 			if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {
-				throw new Error("Skipped remote file larger than 25MB");
+				throw new Error(OVERSIZED_REMOTE_FILE_MESSAGE);
 			}
 			await validateDownloadedContent(
 				diff.path,

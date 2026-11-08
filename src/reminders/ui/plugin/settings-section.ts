@@ -46,35 +46,15 @@ export function renderRemindersSettings(context: SettingsSectionContext): () => 
 		.setDesc('Crate scans this folder and adds hidden tracking IDs to checkbox lines. Changes reach the server when connected. Files are not moved.')
 		.addText(text => {
 			folderSuggest = new FolderSuggest(plugin.app, text.inputEl);
-
-			const commitFolderPath = async (): Promise<void> => {
-				const normalizedPath = normalizeRemindersFolderPath(text.inputEl.value);
-				const currentPath = plugin.remindersSettings.remindersFolderPath;
-				text.setValue(normalizedPath);
-
-				if (normalizedPath === currentPath) {
-					return;
-				}
-
-				await changeReminderFolder(plugin, normalizedPath);
-				new Notice(`Reminders folder updated to "${normalizedPath}"`);
-				rerender();
-			};
-
 			text.setPlaceholder('Reminders')
 				.setValue(settings.remindersFolderPath);
-			text.inputEl.addEventListener('blur', () => {
-				void commitFolderPath().catch((error: unknown) => {
-					new Notice(`Failed to update reminders folder: ${errorMessage(error)}`);
-					text.setValue(plugin.remindersSettings.remindersFolderPath);
-				});
-			});
-			text.inputEl.addEventListener('keydown', (event: KeyboardEvent) => {
-				if (event.key === 'Enter') {
-					event.preventDefault();
-					text.inputEl.blur();
-				}
-			});
+			bindCommittedText(text, () => plugin.remindersSettings.remindersFolderPath, async value => {
+				const folderPath = normalizeRemindersFolderPath(value);
+				if (folderPath === plugin.remindersSettings.remindersFolderPath) return;
+				await changeReminderFolder(plugin, folderPath);
+				new Notice(`Reminders folder updated to "${folderPath}"`);
+				rerender();
+			}, undefined, error => `Failed to update reminders folder: ${errorMessage(error)}`);
 		});
 
 	if (!settings.enabled) return () => folderSuggest?.close();

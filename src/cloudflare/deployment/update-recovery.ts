@@ -1,5 +1,4 @@
 import { canReplaceServerBuild, isCrateResourceName } from '../../protocol/server-build';
-import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { isSha256Hex } from '../../platform/validation';
 import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import { nullOn404 } from '../cloudflare-api-error';
@@ -8,11 +7,12 @@ import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild
 import { SERVER_RELEASE } from './database-upgrades';
 import {
 	awaitsPublicationVerification, type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation,
-	isRejectedWorkerUpload, isSettledStep, isUploadTag, parseFenceRecord, readStoredFence, UPDATE_STEPS, withDeploymentFence,
+	isRejectedWorkerUpload, isSettledStep, isUploadTag, parseFenceRecord, readStoredFence, removeFenceValue, replaceFenceValue, UPDATE_STEPS, withDeploymentFence,
 } from './fence';
 import { provisionCloudflareDeployment } from './provisioner';
 import type { CloudflareDeploymentMetadata } from './types';
 import { workersDevOrigin } from './worker-origin';
+import { verifyWorkerDeployment } from './verify-worker';
 import { parseReleaseWorkerMessage, releaseWorkerMessage, workerStorageBindings } from './discovery';
 
 type RecoveryApi = Pick<CloudflareApiClient, 'queryD1' | 'getWorkerSettings'>;
@@ -73,10 +73,7 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 		&& build?.version === record.version && build?.fingerprint === record.fingerprint
 		&& fingerprint === record.fingerprint) {
 		const confirmed = JSON.stringify({ ...record, stepState: 'confirmed' });
-		const changed = await queryD1Rows(api, account, database,
-			'UPDATE maintenance_state SET value = ? WHERE key = ? AND value = ? RETURNING value;',
-			[confirmed, DEPLOYMENT_FENCE_KEY, value]);
-		if (changed.length !== 1 || changed[0]?.value !== confirmed) {
+		if (!await replaceFenceValue(api, account, database, { kind: 'update', from: value, to: confirmed })) {
 			return result('blocked', 'The operation changed during the check. Check again to read its latest status.');
 		}
 		value = confirmed;
@@ -102,9 +99,7 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 		if (!fingerprint || fingerprint !== record.fingerprint) return result('blocked', 'Resume this update with the exact plugin build that started it. No lock was cleared.');
 		return { ...result('resume', 'The confirmed update can resume under new ownership.'), resumeValue: value };
 	}
-	const removed = await queryD1Rows(api, account, database,
-		'DELETE FROM maintenance_state WHERE key = ? AND value = ? RETURNING key;', [DEPLOYMENT_FENCE_KEY, value]);
-	if (removed.length !== 1 || removed[0]?.key !== DEPLOYMENT_FENCE_KEY) {
+	if (!await removeFenceValue(api, account, database, value)) {
 		return result('blocked', 'The operation changed during the check. Let it finish, then check again.');
 	}
 	return result('recovered', 'The confirmed operation was recovered. You can now retry the server update.');
@@ -112,7 +107,7 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 
 /** Verify an already-published update and its address. Never upload a replacement build. */
 export async function completePublishedDeployment(
-	api: Pick<CloudflareApiClient, 'getWorkerSettings' | 'getWorkerSubdomain' | 'queryD1' | 'verifyPublishedWorkerDeployment'>,
+	api: Pick<CloudflareApiClient, 'getWorkerSettings' | 'getWorkerSubdomain' | 'queryD1' | 'transport' | 'sleep'>,
 	target: CloudflareDeploymentMetadata,
 	artifacts: CloudflareDeploymentArtifacts,
 	value: string,
@@ -153,7 +148,7 @@ export async function completePublishedDeployment(
 			|| storage?.databaseId !== databaseId || storage.bucketName !== target.r2BucketName) {
 			throw new Error('The published Worker or its storage changed. Recovery stopped.');
 		}
-		const live = await api.verifyPublishedWorkerDeployment(workersDevOrigin(target.workerName, target.workersSubdomain!), fingerprint);
+		const live = await verifyWorkerDeployment(api.transport, workersDevOrigin(target.workerName, target.workersSubdomain!), fingerprint, true, api.sleep);
 		if (live.developmentBuild && live.developmentBuild.worker !== target.workerName) throw new Error('The published development build belongs to another Worker.');
 		publishedArtifacts.development = live.developmentBuild;
 		const schema = { api, accountId, databaseId, artifacts: publishedArtifacts };

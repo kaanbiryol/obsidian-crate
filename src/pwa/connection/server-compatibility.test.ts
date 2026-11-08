@@ -5,7 +5,7 @@ import { makeApiFetch } from './api-fetch';
 
 vi.mock('../reminders/encryption-session', () => ({ prepareReminderEncryption: async () => null, reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }) }));
 
-const info = { service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: 20_000 };
+const info = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: 20_000 };
 const fetchMock = vi.fn(async () => Response.json(info));
 
 // Each test starts a minute later, so a result shared by the previous test has expired.

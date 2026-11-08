@@ -2,13 +2,12 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { AUTH_TOKEN_KEY } from './config';
 import { readingSession } from './reading/session/session';
 import { parseSharedFeatures, type SharedFeatures } from '@/protocol/feature-policy';
+import { FOREGROUND_REFRESH_GAP_MS } from './shell/app-resume';
 
 const CACHE_KEY = 'crate-shared-features';
 const defaults: SharedFeatures = { reading: true, reminders: true };
 // Data refreshes can repeat often; paused responses always check immediately.
 const REFRESH_INTERVAL_MS = 5 * 60_000;
-// Foregrounding repeats quickly; reconnecting always checks.
-const FOREGROUND_MAX_AGE_MS = 30_000;
 const refreshListeners = new Set<(immediate: boolean) => void>();
 /** Re-read the shared policy after a data refresh, or at once after a paused response. */
 export function requestSharedFeaturesRefresh(immediate = false): void {
@@ -49,8 +48,9 @@ export function useServerFeatures(): SharedFeatures {
 		const requested = (immediate: boolean) => {
 			if (immediate || Date.now() - checkedAt >= REFRESH_INTERVAL_MS) void refresh();
 		};
-		// Returning to the app or reconnecting checks; there is no timer.
-		const focused = () => { if (Date.now() - checkedAt >= FOREGROUND_MAX_AGE_MS) void refresh(); };
+		// Returning to the app or reconnecting checks; there is no timer. Foregrounding
+		// repeats quickly, so it reuses a recent check; reconnecting always checks.
+		const focused = () => { if (Date.now() - checkedAt >= FOREGROUND_REFRESH_GAP_MS) void refresh(); };
 		const online = () => { void refresh(); };
 		void refresh();
 		refreshListeners.add(requested);

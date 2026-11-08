@@ -4,7 +4,7 @@ import { arrayBufferToBase64 } from "../encoding";
 import { createBatchUploadChunks } from "./prepare";
 import { isMarkdownPath } from "../../protocol/note-paths";
 import type { TransferContext } from "./types";
-import type { BatchUploadFile, MutationFailure } from '../../protocol/sync-types';
+import type { BatchUploadFile, FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { PreparedUpload, SyncResult } from '../types';
 import { pendingChangeKey, type PendingKey } from '../pending/pending-change';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
@@ -187,17 +187,26 @@ async function recordAcceptedUpload(context: UploadTransferContext, result: Sync
 		recordUploadError(result, `Hash mismatch after upload (expected ${upload.hash}, got ${accepted.hash})`, upload.path, options);
 		return;
 	}
+	await acknowledgeUpload(context, result, upload, accepted);
+}
+
+/** Counts an upload the server accepted with the sent bytes and makes them the path's
+ * baseline. The caller has already checked the acknowledged hash. */
+export async function acknowledgeUpload(context: UploadTransferContext, result: SyncResult, upload: PreparedUpload,
+	accepted: { revision?: string }): Promise<FileEntry> {
 	result.uploaded++;
 	result.uploadedPaths.push(upload.path);
-	context.localManifest.setEntry(upload.path, {
+	const entry: FileEntry = {
 		hash: upload.hash,
 		revision: accepted.revision,
 		size: upload.size,
 		modified: await context.getModifiedIso(upload.path, upload.mtime),
-	});
+	};
+	context.localManifest.setEntry(upload.path, entry);
 	if (isMarkdownPath(upload.path)) {
 		await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
 	}
+	return entry;
 }
 
 function recordUploadError(result: SyncResult, error: unknown, path: string, options: Pick<UploadPreparedFilesOptions, 'onFailure'>): void {

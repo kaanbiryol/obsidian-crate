@@ -8,10 +8,7 @@ import { assertReadingSession, type ReadingSession } from '../session/session';
 import { isReadingArticleCache, isReadingCache, type ReadingArticleCache } from './storage-validation';
 import { isReadingItem } from './record-validation';
 import { isArticleReadingKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
-import { readingKeys as readingEncryptionKeys } from '../session/encryption-session';
-
-/** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
-const readingFolder = (session: ReadingSession) => readingEncryptionKeys()?.folderPath ?? session.folderPath;
+import { readingNoteFolder } from '../session/encryption-session';
 
 /** `revision` is the server's list ETag for this snapshot, sent back to skip unchanged reloads.
  * `deltaBase` is the server's changelog position for it, sent back to receive only changed notes. */
@@ -20,7 +17,7 @@ export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: stri
 export async function readReadingCache(session: ReadingSession): Promise<ReadingCache | undefined> {
 	const value = await readReadingValue(readingKeys.list(session.id));
 	if (value === undefined) return undefined;
-	if (!isReadingCache(value, readingFolder(session))) throw new Error('The saved Reading library could not be read. Refresh when connected.');
+	if (!isReadingCache(value, readingNoteFolder(session))) throw new Error('The saved Reading library could not be read. Refresh when connected.');
 	return value;
 }
 
@@ -53,7 +50,7 @@ function isIndexEntry(folder: string) {
 export async function readReadingArticle(session: ReadingSession, id: string) {
 	const value = await readReadingValue(`${readingKeys.articlePrefix(session.id)}${id}`);
 	if (value === undefined) return undefined;
-	if (!isReadingArticleCache(value, readingFolder(session)) || value.item.crate_reading_id !== id) throw new Error('The saved article could not be read. Open it again when connected.');
+	if (!isReadingArticleCache(value, readingNoteFolder(session)) || value.item.crate_reading_id !== id) throw new Error('The saved article could not be read. Open it again when connected.');
 	return value;
 }
 
@@ -96,11 +93,11 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
 			assertReadingSession(session); await tx.done;
 			// The next reload is complete, so this notice cannot outlive the problem.
 			delete cache.deltaBase;
-			cache.issues.push({ path: readingFolder(session), message: 'The saved library needs recovery. Export Reading data before clearing this device’s storage.' });
+			cache.issues.push({ path: readingNoteFolder(session), message: 'The saved library needs recovery. Export Reading data before clearing this device’s storage.' });
 			return cache;
 		}
 		// Only notes with source issues keep their previous entries.
-		if (uncertain.size && isReadingCache(previous, readingFolder(session))) for (const item of previous.items) {
+		if (uncertain.size && isReadingCache(previous, readingNoteFolder(session))) for (const item of previous.items) {
 			if (uncertain.has(item.path) && !ids.has(item.crate_reading_id)) {
 				cache.items.push(item); ids.add(item.crate_reading_id);
 			}
@@ -115,7 +112,7 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
 			let article: unknown;
 			try { article = decodeReadingValue(key, raw); } catch { continue; }
 			// Unknown records remain exportable; source issues are not deletions.
-			if (isReadingArticleCache(article, readingFolder(session)) && !uncertain.has(article.item.path)) await tx.store.delete(key);
+			if (isReadingArticleCache(article, readingNoteFolder(session)) && !uncertain.has(article.item.path)) await tx.store.delete(key);
 		}
 		assertReadingSession(session);
 		await tx.store.put(encodeReadingValue(readingKeys.list(session.id), cache), readingKeys.list(session.id));
@@ -163,7 +160,7 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
 		const previous = await tx.store.get(key);
 		if (previous !== undefined && prefetched) { await tx.done; return true; }
 		const saved = previous === undefined ? undefined : decodeReadingValue(key, previous);
-		if (previous !== undefined && !isReadingArticleCache(saved, readingFolder(session))) {
+		if (previous !== undefined && !isReadingArticleCache(saved, readingNoteFolder(session))) {
 			throw new Error('The saved article needs recovery before replacing its offline copy.');
 		}
 		const replaced = refresh ? saved as ReadingArticleCache | undefined : undefined;
@@ -184,7 +181,7 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
 			let value: unknown;
 			try { value = decodeReadingValue(stored, await tx.store.get(stored)); } catch { continue; }
 			// Preserve unreadable copies for recovery; they must not break a healthy write.
-			if (isReadingArticleCache(value, readingFolder(session))) uses.push({ id, usedAt: value.usedAt, bytes: new TextEncoder().encode(value.markdown).byteLength, ...backgroundFlag(value.prefetched) });
+			if (isReadingArticleCache(value, readingNoteFolder(session))) uses.push({ id, usedAt: value.usedAt, bytes: new TextEncoder().encode(value.markdown).byteLength, ...backgroundFlag(value.prefetched) });
 		}
 		uses.sort(byRetention);
 		let bytes = 0;

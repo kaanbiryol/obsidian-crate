@@ -9,6 +9,7 @@ function createController(options: Partial<{
 	automaticSync: boolean;
 	destroyed: boolean;
 	maxDebounceWaitMs: number;
+	shouldIgnore: (path: string) => boolean;
 }> = {}) {
 	const updateState = vi.fn();
 	// A flush stops at the configuration check, so its calls count flushes.
@@ -21,7 +22,7 @@ function createController(options: Partial<{
 		recoverUploads: async () => {},
 		apiConfigured: isConfigured,
 		localManifest: { getEntry: () => undefined, renameDestination: () => undefined, save: async () => {} },
-		shouldIgnore: (path: string) => path.startsWith('.trash/'),
+		shouldIgnore: options.shouldIgnore ?? ((path: string) => path.startsWith('.trash/')),
 		updateState,
 		setLastSync: vi.fn(),
 		reconnectNotice: new ReconnectNotice(),
@@ -268,6 +269,105 @@ describe('settleSyncResult', () => {
 
 		expect(h.pending()).toEqual(['notes/a.md']);
 		expect(h.revisions()).toEqual(['notes/a.md']);
+	});
+});
+
+describe('exclusion changes', () => {
+	it('drops queued uploads and deletes under a new exclusion and publishes the pending count', () => {
+		let excluded = false;
+		const h = createController({ shouldIgnore: path => excluded && path.startsWith('Private/') });
+		h.controller.onFileChange({ path: 'Private/a.md', kind: 'file' });
+		h.controller.onFileDelete({ path: 'Private/old.md', kind: 'file' });
+		h.controller.onFileChange({ path: 'notes/b.md', kind: 'file' });
+		h.updateState.mockClear();
+
+		excluded = true;
+		h.controller.settingsChanged();
+
+		expect(h.pending()).toEqual(['notes/b.md']);
+		expect(h.revisions()).toEqual(['notes/b.md']);
+		expect(h.updateState).toHaveBeenCalledWith({ pendingChanges: 1 });
+	});
+
+	it('publishes an empty queue when every queued change is excluded', () => {
+		let excluded = false;
+		const h = createController({ shouldIgnore: path => excluded && path.startsWith('Private/') });
+		h.controller.onFileChange({ path: 'Private/a.md', kind: 'file' });
+		h.updateState.mockClear();
+
+		excluded = true;
+		h.controller.settingsChanged();
+
+		expect(h.pending()).toEqual([]);
+		expect(h.updateState).toHaveBeenCalledExactlyOnceWith({ pendingChanges: 0 });
+	});
+
+	function createFlushingController(isExcluded: () => boolean) {
+		let recover: () => Promise<void> = async () => { throw new Error('offline'); };
+		const prepared: string[] = [];
+		const deleted: string[] = [];
+		const controller = new SyncQueueController({
+			finishInitialSetup: async () => {},
+			uploadPreparedFiles: async () => {},
+			deleteRemoteFiles: async files => { deleted.push(...files.map(file => file.path)); return []; },
+			automaticSyncEnabled: () => true,
+			recoverUploads: () => recover(),
+			apiConfigured: () => true,
+			localManifest: {
+				getEntry: () => ({ hash: 'a'.repeat(64), size: 1, modified: '2026-10-01T00:00:00.000Z' }),
+				renameDestination: () => undefined, save: async () => {},
+			},
+			shouldIgnore: path => isExcluded() && path.startsWith('Private/'),
+			updateState: vi.fn(),
+			setLastSync: vi.fn(),
+			reconnectNotice: new ReconnectNotice(),
+			isDestroyed: () => false,
+			getStatus: () => 'idle',
+			verifyPendingPaths: async () => [],
+			prepareUploadFromPath: async path => { prepared.push(path); return null; },
+			getDebounceDelayMs: () => 25,
+			maxDebounceWaitMs: 30_000,
+			reconcile: async () => createEmptySyncResult(),
+			onFlushResult: vi.fn(),
+		});
+		return { controller, prepared, deleted, setRecover: (next: () => Promise<void>) => { recover = next; } };
+	}
+
+	it('does not send changes queued before an exclusion when a backed-off flush retries', async () => {
+		let excluded = false;
+		const h = createFlushingController(() => excluded);
+		h.controller.onFileChange({ path: 'notes/b.md', kind: 'file' });
+		await vi.advanceTimersByTimeAsync(25);
+		// Offline: the flush failed and backs off. Edits keep arriving meanwhile.
+		h.controller.onFileChange({ path: 'Private/a.md', kind: 'file' });
+		h.controller.onFileDelete({ path: 'Private/old.md', kind: 'file' });
+
+		excluded = true;
+		h.controller.settingsChanged();
+		h.setRecover(async () => {});
+		await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+		expect(h.prepared).toEqual(['notes/b.md']);
+		expect(h.deleted).toEqual([]);
+		expect(h.controller.getPendingKeys()).toEqual([]);
+	});
+
+	it('does not requeue a failed change in flight once its path is excluded', async () => {
+		let excluded = false;
+		const h = createFlushingController(() => excluded);
+		let fail!: () => void;
+		h.setRecover(() => new Promise((_, reject) => { fail = () => reject(new Error('offline')); }));
+		h.controller.onFileChange({ path: 'Private/a.md', kind: 'file' });
+		h.controller.onFileChange({ path: 'notes/b.md', kind: 'file' });
+		await vi.advanceTimersByTimeAsync(25);
+		expect(h.controller.getPendingKeys()).toEqual(['Private/a.md', 'notes/b.md']);
+
+		excluded = true;
+		h.controller.settingsChanged();
+		fail();
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(h.controller.getPendingKeys()).toEqual(['notes/b.md']);
 	});
 });
 

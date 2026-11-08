@@ -23,7 +23,8 @@ const CRATE_SERVER_VERSION =
 		? __CRATE_SERVER_VERSION__
 		: 'dev';
 
-export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
+/** The fixed part of the metadata; each response adds the revision and the current operation day. */
+export const CRATE_SERVER_INFO: Omit<CrateServerInfo, 'serverRevision' | 'reminderOperationDay'> = Object.freeze({
 	service: CRATE_SERVICE_ID,
 	serverVersion: CRATE_SERVER_VERSION,
 	pwaAssetVersion: PWA_ASSET_VERSION,

@@ -10,7 +10,7 @@ import { connectReadingFromReminders } from './session/reminders-session';
 import { prepareReadingEncryption } from './session/encryption-session';
 import { EncryptionVerificationUnavailableError } from '../encryption/encryption-verification';
 
-vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingKeys: () => null, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
+vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingEncryptionKeys: () => null, readingNoteFolder: ({ folderPath }: { folderPath: string }) => folderPath, resetReadingEncryption: vi.fn(), readingEncryptionHeaders: () => ({}), onReadingEncryptionReset: vi.fn() }));
 vi.mock('../service-worker-registration', () => ({ registerPwaServiceWorker: vi.fn(async () => null) }));
 vi.mock('./session/reminders-session', async importOriginal => ({
 	...await importOriginal<typeof import('./session/reminders-session')>(), connectReadingFromReminders: vi.fn(async () => null),
@@ -46,7 +46,7 @@ function renderSession() {
 }
 function start() {
 	const connected = deferred<ReadingSession>();
-	localStorage.setItem(AUTH_TOKEN_KEY, 'reminders');
+	localStorage.setItem(AUTH_TOKEN_KEY, session.token);
 	vi.mocked(connectReadingFromReminders).mockImplementationOnce(async () => {
 		const next = await connected.promise;
 		localStorage.setItem(READING_SESSION_KEY, JSON.stringify(next));
@@ -168,7 +168,7 @@ describe('Reading session authority', () => {
 	});
 
 	it('removes connection listeners after enrollment and on unmount', async () => {
-		localStorage.setItem(AUTH_TOKEN_KEY, 'reminders');
+		localStorage.setItem(AUTH_TOKEN_KEY, session.token);
 		const rendered = renderSession();
 		await act(async () => {});
 		expect(connectReadingFromReminders).toHaveBeenCalledOnce();

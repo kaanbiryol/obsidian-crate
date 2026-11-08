@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 function info(day?: number) {
-	return new Response(JSON.stringify({ service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: day }));
+	return new Response(JSON.stringify({ service: 'crate', serverVersion: 'test', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: day }));
 }
 it.each(['2000-01-01', '2099-01-01'])('uses server dates when the device clock is %s', async date => {
 	vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(date));

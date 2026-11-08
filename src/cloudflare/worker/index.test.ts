@@ -302,10 +302,6 @@ describe('worker entrypoint', () => {
 			new Request('https://worker.test/notifications/open-obsidian?project=Work'),
 			createEnv(),
 		);
-		const themeScriptResponse = await worker.fetch(
-			new Request(`https://worker.test/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}`),
-			createEnv(),
-		);
 		const handoffScriptResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/open-obsidian.js?v=${PWA_ASSET_VERSION}`),
 			createEnv(),
@@ -325,7 +321,6 @@ describe('worker entrypoint', () => {
 		expect([...pageHtml.matchAll(/<script\b[^>]*>/g)].every(([tag]) => tag.includes(`nonce="${nonce}"`))).toBe(true);
 		expect(pageHtml).not.toContain('<script>');
 		expect(await handoffResponse.text()).not.toContain('<script>');
-		expect(themeScriptResponse.headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');
 		expect(handoffScriptResponse.headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');
 	});
 
@@ -340,10 +335,6 @@ describe('worker entrypoint', () => {
 		);
 		const staleVersionAppResponse = await worker.fetch(
 			new Request('https://worker.test/notifications/app.js?v=stale'),
-			createEnv(),
-		);
-		const versionedThemeResponse = await worker.fetch(
-			new Request(`https://worker.test/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}`),
 			createEnv(),
 		);
 		const versionedIconResponse = await worker.fetch(
@@ -362,7 +353,6 @@ describe('worker entrypoint', () => {
 		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(unversionedAppResponse.headers.get('Cache-Control')).toBe('no-store');
 		expect(staleVersionAppResponse.headers.get('Cache-Control')).toBe('no-store');
-		expect(versionedThemeResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedCrateIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedCrateIconResponse.headers.get('Content-Type')).toBe('image/png');

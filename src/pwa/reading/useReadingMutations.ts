@@ -7,6 +7,7 @@ import { queueReading, type ReadingCommand } from './outbox';
 import { presentReadingItems } from './pending-view';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import type { useReadingSession } from './useReadingSession';
+import { usePreparationGuard } from '../update/usePreparationGuard';
 
 type ReadingMutationSession = Pick<ReturnType<typeof useReadingSession>,
 	'session' | 'cache' | 'pending' | 'url' | 'run' | 'isCurrentSession' |
@@ -21,20 +22,10 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
 	const { session, cache, pending, url, run, isCurrentSession, publishPending, reportSessionError, finishCapture } = connection;
 	const [saving, setSaving] = useState(false);
 	const savingRef = useRef(false);
-	const preparingChanges = useRef(0);
-	const [preparationCount, setPreparationCount] = useState(0);
-	const canApplyUpdate = useCallback(() => preparingChanges.current === 0 && !savingRef.current, []);
+	// Web Locks and IndexedDB can delay durability. Block reload synchronously.
+	const { track: withPreparation, isPreparing, preparing } = usePreparationGuard();
+	const canApplyUpdate = useCallback(() => !isPreparing() && !savingRef.current, [isPreparing]);
 
-	const withPreparation = async <T,>(action: () => Promise<T>): Promise<T> => {
-		// Web Locks and IndexedDB can delay durability. Block reload synchronously.
-		preparingChanges.current++;
-		setPreparationCount(preparingChanges.current);
-		try { return await action(); }
-		finally {
-			preparingChanges.current--;
-			setPreparationCount(preparingChanges.current);
-		}
-	};
 	const persistChange = async (command: ReadingCommand) => {
 		if (!session) throw new Error('Connect Reading before saving changes.');
 		try {
@@ -106,5 +97,5 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
 		void run(() => refresh(session));
 	};
 
-	return { saving, preparingChange: preparationCount > 0, canApplyUpdate, queueChange, saveLink, updateItem, retryArticle, deleteItem };
+	return { saving, preparingChange: preparing, canApplyUpdate, queueChange, saveLink, updateItem, retryArticle, deleteItem };
 }

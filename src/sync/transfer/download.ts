@@ -1,10 +1,11 @@
-import { recordDeferredChange, recordSyncError } from '../issues';
+import { OVERSIZED_REMOTE_FILE_MESSAGE, recordDeferredChange, recordSyncError } from '../issues';
 import { isAbortError } from "../abort";
 import { base64ToArrayBuffer } from "../encoding";
 import { applyRemoteContentIfUnchanged, incomingReviewMessage } from "../local/local-apply";
 import { unsupportedLocalPathIssue } from '../local/local-path-safety';
 import { recordAppliedContent } from './applied-content';
 import type { DiffApplyOutcome, TransferContext } from "./types";
+import type { DownloadedFile } from '../worker-api/sync';
 import { createLogger } from "../logger";
 import { errorMessage } from "../../platform/logger";
 import type { SyncResult } from '../types';
@@ -61,16 +62,50 @@ export async function downloadAndSaveFile(
 	const response = await context.files.downloadFile(path, request.remoteSize);
 	const content = response.content;
 	if (content.byteLength > MAX_FILE_SIZE_BYTES) {
-		return { status: "deferred", reason: "Skipped remote file larger than 25MB" };
+		return { status: "deferred", reason: OVERSIZED_REMOTE_FILE_MESSAGE };
 	}
-	const hash = await validateDownloadedContent(path, content, response.size, response.hash, request.expectedRemoteHash, response.verified);
-	const outcome = await applyRemoteContentIfUnchanged(context, path, content, request.expectedLocalHash);
+	return saveDownloadedFile(context, request, response, result);
+}
+
+/** Checks downloaded bytes against the planned remote version, then writes them unless
+ * the local file changed since it was planned. */
+async function saveDownloadedFile(
+	context: TransferContext,
+	request: DownloadRequest,
+	file: Pick<DownloadedFile, 'content' | 'size' | 'hash' | 'revision'> & { verified?: boolean },
+	result: SyncResult,
+): Promise<DiffApplyOutcome> {
+	const { path } = request;
+	const hash = await validateDownloadedContent(path, file.content, file.size, file.hash, request.expectedRemoteHash, file.verified);
+	const outcome = await applyRemoteContentIfUnchanged(context, path, file.content, request.expectedLocalHash);
 	if (outcome.status === "deferred") return outcome;
 
-	await recordAppliedContent(context, path, content, response.revision, hash);
+	await recordAppliedContent(context, path, file.content, file.revision, hash);
 	result.downloaded++;
 	result.downloadedPaths.push(path);
 	return { status: "applied" };
+}
+
+/** Records one file's download: a deferral or failure is recorded against its path and
+ * the rest continue; cancellation stops them all. */
+async function recordDownload(
+	result: SyncResult,
+	path: string,
+	download: () => Promise<DiffApplyOutcome | null>,
+	onProcessed?: () => void,
+	onFailure?: (failure: MutationFailure) => void,
+): Promise<void> {
+	try {
+		const outcome = await download();
+		if (outcome?.status === "deferred") recordDeferredChange(result, outcome, path);
+	} catch (error) {
+		if (isAbortError(error)) throw error;
+		const downloadError = error instanceof Error ? error.message : "Download failed";
+		recordSyncError(result, `${downloadError}`, path);
+		onFailure?.(fileFailure(path, error));
+	} finally {
+		onProcessed?.();
+	}
 }
 
 /** A version already saved for review is not downloaded again only to save the same copy. */
@@ -148,48 +183,19 @@ export async function parallelDownloadAndSaveFiles(
 
 				const seenPaths = new Set<string>();
 				// Paths in one response are distinct, as are the paths of concurrent batches.
-				await context.runConcurrent(response.files.map(file => async () => {
-					try {
-						const downloadRequest = requestsByPath.get(file.path);
-						if (!downloadRequest) throw new Error("Unexpected path in batch response");
-						seenPaths.add(file.path);
-						if (file.error) {
-							recordSyncError(result, `${file.error}`, file.path);
-							return;
-						}
-
-						const verified = "verifiedContent" in file;
-						const content = verified ? file.verifiedContent : base64ToArrayBuffer(file.content);
-						const hash = await validateDownloadedContent(
-							file.path,
-							content,
-							file.size,
-							file.hash,
-							downloadRequest.expectedRemoteHash,
-							verified,
-						);
-						const outcome = await applyRemoteContentIfUnchanged(
-							context,
-							file.path,
-							content,
-							downloadRequest.expectedLocalHash,
-						);
-						if (outcome.status === "deferred") {
-							recordDeferredChange(result, outcome, file.path);
-							return;
-						}
-						await recordAppliedContent(context, file.path, content, file.revision, hash);
-						result.downloaded++;
-						result.downloadedPaths.push(file.path);
-					} catch (error) {
-						if (isAbortError(error)) throw error;
-						const downloadError = error instanceof Error ? error.message : "Download failed";
-						recordSyncError(result, `${downloadError}`, file.path);
-						onFailure?.(fileFailure(file.path, error));
-					} finally {
-						onProcessed?.();
+				await context.runConcurrent(response.files.map(file => () => recordDownload(result, file.path, async () => {
+					const downloadRequest = requestsByPath.get(file.path);
+					if (!downloadRequest) throw new Error("Unexpected path in batch response");
+					seenPaths.add(file.path);
+					if (file.error) {
+						recordSyncError(result, `${file.error}`, file.path);
+						return null;
 					}
-				}), getDownloadApplyConcurrency());
+
+					const verified = "verifiedContent" in file;
+					const content = verified ? file.verifiedContent : base64ToArrayBuffer(file.content);
+					return saveDownloadedFile(context, downloadRequest, { content, size: file.size, hash: file.hash, revision: file.revision, verified }, result);
+				}, onProcessed, onFailure)), getDownloadApplyConcurrency());
 				for (const request of chunk) {
 					if (!seenPaths.has(request.path)) {
 						recordSyncError(result, `Missing from batch download response`, request.path);
@@ -227,21 +233,8 @@ async function downloadFilesIndividually(
 	onProcessed?: () => void,
 	onFailure?: (failure: MutationFailure) => void,
 ): Promise<void> {
-	const tasks = requests.map((request) => async () => {
-		try {
-			const outcome = await downloadAndSaveFile(context, request, result);
-			if (outcome.status === "deferred") {
-				recordDeferredChange(result, outcome, request.path);
-			}
-		} catch (error) {
-			if (isAbortError(error)) throw error;
-			const downloadError = error instanceof Error ? error.message : "Download failed";
-			recordSyncError(result, `${downloadError}`, request.path);
-			onFailure?.(fileFailure(request.path, error));
-		} finally {
-			onProcessed?.();
-		}
-	});
+	const tasks = requests.map((request) => () =>
+		recordDownload(result, request.path, () => downloadAndSaveFile(context, request, result), onProcessed, onFailure));
 
 	await context.runConcurrent(tasks, concurrency);
 }

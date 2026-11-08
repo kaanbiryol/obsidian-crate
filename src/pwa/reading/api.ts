@@ -1,6 +1,6 @@
 import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
 import { onReadingEncryptionReset } from './session/encryption-lifecycle';
-import { prepareReadingEncryption, readingEncryptionHeaders, readingKeys } from './session/encryption-session';
+import { prepareReadingEncryption, readingEncryptionHeaders, readingNoteFolder } from './session/encryption-session';
 import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage/storage';
 import { cacheReadingArticle, commitReadingCache, readReadingArticle, readReadingCache, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
@@ -19,8 +19,6 @@ import { checkEncryptionSignals, EncryptionStateChangedError, retryAfterEncrypti
 import { responseError } from '../connection/response-error';
 import { crateProtocol, crateRequestHeaders, forgetRefusedProtocol } from '../connection/request-headers';
 
-/** Notes carry plaintext paths; an encrypted session names its folder by its tag. */
-const noteFolder = (session: ReadingSession) => readingKeys()?.folderPath ?? session.folderPath;
 const ENCRYPTED_READING_PATH = new RegExp(`^/reading/(?:${ENCRYPTED_READING_ACTIONS.join('|')})(?:\\?|$)`);
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
 onReadingEncryptionReset(() => { encryptedClient = undefined; });
@@ -140,7 +138,7 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
 			if (first.revision) cache.revision = first.revision;
 			deltaBase = first.deltaBase;
 		} else response = await readingRequest<unknown>(`/reading/list?cursor=${encodeURIComponent(cursor!)}`, session);
-		const page = parseReadingListPage(response, noteFolder(session));
+		const page = parseReadingListPage(response, readingNoteFolder(session));
 		if (!page) throw new Error('Reading library response is unreadable.');
 		if (page.changedPaths) {
 			const merged = previous && mergeReadingDelta(previous, { ...page, changedPaths: page.changedPaths });
@@ -162,10 +160,10 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
 }
 
 /** A confirmed edit and the library revisions the server reported around it. `article`
- * is the committed item that a newer server returns with an update. */
+ * is the committed item that the server returns with an update. */
 export interface ReadingWrite { itemId: string; library?: unknown; article?: unknown; deleted?: true }
 
-// Edited items reload a few at a time.
+// Saved copies of edited items refresh a few at a time.
 const ITEM_RELOAD_CONCURRENCY = 3;
 
 /** The committed item from an update response, or null when the server sent none. */
@@ -185,8 +183,8 @@ async function refreshSavedArticle(session: ReadingSession, item: ReadingItem, e
 	} catch { /* The copy is only a cache; the reader downloads the article instead. */ }
 }
 
-/** Edits that chain from the cached library revision only need their items again; any
- * other write, a lost response or a missing revision reloads the whole library. */
+/** Edits that chain from the cached library revision only need their committed items; any
+ * other write, a lost response or a missing revision or item reloads the whole library. */
 export async function reloadReadingAfterWrites(session: ReadingSession, writes: ReadingWrite[]): Promise<ReadingCache> {
 	const previous = await readReadingCache(session);
 	let revision = previous?.revision;
@@ -199,22 +197,21 @@ export async function reloadReadingAfterWrites(session: ReadingSession, writes: 
 	if (!previous || !writes.length) return loadReading(session, previous);
 	const items = new Map<string, ReadingItem | null>(previous.items.map(item => [item.crate_reading_id, item]));
 	const deleted = new Set(writes.flatMap(write => write.deleted ? [write.itemId] : []));
-	// The last write to an item returned its committed state; an older server returns none.
+	// The last write to an item returned its committed state.
 	const latest = new Map(writes.map(write => [write.itemId, write]));
 	const ids = [...latest.keys()];
 	if (ids.some(id => !items.has(id))) return loadReading(session, previous);
+	const committed = new Map<string, NonNullable<ReturnType<typeof committedArticle>>>();
+	for (const id of ids) {
+		if (deleted.has(id)) continue;
+		const article = committedArticle(latest.get(id)!.article, readingNoteFolder(session), id);
+		if (!article) return loadReading(session, previous);
+		committed.set(id, article);
+	}
 	await mapBounded(ids, ITEM_RELOAD_CONCURRENCY, async id => {
-		if (deleted.has(id)) { items.set(id, null); return; }
-		const committed = committedArticle(latest.get(id)!.article, noteFolder(session), id);
-		if (committed) {
-			items.set(id, committed.item);
-			if (committed.etag && committed.markdownHash) await refreshSavedArticle(session, committed.item, committed.etag, committed.markdownHash);
-			return;
-		}
-		const article = await loadReadingArticle(session, id);
-		items.set(id, article.item);
-		// Keep an offline copy current, so an open reader does not download the same body again.
-		await cacheReadingArticle(session, article.item, article.markdown, { etag: article.etag, refresh: true }).catch(() => false);
+		const article = committed.get(id);
+		items.set(id, article?.item ?? null);
+		if (article?.etag && article.markdownHash) await refreshSavedArticle(session, article.item, article.etag, article.markdownHash);
 	});
 	return commitReadingCache(session, { ...previous, items: previous.items.flatMap(item => items.get(item.crate_reading_id) ?? []), savedAt: Date.now(), revision });
 }
@@ -240,6 +237,6 @@ export async function loadReadingArticle(session: ReadingSession, id: string, sa
 	});
 	if (!result) return null;
 	const { article } = result;
-	if (!isReadingArticle(article, noteFolder(session), id) || !article.item.path) throw new Error('Reading article response is unreadable.');
+	if (!isReadingArticle(article, readingNoteFolder(session), id) || !article.item.path) throw new Error('Reading article response is unreadable.');
 	return { item: article.item, markdown: article.markdown, ...(result.etag ? { etag: result.etag } : {}) };
 }

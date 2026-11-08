@@ -8,6 +8,7 @@ import { normalizeTimeString } from '../../platform/validation';
 import { openNotificationPolicy } from '../../reminders/notification-policy-sync';
 import type { SyncApiClient } from '../../sync/worker-api/client';
 import type { SettingsSectionContext } from './section-helpers';
+import { bindCommittedText } from './input-helpers';
 
 export function renderNotificationsSection(context: SettingsSectionContext): () => void {
 	const { containerEl, plugin } = context;
@@ -53,34 +54,11 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 					text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '')
 						.setPlaceholder('09:00');
 					text.inputEl.maxLength = 5;
-
-					const commit = async (): Promise<void> => {
-						const trimmed = text.inputEl.value.trim();
-						if (trimmed === '') {
-							await saveAllDayTime(null);
-							return;
-						}
-						const normalized = normalizeTimeString(trimmed);
-						if (normalized) {
-							text.setValue(normalized);
-							await saveAllDayTime(normalized);
-						} else {
-							text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
-						}
-					};
-
-					text.inputEl.addEventListener('blur', () => {
-						void commit().catch((error: unknown) => {
-							new Notice(`Failed to save notification time: ${errorMessage(error)}`);
-							text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
-						});
-					});
-					text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
-						if (e.key === 'Enter') {
-							e.preventDefault();
-							text.inputEl.blur();
-						}
-					});
+					// The field shows the shared policy's time once it loads. An empty time means off.
+					bindCommittedText(text, () => (opened.policy ? opened.policy.allDayTime : plugin.remindersSettings.allDayNotificationTime) ?? '',
+						value => saveAllDayTime(value ? normalizeTimeString(value) : null),
+						value => value === '' || normalizeTimeString(value) !== null,
+						error => `Failed to save notification time: ${errorMessage(error)}`);
 				})
 				.addButton(button => button.setButtonText('Turn off').onClick(async () => {
 					button.setDisabled(true);
@@ -232,6 +210,7 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin, ap
 		}
 	} catch {
 		if (!isActive()) return;
+		container.empty();
 		onCount(0);
 		container.createEl('p', {
 			text: 'Failed to load subscriptions.',

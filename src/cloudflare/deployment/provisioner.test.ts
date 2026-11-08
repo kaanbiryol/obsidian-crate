@@ -1,5 +1,5 @@
 import { SERVER_RELEASE } from './database-upgrades';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CloudflareDeploymentMetadata } from './types';
 import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare-api';
 import { recoverDeployment } from './update-recovery';
@@ -7,6 +7,11 @@ import type { CloudflareApiClient } from '../cloudflare-api';
 import { provisionCloudflareDeployment, R2NotActiveError } from './provisioner';
 import { createFenceQueryHarness } from './fence-test-harness';
 import { UPDATE_STEPS } from './fence';
+import type { HttpTransport } from '../http';
+
+const verifyWorkerDeployment = vi.hoisted(() => vi.fn(async () => ({ revision: 1, schemaVersion: 1 })));
+vi.mock('./verify-worker', () => ({ verifyWorkerDeployment }));
+beforeEach(() => { verifyWorkerDeployment.mockReset(); });
 
 function createMetadata(): CloudflareDeploymentMetadata {
 	return {
@@ -50,7 +55,8 @@ function createApi() {
 		listDurableObjectNamespaces: vi.fn(async (): ReturnType<CloudflareApiClient['listDurableObjectNamespaces']> => [
 			{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' },
 		]),
-		verifyWorkerDeployment: vi.fn(async () => {}),
+		transport: vi.fn<HttpTransport>(),
+		sleep: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
 		createWorkersSubdomain: vi.fn(),
@@ -90,7 +96,7 @@ describe('provisionCloudflareDeployment', () => {
 		const metadata = createMetadata();
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
 		expect(api.enableWorkerSubdomain).not.toHaveBeenCalled();
-		expect(api.verifyWorkerDeployment).toHaveBeenCalledOnce();
+		expect(verifyWorkerDeployment).toHaveBeenCalledOnce();
 		expect(metadata.lastDeployedFingerprint).toBe(artifacts.fingerprint);
 		expect(metadata.lastKnownRevision).toBe(SERVER_RELEASE.revision);
 	});
@@ -182,7 +188,7 @@ describe('provisionCloudflareDeployment', () => {
 		const metadata = createMetadata();
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
 		expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
-		expect(api.verifyWorkerDeployment).toHaveBeenCalledWith('https://crate-0123456789abcdef.personal-crate.workers.dev', artifacts.fingerprint);
+		expect(verifyWorkerDeployment).toHaveBeenCalledWith(api.transport, 'https://crate-0123456789abcdef.personal-crate.workers.dev', artifacts.fingerprint, false, api.sleep);
 	});
 
 	it('records only steps that update recovery can resume from', async () => {
@@ -228,7 +234,7 @@ describe('provisionCloudflareDeployment', () => {
 
 	it('keeps the update locked and unrecorded when live verification fails', async () => {
 		const api = createApi();
-		api.verifyWorkerDeployment.mockRejectedValue(new Error('Live check failed'));
+		verifyWorkerDeployment.mockRejectedValue(new Error('Live check failed'));
 		const metadata = createMetadata();
 		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
 			.rejects.toThrow('deployment fence remains held');
@@ -254,7 +260,7 @@ it('resumes and verifies after Cloudflare publishes an upload but its response i
 		const recovery = await recoverDeployment(api, metadata, artifacts.fingerprint);
 		expect(recovery.status).toBe('resume');
 		await provisionCloudflareDeployment({ ...input, resumeUpdateValue: recovery.resumeValue });
-		expect(api.verifyWorkerDeployment).toHaveBeenCalledOnce();
+		expect(verifyWorkerDeployment).toHaveBeenCalledOnce();
 		expect(metadata.lastDeployedFingerprint).toBe(artifacts.fingerprint);
 		const calls = api.uploadWorker.mock.calls;
 		expect(calls[0]![0].uploadTag).not.toBe(calls[1]![0].uploadTag);

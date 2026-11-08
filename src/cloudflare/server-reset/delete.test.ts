@@ -5,6 +5,17 @@ import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
 import { createFenceQueryHarness } from '../deployment/fence-test-harness';
 import { deleteCrateServer } from './delete';
 
+// The cleanup Worker answers through the guarded transport. Each harness stands in for it
+// with its `verifyResetWorker` and `deleteR2Objects` mocks.
+const cleanupWorker = vi.hoisted(() => ({
+	verify: async (..._args: unknown[]): Promise<boolean> => { throw new Error('No harness'); },
+	deleteObjects: async (_origin: string, _id: string, _token: string, _keys: string[]): Promise<void> => { throw new Error('No harness'); },
+}));
+vi.mock('./reset-worker-client', () => ({
+	verifyResetWorker: (_transport: unknown, ...args: unknown[]) => cleanupWorker.verify(...args),
+	deleteResetWorkerObjects: (_transport: unknown, origin: string, id: string, token: string, keys: string[]) => cleanupWorker.deleteObjects(origin, id, token, keys),
+}));
+
 function harness() {
 	const fence = createFenceQueryHarness();
 	const name = 'crate-0123456789abcdef', accountId = 'a'.repeat(32), databaseId = '01234567-89ab-cdef-0123-456789abcdef';
@@ -55,7 +66,10 @@ function harness() {
 		}),
 		deleteR2Bucket: vi.fn(async () => { events.push('bucket'); remote.bucket = false; }),
 		deleteD1Database: vi.fn(async () => { events.push('database'); remote.database = false; }),
+		transport: vi.fn(), sleep: vi.fn(async () => {}),
 	};
+	cleanupWorker.verify = api.verifyResetWorker;
+	cleanupWorker.deleteObjects = api.deleteR2Objects;
 	const input = { api, accountId, metadata, beforeDelete: vi.fn(async () => { events.push('shutdown'); }),
 		persist: vi.fn(async () => { events.push(`save:${metadata.deletion?.phase}`); }) };
 	const record = () => JSON.parse(fence.query('SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])![0]!.results[0]!.value as string) as Record<string, unknown>;

@@ -1,6 +1,6 @@
 import { Script } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
-import { PWA_THEME_BOOTSTRAP_JS } from './theme-bootstrap';
+import { PWA_THEME_INIT_JS, PWA_THEME_STYLES_JS } from './theme-bootstrap';
 import { PWA_UPDATE_TRANSITION_KEY } from '../../../pwa/update/update-transition';
 
 const now = 1_000_000;
@@ -16,7 +16,7 @@ function bootstrap(marker: string | null, storageUnavailable = false) {
 		}),
 		removeItem: vi.fn(),
 	};
-	new Script(PWA_THEME_BOOTSTRAP_JS).runInNewContext({
+	new Script(PWA_THEME_INIT_JS + PWA_THEME_STYLES_JS).runInNewContext({
 		Date: { now: () => now },
 		document: { documentElement: root, getElementById: (id: string) => id === 'pwa-light-theme' ? lightTheme : themeColor },
 		window: {

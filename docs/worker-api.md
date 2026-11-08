@@ -8,7 +8,7 @@ App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before w
 
 ## Authentication
 
-All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have `vault`, `reminders`, `reading`, or `reading_capture` scope, and may have an expiry. Reading grants are also bound to the active Reading policy generation. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table, joined with the single `server_state` row that holds the encryption state, feature policy and reset generation. Authentication fails closed with `503` when D1 is unavailable, or with the `d1_daily_limit` 429 below once the daily allowance is used. A failed last-seen update does not block the request.
+All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have `vault`, `reminders` or `reading_capture` scope, and may have an expiry. Reading grants are also bound to the active Reading policy generation. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table, joined with the single `server_state` row that holds the encryption state, feature policy and reset generation. Authentication fails closed with `503` when D1 is unavailable, or with the `d1_daily_limit` 429 below once the daily allowance is used. A failed last-seen update does not block the request.
 
 Vault device tokens are registered only through Cloudflare account authorization: directly through a temporary Cloudflare OAuth authorization, or by redeeming a one-use [device pairing code](#post-authdevice-pairing-public) that a connected device wrote through the Cloudflare D1 API. No device token can issue a vault credential. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. Once a Reading folder is configured, the same token can use Reading library, save, update, and shortcut-pairing routes. It cannot change the Reading folder, and it cannot call sync, settings, device-management or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
@@ -104,13 +104,13 @@ and with the article fetching setting; writes elsewhere in the vault leave it un
 Successful `POST /reading/update`, `/reading/retry` and `/reading/delete` responses add `library:
 { before, after }`, the list ETags immediately before and after that edit. Reading
 writes run under the coordinator lock, so a client whose cached library carries
-`before` re-reads only the edited item (or drops a deleted one) and adopts `after`; any other client, a
+`before` updates only the edited item (or drops a deleted one) and adopts `after`; any other client, a
 replayed receipt (which omits `library`) or a capture reloads the list.
 Update and retry responses also add `article: { item, etag, markdownHash }`: the committed
 item, its `GET /reading/item` ETag and the SHA-256 of its article body. A client applies
 `item` without reading the item again, and keeps a saved body whose hash matches under the
-new ETag. A replayed receipt and an older server omit `article`; the client then reads the
-item as before.
+new ETag. A replayed receipt omits `article` as well; without a usable `article` the client
+reloads the list.
 
 `GET /reading/item` answers an indexed note with an `ETag` derived from the index format,
 Reading folder scope, item ID, path and the file revision its row names. A matching
@@ -541,7 +541,7 @@ retention, cleanup, and restore validation.
 
 Server revision 67 advertises `reading-shortcut-pairing-v1`. `POST /reading/shortcut-pairing` requires an active Reading or vault credential and HTTPS. It returns `{ pairingCode, expiresAt }`, with a ten-minute, single-use secret in the code’s URL fragment. Only one outstanding code per issuer is retained. The browser cannot issue library or vault access through this route.
 
-`POST /reading/shortcut/v1/exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. The token records its issuer in `auth_tokens.device_id`, so revoking the issuer revokes it too. Replacing a web app session with a fresh link moves it to the new session. Capture tokens paired before server revision 2 have no recorded issuer and stay valid until they expire or are removed. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Pairing creation requires the app protocol; exchange uses the independent shortcut contract. Both have separate per-minute action limits and return `Cache-Control: no-store`. Grant hashes use existing `reading_enrollments` rows with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
+`POST /reading/shortcut/v1/exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. The token records its issuer in `auth_tokens.device_id`, so revoking the issuer revokes it too. Replacing a web app session with a fresh link moves it to the new session. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Pairing creation requires the app protocol; exchange uses the independent shortcut contract. Both have separate per-minute action limits and return `Cache-Control: no-store`. Grant hashes use existing `reading_enrollments` rows with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
 
 Reading updates also accept optional `highlights` alongside their `before.highlights`
 precondition. Each entry contains `start`, `end` (UTF-16 offsets in sanitized reader

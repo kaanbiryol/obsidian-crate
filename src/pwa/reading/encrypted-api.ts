@@ -237,8 +237,10 @@ export class EncryptedReadingApi {
 				continue;
 			}
 			if (outcome.kind === 'failed') {
-				const answer = outcome.answer ?? await outcome.response.json() as { error?: string; code?: string };
-				throw this.options.error(answer.error ?? 'Reading request failed.', outcome.response.status, answer.code);
+				const { message, code } = outcome.answer
+					? { message: outcome.answer.error ?? 'Reading request failed.', code: outcome.answer.code }
+					: await responseError(outcome.response, 'Reading request failed.');
+				throw this.options.error(message, outcome.response.status, code);
 			}
 			const receipt = await decryptJson(outcome.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
 			if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');

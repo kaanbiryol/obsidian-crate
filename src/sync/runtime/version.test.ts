@@ -4,7 +4,7 @@ import { createDeferred, createRuntimeHarness, initializeRuntime, mockApiClient 
 
 const info: CrateServerInfo = {
 	service: 'crate', serverVersion: 'test', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [],
-	serverRevision: 6, deploymentFingerprint: 'a'.repeat(64),
+	serverRevision: 6, reminderOperationDay: 20_000, deploymentFingerprint: 'a'.repeat(64),
 	developmentBuild: { number: 2, worker: 'crate-0123456789abcdef' },
 };
 const client = () => ({ getServerInfo: vi.fn(async () => info), testConnection: vi.fn(), putSharedSettings: vi.fn() });

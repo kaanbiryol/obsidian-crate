@@ -1,10 +1,11 @@
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from '../support/preview/pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from '../support/preview/pwa-preview-server.mjs';
+import { previewAuthToken } from '../support/preview/pwa-preview-fixtures.mjs';
 
 const assets = await buildPwaPreviewAssets();
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
-const session = { token: 'reading-appearance-test', id: 'reading-appearance-test', folderPath: 'Reading', generation: 'appearance-test', expiresAt: Date.now() + 86400000 };
+const session = { token: previewAuthToken, id: 'reading-appearance-test', folderPath: 'Reading', generation: 'appearance-test', expiresAt: Date.now() + 86400000 };
 const items = [1, 2].map(index => ({
   crate_reading_version: 1, crate_reading_id: `67de6c50-c70c-4c85-93f2-${String(index).padStart(12, '0')}`,
   title: `Appearance article ${index}`, source_url: 'https://example.com/article', saved_at: '2026-09-21T10:00:00.000Z',

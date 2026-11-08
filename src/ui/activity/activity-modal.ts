@@ -45,10 +45,14 @@ export interface ActivityModalDeps extends FileHistoryRuntime {
 	getActivityProgress(): SyncActivityProgress | null;
 	addProgressListener(listener: (current: number, total: number) => void): void;
 	removeProgressListener(listener: (current: number, total: number) => void): void;
-	sync(): Promise<unknown>;
-	stopSync(): Promise<void>;
 	addStateChangeListener(listener: (state: SyncState) => void): void;
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
+}
+
+/** The header's Sync and Stop actions. They report their own failures and settle when done. */
+export interface ActivityModalActions {
+	sync(): Promise<void>;
+	stop(): Promise<void>;
 }
 
 export class ActivityModal extends BaseUiModal {
@@ -154,7 +158,8 @@ export class ActivityModal extends BaseUiModal {
 		}
 	}
 
-	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: ActivityTab = 'pending') {
+	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly actions: ActivityModalActions,
+		private readonly initialTab: ActivityTab = 'pending') {
 		super(app);
 		this.settings = settings;
 		this.deps = deps;
@@ -217,13 +222,8 @@ export class ActivityModal extends BaseUiModal {
 		if (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress()) {
 			this.stoppingSync = true;
 			this.header.updateSyncBtn();
-			void this.deps.stopSync()
-				.then(() => { new Notice('Sync stopped. Automatic sync is off on this device.'); })
-				.catch(error => { new Notice(error instanceof Error ? error.message : 'Could not stop sync.'); })
-				.finally(() => { this.stoppingSync = false; this.header.updateSyncBtn(); });
-		} else {
-			void this.deps.sync().catch(error => { new Notice(error instanceof Error ? error.message : 'Could not sync.'); });
-		}
+			void this.actions.stop().finally(() => { this.stoppingSync = false; this.header.updateSyncBtn(); });
+		} else void this.actions.sync();
 	}
 
 	private switchTab(tab: ActivityTab): void {
@@ -316,9 +316,4 @@ export class ActivityModal extends BaseUiModal {
 		this.contentEl.empty();
 		this.contentEl.removeClasses(['crate-reminder-editor-modal__content', 'crate-reminders-ui']);
 	}
-}
-
-/** Opens sync activity for the plugin's runtime. */
-export function openSyncActivity(plugin: { app: App; settings: CrateSettings; syncRuntime: ActivityModalDeps }, tab?: ActivityTab): void {
-	new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime, tab).open();
 }

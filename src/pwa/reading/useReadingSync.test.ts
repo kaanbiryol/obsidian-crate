@@ -24,6 +24,7 @@ vi.mock('./prefetch', () => ({ prefetchReadingArticles: vi.fn(async () => {}) })
 vi.mock('./session/session', async importOriginal => ({
 	...await importOriginal<typeof import('./session/session')>(),
 	assertReadingSession: (session: ReadingSession) => { if (stored.session !== session) throw new Error('Session changed'); },
+	isReadingSessionCurrent: (session: ReadingSession) => stored.session === session,
 	readingSession: () => { if (stored.sessionError) throw stored.sessionError; return stored.session; },
 }));
 vi.mock('./storage/storage', async importOriginal => ({
@@ -41,7 +42,7 @@ const session: ReadingSession = { id: 'session', token: 'token', generation: 'on
 const cache: ReadingCache = { items: [], issues: [], savedAt: 1 };
 const resetSession = vi.fn();
 const connection: ReadingConnection = { session, ready: true, lockedSession: null, verificationUnavailable: false, offlineCopy: false, retryVerification: vi.fn(async () => {}), encryptionSetupRequired: false,
-	converting: false, expire: vi.fn(), connecting: false, connect: vi.fn(), resetSession, issue: null, error: null, connectionState: 'available' };
+	converting: false, connecting: false, connect: vi.fn(), resetSession, issue: null, error: null, connectionState: 'available' };
 function renderSync(enabled = () => true, currentConnection = connection) {
 	return renderHook(() => {
 		const state = useReadingSession(currentConnection);
@@ -96,7 +97,7 @@ it('does not save offline copies from an offline refresh', async () => {
 });
 
 it('ignores unrelated cross-tab preferences and reminder queue changes', async () => {
-	const linked = { ...session, source: 'reminders' as const };
+	const linked = session;
 	stored.session = linked;
 	stored.queue = [];
 	renderSync(() => true, { ...connection, session: linked });
@@ -127,7 +128,7 @@ it.each([AUTH_TOKEN_KEY, READING_SESSION_KEY, PWA_LOGOUT_KEY, null])('still inva
 });
 
 it('coalesces event bursts throughout enrollment checks and list refreshes', async () => {
-	const linked = { ...session, source: 'reminders' as const };
+	const linked = session;
 	stored.session = linked;
 	stored.queue = [];
 	const checks: Array<(value: { session: ReadingSession } | null) => void> = [];
@@ -159,7 +160,7 @@ it('coalesces event bursts throughout enrollment checks and list refreshes', asy
 });
 
 it.each(['paused', 'unmounted', 'replaced'])('does not act on a delayed enrollment check when %s', async state => {
-	const linked = { ...session, source: 'reminders' as const };
+	const linked = session;
 	stored.session = linked;
 	let release!: (value: { session: ReadingSession } | null) => void;
 	vi.mocked(connectReadingFromReminders).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
@@ -304,8 +305,24 @@ it('reuses a refresh completed within 30 seconds when shown again, but not when 
 	expect(loadReading).toHaveBeenCalledTimes(3);
 });
 
+it('refreshes once when one resume fires both pageshow and visibilitychange', async () => {
+	stored.queue = [];
+	renderSync();
+	await act(async () => {});
+	expect(loadReading).toHaveBeenCalledOnce();
+	await act(async () => vi.advanceTimersByTimeAsync(30_000));
+	let release!: (cache: ReadingCache) => void;
+	vi.mocked(loadReading).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+	// Before: a page restored from the back-forward cache was not refreshed.
+	await act(async () => window.dispatchEvent(new window.Event('pageshow')));
+	expect(loadReading).toHaveBeenCalledTimes(2);
+	await act(async () => document.dispatchEvent(new window.Event('visibilitychange')));
+	await act(async () => { release(cache); });
+	expect(loadReading).toHaveBeenCalledTimes(2);
+});
+
 it('reuses the enrollment check for the drain, so one sync reads the Reading session once', async () => {
-	const linked = { ...session, source: 'reminders' as const };
+	const linked = session;
 	stored.session = linked;
 	vi.mocked(connectReadingFromReminders).mockImplementation(async () => ({ session: linked, day: 20_000 }));
 	vi.mocked(readingRequest).mockImplementation(async path => {

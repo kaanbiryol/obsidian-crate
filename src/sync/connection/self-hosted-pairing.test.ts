@@ -14,7 +14,7 @@ function mockResponse(body: unknown, status = 200) {
 	vi.mocked(requestUrl).mockImplementation(request => {
 		const url = typeof request === 'string' ? request : request.url;
 		const result = url.endsWith('/.well-known/crate')
-			? response({ service: 'crate', serverVersion: 'crate', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] })
+			? response({ service: 'crate', serverVersion: 'crate', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] })
 			: response(body, status);
 		return Object.assign(Promise.resolve(result), {
 			arrayBuffer: Promise.resolve(result.arrayBuffer), json: Promise.resolve(result.json), text: Promise.resolve(result.text),

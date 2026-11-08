@@ -2,7 +2,7 @@ import { pruneSharedCheckpoints } from '../sync/history-checkpoints';
 import { readEncryptionState } from '../encryption/state';
 import { cleanStagedUploads } from './staged-upload-cleanup';
 import { cleanStagedBatches } from './staged-batch-cleanup';
-import { pruneChangelog } from '../d1/db';
+import { deploymentFenceHeld, pruneChangelog } from '../d1/db';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './object-cleanup';
 import type { Env } from '../types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './database';
@@ -15,7 +15,6 @@ import { pruneEncryptionMetadata, releaseExpiredVersionDescriptors, releasePrune
 import { wakeProjection } from '../coordinator/coordinator';
 import { countD1Queries } from '../d1/d1-query-count';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
-import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }
 
@@ -24,7 +23,7 @@ export interface MaintenanceResult { removedObjects: number; backlog: boolean }
  * episode. `reserved` counts D1 queries the caller runs in the same invocation. */
 export async function runScheduledMaintenance(env: Env, { firstPass = true, reserved = 0 }: { firstPass?: boolean; reserved?: number } = {}): Promise<MaintenanceResult> {
 	const { db, count } = countD1Queries(env.DB, { queries: reserved, statements: reserved });
-	if (await db.prepare(`SELECT 1 FROM maintenance_state WHERE key='${DEPLOYMENT_FENCE_KEY}'`).first()) return { removedObjects: 0, backlog: false };
+	if (await deploymentFenceHeld(db)) return { removedObjects: 0, backlog: false };
 	const encryption = await readEncryptionState(db);
 	if (encryption?.mode === 'resetting') return { removedObjects: 0, backlog: false };
 	// Descriptors exist only in an active encrypted vault; each release rechecks that.

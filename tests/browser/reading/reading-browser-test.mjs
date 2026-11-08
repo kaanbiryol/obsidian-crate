@@ -907,7 +907,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await page.getByRole('searchbox',{name:'Search reading'}).waitFor();
   const linked = await page.evaluate(() => ({ reading: JSON.parse(localStorage.getItem('crate-reading-session-v1')), reminders: localStorage.getItem('crate-reminders-auth-token') }));
-  assert.equal(linked.reading.source, 'reminders'); assert.equal(linked.reading.token, linked.reminders);
+  assert.equal(linked.reading.token, linked.reminders);
   await switchFeature(page, 'Reminders');
   await page.getByRole('button',{name:'Open settings',exact:true}).click();
   const reminderSheetAppearance = await sheetAppearance(page);

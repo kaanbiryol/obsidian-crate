@@ -63,7 +63,7 @@
     .crate-history-diff .crate-diff-code { flex: none; max-width: 100%; overscroll-behavior-y: auto; }
     .crate-history-diff .crate-diff-line { width: max-content; min-width: 100%; grid-template-columns: 3ch 3ch 2ch minmax(0, 1fr); box-sizing: border-box; }
     .crate-history-diff .crate-diff-text { white-space: pre; overflow-wrap: normal; }
-    .crate-history-back { display: none; margin-bottom: 16px; }
+    .crate-history-back { display: none; align-items: center; gap: 6px; margin-bottom: 16px; svg { display: block; width: 14px; height: 14px; } }
 
     @media (max-width: sync-review.$compact-width) {
       .crate-history-workspace { display: block; position: relative; }

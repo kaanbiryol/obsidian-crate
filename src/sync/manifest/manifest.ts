@@ -169,12 +169,12 @@ export class LocalManifest {
 		return save;
 	}
 
-	/** Fence late callbacks and wait for every checkpoint I/O before reset/reuse. */
 	/** Waits for the initial load and queued saves without closing the manifest. */
 	async whenSaved(): Promise<void> {
 		await Promise.allSettled([this.loadTask, this.saveChain]);
 	}
 
+	/** Fence late callbacks and wait for every checkpoint I/O before reset/reuse. */
 	async close(): Promise<void> {
 		this.closed = true;
 		await Promise.allSettled([this.loadTask, this.saveChain, this.uploadJournal.close()]);
@@ -185,12 +185,7 @@ export class LocalManifest {
 			manifest: this.manifest,
 			generation: this.generation,
 			authority: this.authority,
-			settledUploads: this.uploadJournal.completedSnapshot(),
-			renames: this.renames.entries,
-			uploadDiagnostics: this.uploadDiagnostics,
-			restoreIntents: this.restoreIntents,
-			initialConfigPull: this.initialConfigPull,
-			initialImportToken: this.initialImportToken,
+			...this.recoveryState(),
 		});
 	}
 

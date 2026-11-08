@@ -15,6 +15,3 @@ export const PWA_THEME_INIT_JS = `
 
 // The palette element is parsed after the early theme initializer.
 export const PWA_THEME_STYLES_JS = `(()=>{const preference=document.documentElement.dataset.pwaThemePreference;const lightTheme=document.getElementById(${JSON.stringify(PWA_LIGHT_THEME_STYLE_ID)});if(lightTheme)lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':${JSON.stringify(PWA_LIGHT_SCHEME_MEDIA)};})();`;
-
-// Keep the old external entry available to already-installed shell versions.
-export const PWA_THEME_BOOTSTRAP_JS = PWA_THEME_INIT_JS + PWA_THEME_STYLES_JS;

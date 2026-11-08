@@ -113,7 +113,7 @@ it('includes observed server versions and marks unavailable versions as unknown'
 	const settings = normalizeCrateSettings({}, '.obsidian');
 	const state = { status: 'idle' as const, lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
 	const server = { service: 'crate' as const, serverVersion: 'crate', serverRevision: 43, pwaAssetVersion: 'build-123',
-		deploymentFingerprint: 'a'.repeat(64), protocol: { current: 10, oldestCompatible: 7 }, capabilities: [] };
+		deploymentFingerprint: 'a'.repeat(64), reminderOperationDay: 20_000, protocol: { current: 10, oldestCompatible: 7 }, capabilities: [] };
 	expect(JSON.parse(buildDiagnosticExport(settings, state, '0.2.0', undefined, server))).toMatchObject({
 		pluginVersion: '0.2.0', serverRevision: 43, serverWebAppBuild: 'build-123', serverFingerprint: 'a'.repeat(64),
 	});

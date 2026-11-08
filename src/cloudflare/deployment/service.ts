@@ -6,7 +6,7 @@ import type { CloudflareDeploymentMetadata, CloudflareDeploymentResult, Deployme
 import { CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { API_BASE_URL, type HttpTransport } from '../http';
-import { CLOUDFLARE_OAUTH_SCOPES } from '../oauth/config';
+import { hasOAuthScopes } from '../oauth/config';
 import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from '../oauth/client';
 import { CloudflareOAuthSession } from '../oauth/oauth-session';
 import { provisionCloudflareDeployment } from './provisioner';
@@ -19,6 +19,9 @@ import {
 	registerCloudflareAuthorizedDevice,
 	type CloudflareAuthorizedDevice,
 } from './device-registration';
+import {
+	assertDeploymentCanStart, assertRequestCurrent, assertSavedAuthorizationCanStart, assertSavedRequestCurrent, assertSavedServer, assertSavedTarget,
+} from './preconditions';
 
 interface DeploymentSettingsOwner {
 	settings: DeploymentSettings;
@@ -30,13 +33,6 @@ export type WithCloudflareAuthorization = <T>(operation: (tokens: CloudflareOAut
 
 type DeploymentAccount = Awaited<ReturnType<typeof resolveDeploymentTarget>>['account'];
 
-/** The saved server operation that must finish before `intent` can run. A deletion admits only deletion. */
-export function blockingServerOperation(saved: CloudflareDeploymentMetadata | null | undefined, intent: DeploymentIntent): 'deletion' | null {
-	return saved?.deletion && intent !== 'delete' ? 'deletion' : null;
-}
-
-const resumeBeforeStarting = { deletion: 'Resume server deletion before connecting or updating.' };
-const resumeBeforeContinuing = { deletion: 'Resume server deletion before continuing.' };
 /** A restore reads backups from the saved server, which must be complete. */
 const restoreSource = { missing: 'Select the source Cloudflare server and finish any deletion first.' };
 
@@ -80,12 +76,7 @@ export class CloudflareDeploymentService {
 		this.assertIdle();
 		if (changesServer(intent)) this.assertServerChangeAllowed();
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
-		const blocking = blockingServerOperation(existingMetadata, intent);
-		if (blocking) throw new Error(resumeBeforeStarting[blocking]);
-		if (intent === 'delete' && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) {
-			throw new Error('Connect to a Crate server before resetting its remote data.');
-		}
-		if (intent === 'reconnect' && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) throw new Error('Connect a Cloudflare server first.');
+		assertDeploymentCanStart(existingMetadata, intent);
 		const metadata = existingMetadata && intent !== 'switch' && intent !== 'create'
 			? { ...existingMetadata }
 			: createCloudflareDeploymentMetadata(this.options.getVaultName?.());
@@ -139,7 +130,7 @@ export class CloudflareDeploymentService {
 			this.lifetime.signal.throwIfAborted();
 			const checkTarget = savedLogin || request.intent === 'reconnect' ? () => this.checkSavedTarget(request.metadata, request.intent) : undefined;
 			const api = this.createGuardedApi(tokens, savedLogin ? 'saved' : 'temporary', checkTarget);
-			this.assertRequestCurrent(request);
+			assertRequestCurrent(this.options.settingsOwner.settings.cloudflareDeployment, request);
 			const { metadata, account, reuseExisting } = await this.whileActive(() => resolveDeploymentTarget({
 				request, api, getVaultName: this.options.getVaultName, selectDeployment, onProgress,
 				whileActive: operation => this.whileActive(operation),
@@ -161,18 +152,6 @@ export class CloudflareDeploymentService {
 			// Failed operations discard credentials even if revocation is unavailable.
 			if (!retained) await this.oauthClient.revokeTokens(tokens);
 		}
-	}
-
-	/** Refuse a request whose saved server changed or gained a pending deletion during authorization. */
-	private assertRequestCurrent(request: DeploymentRequest): void {
-		const saved = this.options.settingsOwner.settings.cloudflareDeployment;
-		const blocking = blockingServerOperation(saved, request.intent);
-		if (blocking) throw new Error(resumeBeforeStarting[blocking]);
-		if (request.intent === 'delete' && stableJson(request.metadata) !== stableJson(saved)) {
-			throw new Error('Server settings changed during authorization. Confirm the deletion again.');
-		}
-		if ((request.intent === 'switch' || request.intent === 'create') && request.originalMetadata !== stableJson(saved)) throw new Error('Server settings changed during authorization. Start again.');
-		if (request.intent === 'reconnect') this.checkSavedTarget(request.metadata, request.intent);
 	}
 
 	/** Stop sync before changing servers, then save the account the deployment targets. */
@@ -251,9 +230,7 @@ export class CloudflareDeploymentService {
 		this.assertIdle('A Cloudflare operation is already in progress.');
 		if (changesServer(intent)) this.assertServerChangeAllowed();
 		const metadata = this.options.settingsOwner.settings.cloudflareDeployment;
-		if (!metadata?.accountId) throw new Error('Connect a Cloudflare server first.');
-		this.checkSavedTarget(metadata, intent);
-		if (intent === 'delete' && !metadata.d1DatabaseId) throw new Error('Connect a Cloudflare server first.');
+		assertSavedAuthorizationCanStart(metadata, intent);
 		const request: DeploymentRequest = {
 			metadata: structuredClone(metadata), intent, discoverExisting: false,
 			originalMetadata: stableJson(metadata),
@@ -261,8 +238,7 @@ export class CloudflareDeploymentService {
 		return this.exclusive(async () => {
 			const result = await this.options.withAuthorization(async tokens => {
 				this.lifetime.signal.throwIfAborted();
-				this.checkSavedTarget(request.metadata, request.intent);
-				if (stableJson(this.options.settingsOwner.settings.cloudflareDeployment) !== request.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
+				assertSavedRequestCurrent(this.options.settingsOwner.settings.cloudflareDeployment, request);
 				return this.runAuthorizedDeployment(request, tokens, selectDeployment, device, onProgress, true);
 			});
 			if (result.status === 'deleted') await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
@@ -279,7 +255,7 @@ export class CloudflareDeploymentService {
 		this.assertIdle();
 		if (changesServer(intent)) this.assertServerChangeAllowed();
 		const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
-		if (!metadata?.accountId || !required.accountOnly && (!metadata.d1DatabaseId || metadata.deletion)) throw new Error(required.missing);
+		assertSavedServer(metadata, required);
 		this.checkSavedTarget(metadata, intent);
 		return this.exclusive(() => this.options.withAuthorization(tokens =>
 			operation(this.createGuardedApi(tokens, 'saved', () => this.checkSavedTarget(metadata, intent)), metadata)));
@@ -326,10 +302,7 @@ export class CloudflareDeploymentService {
 	}
 
 	private createGuardedApi(tokens: CloudflareOAuthTokens, authorization: 'saved' | 'temporary', checkTarget?: () => void): CloudflareApiClient {
-		if (authorization === 'saved' && tokens.scope !== undefined) {
-			const scopes = tokens.scope.split(/\s+/);
-			if (CLOUDFLARE_OAUTH_SCOPES.some(scope => !scopes.includes(scope))) throw new CloudflareReauthorizationRequired();
-		}
+		if (authorization === 'saved' && tokens.scope !== undefined && !hasOAuthScopes(tokens.scope)) throw new CloudflareReauthorizationRequired();
 		// Obsidian cannot cancel dispatched requests. Guard both sides so a late
 		// response cannot start more work. OAuth is separate so it can be revoked.
 		return new CloudflareApiClient(tokens.accessToken, (url, request) => this.whileActive(async () => {
@@ -354,14 +327,7 @@ export class CloudflareDeploymentService {
 	}
 
 	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: DeploymentIntent): void {
-		const current = this.options.settingsOwner.settings.cloudflareDeployment;
-		const blocking = blockingServerOperation(current, intent);
-		if (blocking) throw new Error(resumeBeforeContinuing[blocking]);
-		if (!current || current.accountId !== expected.accountId || current.workerName !== expected.workerName
-			|| current.d1DatabaseId !== expected.d1DatabaseId || current.r2BucketName !== expected.r2BucketName
-			|| expected.deletion && current.deletion?.id !== expected.deletion.id) {
-			throw new Error('Server settings changed. Start the update again.');
-		}
+		assertSavedTarget(this.options.settingsOwner.settings.cloudflareDeployment, expected, intent);
 	}
 
 	cancelPendingDeployment(): void {

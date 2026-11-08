@@ -6,7 +6,7 @@ import { switchFeature } from '../support/pwa-feature-navigation.mjs';
 
 const assets = await buildPwaPreviewAssets();
 const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
-const session = { id: 'reminders:coordinator:g1', token: previewAuthToken, generation: 'g1', folderPath: 'Reading', source: 'reminders', expiresAt: Date.now() + 86400000 };
+const session = { id: 'reminders:coordinator:g1', token: previewAuthToken, generation: 'g1', folderPath: 'Reading', expiresAt: Date.now() + 86400000 };
 
 async function setup(browser, { reading = true, reminders = true, pendingReading = false, pendingReminder = false } = {}) {
 	const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: 'reduce', serviceWorkers: 'block' });

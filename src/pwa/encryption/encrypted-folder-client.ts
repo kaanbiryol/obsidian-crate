@@ -53,9 +53,10 @@ export type EncryptedCommitOutcome =
 export async function postEncryptedCommit(send: (path: string, body: string) => Promise<Response>, prefix: EncryptedFolderPrefix, body: string): Promise<EncryptedCommitOutcome> {
 	const response = await send(`${prefix}/encrypted-commit`, body);
 	if (response.status === 409) {
-		// A copy, so a conflict that is reported as is still has its body.
-		const answer = await response.clone().json() as CommitAnswer;
-		if (answer.code === 'version_conflict') return { kind: 'conflict', response, answer };
+		// A copy, so a conflict that is reported as is still has its body. A proxy's
+		// non-JSON 409 is not the Worker's conflict, so it fails like any other refusal.
+		const answer = await response.clone().json().catch(() => null) as CommitAnswer | null;
+		if (answer?.code === 'version_conflict') return { kind: 'conflict', response, answer };
 	}
 	if (!response.ok) return { kind: 'failed', response };
 	const answer = await response.json() as CommitAnswer;

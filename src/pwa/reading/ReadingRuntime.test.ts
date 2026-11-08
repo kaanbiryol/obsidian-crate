@@ -7,6 +7,7 @@ import { pwaSyncState } from '../sync/state';
 import { ReadingRuntimeProvider, useReadingRuntime } from './ReadingRuntime';
 import { readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, readingLock, saveReadingDraft, savePendingReading } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
+import { AUTH_TOKEN_KEY } from '../config';
 import type { PendingReading, ReadingCommand } from './outbox';
 import type { ReadingItem } from '@/reading/core/model';
 
@@ -15,9 +16,14 @@ vi.mock('../sync/SyncFeedback', () => ({ useSyncFeedback: () => showToast }));
 vi.mock('../connection/AppConnection', () => ({
 	useAppConnection: () => ({ reading: connection, logOut: vi.fn() }), useConnectionReset: vi.fn(),
 }));
-vi.mock('./useReadingSync', () => ({ useReadingSync: () => ({
-	refresh: vi.fn(), refreshManually: vi.fn(), syncing: false, syncedSession: session, isOffline: false,
-}) }));
+vi.mock('./useReadingSync', async () => {
+	const { readingRetryAt } = await import('./outbox');
+	return { useReadingSync: ({ pending }: { pending: PendingReading[] }) => ({
+		refresh: vi.fn(), refreshManually: vi.fn(), syncing: false, syncedSession: session, isOffline: false,
+		// The sync hook owns the queue's next automatic retry deadline.
+		retryAt: Math.min(...pending.map(op => readingRetryAt(op) ?? Infinity)),
+	}) };
+});
 vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),
 	readReadingCache: vi.fn(async () => ({ items: [], issues: [], savedAt: 1 })),
@@ -39,7 +45,7 @@ beforeEach(() => {
 	vi.mocked(savePendingReading).mockReset().mockResolvedValue(undefined);
 	vi.mocked(removeReadingShare).mockReset().mockResolvedValue(undefined);
 	vi.mocked(readingLock).mockReset();
-	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(currentSession) : null });
+	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(currentSession) : key === AUTH_TOKEN_KEY ? currentSession?.token ?? null : null });
 	vi.stubGlobal('location', { href: 'https://example.test/notifications' });
 	vi.stubGlobal('navigator', { onLine: true });
 });

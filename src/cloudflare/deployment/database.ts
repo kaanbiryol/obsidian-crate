@@ -12,6 +12,7 @@ export const UPGRADE_PROGRESS_KEY = 'crate_upgrade_backup';
 export const UPGRADE_CHECKPOINT_KEY = 'crate_upgrade_checkpoint';
 /** Lists the write-guard triggers an upgrade has created. */
 export const UPGRADE_GUARD_TRIGGERS = "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'crate_upgrade_%';";
+const DATABASE_TABLES = "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';";
 const CONTROL = new Set(['maintenance_state', 'crate_schema', 'crate_migrations', 'crate_release']);
 const GUARDED_ACTIONS = ['INSERT', 'UPDATE', 'DELETE'];
 const guardName = (table: string, action: string) => `crate_upgrade_${table}_${action}`;
@@ -22,7 +23,7 @@ export function upgradeGuards(table: string): string {
 	if (CONTROL.has(table)) return '';
 	return GUARDED_ACTIONS.map(action => `CREATE TRIGGER IF NOT EXISTS ${quoteName(guardName(table, action))} BEFORE ${action} ON ${quoteName(table)} BEGIN SELECT RAISE(ABORT, 'Crate server upgrade in progress'); END;`).join('\n');
 }
-export function removeUpgradeGuards(table: string): string {
+function removeUpgradeGuards(table: string): string {
 	return GUARDED_ACTIONS.map(action => `DROP TRIGGER IF EXISTS ${quoteName(guardName(table, action))};`).join('\n');
 }
 
@@ -35,7 +36,7 @@ export async function releaseUpgradeGuards(api: Pick<CloudflareApiClient, 'query
 
 /** The saved server can only be replaced: retrying the update cannot succeed. */
 export class UnupgradableServerError extends Error {
-	constructor(message = 'This server was created by an earlier beta and its database cannot be upgraded.') {
+	constructor(message: string) {
 		super(message);
 		this.name = 'UnupgradableServerError';
 	}
@@ -50,7 +51,7 @@ export interface DeploymentDatabase {
 
 export async function inspectDeploymentDatabase(input: DeploymentDatabase): Promise<number | null> {
 	const query = (sql: string) => queryD1Rows(input.api, input.accountId, input.databaseId, sql);
-	const tables = (await query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';")).map(row => row.name);
+	const tables = await readTableNames(input);
 	if (!tables.length) return null;
 	if (tables.length === 1 && tables[0] === 'maintenance_state'
 		&& !(await query(`SELECT key FROM maintenance_state WHERE key != '${DEPLOYMENT_FENCE_KEY}' LIMIT 1;`)).length) return null;
@@ -76,9 +77,8 @@ export async function inspectDeploymentDatabase(input: DeploymentDatabase): Prom
 		throw new Error('This server uses a newer or different build of this server revision. Install its matching plugin or a newer server revision; server downgrades are not supported.');
 	}
 	if (deployed && deployed.schema_version === SERVER_RELEASE.schemaVersion && deployed.schema_hash !== input.artifacts.d1SchemaSha256) {
-		// Released schemas only change with a version increase, so this database comes
-		// from a pre-release beta that has no upgrade path.
-		throw new UnupgradableServerError();
+		// Released schemas only change with a version increase.
+		throw new Error('The server database has a different schema at the same schema version, so this build cannot update it.');
 	}
 	const receipts = await query('SELECT id, checksum FROM crate_migrations;');
 	validateMigrationHistory(version, createdVersion, receipts);
@@ -95,13 +95,22 @@ export async function prepareDeploymentDatabase(input: DeploymentDatabase, versi
 		await beforeUpgrade(migrations);
 		fence.requireVerification();
 		for (const migration of migrations) {
-			const sql = `${removeUpgradeGuards('auth_tokens')}\n${await migrationTransaction(migration)}\n${upgradeGuards('auth_tokens')}`;
+			// The migration may write or rebuild any table, so every guard is lifted and
+			// restored in its D1 transaction; old writers never see an unguarded table.
+			const tables = guardedTables(await readTableNames(input));
+			const sql = `${tables.map(removeUpgradeGuards).join('\n')}\n${await migrationTransaction(migration)}\n${tables.map(upgradeGuards).join('\n')}`;
 			await fence.mutate(() => input.api.queryD1(input.accountId, input.databaseId, sql), `migrate-${migration.id}`);
+			const triggers = new Set((await queryD1Rows(input.api, input.accountId, input.databaseId, UPGRADE_GUARD_TRIGGERS)).map(row => String(row.name)));
+			if (!writesPaused(guardedTables(await readTableNames(input)), triggers)) throw new Error('A database migration left server writes unpaused. Use a build whose migrations keep them paused.');
 		}
 	} else if (version === null) {
 		fence.requireVerification();
 		await fence.mutate(() => input.api.queryD1(input.accountId, input.databaseId, input.artifacts.d1Schema), 'initialize-database');
 	}
+}
+
+async function readTableNames(input: DeploymentDatabase): Promise<string[]> {
+	return (await queryD1Rows(input.api, input.accountId, input.databaseId, DATABASE_TABLES)).map(row => String(row.name));
 }
 
 export async function recordDeploymentRelease(input: DeploymentDatabase, fence: DeploymentFence, revision = SERVER_RELEASE.revision): Promise<void> {

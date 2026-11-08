@@ -29,7 +29,7 @@ it.each(['selected', 'full', 'incremental', 'automatic', 'force'] as const)('sha
 	const transport = vi.fn<ApiHttpTransport>(async request => {
 		const route = new URL(request.url).pathname;
 		switch (route) {
-			case '/.well-known/crate': return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
+			case '/.well-known/crate': return response({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
 			case '/sync/changes': return response({ changes: [], lastSeq: 42, hasMore: false });
 			case '/sync/manifest': return response({ version: 1, files: remote, lastSeq: 42, snapshotSeq: 42, hasMore: false });
 			case '/sync/metadata': {

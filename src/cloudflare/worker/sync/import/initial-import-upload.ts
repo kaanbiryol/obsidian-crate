@@ -2,7 +2,7 @@ import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { BATCH_UPLOAD_MAX_BYTES, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { corsResponse } from '../../http/cors';
-import { parseJsonObject, sanitizePath } from '../../http/request-validation';
+import { parseJsonObject, sanitizePath, UPLOAD_BATCH_JSON_BODY_BYTES } from '../../http/request-validation';
 import { readInitialImport } from './initial-import';
 import { loadStoredFileRows, parseExpectedFileHash } from '../storage';
 import { trackStagedBatch, finishStagedBatches } from '../staging/staged-upload-batches';
@@ -35,7 +35,7 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
 			hash: request.headers.get(FILE_HASH_HEADER), content: body.bytes.buffer,
 			contentType: request.headers.get('Content-Type'), expectedHash: parseExpectedFileHash(request.headers.get(EXPECTED_HASH_HEADER)) });
 	} else {
-		const parsed = await parseJsonObject(request, 15 * 1024 * 1024);
+		const parsed = await parseJsonObject(request, UPLOAD_BATCH_JSON_BODY_BYTES);
 		if (!parsed.ok) return parsed.response;
 		if (!Array.isArray(parsed.value.files) || !parsed.value.files.length || parsed.value.files.length > INITIAL_IMPORT_MAX_FILES) {
 			return corsResponse({ error: 'Invalid import batch' }, 400);

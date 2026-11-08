@@ -16,7 +16,7 @@ export async function checkServerVersion(plugin: CratePlugin): Promise<CrateServ
 		|| deployment?.accountId !== current?.accountId || deployment?.d1DatabaseId !== current?.d1DatabaseId) throw new Error('Server connection changed');
 	if (deployment && deployment === plugin.settings.cloudflareDeployment && url === plugin.settings.workerUrl
 		&& isManagedDeploymentUrl(plugin.settings)
-		&& info.serverRevision && deployment.lastKnownRevision !== info.serverRevision) {
+		&& deployment.lastKnownRevision !== info.serverRevision) {
 		await plugin.writeSettings({ cloudflareDeployment: { ...deployment, lastKnownRevision: info.serverRevision } });
 	}
 	return info;
@@ -25,7 +25,6 @@ export async function checkServerVersion(plugin: CratePlugin): Promise<CrateServ
 /** True when the live server runs an older revision, or a different build this plugin's bundled server can replace. */
 export function isBundledServerNewer(info: Pick<CrateServerInfo, 'serverRevision' | 'deploymentFingerprint' | 'developmentBuild'>): boolean {
 	const bundled = { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development };
-	if (!info.serverRevision) return false;
 	if (info.serverRevision < bundled.revision) return true;
 	const fingerprint = info.deploymentFingerprint;
 	return Boolean(fingerprint && fingerprint !== bundled.fingerprint

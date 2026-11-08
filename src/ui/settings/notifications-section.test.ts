@@ -7,7 +7,6 @@ import {
 	noticeMessages,
 	resetObsidianUiMocks,
 } from '../../test/fakes/obsidian-ui';
-import { fakeWithCurrentApi } from '../../test/fakes/sync-runtime';
 import { createSettingsUiState } from '../../plugin/settings-ui-state';
 
 let lastQrCodeData: string | null = null;
@@ -166,6 +165,34 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ allDayNotificationTime: null }, expect.any(Function));
 		expect(setting.texts[0]?.inputEl.value).toBe('');
+	});
+
+	it('saves an edited all-day time once, with the field disabled while it saves', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({ getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })) }) as unknown as { writeRemindersSettings: ReturnType<typeof vi.fn> };
+		renderNotificationsSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		await flushMicrotasks();
+		const input = getSettingByName('All-day notification time').texts[0]!.inputEl;
+		let release!: () => void;
+		updateNotificationPolicy.mockImplementationOnce(policy => new Promise(resolve => { release = () => resolve({ policy: { ...policy, revision: 'policy-2' } }); }));
+
+		input.value = '10:30';
+		input.blur();
+		await flushMicrotasks();
+		expect(input.disabled).toBe(true);
+		input.blur(); // Before: a second blur started another save.
+		release();
+		await flushMicrotasks();
+		expect(updateNotificationPolicy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ allDayTime: '10:30' }));
+		expect(plugin.writeRemindersSettings).toHaveBeenCalledExactlyOnceWith({ allDayNotificationTime: '10:30' }, expect.any(Function));
+		expect(input).toMatchObject({ value: '10:30', disabled: false });
+
+		updateNotificationPolicy.mockRejectedValueOnce(new Error('Offline'));
+		input.value = '';
+		input.blur();
+		await flushMicrotasks();
+		expect(noticeMessages).toContain('Failed to save notification time: Offline');
+		expect(input.value).toBe('10:30');
 	});
 
 	it('updates the shared policy before saving the local notification preference', async () => {
@@ -347,6 +374,26 @@ describe('renderNotificationsSection', () => {
 		expect(noticeMessages).toEqual([]);
 	});
 
+	it('replaces the device list with one error when a refresh fails', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const getPushSubscriptions = vi.fn(async () => ({ subscriptions: [{ id: 'sub-1', device_name: 'iPhone', created_at: '2026-06-04 12:00:00', disabled_at: null }] }));
+		const containerEl = new FakeElement('div');
+		renderNotificationsSection({ containerEl: containerEl as never, plugin: createPlugin({ getPushSubscriptions }), rerender: vi.fn() });
+		await flushMicrotasks();
+		expect(containerEl.collectText()).toContain('iPhone');
+
+		getPushSubscriptions.mockRejectedValue(new Error('Offline'));
+		const refresh = getSettingByName('Notification devices').buttons[0]!;
+		refresh.click(); await flushMicrotasks();
+		refresh.click(); await flushMicrotasks();
+
+		// Before: the old rows stayed, with one more error line per failed refresh.
+		const list = containerEl.querySelector('.crate-push-subscriptions')!;
+		expect(list.collectText()).not.toContain('iPhone');
+		expect(list.collectText().match(/Failed to load subscriptions\./g)).toHaveLength(1);
+		expect(getSettingByName('Test notification').buttons[0]?.buttonEl.classNames.has('is-disabled')).toBe(true);
+	});
+
 	it('shows the Worker error when an app code cannot be created', async () => {
 		const { renderCrateWebApp } = await loadNotificationsSectionModule();
 		renderCrateWebApp({ containerEl: new FakeElement('div') as never, plugin: createPlugin({
@@ -369,26 +416,13 @@ describe('renderNotificationsSection', () => {
 		expect(showCodeButton?.buttonEl.classNames.has('is-disabled')).toBe(false);
 	});
 
-	it('builds the app code from the active API endpoint when persisted settings are stale', async () => {
+	it('shows the setup link as a QR code to connect another device', async () => {
 		const { renderCrateWebApp } = await loadNotificationsSectionModule();
-		const plugin = createPlugin({
-			getWorkerUrl: vi.fn(() => 'https://active-worker.example.com'),
-			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
-			deletePushSubscription: vi.fn(),
-			testPush: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 0, errors: [] })),
-		}) as unknown as { settings: { workerUrl: string; pushEnabled: boolean } };
-		plugin.settings.workerUrl = '';
-		plugin.settings.pushEnabled = false;
-
-		renderCrateWebApp({ containerEl: new FakeElement('div') as never, plugin: plugin as never });
-		await flushMicrotasks();
-
+		renderCrateWebApp({ containerEl: new FakeElement('div') as never, plugin: createPlugin({}) });
 		getSettingByName('Crate web app').buttons[1]?.click();
 		await flushMicrotasks();
-
-		expect(lastQrCodeData).toBe(
-			'https://active-worker.example.com/notifications?token=install-token&browserToken=browser-token&folder=Reminders&upcomingDays=7&allDayTime=09%3A00',
-		);
+		// plugin/web-app-enrollment.test.ts covers the link itself.
+		expect(lastQrCodeData).toContain('https://worker.example.com/notifications?token=install-token');
 	});
 
 	it('opens the reminders app directly in the browser after the enrollment request', async () => {
@@ -444,7 +478,6 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 				})),
 				...apiClient,
 			}),
-			withCurrentApi: fakeWithCurrentApi((): Record<string, unknown> => plugin.syncRuntime.getApiClient()),
 		},
 	};
 	return plugin as never;

@@ -7,6 +7,7 @@ import { createDeferred } from '../runtime/runtime-test-harness';
 import { HttpError } from '../worker-api/client';
 import { Notice } from '../../test/mocks/obsidian';
 import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
+import type { SyncResult } from '../types';
 import {
 	createHarness,
 	createSyncResult,
@@ -314,6 +315,58 @@ describe('SyncEngine event queue behavior', () => {
 			await harness.engine.waitForIdle();
 		}
 		expect(harness.engine.getPendingKeys()).toEqual([]);
+	});
+
+	describe('queue reconciliation results', () => {
+		const lostRace = { success: false, path: 'notes/a.md', status: 409, code: 'version_conflict' as const, error: 'Remote file changed' };
+
+		beforeEach(() => {
+			harness.vault.getAbstractFileByPath.mockReturnValue({ path: 'notes/a.md', extension: 'md', stat: { size: 1, mtime: 1700000000000 } });
+			harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+			harness.api.uploadFile.mockResolvedValueOnce(lostRace).mockResolvedValue({ success: true, path: 'notes/a.md' });
+		});
+
+		it('records the reconciliation a lost upload race starts after the flush result', async () => {
+			Object.assign(harness.api, { getFileMetadata: vi.fn().mockResolvedValue({ files: {} }) });
+			const recorded: SyncResult[] = [];
+			harness.engine.setAutomaticSyncResultCallback(result => { recorded.push(result); });
+
+			harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+			await vi.advanceTimersByTimeAsync(5000);
+			await vi.waitFor(() => expect(recorded).toHaveLength(2));
+			await harness.engine.waitForIdle();
+
+			expect(recorded.map(({ success, uploadedPaths }) => ({ success, uploadedPaths }))).toEqual([
+				{ success: false, uploadedPaths: [] },
+				{ success: true, uploadedPaths: ['notes/a.md'] },
+			]);
+			expect(harness.engine.getPendingKeys()).toEqual([]);
+		});
+
+		it('records nothing for a reconciliation refused while another sync runs', async () => {
+			const getFileMetadata = vi.fn();
+			Object.assign(harness.api, { getFileMetadata });
+			const running = createDeferred<SyncResult>();
+			spyOnIncrementalSync(harness.engine, null).mockReturnValue(running.promise);
+			let manualSync: Promise<SyncResult> | undefined;
+			const recorded: SyncResult[] = [];
+			harness.engine.setAutomaticSyncResultCallback(result => {
+				recorded.push(result);
+				// A manual sync starts before the queued reconciliation does.
+				manualSync ??= harness.engine.sync();
+			});
+
+			harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+			await vi.advanceTimersByTimeAsync(5000);
+			await vi.advanceTimersByTimeAsync(0);
+			running.resolve(createSyncResult());
+			await manualSync;
+			await harness.engine.waitForIdle();
+
+			expect(manualSync).toBeDefined();
+			expect(getFileMetadata).not.toHaveBeenCalled();
+			expect(recorded).toEqual([expect.objectContaining({ success: false, uploadedPaths: [] })]);
+		});
 	});
 
 	it('re-queues pending path when upload returns success false', async () => {
