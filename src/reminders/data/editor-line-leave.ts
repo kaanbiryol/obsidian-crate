@@ -1,5 +1,5 @@
-import { EditorSelection, EditorState, StateField, Transaction, type ChangeSpec, type Line, type Text, type TransactionSpec } from '@codemirror/state';
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { EditorSelection, EditorState, StateField, Transaction, type ChangeSpec, type Line, type SelectionRange, type Text, type TransactionSpec } from '@codemirror/state';
+import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { normalizeReminderIds } from '../core/normalizeReminderIds';
 import { readDescriptionBlock } from '../core/reminderDescription';
 import { extractReminderId, findReminderIdMarker } from '../core/reminderIdentity';
@@ -97,7 +97,7 @@ function endMarker(line: Line): { from: number; to: number } | null {
  * A valid description block under the reminder on `line`, from that line's end
  * to the block's end. Broken blocks stay visible so they can be repaired.
  */
-function descriptionBlock(doc: Text, line: Line): { from: number; to: number } | null {
+function descriptionBlock(doc: Text, line: Line): { from: number; to: number; description?: string } | null {
 	if (line.number >= doc.lines || !TASK_WITH_TEXT.test(line.text) || !doc.line(line.number + 1).text.startsWith(DESCRIPTION_PREFIX)) return null;
 	const lines = [line.text];
 	for (let number = line.number + 1; number <= doc.lines; number++) {
@@ -106,8 +106,8 @@ function descriptionBlock(doc: Text, line: Line): { from: number; to: number } |
 		if (text.includes('-->')) break;
 	}
 	try {
-		const { lineCount } = readDescriptionBlock(lines, 0);
-		return lineCount ? { from: line.to, to: doc.line(line.number + lineCount).to } : null;
+		const { description, lineCount } = readDescriptionBlock(lines, 0);
+		return lineCount ? { from: line.to, to: doc.line(line.number + lineCount).to, description } : null;
 	} catch { return null; }
 }
 
@@ -133,6 +133,91 @@ function tailEndingAt(doc: Text, position: number): { from: number; to: number; 
 	return null;
 }
 
+/** Where a line's text starts, after its indentation and any task checkbox. */
+const TEXT_START = /^\s*(?:-\s*\[[ xX]\]\s*)?/;
+
+/** The hidden tail that `position` touches, from its start to its end inclusive. */
+function tailAround(doc: Text, position: number): { from: number; to: number; description: boolean } | null {
+	const line = doc.lineAt(position);
+	// A whole-line range ends at the start of its reminder's description.
+	const above = line.number > 1 && line.text.startsWith(DESCRIPTION_PREFIX) ? hiddenTail(doc, doc.line(line.number - 1)) : null;
+	const tail = above ?? hiddenTail(doc, line) ?? tailEndingAt(doc, position);
+	return tail && tail.from <= position && position <= tail.to ? tail : null;
+}
+
+/**
+ * Where a copy, cut, delete or drag of `from`..`to` should end so a reminder
+ * whose whole text it covers keeps its hidden markers and description, or null
+ * when it covers no whole reminder. Ranges that took the reminder's line break
+ * also take the one after its description. Only selections and whole lines
+ * count: deleting the last character of a short title edits it in place.
+ */
+function wholeReminderEnd(doc: Text, from: number, to: number, selected: boolean): number | null {
+	const tail = tailAround(doc, to);
+	if (!tail) return null;
+	const line = doc.lineAt(tail.from), wholeLine = to > line.to;
+	if (!(selected || wholeLine) || from > line.from + TEXT_START.exec(line.text)![0].length) return null;
+	if (to >= tail.to) return to;
+	return wholeLine ? Math.min(tail.to + 1, doc.length) : tail.to;
+}
+
+/**
+ * The range CodeMirror copies or cuts for a single selection, and the text to
+ * copy when that range should carry a reminder's hidden tail, or null to leave
+ * the copy to CodeMirror. The cut itself is extended by `protectReminderIdMarker`.
+ */
+export function reminderClipboard(state: EditorState): { from: number; to: number; text: string } | null {
+	if (state.selection.ranges.length > 1) return null;
+	const { main } = state.selection, line = state.doc.lineAt(main.head);
+	// With nothing selected, CodeMirror copies and cuts the whole line.
+	const from = main.empty ? line.from : main.from, to = main.empty ? Math.min(line.to + 1, state.doc.length) : main.to;
+	const end = wholeReminderEnd(state.doc, from, to, true);
+	return end === null || end === to ? null : { from, to, text: state.sliceDoc(from, end) };
+}
+
+/** A reminder line with its description, or any other line on its own. */
+const unitEnd = (doc: Text, line: Line) => Math.max(line.to, hiddenTail(doc, line)?.to ?? line.to);
+const unitStart = (doc: Text, line: Line) => {
+	const tail = tailEndingAt(doc, line.to);
+	return tail ? doc.lineAt(tail.from).from : line.from;
+};
+
+/**
+ * Redoes CodeMirror's line move so a reminder moves with its description and a
+ * line moved past a reminder skips its description, or returns null when no
+ * description is involved.
+ */
+function moveLinesWithDescriptions(transaction: Transaction): TransactionSpec | readonly TransactionSpec[] | null {
+	const state = transaction.startState, { doc } = state;
+	const forward = transaction.newSelection.main.head > state.selection.main.head;
+	// CodeMirror's selected line blocks, counting each description as part of its reminder's line.
+	const blocks: { from: number; to: number; ranges: SelectionRange[] }[] = [];
+	let upto = -1;
+	for (const range of state.selection.ranges) {
+		const start = doc.lineAt(unitStart(doc, doc.lineAt(range.from)));
+		let end = doc.lineAt(range.to);
+		if (!range.empty && range.to === end.from) end = doc.lineAt(range.to - 1);
+		const to = unitEnd(doc, end), last = blocks[blocks.length - 1];
+		if (last && upto >= start.number) { last.to = Math.max(last.to, to); last.ranges.push(range); }
+		else blocks.push({ from: start.from, to, ranges: [range] });
+		upto = doc.lineAt(to).number + 1;
+	}
+	const changes: ChangeSpec[] = [], ranges: SelectionRange[] = [];
+	for (const block of blocks) {
+		if (forward ? block.to === doc.length : block.from === 0) { ranges.push(...block.ranges); continue; }
+		const next = doc.lineAt(forward ? block.to + 1 : block.from - 1);
+		const from = forward ? next.from : unitStart(doc, next), to = forward ? unitEnd(doc, next) : next.to;
+		const text = doc.sliceString(from, to), size = (to - from + 1) * (forward ? 1 : -1);
+		if (forward) changes.push({ from: block.to, to }, { from: block.from, insert: text + state.lineBreak });
+		else changes.push({ from, to: block.from }, { from: block.to, insert: state.lineBreak + text });
+		for (const range of block.ranges) ranges.push(EditorSelection.range(range.anchor + size, range.head + size));
+	}
+	if (!changes.length) return [];
+	const moved = state.changes(changes);
+	if (moved.apply(doc).eq(transaction.newDoc)) return null;
+	return { changes: moved, selection: EditorSelection.create(ranges, state.selection.mainIndex), scrollIntoView: true, userEvent: 'move.line' };
+}
+
 /** Ranges of reminder ID and rule markers to hide, including the leading space. */
 export function hiddenReminderMarkerRanges(state: EditorState, visible: readonly { from: number; to: number }[]): { from: number; to: number }[] {
 	const { doc } = state;
@@ -149,9 +234,9 @@ export function hiddenReminderMarkerRanges(state: EditorState, visible: readonly
 	return ranges;
 }
 
-/** Ranges of valid description blocks to hide, each from its reminder's line end. */
-export function hiddenDescriptionRanges(doc: Text): { from: number; to: number }[] {
-	const ranges: { from: number; to: number }[] = [];
+/** Valid description blocks to hide, each from its reminder's line end, with the text they hold. */
+export function hiddenDescriptionRanges(doc: Text): { from: number; to: number; description?: string }[] {
+	const ranges: { from: number; to: number; description?: string }[] = [];
 	for (let number = 2; number <= doc.lines; number++) {
 		if (!doc.line(number).text.startsWith(DESCRIPTION_PREFIX)) continue;
 		const block = descriptionBlock(doc, doc.line(number - 1));
@@ -188,28 +273,43 @@ function touchesDescriptions(transaction: Transaction): boolean {
 	return touched;
 }
 
-/** Where a line's text starts, after its indentation and any task checkbox. */
-const TEXT_START = /^\s*(?:-\s*\[[ xX]\]\s*)?/;
-
 /**
  * Keeps a reminder's hidden markers at its line end and its description block
  * under it. Typing and deletes at the end of a reminder land before the
  * markers, a line break there continues after the description, and a forward
- * delete of the hidden tail alone joins the next line instead. Deleting a
- * selection of the whole text deletes the tail too. Edits the editor cannot see
- * are healed by `normalizeReminderIds`.
+ * delete of the hidden tail alone joins the next line instead. Cutting,
+ * deleting or dragging a selection of the whole text, or the whole line, takes
+ * the tail along, and moving lines moves a reminder and its description
+ * together. Edits the editor cannot see are healed by `normalizeReminderIds`.
  */
 export function protectReminderIdMarker(transaction: Transaction): Transaction | TransactionSpec | readonly (Transaction | TransactionSpec)[] {
 	const { startState } = transaction;
 	const { doc } = startState;
+	if (transaction.docChanged && transaction.isUserEvent('move.line')) return moveLinesWithDescriptions(transaction) ?? transaction;
+	const changes: { fromA: number; toA: number; text: string }[] = [];
+	if (transaction.docChanged) transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => changes.push({ fromA, toA, text: inserted.toString() }));
+	const selected = (from: number, to: number) => startState.selection.ranges.some(range => !range.empty && range.from <= from && range.to >= to);
+	const userEvent = transaction.annotation(Transaction.userEvent);
+	// A drag of a reminder's whole text carries its tail to the drop, so it keeps its ID and description.
+	if (transaction.isUserEvent('move.drop') && changes.length === 2) {
+		const removed = changes.find(change => !change.text), dropped = changes.find(change => change.text && change.fromA === change.toA);
+		const end = removed && dropped ? wholeReminderEnd(doc, removed.fromA, removed.toA, selected(removed.fromA, removed.toA)) : null;
+		if (removed && dropped && end !== null && end > removed.toA && (dropped.fromA < removed.fromA || dropped.fromA > end)) {
+			const text = dropped.text + doc.sliceString(removed.toA, end);
+			const at = dropped.fromA < removed.fromA ? dropped.fromA : dropped.fromA - (end - removed.fromA);
+			return { changes: [{ from: removed.fromA, to: end }, { from: dropped.fromA, insert: text }], selection: { anchor: at, head: at + text.length }, scrollIntoView: true, ...(userEvent ? { userEvent } : {}) };
+		}
+	}
 	if (transaction.docChanged && (transaction.isUserEvent('input') || transaction.isUserEvent('delete'))) {
-		const changes: { fromA: number; toA: number; text: string }[] = [];
-		transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => changes.push({ fromA, toA, text: inserted.toString() }));
 		const [change] = changes;
-		const userEvent = transaction.annotation(Transaction.userEvent);
 		const spec = (changes: ChangeSpec, cursor: number): TransactionSpec => ({
 			changes, selection: { anchor: cursor }, scrollIntoView: true, ...(userEvent ? { userEvent } : {}),
 		});
+		// A cut or delete of the whole text or line removes the reminder; a tail left behind would name the next text typed there.
+		if (change && changes.length === 1 && !change.text) {
+			const end = wholeReminderEnd(doc, change.fromA, change.toA, selected(change.fromA, change.toA));
+			if (end !== null) return end === change.toA ? transaction : spec({ from: change.fromA, to: end }, change.fromA);
+		}
 		// Moves the line after a description up to its reminder's text, as a join would without the hidden lines between.
 		const join = (tail: { from: number; to: number }) => {
 			const next = doc.lineAt(tail.to + 1);
@@ -226,9 +326,6 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 				const from = Math.min(fromA, tail.from), first = text.slice(0, newline), rest = text.slice(newline);
 				return spec([{ from, to: tail.from, insert: first }, { from: tail.to, insert: rest }], tail.to + first.length - (tail.from - from) + rest.length);
 			}
-			// A cut or delete of the whole text removes the reminder; a tail left behind would name the next text typed there.
-			if (!text && toA >= tail.from && fromA <= line.from + TEXT_START.exec(line.text)![0].length
-				&& startState.selection.ranges.some(range => !range.empty && range.from <= fromA && range.to >= toA)) return spec({ from: fromA, to: tail.to }, fromA);
 			if (toA > tail.from) {
 				// Edits reaching into the tail stop before it.
 				if (fromA < tail.from) return spec({ from: fromA, to: tail.from, insert: text }, fromA + text.length);
@@ -263,11 +360,56 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 	return moved ? [transaction, { selection: EditorSelection.create(ranges, transaction.newSelection.mainIndex), sequential: true }] : transaction;
 }
 
+/** The first line of the reminder whose description ends where a description widget sits. */
+function describedReminder(view: EditorView, element: HTMLElement): Line | null {
+	const tail = tailEndingAt(view.state.doc, view.posAtDOM(element));
+	return tail ? view.state.doc.lineAt(tail.from) : null;
+}
+
 /**
- * Hides reminder ID and rule markers and description blocks in editors
- * `isReminderEditor` accepts, and keeps the cursor in front of them.
+ * A reminder's description, shown as text under its title while the comment
+ * that stores it stays hidden. Selecting it opens the reminder for editing, so
+ * typing never lands inside the comment.
  */
-export function createReminderMarkerHiding(isReminderEditor: (state: EditorState) => boolean) {
+class DescriptionWidget extends WidgetType {
+	constructor(readonly description: string, readonly open: (reminderId: string) => void) { super(); }
+
+	eq(other: DescriptionWidget) { return other.description === this.description; }
+
+	toDOM(view: EditorView) {
+		const element = createDiv({ cls: 'crate-reminder-description' });
+		element.createDiv({ cls: 'crate-reminder-description__text', text: this.description, attr: { role: 'button' } }).addEventListener('click', event => {
+			event.preventDefault();
+			const reminder = describedReminder(view, element), id = reminder && extractReminderId(reminder.text);
+			if (id) this.open(id);
+		});
+		return element;
+	}
+}
+
+/** Lines each description up with its reminder's text, which the editor indents line by line. */
+const alignDescriptions = ViewPlugin.define(view => {
+	const measure = () => view.requestMeasure({
+		key: alignDescriptions,
+		read: () => [...view.contentDOM.querySelectorAll<HTMLElement>('.crate-reminder-description')].map(element => {
+			const reminder = describedReminder(view, element);
+			const start = reminder && view.coordsAtPos(reminder.from + TEXT_START.exec(reminder.text)![0].length, 1);
+			return { element, indent: start ? Math.max(0, Math.round(start.left - element.getBoundingClientRect().left)) : null };
+		}),
+		write: indents => {
+			for (const { element, indent } of indents) if (indent !== null) element.setCssProps({ '--crate-reminder-description-indent': `${indent}px` });
+		},
+	});
+	measure();
+	return { update: (update: ViewUpdate) => { if (update.docChanged || update.geometryChanged || update.viewportChanged) measure(); } };
+});
+
+/**
+ * Hides reminder ID and rule markers in editors `isReminderEditor` accepts and
+ * shows description blocks as text, keeps the cursor in front of them, and
+ * copies a reminder's whole text with what is hidden.
+ */
+export function createReminderMarkerHiding(isReminderEditor: (state: EditorState) => boolean, openReminder: (reminderId: string) => void) {
 	const decorate = (view: EditorView): DecorationSet => isReminderEditor(view.state)
 		? Decoration.set(hiddenReminderMarkerRanges(view.state, view.visibleRanges).map(({ from, to }) => hiddenMarker.range(from, to)))
 		: Decoration.none;
@@ -277,9 +419,13 @@ export function createReminderMarkerHiding(isReminderEditor: (state: EditorState
 			if (update.docChanged || update.viewportChanged) this.decorations = decorate(update.view);
 		},
 	}), { decorations: plugin => plugin.decorations });
-	// Replacing line breaks changes line layout, which only a state field may do.
+	// Replacing line breaks and adding block widgets change line layout, which only a state
+	// field may do. As a block below the title, the text is skipped by moving up and down.
 	const decorateDescriptions = (state: EditorState): DecorationSet => isReminderEditor(state)
-		? Decoration.set(hiddenDescriptionRanges(state.doc).map(({ from, to }) => hiddenMarker.range(from, to)))
+		? Decoration.set(hiddenDescriptionRanges(state.doc).flatMap(({ from, to, description }) => [
+			hiddenMarker.range(from, to),
+			...description ? [Decoration.widget({ widget: new DescriptionWidget(description, openReminder), block: true, side: 1 }).range(to)] : [],
+		]), true)
 		: Decoration.none;
 	const descriptions = StateField.define<DecorationSet>({
 		create: decorateDescriptions,
@@ -288,11 +434,24 @@ export function createReminderMarkerHiding(isReminderEditor: (state: EditorState
 			: touchesDescriptions(transaction) ? decorateDescriptions(transaction.state) : value.map(transaction.changes),
 		provide: field => EditorView.decorations.from(field),
 	});
+	// CodeMirror copies only the selected text; a reminder's whole text also takes what is hidden.
+	const copy = (event: ClipboardEvent, view: EditorView) => {
+		const copied = view.hasFocus && event.clipboardData && isReminderEditor(view.state) ? reminderClipboard(view.state) : null;
+		if (!copied) return false;
+		if (event.type === 'cut' && !view.state.readOnly) {
+			view.dispatch({ changes: { from: copied.from, to: copied.to }, scrollIntoView: true, userEvent: 'delete.cut' });
+		}
+		event.clipboardData!.clearData();
+		event.clipboardData!.setData('text/plain', copied.text);
+		return true;
+	};
 	return [
 		hiding,
 		descriptions,
+		alignDescriptions,
 		EditorView.atomicRanges.of(view => view.plugin(hiding)?.decorations ?? Decoration.none),
 		EditorView.atomicRanges.of(view => view.state.field(descriptions, false) ?? Decoration.none),
+		EditorView.domEventHandlers({ copy, cut: copy }),
 		EditorState.transactionFilter.of(transaction => isReminderEditor(transaction.startState) ? protectReminderIdMarker(transaction) : transaction),
 	];
 }

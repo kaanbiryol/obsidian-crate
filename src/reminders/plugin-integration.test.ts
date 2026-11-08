@@ -122,6 +122,7 @@ async function loadPluginIntegrationModule() {
 		},
 		VIEW_TYPE_REMINDERS: 'reminders-view',
 	}));
+	vi.doMock('./ui/plugin/reminder-modal/reminderEditorModals', () => ({ openReminderEditModal: vi.fn() }));
 	vi.doMock('./logger', () => ({
 		configureLogger: vi.fn(),
 		createLogger: vi.fn(() => ({
@@ -223,6 +224,7 @@ afterEach(() => {
 	vi.doUnmock('./data/vault-watcher');
 	vi.doUnmock('./ui/plugin/workspaceLayout');
 	vi.doUnmock('./ui/plugin/reminders-view');
+	vi.doUnmock('./ui/plugin/reminder-modal/reminderEditorModals');
 	vi.doUnmock('./utils/logger');
 });
 

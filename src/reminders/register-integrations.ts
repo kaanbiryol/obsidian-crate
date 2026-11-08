@@ -9,6 +9,7 @@ import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { CRATE_ICON_ID, CRATE_ICON_SVG } from '../ui/crate-icon';
 import { createReminderMarkerHiding, createReminderLineLeaveExtension } from './data/editor-line-leave';
+import { openReminderEditModal } from './ui/plugin/reminder-modal/reminderEditorModals';
 
 const remindersLogger = createLogger('Reminders');
 const registeredReminderUi = new WeakSet<CratePlugin>();
@@ -44,6 +45,9 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 		createReminderMarkerHiding(state => {
 			const path = editorPath(state);
 			return Boolean(path && plugin.reminders?.index.isReminderFile(path));
+		}, reminderId => {
+			const reminder = plugin.reminders?.index.getById(reminderId);
+			if (reminder) openReminderEditModal(plugin, reminder, () => undefined);
 		}),
 	]);
 	registerReminderCommands(plugin);

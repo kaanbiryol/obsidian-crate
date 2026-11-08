@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EditorSelection, EditorState, Transaction, type TransactionSpec } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
-import { createReminderLineLeaveExtension, createReminderMarkerHiding, hiddenDescriptionRanges, hiddenReminderMarkerRanges, protectReminderIdMarker, reminderIdChangesForLeftLines } from './editor-line-leave';
+import { createReminderLineLeaveExtension, createReminderMarkerHiding, hiddenDescriptionRanges, hiddenReminderMarkerRanges, protectReminderIdMarker, reminderClipboard, reminderIdChangesForLeftLines } from './editor-line-leave';
 import { normalizeReminderIds } from '../core/normalizeReminderIds';
 import { readDescriptionBlock } from '../core/reminderDescription';
 
@@ -148,13 +148,13 @@ describe('reminder description hiding', () => {
 	});
 
 	describe('while editing', () => {
-		const extensions = createReminderMarkerHiding(() => true);
+		const extensions = createReminderMarkerHiding(() => true, () => undefined);
 		const reminder = '- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:Oat milk -->';
-		/** Text under the description decorations; the marker plugin's decorations need a view. */
+		/** Text under the description decorations, without the shown-text widgets; the marker plugin's decorations need a view. */
 		const decorated = (state: EditorState) => state.facet(EditorView.decorations).flatMap(set => {
 			if (typeof set === 'function') return [];
 			const ranges: string[] = [];
-			for (const iter = set.iter(); iter.value; iter.next()) ranges.push(state.doc.sliceString(iter.from, iter.to));
+			for (const iter = set.iter(); iter.value; iter.next()) if (iter.from < iter.to) ranges.push(state.doc.sliceString(iter.from, iter.to));
 			return ranges;
 		});
 
@@ -181,6 +181,23 @@ describe('reminder description hiding', () => {
 			state = state.update({ changes: { from: open.length, insert: ' -->' }, userEvent: 'input.type' }).state;
 			expect(decorated(state)).toEqual(['\n<!-- crate-desc:One\ntwo\nthree\nfour -->']);
 		});
+	});
+
+	it('hides the comment and shows its decoded text as a block under the reminder', () => {
+		const comment = '\n<!-- crate-desc:v1:Oat%20milk%0Afrom%20the%20shop -->';
+		const text = `- [ ] Buy milk <!-- crate-id:a -->${comment}\nNotes`, end = text.indexOf('\nNotes');
+		const state = EditorState.create({ doc: text, extensions: createReminderMarkerHiding(() => true, () => undefined) });
+		const shown: { from: number; to: number; block: unknown; description: unknown }[] = [];
+		for (const source of state.facet(EditorView.decorations)) {
+			if (typeof source !== 'function') source.between(0, text.length, (from, to, value) => {
+				const spec = value.spec as { block?: boolean; widget?: { description?: string } };
+				shown.push({ from, to, block: spec.block, description: spec.widget?.description });
+			});
+		}
+		expect(shown).toEqual([
+			{ from: end - comment.length, to: end, block: undefined, description: undefined },
+			{ from: end, to: end, block: true, description: 'Oat milk\nfrom the shop' },
+		]);
 	});
 });
 
@@ -272,6 +289,70 @@ describe('reminder ID marker protection', () => {
 
 		it('deletes the description with a selection of the whole reminder text', () => {
 			expect(edit(`${block}\nNext`, 0, { changes: { from: 0, to: end }, userEvent: 'delete.cut' }, end).text).toBe('\nNext');
+			// A selection that already ends after the description deletes as it is.
+			expect(edit(`${block}\nNext`, 0, { changes: { from: 0, to: block.length }, userEvent: 'delete.selection' }, block.length).text).toBe('\nNext');
+		});
+
+		it('deletes the description with a cut or delete of the whole line', () => {
+			const doc = `Before\n${block}\nNext`, from = doc.indexOf(line);
+			for (const userEvent of ['delete.cut', 'delete.line']) {
+				expect(edit(doc, from + 3, { changes: { from, to: from + line.length + 1 }, userEvent }).text).toBe('Before\nNext');
+			}
+		});
+
+		it('copies and cuts the whole reminder text with its markers and description', () => {
+			const doc = `${block}\nNext`;
+			const copied = (anchor: number, head = anchor) => reminderClipboard(EditorState.create({ doc, selection: EditorSelection.single(anchor, head) }));
+			expect(copied(0, end)).toEqual({ from: 0, to: end, text: block });
+			expect(copied(end, 0)).toEqual({ from: 0, to: end, text: block });
+			// With nothing selected, the whole line is copied with its description and line break.
+			expect(copied(3)).toEqual({ from: 0, to: line.length + 1, text: `${block}\n` });
+			// The title without its checkbox is the whole text; part of it, or a selection that already holds everything, stays a plain copy.
+			expect(copied(6, end)?.text).toBe(block.slice(6));
+			expect(copied(10, end)).toBeNull();
+			expect(copied(0, block.length)).toBeNull();
+			const several = EditorState.create({ doc, selection: EditorSelection.create([EditorSelection.range(0, end), EditorSelection.range(doc.length - 2, doc.length)]), extensions: EditorState.allowMultipleSelections.of(true) });
+			expect(reminderClipboard(several)).toBeNull();
+			// The ID alone travels with a reminder that has no description.
+			expect(reminderClipboard(EditorState.create({ doc: line, selection: EditorSelection.single(0, end) }))?.text).toBe(line);
+		});
+
+		/** A CodeMirror line move of the cursor line, as Obsidian's move line commands dispatch it. */
+		function moveLine(doc: string, cursor: number, forward: boolean) {
+			const state = EditorState.create({ doc, selection: EditorSelection.cursor(cursor), extensions: EditorState.transactionFilter.of(protectReminderIdMarker) });
+			const current = state.doc.lineAt(cursor), next = state.doc.lineAt(forward ? current.to + 1 : current.from - 1), size = (next.length + 1) * (forward ? 1 : -1);
+			const changes = forward
+				? [{ from: current.to, to: next.to }, { from: current.from, insert: next.text + '\n' }]
+				: [{ from: next.from, to: current.from }, { from: current.to, insert: '\n' + next.text }];
+			const moved = state.update({ changes, selection: { anchor: cursor + size }, userEvent: 'move.line' }).state;
+			return { text: moved.doc.toString(), line: moved.doc.lineAt(moved.selection.main.head).text };
+		}
+
+		it('moves a reminder and its description together', () => {
+			const doc = `- [ ] Other\n${block}\nNext`, at = doc.indexOf('Buy');
+			expect(moveLine(doc, at, false)).toEqual({ text: `${block}\n- [ ] Other\nNext`, line });
+			expect(moveLine(doc, at, true)).toEqual({ text: `- [ ] Other\nNext\n${block}`, line });
+		});
+
+		it('moves a line past a reminder and its description', () => {
+			const doc = `- [ ] Other\n${block}\nNext`;
+			expect(moveLine(doc, doc.length, false)).toEqual({ text: `- [ ] Other\nNext\n${block}`, line: 'Next' });
+			expect(moveLine(doc, 3, true)).toEqual({ text: `${block}\n- [ ] Other\nNext`, line: '- [ ] Other' });
+		});
+
+		it('keeps a reminder with its description at the end of the note in place', () => {
+			const doc = `Before\n${block}`;
+			expect(moveLine(doc, doc.indexOf('Buy'), true).text).toBe(doc);
+			expect(moveLine('Before\nNext', 9, false).text).toBe('Next\nBefore');
+		});
+
+		it('drags a reminder with its markers and description', () => {
+			const doc = `${block}\nNext`;
+			const state = EditorState.create({ doc, selection: EditorSelection.single(0, end), extensions: EditorState.transactionFilter.of(protectReminderIdMarker) });
+			// CodeMirror deletes the dragged selection and inserts its text at the drop.
+			const dropped = state.update({ changes: [{ from: 0, to: end }, { from: doc.length, insert: `\n${doc.slice(0, end)}` }], userEvent: 'move.drop' }).state;
+			expect(dropped.doc.toString()).toBe(`\nNext\n${block}`);
+			expect(dropped.sliceDoc(dropped.selection.main.from, dropped.selection.main.to)).toBe(`\n${block}`);
 		});
 	});
 

@@ -1,0 +1,18 @@
+/* A reminder's description under its title in a note, lined up with the title text and styled like the theme's quotes. */
+.crate-reminder-description {
+	padding-block-end: var(--size-2-1);
+	padding-inline-start: var(--crate-reminder-description-indent, var(--list-indent));
+}
+
+.crate-reminder-description__text {
+	padding-inline-start: var(--size-4-3);
+	border-inline-start: var(--blockquote-border-thickness) solid var(--blockquote-border-color);
+	color: var(--text-muted);
+	font-size: var(--font-smaller);
+	white-space: pre-wrap;
+	cursor: pointer;
+}
+
+.crate-reminder-description__text:hover {
+	color: var(--text-normal);
+}
