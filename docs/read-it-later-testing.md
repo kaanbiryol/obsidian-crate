@@ -51,7 +51,7 @@ On a physical iPhone, also test revoked capture access, expired pairing, paused 
 
 ## Test Android
 
-Install the enrolled Crate web app in a browser supporting Web Share Target. **Share → Crate** opens the Reading form with the link prefilled; select **Save link**. The service worker keeps the incoming share on the device before opening the form, including offline. Paste a URL manually when the browser does not support share targets.
+Install the enrolled Crate web app in a browser supporting Web Share Target. **Share → Crate** opens Reading and saves the link without the form, offline included. The service worker keeps the incoming share on the device first, and an unconnected browser saves it after enrollment. If the save fails, the form opens with the link and the error. Paste a URL manually when the browser does not support share targets.
 
 ## Existing server upgrade
 

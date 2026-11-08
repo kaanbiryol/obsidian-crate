@@ -815,8 +815,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await context.setOffline(true);
     await page.evaluate(() => { const form=document.createElement('form');form.method='POST';form.action='/notifications/share/reading';for (const [name,value] of Object.entries({url:'https://android.example.invalid/android',title:'Android share'})){const input=document.createElement('input');input.name=name;input.value=value;form.append(input);}document.body.append(form);form.submit(); });
     await page.waitForURL(/share=/);
-    await page.getByLabel('Link',{exact:true}).waitFor(); assert.equal(await page.getByLabel('Link',{exact:true}).inputValue(),'https://android.example.invalid/android');
-    await page.getByRole('button',{name:'Save link',exact:true}).click();
+    // A connected app saves the shared link without the form, offline included.
+    await expect(page.getByText('Link saved on this device', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Link', { exact: true })).toHaveCount(0);
     await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Offline: 1 change waiting to sync');
     await assertNoPendingBanner(page);
     await context.setOffline(false);
@@ -833,10 +834,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const db = await new Promise((resolve, reject) => { const request = indexedDB.open('crate-reading-v1', 1); request.onsuccess = () => resolve(request.result); request.onerror = reject; });
     return new Promise(resolve => { const request = db.transaction('values').objectStore('values').get(`share:${id}`); request.onsuccess = () => { db.close(); resolve(request.result?.encryptedShare === 1); }; });
   }), true, 'An unconnected browser retains the shared link for enrollment');
-  // The enrollment link replaces the share parameter; the newest staged share still opens
-  // and leaves storage once the draft holds it.
+  // The enrollment link replaces the share parameter; the newest staged share is still
+  // saved and leaves storage once the draft holds it.
   await shared.goto(await fixture.readingAppUrl());
-  await expect(shared.getByLabel('Link', { exact: true })).toHaveValue('https://example.invalid/first-share');
+  await expect(shared.getByText(/^Link saved/)).toBeVisible();
+  await expect(shared.getByLabel('Link', { exact: true })).toHaveCount(0);
   await expect.poll(() => shared.evaluate(async () => {
     const db = await new Promise((resolve, reject) => { const request = indexedDB.open('crate-reading-v1', 1); request.onsuccess = () => resolve(request.result); request.onerror = reject; });
     return new Promise(resolve => { const request = db.transaction('values').objectStore('values').getAllKeys(); request.onsuccess = () => { db.close(); resolve(request.result.filter(key => key.startsWith('share:')).length); }; });

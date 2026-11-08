@@ -19,6 +19,7 @@ export function useReadingSession(connection: ReadingConnection) {
 	const [error, setError] = useState<string | null>(null), [storageError, setStorageError] = useState<string | null>(null);
 	const [recovery, setRecovery] = useState(false), [draftReady, setDraftReady] = useState(false);
 	const [adding, setAdding] = useState(false), [url, setUrl] = useState('');
+	const [sharedLinkReady, setSharedLinkReady] = useState(false);
 	const alive = useRef(true), generation = useRef(0);
 	const authority = useRef<ReadingSession | null>(null);
 	const isCurrentSession = useCallback((expected: ReadingSession) => {
@@ -55,6 +56,7 @@ export function useReadingSession(connection: ReadingConnection) {
 	}, [isCurrentSession]);
 	const openCapture = useCallback(() => { setError(null); setAdding(true); }, []);
 	const closeCapture = useCallback(() => setAdding(false), []);
+	const takeSharedLink = useCallback(() => setSharedLinkReady(false), []);
 	const run = useCallback(async (action: () => Promise<void>) => {
 		const revision = generation.current;
 		try { await action(); } catch (cause) {
@@ -65,7 +67,7 @@ export function useReadingSession(connection: ReadingConnection) {
 	const resetSession = useCallback((message?: string) => {
 		generation.current++; authority.current = null; resetConnection();
 		setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
-		setUrl(''); setAdding(false);
+		setUrl(''); setAdding(false); setSharedLinkReady(false);
 		if (message) setError(message);
 	}, [resetConnection]);
 	// An unanswered check on a device without encryption evidence shows the plaintext
@@ -82,7 +84,7 @@ export function useReadingSession(connection: ReadingConnection) {
 		const current = target;
 		authority.current = current;
 		setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
-		setUrl(''); setAdding(false); setError(null);
+		setUrl(''); setAdding(false); setSharedLinkReady(false); setError(null);
 		const currentRequest = () => {
 			if (!alive.current || revision !== generation.current) return false;
 			if (current) assertReadingSession(current);
@@ -124,15 +126,22 @@ export function useReadingSession(connection: ReadingConnection) {
 			setHydrated(current);
 			if (readOnly || draft.status !== 'fulfilled') return;
 			// A staged share leaves storage once its link is in this session's draft, so
-			// a dismissed form cannot strand it. Without `?share=`, for example after an
-			// enrollment link replaced the URL, take the newest one unless the draft has a link.
+			// a dismissed form or interrupted save cannot strand it. Without `?share=`, for
+			// example after an enrollment link replaced the URL, take the newest one unless
+			// the draft has a link. The app then saves it; the form opens only if that fails.
 			const shareId = new URL(location.href).searchParams.get('share');
 			const staged = shareId ? await readReadingShare(shareId).then(share => share && { id: shareId, url: share.url })
 				: draft.value?.url ? undefined : await newestReadingShare().catch(() => undefined);
 			if (!staged || !currentRequest()) return;
-			setUrl(staged.url); setAdding(true);
-			await saveReadingDraft(current, { url: staged.url });
-			await removeReadingShare(current, staged.id);
+			setUrl(staged.url);
+			try {
+				await saveReadingDraft(current, { url: staged.url });
+				await removeReadingShare(current, staged.id);
+			} catch (cause) {
+				if (currentRequest()) setAdding(true);
+				throw cause;
+			}
+			if (currentRequest()) setSharedLinkReady(true);
 		});
 		return () => { alive.current = false; authority.current = null; lifetime.current++; };
 	}, [target, readOnly, connection.ready, connection.connecting, connection.lockedSession, run]);
@@ -141,6 +150,6 @@ export function useReadingSession(connection: ReadingConnection) {
 		if (session && ready && draftReady) void run(() => saveReadingDraft(session, { url }));
 	}, [session, ready, draftReady, url, run]);
 	return { ...connection, session, readOnly, ready, resetSession, cache, pending,
-		error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, run,
+		error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, sharedLinkReady, takeSharedLink, run,
 		isCurrentSession, publishPending, publishSyncResult, publishPartialCache, refreshRecovery, reportSessionError, finishCapture, openCapture, closeCapture };
 }

@@ -111,7 +111,7 @@ The shortcut works with encryption too: your server downloads the article and sa
 
 ### Save from the share sheet on Android
 
-In browsers that support sharing to web apps, install the web app, then select **Share → Crate**. It works with encrypted vaults too.
+In browsers that support sharing to web apps, install the web app, then select **Share → Crate**. Crate opens and saves the link right away, offline too. If this browser isn't connected to Reading yet, the link stays on the device and is saved once you connect. It works with encrypted vaults too.
 
 ## Read offline
 

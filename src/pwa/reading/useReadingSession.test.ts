@@ -143,17 +143,26 @@ describe('Reading session authority', () => {
 		expect(adoptEarlierReadingCaptures).toHaveBeenCalledWith(session);
 	});
 
-	it('copies a shared link into the draft and removes its staged record, so dismissing keeps only the draft', async () => {
+	it('copies a shared link into the draft and removes its staged record before offering it for saving', async () => {
 		vi.stubGlobal('location', { hash: '', href: 'https://example.test/notifications?section=reading&share=shared' });
 		vi.mocked(readReadingShare).mockResolvedValueOnce({ url: 'https://shared.example/article' });
 		const h = start();
 		await act(async () => { h.release(session); });
-		expect(h.rendered.current).toMatchObject({ adding: true, url: 'https://shared.example/article' });
+		expect(h.rendered.current).toMatchObject({ adding: false, sharedLinkReady: true, url: 'https://shared.example/article' });
 		expect(saveReadingDraft).toHaveBeenCalledWith(session, { url: 'https://shared.example/article' });
 		expect(removeReadingShare).toHaveBeenCalledExactlyOnceWith(session, 'shared');
-		act(() => h.rendered.current.closeCapture());
-		expect(h.rendered.current).toMatchObject({ adding: false, url: 'https://shared.example/article' });
+		act(() => h.rendered.current.takeSharedLink());
+		expect(h.rendered.current).toMatchObject({ adding: false, sharedLinkReady: false, url: 'https://shared.example/article' });
 		expect(newestReadingShare).not.toHaveBeenCalled();
+	});
+
+	it('opens the form instead of saving when a shared link cannot leave staging', async () => {
+		vi.stubGlobal('location', { hash: '', href: 'https://example.test/notifications?section=reading&share=shared' });
+		vi.mocked(readReadingShare).mockResolvedValueOnce({ url: 'https://shared.example/article' });
+		vi.mocked(removeReadingShare).mockRejectedValueOnce(new Error('Storage failed.'));
+		const h = start();
+		await act(async () => { h.release(session); });
+		expect(h.rendered.current).toMatchObject({ adding: true, sharedLinkReady: false, url: 'https://shared.example/article', error: 'Storage failed.' });
 	});
 
 	it.each([[undefined, true], [{ url: 'https://saved.example/draft' }, false]])('takes the newest staged share after enrollment replaced the link (draft %o)', async (draft, taken) => {
@@ -161,7 +170,7 @@ describe('Reading session authority', () => {
 		vi.mocked(newestReadingShare).mockResolvedValueOnce({ id: 'before-enrollment', url: 'https://shared.example/early' });
 		const h = start();
 		await act(async () => { h.release(session); });
-		expect(h.rendered.current).toMatchObject({ adding: true, url: taken ? 'https://shared.example/early' : 'https://saved.example/draft' });
+		expect(h.rendered.current).toMatchObject({ adding: !taken, sharedLinkReady: taken, url: taken ? 'https://shared.example/early' : 'https://saved.example/draft' });
 		// A draft link is never replaced by a share the user did not just send.
 		expect(newestReadingShare).toHaveBeenCalledTimes(taken ? 1 : 0);
 		expect(removeReadingShare).toHaveBeenCalledTimes(taken ? 1 : 0);

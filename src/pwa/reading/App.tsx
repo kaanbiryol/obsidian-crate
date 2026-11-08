@@ -8,7 +8,7 @@ import { ReadingLibraryPanel } from '@/reading/ui/ReadingLibrary';
 import { SaveLinkForm } from '@/reading/ui/SaveLinkForm';
 import { EmptyState } from '@/ui/shared/EmptyState';
 import { Button } from '@/ui/shared/Button';
-import { useContext, useId, useMemo, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
@@ -43,7 +43,7 @@ function ReadingAppContent() {
 	const active = featureNavigation?.active !== false;
 	const { connection, sync, showToast, claimFailure, saving, saveLink, updateItem, retryArticle, deleteItem } = useReadingRuntime();
 	const { session, readOnly, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, run, connect,
-		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture } = connection;
+		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture, sharedLinkReady, takeSharedLink } = connection;
 	const { refreshManually, isOffline } = sync;
 	const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run });
 	const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
@@ -53,6 +53,15 @@ function ReadingAppContent() {
 		try { readingUrl(url); return !saving; } catch { return false; }
 	})();
 	const visibleItems = useMemo(() => presentReadingItems(cache?.items ?? [], pending), [cache, pending]);
+	// A shared link saves at once, like the iPhone shortcut. Its draft keeps it until
+	// the save succeeds, and a failure opens the form with the error beside the link.
+	useEffect(() => {
+		if (!sharedLinkReady || !session || saving) return;
+		takeSharedLink();
+		void run(async () => {
+			try { await saveLink(open); } catch (cause) { openCaptureForm(); throw cause; }
+		});
+	}, [sharedLinkReady, session, saving, takeSharedLink, run, saveLink, open, openCaptureForm]);
 	const openCapture = () => {
 		if (!session) { showToast('info', 'Choose a Reading folder in Obsidian’s Crate settings to save a link.'); return; }
 		// Mount and focus within the tap so iOS can open its software keyboard.
