@@ -8,11 +8,13 @@ interface InitialSetupContext {
 	initialImport?: Pick<InitialImportApi, 'isPreparingReminders' | 'finishReminderSetup'>;
 	prepareReminderScope?: () => Promise<void>;
 	reportWork: (work: SyncWork) => void;
+	/** The reminder wait only polls the server, so other writers may change vault files meanwhile. */
+	markUploadOnly: () => void;
 	throwIfDestroyed: () => void;
 }
 
 /** Finish local setup before waiting for server-side reminder readiness. */
-export async function finishInitialSetup({ manifest, lastSeq, initialImport, prepareReminderScope, reportWork, throwIfDestroyed }: InitialSetupContext): Promise<void> {
+export async function finishInitialSetup({ manifest, lastSeq, initialImport, prepareReminderScope, reportWork, markUploadOnly, throwIfDestroyed }: InitialSetupContext): Promise<void> {
 	const initialConfig = manifest.getInitialConfigPull();
 	if (initialConfig && (lastSeq > 0 || Object.keys(initialConfig.files).every(path => manifest.hasFile(path)))) {
 		manifest.setInitialConfigPull(undefined);
@@ -20,6 +22,7 @@ export async function finishInitialSetup({ manifest, lastSeq, initialImport, pre
 		throwIfDestroyed();
 	}
 	if (!initialImport?.isPreparingReminders()) return;
+	markUploadOnly();
 	reportWork({ phase: 'reminders' });
 	await prepareReminderScope?.();
 	throwIfDestroyed();

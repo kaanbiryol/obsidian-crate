@@ -385,6 +385,12 @@ File events (create, modify, delete, rename) are debounced before syncing:
 
 If a local Markdown file changes after an automatic merge has already been accepted remotely, Crate keeps the uploaded local snapshot as a virtual merge base and immediately replans the path. This prevents both overwriting the newer local edit and duplicating changes already included in the remote merge.
 
+While a sync runs, `SyncState.writesVault` says whether it may change vault files.
+Queue flushes, a first upload and the reminder setup wait only read the vault, so they
+publish `writesVault: false` and the reminder and Reading writers keep working; every
+other sync, and any exclusive operation such as a history restore, holds them back.
+Readers never wait for sync.
+
 Implementation: `queue/controller.ts` and `queue/flush.ts`
 
 Selected-file sync classifies only the selected paths against current server

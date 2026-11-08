@@ -41,7 +41,7 @@ async function createPlugin() {
 		settings: { reading: { enabled: false, folderPath: 'Reading' } },
 		get remindersSettings() { return useRemindersSettingsStore.getState(); },
 		syncRuntime: {
-			getState: () => ({ status: 'idle' }), getApiClient: () => null, isConfigured: () => false,
+			getState: () => ({ status: 'idle' }), isWritingVault: () => false, getApiClient: () => null, isConfigured: () => false,
 			addStateChangeListener: () => {}, removeStateChangeListener: () => {},
 		},
 		registerEvent: () => {},

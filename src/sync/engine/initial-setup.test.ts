@@ -15,7 +15,7 @@ function setup() {
 	const context = {
 		manifest, lastSeq: 0,
 		initialImport: { isPreparingReminders: () => true, finishReminderSetup: vi.fn<InitialImportApi['finishReminderSetup']>(async () => {}) },
-		prepareReminderScope: vi.fn(async () => {}), reportWork: vi.fn(), throwIfDestroyed: () => controller.signal.throwIfAborted(),
+		prepareReminderScope: vi.fn(async () => {}), reportWork: vi.fn(), markUploadOnly: vi.fn(), throwIfDestroyed: () => controller.signal.throwIfAborted(),
 	};
 	return { context, controller };
 }
@@ -42,6 +42,15 @@ it.each(['files', 'cursor'] as const)('persists completed %s before preparing re
 	expect(context.prepareReminderScope).toHaveBeenCalledOnce();
 	expect(context.initialImport.finishReminderSetup).toHaveBeenCalledOnce();
 	expect(context.reportWork).toHaveBeenCalledWith({ phase: 'reminders' });
+	// The reminder wait only polls the server, so it does not hold back vault writers.
+	expect(context.markUploadOnly).toHaveBeenCalledOnce();
+});
+
+it('keeps vault writes held when no reminder setup is pending', async () => {
+	const { context } = setup();
+	context.initialImport.isPreparingReminders = () => false;
+	await finishInitialSetup(context);
+	expect(context.markUploadOnly).not.toHaveBeenCalled();
 });
 
 it.each(['storage', 'shutdown'] as const)('does not proceed to readiness after %s interrupts checkpoint persistence', async reason => {

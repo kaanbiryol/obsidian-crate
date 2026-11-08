@@ -103,6 +103,9 @@ interface ScanFileOptions {
 	reservedIds?: ReadonlySet<string>;
 	signal?: AbortSignal;
 	identityOwners?: ReminderIdentityOwners;
+	/** Holds the whole note back, such as during a move awaiting review. */
+	shouldDeferScan?: () => boolean;
+	/** Holds only its writes; the lines that need none are indexed meanwhile. */
 	shouldDeferNormalization?: () => boolean;
 	shouldDeferCollisionRepair?: () => boolean;
 	/** Writes normalization through a loaded editor that shows the file instead of the vault. */
@@ -140,7 +143,12 @@ async function writeReminderIds(app: App, file: TFile, filePath: string, origina
 			targetChanged = true;
 			return currentContent;
 		}
-		if (signal?.aborted || mustDefer()) return currentContent;
+		if (signal?.aborted) return currentContent;
+		// Writes that must wait, such as while sync may change the file, retry on a later flush.
+		if (mustDefer()) {
+			writeDeferred = true;
+			return currentContent;
+		}
 		// A note opened since the editor check is written through its editor later.
 		if (editor?.isOpen(filePath)) {
 			writeDeferred = true;
@@ -172,6 +180,7 @@ export async function scanFile(
 		reservedIds = new Set(),
 		signal,
 		identityOwners,
+		shouldDeferScan = () => false,
 		shouldDeferNormalization = () => false,
 		shouldDeferCollisionRepair = () => false,
 		editor,
@@ -197,10 +206,12 @@ export async function scanFile(
 		const ownership = identityOwners ? await resolveReminderIdentityOwners(app, filePath, originalContent, identityOwners) : undefined;
 		if (signal?.aborted) return cancelled;
 		const currentReservedIds = new Set([...reservedIds, ...(ownership?.reservedIds ?? [])]);
-		const mustDefer = () => shouldDeferNormalization()
-			|| (currentReservedIds.size > 0 && shouldDeferCollisionRepair())
-			|| (ownership !== undefined && !ownership.isCurrent());
-		if (mustDefer()) return deferred();
+		// A held note, or an identity another note may own, keeps the note's previous
+		// records until a later scan can write it.
+		const mustHold = () => shouldDeferScan() || (ownership !== undefined && !ownership.isCurrent())
+			|| (currentReservedIds.size > 0 && (shouldDeferCollisionRepair() || shouldDeferNormalization()));
+		const mustDefer = () => shouldDeferNormalization() || mustHold();
+		if (mustHold()) return deferred();
 		// Index the lines normalization would keep; the rest wait for a later scan.
 		const pending = (content: string): FileScanResult => {
 			const lines = content.split("\n");
@@ -215,6 +226,8 @@ export async function scanFile(
 			};
 		};
 		let normalized = normalizeReminderIds(originalContent, currentReservedIds, parses.remember);
+		// A note that needs no write is read as it is, even while writes wait.
+		if (normalized.remindersUpdated > 0 && shouldDeferNormalization()) return pending(originalContent);
 		// Nothing has been awaited since the checks above, so they also guard this editor write.
 		const edited = normalized.remindersUpdated > 0 ? editor?.write(filePath, originalContent, normalized.content) : undefined;
 		if (edited && !edited.complete) return pending(edited.content);
@@ -226,12 +239,12 @@ export async function scanFile(
 			if (write.status === 'target-changed') return deferred();
 			if (write.status === 'write-deferred') {
 				if (signal?.aborted) return cancelled;
-				return mustDefer() ? deferred() : pending(write.content);
+				return mustHold() ? deferred() : pending(write.content);
 			}
 			normalized = write.normalized;
 		}
 		if (signal?.aborted) return cancelled;
-		if (mustDefer()) return deferred();
+		if (mustHold()) return deferred();
 		const result = scanReminderMarkdownContent(filePath, normalized.content, remindersFolderPath, { parsePersisted: parses.take });
 
 		return {
@@ -256,8 +269,12 @@ export async function scanFile(
 
 interface ScanVaultOptions {
 	signal?: AbortSignal;
-	/** Called without a path before each file, then with the path during its normalization. */
-	shouldDeferNormalization?: (filePath?: string) => boolean;
+	/** Called before each file; true stops the scan and leaves the whole load for later. */
+	shouldStop?: () => boolean;
+	/** Holds a file back entirely; it keeps its previous records until a later rescan. */
+	shouldDeferScan?: (filePath: string) => boolean;
+	/** Called with the path during each file's normalization; a held write retries later. */
+	shouldDeferNormalization?: (filePath: string) => boolean;
 	shouldDeferCollisionRepair?: () => boolean;
 	editor?: ReminderEditorWriter;
 	knownOwners?: ReminderIdentityOwner[];
@@ -273,6 +290,8 @@ export async function scanVault(
 	remindersFolderPath: string,
 	{
 		signal,
+		shouldStop = () => false,
+		shouldDeferScan = () => false,
 		shouldDeferNormalization = () => false,
 		shouldDeferCollisionRepair = () => false,
 		editor,
@@ -311,9 +330,10 @@ export async function scanVault(
 	const writeDeferredPaths: string[] = [];
 	for (const file of reminderFiles) {
 		if (signal?.aborted) break;
-		if (shouldDeferNormalization()) { deferred = true; complete = false; break; }
+		if (shouldStop()) { deferred = true; complete = false; break; }
 		const result = await scanFile(app, file, remindersFolderPath, {
-			signal, identityOwners, shouldDeferNormalization: () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair,
+			signal, identityOwners, shouldDeferScan: () => shouldDeferScan(file.path),
+			shouldDeferNormalization: () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair,
 			editor,
 		});
 		if (result.deferred) { deferred = true; deferredPaths.push(file.path); }

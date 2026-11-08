@@ -73,6 +73,7 @@ export class SyncEngine {
 	/** Counts full-sync requests, so a sync clears only the requests made before it read them. */
 	private fullSyncRequests = 0;
 	private prepareReminderScope?: () => Promise<void>;
+	private prepareInitialUpload?: () => Promise<void>;
 	private readonly rawConfigEvents: (path: string) => Promise<void>;
 	private readonly ignore: SyncIgnoreMatcher;
 	/** The patterns the pending list was last built with; settings objects are updated in place. */
@@ -167,6 +168,7 @@ export class SyncEngine {
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
 		this.contexts = new SyncEngineContexts({
 			prepareReminderScope: async () => { await this.prepareReminderScope?.(); },
+			prepareInitialUpload: async () => { await this.prepareInitialUpload?.(); },
 			vault: this.vault,
 			pluginDir: pluginFolder,
 			fileManager: this.plugin.app.fileManager,
@@ -304,6 +306,10 @@ export class SyncEngine {
 		this.prepareReminderScope = prepare;
 	}
 
+	setInitialUploadPreparation(prepare?: () => Promise<void>): void {
+		this.prepareInitialUpload = prepare;
+	}
+
 	private async retryReminderScope(): Promise<void> {
 		try {
 			await this.prepareReminderScope?.();
@@ -383,7 +389,7 @@ export class SyncEngine {
 	private async runExclusiveOperation<T>(operation: () => Promise<T>, busyMessage = 'Wait for sync to finish, then try again.'): Promise<T> {
 		this.lifecycle.throwIfDestroyed();
 		if (this.state.status === 'syncing') throw new Error(busyMessage);
-		this.updateState({ status: 'syncing' });
+		this.updateState({ status: 'syncing', writesVault: true });
 		return this.trackWork(async () => {
 			try { return await operation(); }
 			finally { if (!this.lifecycle.isDestroyed) this.updateState({ status: 'idle' }); }

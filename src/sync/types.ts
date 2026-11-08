@@ -30,6 +30,9 @@ export interface SyncState {
 	initializing?: boolean;
 	work?: SyncWork;
 	status: SyncStatus;
+	/** False while the running sync only reads vault files: a queue flush, a first
+	 * upload or the reminder setup wait. Any other sync may change them. */
+	writesVault?: boolean;
 	lastSync: string | null;
 	lastError: string | null;
 	lastIssues?: SyncIssue[];

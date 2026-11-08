@@ -257,6 +257,32 @@ it('preserves initial uploads when reminder settings fail and resumes without up
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 1 });
 }, 15_000);
 
+it('schedules a reminder that gets its ID before the first upload from that one upload', async () => {
+	vi.spyOn(console, 'info').mockImplementation(() => {});
+	const device = new SyncTestDevice('first-upload-reminder-ids', env); clients.push(device);
+	await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
+	const path = 'Reminders/task.md', id = crypto.randomUUID();
+	device.disk.write(path, '- [ ] Task @2099-01-01T12:00:00.000Z\n');
+	let writesVault: boolean | undefined;
+	// Stands in for the reminder index, which writes missing IDs once sync allows vault writes.
+	device.engine.setInitialUploadPreparation(async () => {
+		writesVault = device.engine.getState().writesVault;
+		device.disk.write(path, `${note('2099-01-01T12:00:00.000Z', id)}\n`);
+	});
+	const upload = vi.spyOn(device.api.initialImport, 'upload');
+	const wait = vi.spyOn(device.api.initialImport, 'waitUntilReady');
+	const syncing = device.engine.sync();
+	await vi.waitFor(() => expect(wait).toHaveBeenCalled(), { timeout: 5_000 });
+	// The server's reminder setup wait does not hold back local writers either.
+	expect(device.engine.getState()).toMatchObject({ status: 'syncing', writesVault: false });
+	await runDurableObjectAlarm(env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')));
+	expect(await syncing).toMatchObject({ success: true, uploaded: 1 });
+	expect(writesVault).toBe(false);
+	// Before: the ID was written after the upload, so the schedule needed a second upload.
+	expect(upload).toHaveBeenCalledOnce();
+	expect(await env.DB.prepare('SELECT reminder_id FROM scheduled_reminders').all()).toMatchObject({ results: [{ reminder_id: id }] });
+}, 15_000);
+
 it.each(['failed', 'pending'])('syncs an ordinary edit while reminder settings are %s', async status => {
 	vi.spyOn(console, 'info').mockImplementation(() => {});
 	const device = new SyncTestDevice(`incremental-policy-${status}`, env); clients.push(device);

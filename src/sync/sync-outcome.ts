@@ -19,15 +19,16 @@ export type SyncStatus = SyncState['status'];
 
 /** Starts every sync entry the same way: refuses an unconfigured or busy engine,
  * otherwise publishes `syncing`. `enter` runs after the guard passes and before
- * that transition, and returns state to publish with it. Returns the refusal, or
- * null once the attempt has started. */
+ * that transition, and returns state to publish with it. An attempt may change vault
+ * files unless `enter` reports `writesVault: false`. Returns the refusal, or null
+ * once the attempt has started. */
 export function beginSyncAttempt(
 	context: { apiConfigured(): boolean; getStatus(): SyncStatus; updateState(updates: Partial<SyncState>): void },
 	enter?: () => Partial<SyncState>,
 ): SyncResult | null {
 	if (!context.apiConfigured()) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
 	if (context.getStatus() === 'syncing') return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
-	context.updateState({ ...enter?.(), status: 'syncing' });
+	context.updateState({ writesVault: true, ...enter?.(), status: 'syncing' });
 	return null;
 }
 

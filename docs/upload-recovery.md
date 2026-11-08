@@ -22,6 +22,10 @@ adding another device. Initial sync reports completion only after selected-folde
 reminder setup finishes. If that phase is interrupted, the next sync resumes it
 from the server’s persisted marker; committed files are kept. Local edits sync
 before the readiness wait so correcting an invalid reminder note can unblock setup.
+Before the first upload lists vault files, the plugin writes missing reminder IDs, so
+the first upload already carries every schedule instead of a second upload after
+the scan. Neither the upload nor the readiness wait holds back local reminder or
+Reading writes.
 
 
 Normal sync binds every upload to a stable operation ID, exact content hash, size, path, content type and expected remote hash. The plugin saves the exact payload in its private `pending-uploads/` directory before dispatch. Each batch member has its own identity. A disk-write failure prevents dispatch. Because adapter writes are not atomic, each record is written to `<operation>.json.tmp` and renamed to `<operation>.json`; the request is sent only after the rename. A leftover temporary file was never sent, so the next start removes it, and an existing record is never replaced. A damaged final record still stops sync.

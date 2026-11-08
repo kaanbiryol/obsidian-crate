@@ -43,6 +43,28 @@ it('prepares the next chunk of an initial import while the current one uploads',
 	expect(events.slice(start, events.indexOf('upload end', start)).some(event => event.startsWith('prepare'))).toBe(true);
 });
 
+it('lets local writers finish before a first upload lists vault files, and only when an import runs', async () => {
+	const { getAllVaultFiles } = await import('../local/file-discovery');
+	const order: string[] = [];
+	vi.mocked(getAllVaultFiles).mockImplementationOnce(async () => { order.push('list'); return []; });
+	const beforeUpload = vi.fn(async () => { order.push('before upload'); });
+	const context = (state: 'importing' | 'complete') => ({
+		transfer: { vault: {}, localManifest: { setEntry: vi.fn(), removeEntry: vi.fn() }, markdownBaseCache: { putBase: async () => {} }, encrypted: () => false } as never,
+		api: {
+			getManifest: async () => ({ files: {} }),
+			initialImport: { begin: async () => ({ state, token: 't' }), prune: async () => {}, upload: vi.fn(), finish: async () => 1 },
+		} as never,
+		beforeUpload,
+		shouldIgnore: () => false, throwIfDestroyed: () => {}, save: async () => {}, setLastSeq: () => {}, report: () => {},
+		getImportToken: () => 't', setImportToken: () => {},
+	});
+	await runInitialImport(context('complete'), createEmptySyncResult());
+	expect(beforeUpload).not.toHaveBeenCalled();
+	await runInitialImport(context('importing'), createEmptySyncResult());
+	// Reminder IDs written first reach the server with the first upload.
+	expect(order).toEqual(['before upload', 'list']);
+});
+
 function importContext(token: string | undefined, revision: string | undefined) {
 	const calls: string[] = [];
 	const context = {

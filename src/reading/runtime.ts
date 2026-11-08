@@ -9,6 +9,10 @@ import { createObsidianReadingVault } from './data/obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
 
 export const READING_VIEW_TYPE = 'crate-reading';
+/** Vault events settle this long before a refresh; a burst, such as a sync download,
+ * still refreshes at least every `REFRESH_MAX_WAIT_MS`. */
+const REFRESH_DELAY_MS = 400;
+const REFRESH_MAX_WAIT_MS = 2_000;
 
 /** The plugin settings, vault, sync state and server credentials Reading runs on. */
 type ReadingRuntimeHost = Pick<CratePlugin, 'app' | 'settings' | 'remindersSettings' | 'secretStorage' | 'syncRuntime' | 'writeSettings'>;
@@ -105,7 +109,9 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	});
 	let policyChecked = !plugin.settings.workerUrl;
 	let checkedAt = 0;
-	const canAdopt = () => policyChecked && plugin.app.workspace.layoutReady && !['syncing', 'error', 'offline'].includes(plugin.syncRuntime.getState().status);
+	// Imports rewrite notes, so they wait while sync may change vault files. Reading does not.
+	const canAdopt = () => policyChecked && plugin.app.workspace.layoutReady && !plugin.syncRuntime.isWritingVault()
+		&& !['error', 'offline'].includes(plugin.syncRuntime.getState().status);
 	// Keep replacement views synchronous, but start their vault work after the old library drains.
 	const library = new ReadingLibrary({ ...readingVault,
 		// Background tabs count too: their editor reloads the note when selected.
@@ -116,12 +122,15 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		} },
 	}, folder, controller.signal, canAdopt, states.get(plugin)?.stopping);
 	let timer: number | undefined;
+	let scheduledAt = 0;
 	let lastErrorAt = 0;
 	const refreshes = new Set<Promise<void>>();
 	const refresh = () => {
-		if (controller.signal.aborted || !plugin.app.workspace.layoutReady || plugin.syncRuntime.getState().status === 'syncing') return;
+		timer = undefined;
+		if (controller.signal.aborted || !plugin.app.workspace.layoutReady) return;
 
-		if (plugin.settings.workerUrl && Date.now() - checkedAt > 60_000) {
+		// Adopting the server's folder restarts Reading, which a running download should not see change.
+		if (plugin.settings.workerUrl && !plugin.syncRuntime.isWritingVault() && Date.now() - checkedAt > 60_000) {
 			checkedAt = Date.now();
 			void (async () => {
 				const connection = captureServerConnection(plugin);
@@ -136,7 +145,18 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	};
 	const schedule = () => {
 		if (controller.signal.aborted) return;
-		window.clearTimeout(timer); timer = window.setTimeout(refresh, 400);
+		const now = Date.now();
+		if (timer === undefined) scheduledAt = now;
+		else window.clearTimeout(timer);
+		timer = window.setTimeout(refresh, Math.min(REFRESH_DELAY_MS, Math.max(0, scheduledAt + REFRESH_MAX_WAIT_MS - now)));
+	};
+	// Sync progress updates change nothing Reading uses; status and vault writes do.
+	let syncPhase = '';
+	const onSyncStateChange = () => {
+		const phase = `${plugin.syncRuntime.getState().status}:${plugin.syncRuntime.isWritingVault()}`;
+		if (phase === syncPhase) return;
+		syncPhase = phase;
+		schedule();
 	};
 	const inFolder = (path: string) => path === folder || path.startsWith(`${folder}/`) || folder.startsWith(`${path}/`);
 	const changed = (path: string) => {
@@ -152,12 +172,12 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	];
 	// Closing an editor lets deferred imports and highlight records proceed; other layout changes need no scan.
 	const layoutRef = plugin.app.workspace.on('layout-change', () => { if (library.waitingForEditor) schedule(); });
-	plugin.syncRuntime.addStateChangeListener(schedule);
+	plugin.syncRuntime.addStateChangeListener(onSyncStateChange);
 	const stop = () => {
 		controller.abort(); window.clearTimeout(timer);
 		for (const ref of refs) vault.offref(ref);
 		plugin.app.workspace.offref(layoutRef);
-		plugin.syncRuntime.removeStateChangeListener(schedule);
+		plugin.syncRuntime.removeStateChangeListener(onSyncStateChange);
 		lifetime.removeEventListener('abort', onAbort);
 		return Promise.allSettled([library.close(), ...refreshes]).then(() => {});
 	};

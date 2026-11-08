@@ -80,6 +80,8 @@ export class SyncRuntime {
 		private reminderFolders: () => readonly string[] = () => [],
 		/** Where notes the server sealed to the vault (Save to Crate captures) are accepted. */
 		private readingFolder: () => string | null = () => null,
+		/** Runs when a first upload starts, before it lists vault files. */
+		private prepareInitialUpload?: () => Promise<void>,
 	) {
 		this.initializing = this.isConfigured();
 		this.serverStatus = new RuntimeServerStatus({
@@ -167,6 +169,13 @@ export class SyncRuntime {
 		return { status: this.initializationError ? 'error' : 'idle', lastSync: null, lastError: this.initializationError, pendingChanges: 0, conflictCount: 0,
 			...(this.initializing && !this.initializationError ? { initializing: true } : {}),
 		};
+	}
+
+	/** Whether a running sync may change vault files now. Writers that would race it
+	 * (reminder IDs, Reading imports) wait; readers never need to. */
+	isWritingVault(): boolean {
+		const state = this.syncEngine?.getState();
+		return state?.status === 'syncing' && state.writesVault !== false;
 	}
 
 	getPendingKeys(): string[] {
@@ -325,6 +334,7 @@ export class SyncRuntime {
 		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
 		syncEngine.setSettingsPersistence(() => this.persistSettings());
 		syncEngine.setReminderScopePreparation(this.prepareReminderScope);
+		syncEngine.setInitialUploadPreparation(this.prepareInitialUpload);
 
 		this.emitCurrentState();
 

@@ -182,7 +182,8 @@ export async function processPendingChanges(
 	const startFailure = beginSyncAttempt(context, () => {
 		batch = context.beginBatch();
 		logger.info(`Processing ${batch.paths.length} pending changes`);
-		return { pendingChanges: context.getQueuedKeyCount() };
+		// A flush uploads and deletes on the server only.
+		return { pendingChanges: context.getQueuedKeyCount(), writesVault: false };
 	});
 	if (startFailure) {
 		context.updateState({ pendingChanges: context.getQueuedKeyCount() });

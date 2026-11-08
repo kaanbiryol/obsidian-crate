@@ -39,6 +39,8 @@ const VAULT_REPLACEMENT_UNFINISHED = 'Select Sync now to finish replacing this v
 
 interface SyncEngineContextDependencies {
 	prepareReminderScope?: () => Promise<void>;
+	/** Lets local writers finish before a first upload lists vault files. */
+	prepareInitialUpload?: () => Promise<void>;
 	vault: Vault;
 	pluginDir: string;
 	fileManager: FileManager;
@@ -129,6 +131,10 @@ export class SyncEngineContexts {
 			replaceLocalVault: this.replaceLocalVault,
 			tryInitialImport: (result, progress) => runInitialImport({ transfer: this.transfer, api: d.api,
 				prepareReminderScope: d.prepareReminderScope,
+				beforeUpload: async () => {
+					this.markUploadOnly();
+					await d.prepareInitialUpload?.();
+				},
 				shouldIgnore: d.shouldIgnore, throwIfDestroyed: d.throwIfDestroyed,
 				save: () => d.localManifest.save(),
 				setLastSeq: this.setLastSeq,
@@ -259,6 +265,9 @@ export class SyncEngineContexts {
 
 	private readonly reportWork = (work: SyncWork): void => this.dependencies.updateState({ work });
 
+	/** The rest of the running sync only reads vault files. */
+	private readonly markUploadOnly = (): void => this.dependencies.updateState({ writesVault: false });
+
 	private readonly encrypted = (): boolean => this.dependencies.api.isEncrypted();
 
 	/** Replays interrupted uploads before any path is planned, reporting recovery progress.
@@ -298,7 +307,7 @@ export class SyncEngineContexts {
 		return finishInitialSetup({
 			manifest: d.localManifest, lastSeq: d.getSettings().lastSeq,
 			initialImport: d.api.initialImport, prepareReminderScope: d.prepareReminderScope,
-			reportWork: this.reportWork, throwIfDestroyed: d.throwIfDestroyed,
+			reportWork: this.reportWork, markUploadOnly: this.markUploadOnly, throwIfDestroyed: d.throwIfDestroyed,
 		});
 	};
 

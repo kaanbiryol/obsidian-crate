@@ -202,6 +202,13 @@ subscribers. Scan failure retains the last published records and lookups togethe
 A full load that holds back individual files (a move awaiting review, deferred
 duplicate repair) publishes every other file and keeps those files' previous
 records until a later rescan can read them safely.
+Reads never wait for sync: the index is derived from Markdown, and vault events
+correct whatever sync changes afterwards. `reminders/scan-gate.ts` holds only writes
+(IDs, typed dates, duplicate repair) while `SyncRuntime.isWritingVault()` reports a
+sync that may change vault files. A note that needs a write meanwhile is indexed
+without the lines that write would change and is written on a later flush; a sync
+starting mid-load does not restart the folder scan. Reading follows the same rule:
+its library refreshes during sync, and imports and highlight records wait.
 `file-scan-result.ts` applies one file's scan result to that state; queueing,
 invalidation and deferral stay in `index.ts`.
 

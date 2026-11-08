@@ -22,6 +22,7 @@ function harness() {
 	const syncListeners = new Set<() => void>();
 	const callbacks: (() => void)[] = [];
 	let status = 'idle';
+	let writesVault = true;
 	const vault = {
 		configDir: '.obsidian', getAbstractFileByPath: (path: string) => path === root.path ? root : path === file.path ? file : null,
 		read: vi.fn(async (_file?: TFile) => content), process: vi.fn(async (_file: TFile, update: (content: string) => string) => { content = update(content); return content; }),
@@ -34,10 +35,10 @@ function harness() {
 	const workspace = { layoutReady: false, on: () => ({}), offref: vi.fn(), getLeavesOfType: () => [], onLayoutReady: (callback: () => void) => { callbacks.push(callback); if (workspace.layoutReady) callback(); } };
 	const plugin = { secretStorage: { get: () => null }, settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading', confirmed: true } }, '.obsidian'),
 		remindersSettings: { remindersFolderPath: 'Reminders' }, app: { vault, workspace }, registerEvent: vi.fn(),
-		syncRuntime: { getState: () => ({ status }), addStateChangeListener: (listener: () => void) => { syncListeners.add(listener); }, removeStateChangeListener: (listener: () => void) => { syncListeners.delete(listener); } },
+		syncRuntime: { getState: () => ({ status }), isWritingVault: () => status === 'syncing' && writesVault, addStateChangeListener: (listener: () => void) => { syncListeners.add(listener); }, removeStateChangeListener: (listener: () => void) => { syncListeners.delete(listener); } },
 	} as unknown as CratePlugin;
 	return { plugin, file, vault, workspace, callbacks, events, syncListeners,
-		setStatus: (next: string) => { status = next; for (const listener of syncListeners) listener(); },
+		setStatus: (next: string, writes = true) => { status = next; writesVault = writes; for (const listener of syncListeners) listener(); },
 		edit: (update: (source: string) => string) => { content = update(content); for (const listener of events.get('modify') ?? []) listener(file); },
 	};
 }
@@ -226,6 +227,33 @@ describe('Reading runtime lifecycle', () => {
 		expect(h.vault.process).toHaveBeenCalledTimes(1);
 		stopReading(h.plugin);
 	});
+	it('imports a clip only once sync stops changing vault files', async () => {
+		const h = harness();
+		h.edit(() => '---\nsource: https://example.com/article\nauthor:\n---\nClipped text.');
+		h.setStatus('syncing'); h.workspace.layoutReady = true; startReading(h.plugin);
+		await vi.advanceTimersByTimeAsync(500);
+		await getReadingLibrary(h.plugin)!.refresh();
+		expect(getReadingLibrary(h.plugin)!.getSnapshot().issues).toEqual([{ path: 'Reading/article.md', message: 'Note is waiting for import after sync.' }]);
+		expect(h.vault.process).not.toHaveBeenCalled();
+		// A queue flush only uploads, so the import goes ahead without waiting for it.
+		h.setStatus('syncing', false); await vi.advanceTimersByTimeAsync(500);
+		await getReadingLibrary(h.plugin)!.refresh();
+		expect(h.vault.process).toHaveBeenCalledTimes(1);
+		expect(getReadingLibrary(h.plugin)!.getSnapshot().items[0]).toMatchObject({ source_url: 'https://example.com/article' });
+		stopReading(h.plugin);
+	});
+	it('refreshes during a long burst of vault events instead of waiting for it to end', async () => {
+		const h = harness(); h.workspace.layoutReady = true; startReading(h.plugin);
+		await vi.advanceTimersByTimeAsync(500);
+		const reads = h.vault.read.mock.calls.length;
+		for (let event = 0; event < 10; event++) {
+			h.edit(source => `${source}\nDownloaded ${event}.`);
+			await vi.advanceTimersByTimeAsync(300);
+		}
+		// Before: each event restarted the 400 ms wait, so no refresh ran during the burst.
+		expect(h.vault.read.mock.calls.length).toBeGreaterThan(reads);
+		stopReading(h.plugin);
+	});
 	it('leaves notes in an existing Reading folder unchanged on a fresh install', async () => {
 		const h = harness();
 		h.plugin.settings.reading = { ...DEFAULT_READING_SETTINGS };
@@ -236,14 +264,15 @@ describe('Reading runtime lifecycle', () => {
 		expect(h.vault.read).not.toHaveBeenCalled();
 		expect(h.vault.process).not.toHaveBeenCalled();
 	});
-	it('waits for the vault and startup sync, then cancels every watcher on unload', async () => {
+	it('waits for the vault but not for sync, then cancels every watcher on unload', async () => {
 		const h = harness(); startReading(h.plugin);
 		await vi.advanceTimersByTimeAsync(500); expect(h.vault.read).not.toHaveBeenCalled();
 		h.setStatus('syncing'); h.workspace.layoutReady = true; h.callbacks[0]!();
-		await vi.advanceTimersByTimeAsync(500); expect(h.vault.read).not.toHaveBeenCalled();
-		expect(getReadingLibrary(h.plugin)?.getSnapshot().loading).toBe(true);
-		h.setStatus('idle'); await vi.advanceTimersByTimeAsync(500);
+		await vi.advanceTimersByTimeAsync(500);
+		// Before: the library stayed loading until the sync finished.
 		expect(getReadingLibrary(h.plugin)?.getSnapshot().items).toHaveLength(1);
+		h.setStatus('idle'); await vi.advanceTimersByTimeAsync(500);
+		expect(h.vault.read).toHaveBeenCalledTimes(1);
 		h.edit(source => source + '\nPersonal note.');
 		endPluginLifecycle(h.plugin); await vi.advanceTimersByTimeAsync(500);
 		expect(h.vault.read).toHaveBeenCalledTimes(1);

@@ -16,7 +16,8 @@ async function workspace(source = 'A', destination = 'Z') {
 	let status = 'idle';
 	const index = createReminderIndex(app, 'Reminders', {
 		signal: lifetime.signal,
-		shouldDeferScan: () => status === 'syncing',
+		// Reads never wait for sync; writes wait while it may change vault files.
+		shouldDeferWrites: () => status === 'syncing',
 		shouldDeferCollisionRepair: () => status === 'error' || status === 'offline',
 	});
 	function file(path: string): TFile {

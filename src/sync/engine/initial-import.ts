@@ -18,6 +18,9 @@ import type { FileEntry } from '@/protocol/sync-types';
 
 interface ImportContext {
 	prepareReminderScope?(): Promise<void>;
+	/** Runs when a first upload starts, before it lists vault files. The upload only
+	 * reads the vault, so other writers, such as reminder ID assignment, may go first. */
+	beforeUpload?(): Promise<void>;
 	transfer: TransferContext;
 	api: SyncApiClient;
 	shouldIgnore(path: string): boolean;
@@ -61,6 +64,8 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 		return null;
 	}
 	const transfer = context.transfer;
+	await context.beforeUpload?.();
+	context.throwIfDestroyed();
 	context.report({ phase: 'scanning' });
 	const local = await getAllVaultFiles(transfer.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
 	const remote = await context.api.getManifest();

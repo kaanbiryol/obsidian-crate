@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { createReminderScanGate, type ReminderScanGateHost } from './scan-gate';
 
 function harness({ configured = true, api = null as object | null } = {}) {
-	const state = { status: 'idle', api, configured, layoutReady: true, pendingMoves: false, pendingFiles: new Set<string>() };
+	const state = { status: 'idle', writesVault: true, api, configured, layoutReady: true, pendingMoves: false, pendingFiles: new Set<string>() };
 	const host = {
 		workspace: { get layoutReady() { return state.layoutReady; } },
 		syncRuntime: {
 			getState: vi.fn(() => ({ status: state.status })),
+			isWritingVault: vi.fn(() => state.status === 'syncing' && state.writesVault),
 			getApiClient: vi.fn(() => state.api),
 			isConfigured: vi.fn(() => state.configured),
 		},
@@ -28,15 +29,27 @@ function harness({ configured = true, api = null as object | null } = {}) {
 }
 
 describe('reminder scan gate', () => {
-	it('defers scans until the vault file list is ready and while sync runs', () => {
+	it('defers scans and writes until the vault file list is ready', () => {
 		const { state, gate } = harness();
 		state.layoutReady = false;
 		expect(gate.shouldDeferScan()).toBe(true);
 		expect(gate.shouldDeferScan('Reminders/Inbox.md')).toBe(true);
+		expect(gate.shouldDeferWrites('Reminders/Inbox.md')).toBe(true);
 		state.layoutReady = true;
 		expect(gate.shouldDeferScan()).toBe(false);
+		expect(gate.shouldDeferWrites()).toBe(false);
+	});
+
+	it('reads during sync and defers writes only while sync may change vault files', () => {
+		const { state, gate } = harness();
 		state.status = 'syncing';
-		expect(gate.shouldDeferScan('Reminders/Inbox.md')).toBe(true);
+		expect(gate.shouldDeferScan()).toBe(false);
+		expect(gate.shouldDeferScan('Reminders/Inbox.md')).toBe(false);
+		expect(gate.shouldDeferWrites()).toBe(true);
+		expect(gate.shouldDeferWrites('Reminders/Inbox.md')).toBe(true);
+		// Queue flushes, a first upload and the reminder setup wait only read the vault.
+		state.writesVault = false;
+		expect(gate.shouldDeferWrites('Reminders/Inbox.md')).toBe(false);
 	});
 
 	it('defers only the files of an unresolved move', () => {
@@ -45,6 +58,8 @@ describe('reminder scan gate', () => {
 		expect(gate.shouldDeferScan()).toBe(false);
 		expect(gate.shouldDeferScan('Reminders/Healthy.md')).toBe(false);
 		expect(gate.shouldDeferScan('Reminders/Pending.md')).toBe(true);
+		expect(gate.shouldDeferWrites('Reminders/Healthy.md')).toBe(false);
+		expect(gate.shouldDeferWrites('Reminders/Pending.md')).toBe(true);
 	});
 
 	it('allows collision repair without a configured connection unless a move is pending', () => {
@@ -69,6 +84,25 @@ describe('reminder scan gate', () => {
 		state.status = 'idle';
 		state.api = {};
 		expect(gate.shouldDeferCollisionRepair()).toBe(true); // A replaced connection needs its own reconciliation.
+	});
+
+	it('does not verify a connection with an upload-only flush after a failed sync', () => {
+		const { state, gate, transition } = harness({ api: {} });
+		transition('syncing', 'error'); // A failed sync may leave downloads partly applied.
+		state.writesVault = false;
+		transition('syncing', 'idle'); // Before: this flush verified the connection.
+		expect(gate.shouldDeferCollisionRepair()).toBe(true);
+		state.writesVault = true;
+		transition('syncing', 'idle');
+		expect(gate.shouldDeferCollisionRepair()).toBe(false);
+	});
+
+	it('verifies a first upload that turns upload-only partway through', () => {
+		const { state, gate, transition } = harness({ api: {} });
+		transition('syncing');
+		state.writesVault = false;
+		transition('syncing', 'idle');
+		expect(gate.shouldDeferCollisionRepair()).toBe(false);
 	});
 
 	it('does not trust an existing connection before it finishes a sync', () => {

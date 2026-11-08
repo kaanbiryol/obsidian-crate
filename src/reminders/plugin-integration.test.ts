@@ -27,6 +27,7 @@ type MockPlugin = {
 		getApiClient: ReturnType<typeof vi.fn>;
 		isConfigured: ReturnType<typeof vi.fn>;
 		getState: ReturnType<typeof vi.fn>;
+		isWritingVault: ReturnType<typeof vi.fn>;
 		addStateChangeListener: ReturnType<typeof vi.fn>;
 		removeStateChangeListener: ReturnType<typeof vi.fn>;
 	};
@@ -78,6 +79,7 @@ function indexOptions(call = 0): ReminderIndexOptions {
 const gatedIndexOptions: Record<keyof ReminderIndexOptions, unknown> = {
 	signal: expect.any(AbortSignal),
 	shouldDeferScan: expect.any(Function),
+	shouldDeferWrites: expect.any(Function),
 	shouldDeferCollisionRepair: expect.any(Function),
 	editor: expect.any(Object),
 };
@@ -163,6 +165,10 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 			getApiClient: vi.fn(),
 			isConfigured: vi.fn(() => false),
 			getState: vi.fn(() => ({ status: 'idle' })),
+			isWritingVault: vi.fn(() => {
+				const state = (plugin.syncRuntime.getState as () => { status: string; writesVault?: boolean })();
+				return state.status === 'syncing' && state.writesVault !== false;
+			}),
 			addStateChangeListener: vi.fn(),
 			removeStateChangeListener: vi.fn(),
 		},
@@ -370,6 +376,26 @@ it('flushes deferred scans on sync state changes and removes the listener on unl
 	const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
 	endPluginLifecycle(plugin as never);
 	expect(plugin.syncRuntime.removeStateChangeListener).toHaveBeenCalledWith(listener);
+});
+
+it('retries held reminder writes during upload-only sync work but not while sync may change notes', async () => {
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	plugin.app.workspace.layoutReady = true;
+	await initializeReminders(plugin as never);
+	const listener = plugin.syncRuntime.addStateChangeListener.mock.calls[0]?.[0] as () => void;
+	reminderIndexFlushDeferredScans.mockClear();
+	plugin.syncRuntime.getState.mockReturnValue({ status: 'syncing' });
+	listener(); await flushMicrotasks();
+	expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
+	// A queue flush only uploads.
+	plugin.syncRuntime.getState.mockReturnValue({ status: 'syncing', writesVault: false });
+	listener(); await flushMicrotasks();
+	expect(reminderIndexFlushDeferredScans).toHaveBeenCalledOnce();
+	expect(indexOptions().shouldDeferWrites!('Reminders/Inbox.md')).toBe(false);
+	plugin.syncRuntime.getState.mockReturnValue({ status: 'syncing' });
+	expect(indexOptions().shouldDeferWrites!('Reminders/Inbox.md')).toBe(true);
+	expect(indexOptions().shouldDeferScan!('Reminders/Inbox.md')).toBe(false);
 });
 
 it('defers startup collision repair until the configured connection finishes a successful sync', async () => {

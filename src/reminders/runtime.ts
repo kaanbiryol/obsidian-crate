@@ -66,6 +66,19 @@ function createMoveRecoveryReporter(): (issues: string[]) => void {
 	};
 }
 
+/** A first upload carries notification schedules only for reminders that have IDs, so
+ * the uploading device writes missing IDs before the upload lists its files. A failure
+ * leaves them to the scan after the upload. */
+export async function prepareRemindersForFirstUpload(plugin: ReminderRuntimeHost): Promise<void> {
+	const backend = plugin.reminders;
+	if (!backend) return;
+	try {
+		await backend.index.load();
+	} catch (error) {
+		if (!getPluginLifecycleSignal(plugin).aborted) remindersLogger.warn('Reminder IDs will be added after the first upload:', error);
+	}
+}
+
 export function stopReminderBackend(plugin: ReminderRuntimeHost): void {
 	const state = states.get(plugin);
 	state?.setup?.abort();
@@ -89,7 +102,8 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 	const journal = createReminderMoveJournal(plugin.app, `${plugin.manifest.dir}/reminder-moves`, folderPath, controller.signal);
 	const reportMoveRecoveryIssues = createMoveRecoveryReporter();
 	try {
-		if (plugin.syncRuntime.getState().status !== 'syncing') reportMoveRecoveryIssues(await journal.recover());
+		// Recovery rewrites notes, so it waits while sync may change them.
+		if (!plugin.syncRuntime.isWritingVault()) reportMoveRecoveryIssues(await journal.recover());
 	} catch (error) {
 		const cancelled = controller.signal.aborted;
 		controller.abort();
@@ -110,14 +124,15 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 	const index = createReminderIndex(plugin.app, folderPath, {
 		signal: controller.signal,
 		shouldDeferScan: gate.shouldDeferScan,
+		shouldDeferWrites: gate.shouldDeferWrites,
 		shouldDeferCollisionRepair: gate.shouldDeferCollisionRepair,
 		editor,
 	});
 	const onSyncStateChanged = () => {
 		gate.onSyncStateChanged();
-		const { status } = plugin.syncRuntime.getState();
 		const refresh = async () => {
-			if (status === 'syncing' || controller.signal.aborted) return;
+			// Held writes resume once sync stops changing vault files, including during upload-only work.
+			if (plugin.syncRuntime.isWritingVault() || controller.signal.aborted) return;
 			if (journal.hasPending()) {
 				reportMoveRecoveryIssues(await journal.recover());
 				// Reload only once recovery settles; a record awaiting review keeps its paths deferred.
@@ -148,7 +163,7 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 		index,
 		repository: createReminderRepository(index, createMarkdownWriter(plugin.app, index, journal)),
 		watcher: new VaultWatcher(plugin.app.vault, index),
-		canAssignEditorIds: filePath => index.isReminderFile(filePath) && !gate.shouldDeferScan(filePath),
+		canAssignEditorIds: filePath => index.isReminderFile(filePath) && !gate.shouldDeferWrites(filePath),
 	};
 	plugin.reminders = backend;
 	backend.watcher.register();

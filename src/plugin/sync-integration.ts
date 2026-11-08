@@ -11,6 +11,7 @@ import type { ActivityTab } from '../ui/activity/ActivityTabs';
 import { errorMessage } from '../platform/logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from './lifecycle-state';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
+import { prepareRemindersForFirstUpload } from '../reminders/runtime';
 import type { ForegroundSyncReason } from '../sync/runtime/foreground-sync';
 
 export function initializeSyncManagers(plugin: CratePlugin): void {
@@ -23,6 +24,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 	() => ensureReminderNotificationPolicy(plugin, true),
 		() => [plugin.remindersSettings.remindersFolderPath],
 		() => plugin.settings.reading?.enabled ? plugin.settings.reading.folderPath : null,
+		() => prepareRemindersForFirstUpload(plugin),
 	);
 	registerSyncStatus(plugin, plugin.syncRuntime, () => openSyncActivity(plugin));
 	registerSyncResultNotices({

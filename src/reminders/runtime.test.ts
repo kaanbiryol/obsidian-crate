@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ensureReminderNotificationPolicy } from './notification-policy-sync';
+import { prepareRemindersForFirstUpload } from './runtime';
 import type CratePlugin from '../plugin/CratePlugin';
 
 function harness(pushEnabled = true) {
@@ -34,5 +35,19 @@ describe('reminder notification policy initialization', () => {
 		await ensureReminderNotificationPolicy(plugin);
 		await ensureReminderNotificationPolicy(plugin);
 		expect(ensureNotificationPolicy).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('reminder IDs before a first upload', () => {
+	it('loads the reminders folder so missing IDs are written before the upload lists files', async () => {
+		const load = vi.fn(async () => ({}));
+		await prepareRemindersForFirstUpload({ reminders: { index: { load } } } as unknown as CratePlugin);
+		expect(load).toHaveBeenCalledOnce();
+	});
+
+	it('does nothing with reminders off and never fails the upload', async () => {
+		await expect(prepareRemindersForFirstUpload({} as unknown as CratePlugin)).resolves.toBeUndefined();
+		const load = vi.fn(async () => { throw new Error('Note is unreadable'); });
+		await expect(prepareRemindersForFirstUpload({ reminders: { index: { load } } } as unknown as CratePlugin)).resolves.toBeUndefined();
 	});
 });

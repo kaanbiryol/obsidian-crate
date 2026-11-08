@@ -115,6 +115,26 @@ describe('SyncEngine event queue behavior', () => {
 		expect(idlePendingCounts.at(-1)).toBe(0);
 	});
 
+	it('lets other writers change vault files during a queue flush but not during a standard sync', async () => {
+		harness.vault.getAbstractFileByPath.mockReturnValue({ path: 'notes/a.md', extension: 'md', stat: { size: 1, mtime: 1700000000000 } });
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
+		const syncing: Array<boolean | undefined> = [];
+		harness.engine.setStateChangeCallback(state => { if (state.status === 'syncing') syncing.push(state.writesVault); });
+		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+		await vi.advanceTimersByTimeAsync(5000);
+		await harness.engine.waitForIdle();
+		expect(harness.api.uploadFile).toHaveBeenCalled();
+		// A flush only uploads and deletes on the server.
+		expect(syncing.length).toBeGreaterThan(0);
+		expect(syncing.every(writes => writes === false)).toBe(true);
+		syncing.length = 0;
+		spyOnIncrementalSync(harness.engine, createSyncResult());
+		await harness.engine.sync();
+		expect(syncing.length).toBeGreaterThan(0);
+		expect(syncing.every(writes => writes === true)).toBe(true);
+	});
+
 	it.each(['failed', 'pending'])('reports successful automatic uploads while reminder settings are %s', async status => {
 		const pending = createDeferred<void>();
 		const prepare = vi.fn(() => status === 'failed' ? Promise.reject(new Error('settings unavailable')) : pending.promise);

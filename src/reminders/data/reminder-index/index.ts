@@ -57,8 +57,12 @@ export interface ReminderIndex {
 
 export interface ReminderIndexOptions {
 	signal?: AbortSignal;
-	/** Holds scans until the vault and sync can be read safely; whole-vault checks omit the path. */
+	/** Holds scans until the vault can be read; whole-vault checks omit the path. */
 	shouldDeferScan?: (filePath?: string) => boolean;
+	/** Holds writes (IDs, typed dates, duplicate repair), such as while sync may change
+	 * vault files. Held notes are indexed as read and written on a later flush. Defaults
+	 * to `shouldDeferScan`. */
+	shouldDeferWrites?: (filePath?: string) => boolean;
 	/** Holds duplicate-ID repair until sync has reconciled file ownership. */
 	shouldDeferCollisionRepair?: () => boolean;
 	/** Writes normalization of notes open in an editor through that editor. */
@@ -68,7 +72,7 @@ export interface ReminderIndexOptions {
 export function createReminderIndex(
 	app: App,
 	remindersFolderPath: string,
-	{ signal, shouldDeferScan = () => false, shouldDeferCollisionRepair = () => false, editor }: ReminderIndexOptions = {},
+	{ signal, shouldDeferScan = () => false, shouldDeferWrites = shouldDeferScan, shouldDeferCollisionRepair = () => false, editor }: ReminderIndexOptions = {},
 ): ReminderIndex {
 	let reminders: IndexedReminder[] = [];
 	let isLoaded = false;
@@ -149,7 +153,8 @@ export function createReminderIndex(
 		const result = await scanFile(app, file, remindersFolderPath, {
 			signal,
 			identityOwners,
-			shouldDeferNormalization: () => !scan.current || file.path !== scan.path || shouldDeferScan(filePath),
+			shouldDeferScan: () => shouldDeferScan(filePath),
+			shouldDeferNormalization: () => !scan.current || file.path !== scan.path || shouldDeferWrites(filePath),
 			shouldDeferCollisionRepair,
 			editor,
 			preread: content,
@@ -221,7 +226,9 @@ export function createReminderIndex(
 				revision = structureRevision;
 				result = await scanVault(app, remindersFolderPath, {
 					signal,
-					shouldDeferNormalization: path => revision !== structureRevision || shouldDeferScan(path),
+					shouldStop: () => revision !== structureRevision,
+					shouldDeferScan: path => shouldDeferScan(path),
+					shouldDeferNormalization: path => revision !== structureRevision || shouldDeferWrites(path),
 					shouldDeferCollisionRepair,
 					editor,
 					knownOwners: [...reminders, ...ambiguousOwners],
@@ -275,6 +282,8 @@ export function createReminderIndex(
 				await index.load();
 				return;
 			}
+			// Held notes wait for their writes; rescanning sooner would read the same bytes.
+			if (!deferredPaths.size || shouldDeferWrites()) return;
 			const paths = [...deferredPaths];
 			deferredPaths.clear();
 			const rescanned = await enqueueScan(async () => {
