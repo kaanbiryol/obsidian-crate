@@ -22,7 +22,7 @@ function harness(enabled = true, frontmatter: Record<string, unknown> = { crate_
 	const views: MockView[] = [];
 	const triggerForegroundSync = vi.fn();
 	const plugin = {
-		settings: { reading: { enabled, folderPath: 'Reading' } }, register: vi.fn(), registerView: vi.fn(), addCommand: vi.fn(),
+		settings: { reading: { enabled, folderPath: 'Reading' } }, register: vi.fn(), registerView: vi.fn(), registerEditorExtension: vi.fn(), addCommand: vi.fn(),
 		registerEvent: vi.fn(),
 		registerObsidianProtocolHandler: (action: string, handler: (params: Record<string, string>) => void) => { handlers.set(action, handler); },
 		syncRuntime: { triggerForegroundSync },

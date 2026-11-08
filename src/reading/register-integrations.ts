@@ -1,10 +1,11 @@
-import { addIcon, Notice, type MarkdownView, type TAbstractFile, TFile, type WorkspaceLeaf } from 'obsidian';
+import { addIcon, editorInfoField, Notice, type MarkdownView, type TAbstractFile, TFile, type WorkspaceLeaf } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { READING_VIEW_TYPE, requestReadingItem, startReading, stopReading } from './runtime';
 import { CRATE_READER_ICON_ID, CRATE_READER_ICON_SVG } from '../ui/crate-icon';
 import { AddReadingLinkModal } from './ui/plugin/add-link-modal';
 import { ReadingView } from './ui/plugin/reading-view';
+import { createArticleMarkerHiding } from './data/editor-article-markers';
 
 const READING_ID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
@@ -66,6 +67,10 @@ export function registerReading(plugin: CratePlugin): void {
 	} });
 	addIcon(CRATE_READER_ICON_ID, CRATE_READER_ICON_SVG);
 	registerReaderHeaderActions(plugin);
+	plugin.registerEditorExtension(createArticleMarkerHiding(state => {
+		const path = state.field(editorInfoField, false)?.file?.path;
+		return Boolean(plugin.settings.reading.enabled && path?.startsWith(`${plugin.settings.reading.folderPath.trim()}/`));
+	}));
 	try { startReading(plugin); }
 	catch (error) { new Notice(error instanceof Error ? error.message : 'Could not start reading.'); }
 }
