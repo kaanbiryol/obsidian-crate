@@ -181,7 +181,7 @@ export class SyncRuntime {
 		return this.syncEngine?.hasPendingKey(key) ?? false;
 	}
 
-	async loadPendingDiff(path: string, deleted: boolean) {
+	async loadPendingDiff(path: string, deleted: boolean, options?: { localOnly?: boolean }) {
 		const engine = this.requireEngine();
 		const pendingPath = pendingChangeKey(deleted ? 'delete' : 'upload', path);
 		const verify = () => {
@@ -190,7 +190,7 @@ export class SyncRuntime {
 			}
 		};
 		verify();
-		const preview = await engine.loadPendingDiff(path, deleted);
+		const preview = await engine.loadPendingDiff(path, deleted, options);
 		verify();
 		return preview;
 	}

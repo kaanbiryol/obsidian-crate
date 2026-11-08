@@ -28,7 +28,8 @@ interface EnginePendingChangesContext {
 /** Pending review and baseline settlement; operation locks remain in the engine. */
 export function createEnginePendingChanges(context: EnginePendingChangesContext) {
 	return {
-		async loadDiff(path: string, deleted: boolean) {
+		/** `localOnly` reports a missing cached baseline instead of fetching it from the server. */
+		async loadDiff(path: string, deleted: boolean, { localOnly = false }: { localOnly?: boolean } = {}) {
 			assertLocalSyncPath(path);
 			const baseline = context.manifest.getEntry(path);
 			const verifyBaseline = () => {
@@ -40,7 +41,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 				async (filePath, hash) => {
 					const cached = await context.cache.readBase(filePath, hash);
 					verifyBaseline();
-					return cached ?? (baseline ? await loadRemotePendingBase(context.api, filePath, baseline, MAX_PREVIEW_BYTES) : null);
+					return cached ?? (baseline && !localOnly ? await loadRemotePendingBase(context.api, filePath, baseline, MAX_PREVIEW_BYTES) : null);
 				}, path, deleted);
 			verifyBaseline();
 			return preview;

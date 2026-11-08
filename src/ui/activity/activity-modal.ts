@@ -135,7 +135,7 @@ export class ActivityModal extends BaseUiModal {
 		this.pendingPanel.empty();
 		this.pendingBrowserState.configDir = this.app.vault.configDir;
 		this.pendingChecks = renderPendingPanel(this.pendingPanel, {
-			paths, loadDiff: (path, deleted) => this.deps.loadPendingDiff(path, deleted), state, progress,
+			paths, loadDiff: (path, deleted, options) => this.deps.loadPendingDiff(path, deleted, options), state, progress,
 			lastSyncLabel: this.getActivityStatus().lastSyncLabel, browserState: this.pendingBrowserState,
 			actions: {
 				syncSelected: async keys => {

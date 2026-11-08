@@ -44,6 +44,25 @@ describe('background pending comparisons', () => {
 		comparisons.dispose();
 	});
 
+	it('checks in the background locally and loads a missing baseline only on selection', async () => {
+		const incomplete: PendingDiff = { beforeSize: 3, afterSize: 3, kind: 'modified', baselineUnavailable: true };
+		const background = deferred();
+		const load = vi.fn((_index: number, localOnly: boolean) => localOnly ? background.promise : Promise.resolve(snapshot));
+		const result = vi.fn();
+		const comparisons = new PendingComparisons(1, load, result, vi.fn());
+		comparisons.start();
+		await vi.waitFor(() => expect(load).toHaveBeenCalledWith(0, true));
+		const selected = comparisons.read(0);
+		background.resolve(incomplete);
+		await expect(selected).resolves.toEqual(snapshot);
+		expect(load).toHaveBeenLastCalledWith(0, false);
+		expect(result).toHaveBeenNthCalledWith(1, 0, incomplete);
+		expect(result).toHaveBeenNthCalledWith(2, 0, snapshot);
+		await comparisons.read(0);
+		expect(load).toHaveBeenCalledTimes(2);
+		comparisons.dispose();
+	});
+
 	it('continues after a failed file and supports an explicit retry', async () => {
 		const load = vi.fn().mockRejectedValueOnce(new Error('Offline')).mockResolvedValue(snapshot);
 		const error = vi.fn(), result = vi.fn();

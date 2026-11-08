@@ -9,7 +9,8 @@ import { createPendingActions, type PendingActions } from './pending-actions';
 import { createPendingRowSelection, type PendingRowSelectionState } from './pending-row-selection';
 import { CRATE_UPDATE_FILES, crateUpdateVersion } from '../../plugin/crate-update/bundle';
 
-export type PendingDiffLoader = (path: string, deleted: boolean) => Promise<PendingDiff>;
+/** `localOnly` skips fetching a last-synced copy that is not cached on this device. */
+export type PendingDiffLoader = (path: string, deleted: boolean, options?: { localOnly?: boolean }) => Promise<PendingDiff>;
 export interface PendingBrowserState extends PendingRowSelectionState {
 	selectedKey?: string;
 	/** The vault's config folder, so a Crate update bundle shows as an update rather than a JSON file. */
@@ -30,7 +31,7 @@ export interface PendingChecks {
 }
 
 let nextBrowserId = 0;
-/** Each check reads and hashes a file, plus Worker requests for some, so longer lists check on selection. */
+/** Each check reads and hashes a file without Worker requests; longer lists check on selection. */
 const MAX_AUTO_CHECKED_FILES = 200;
 /** A first sync can list every vault file, so only rows near the viewport exist.
  * Rows are one line high; the first two rendered rows measure the real pitch. */
@@ -90,9 +91,9 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		status.title = text;
 		status.classList.toggle('is-unchanged', text === 'Unchanged');
 	};
-	const comparisons = new PendingComparisons(paths.length, index => {
+	const comparisons = new PendingComparisons(paths.length, (index, localOnly) => {
 		const { kind, path } = changes[index]!;
-		return load(path, kind === 'delete');
+		return load(path, kind === 'delete', { localOnly });
 	}, (index, snapshot) => {
 		const label = describeSnapshot(snapshot);
 		labels.set(paths[index]!, label);

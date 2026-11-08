@@ -298,8 +298,8 @@ export class SyncEngine {
 		});
 	}
 
-	async loadPendingDiff(path: string, deleted: boolean) {
-		return this.pendingChanges().loadDiff(path, deleted);
+	async loadPendingDiff(path: string, deleted: boolean, options?: { localOnly?: boolean }) {
+		return this.pendingChanges().loadDiff(path, deleted, options);
 	}
 
 	getPendingKeys(): string[] {

@@ -57,6 +57,13 @@ it.each(['note.md', '.obsidian/plugins/obsidian-minimal-settings/data.json'])('l
  expect(h.vault.adapter.writeBinary).not.toHaveBeenCalled();
 });
 
+it('reports a missing cached baseline without contacting the server for a local-only check', async () => {
+ const h = await setup();
+ h.vault.adapter.exists.mockResolvedValue(false);
+ expect(await h.engine.loadPendingDiff('note.md', false, { localOnly: true })).toMatchObject({ baselineUnavailable: true, kind: 'modified' });
+ for (const method of Object.values(h.api)) if (vi.isMockFunction(method)) expect(method).not.toHaveBeenCalled();
+});
+
 it('checks unchanged JSON locally without contacting the server', async () => {
  const path = '.obsidian/plugins/obsidian-minimal-settings/data.json';
  const h = await setup(path);

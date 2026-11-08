@@ -6,7 +6,7 @@ const MAX_CACHED_CHARACTERS = 1_000_000;
 export class PendingComparisons {
 	private cache = new Map<number, PendingDiff>();
 	private cachedCharacters = 0;
-	private inFlight = new Map<number, Promise<PendingDiff>>();
+	private inFlight = new Map<number, { request: Promise<PendingDiff>; localOnly: boolean }>();
 	private cursor = 0;
 	private workers = 0;
 	private active = false;
@@ -14,16 +14,24 @@ export class PendingComparisons {
 
 	constructor(
 		private readonly count: number,
-		private readonly load: (index: number) => Promise<PendingDiff>,
+		/** `localOnly` loads skip fetching a last-synced copy that is not cached on this device. */
+		private readonly load: (index: number, localOnly: boolean) => Promise<PendingDiff>,
 		private readonly onResult: (index: number, snapshot: PendingDiff) => void,
 		private readonly onError: (index: number) => void,
 		private readonly shouldCheck: (index: number) => boolean = () => true,
 	) {}
 
-	read(index: number): Promise<PendingDiff> {
+	/** Selection loads the full comparison, including a last-synced copy from the server. */
+	read(index: number): Promise<PendingDiff> { return this.request(index, false); }
+
+	private request(index: number, localOnly: boolean): Promise<PendingDiff> {
 		if (this.disposed) return Promise.reject(new Error('This comparison was closed.'));
 		const pending = this.inFlight.get(index);
-		if (pending) return pending;
+		// A background check that lacked the last-synced copy is followed by a full load.
+		if (pending && pending.localOnly && !localOnly) {
+			return pending.request.then(snapshot => snapshot.baselineUnavailable ? this.request(index, false) : snapshot, () => this.request(index, false));
+		}
+		if (pending) return pending.request;
 		const cached = this.cache.get(index);
 		if (cached) {
 			this.cache.delete(index);
@@ -31,16 +39,17 @@ export class PendingComparisons {
 			return Promise.resolve(cached);
 		}
 		this.evict(index);
-		const request = Promise.resolve().then(() => this.fetch(index));
-		this.inFlight.set(index, request);
+		const request = Promise.resolve().then(() => this.fetch(index, localOnly));
+		this.inFlight.set(index, { request, localOnly });
 		return request;
 	}
 
-	private async fetch(index: number): Promise<PendingDiff> {
+	private async fetch(index: number, localOnly: boolean): Promise<PendingDiff> {
 		try {
 			if (this.disposed) throw new Error('This comparison was closed.');
-			const snapshot = await this.load(index);
-			if (!this.disposed) {
+			const snapshot = await this.load(index, localOnly);
+			// Keep an incomplete background result out of the cache so selection loads it fully.
+			if (!this.disposed && !(localOnly && snapshot.baselineUnavailable)) {
 				const size = this.size(snapshot);
 				while (this.cachedCharacters + size > MAX_CACHED_CHARACTERS && this.cache.size) {
 					const oldest = this.cache.keys().next();
@@ -51,8 +60,8 @@ export class PendingComparisons {
 					this.cache.set(index, snapshot);
 					this.cachedCharacters += size;
 				}
-				this.onResult(index, snapshot);
 			}
+			if (!this.disposed) this.onResult(index, snapshot);
 			return snapshot;
 		} catch (error) {
 			if (!this.disposed) this.onError(index);
@@ -83,7 +92,7 @@ export class PendingComparisons {
 			while (this.active && !this.disposed && this.cursor < this.count) {
 				const index = this.cursor++;
 				if (!this.shouldCheck(index)) continue;
-				try { await this.read(index); }
+				try { await this.request(index, true); }
 				catch { /* A failed check labels that row; keep checking the others. */ }
 			}
 		} finally { this.workers--; }
