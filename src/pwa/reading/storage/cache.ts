@@ -190,10 +190,10 @@ export async function commitReadingCache(session: ReadingSession, cache: Reading
 	}
 	return cache;
 }
-/** The bytes of each saved copy, so a save checks the limits without decrypting every copy.
+/** Each saved copy, so a library commit can keep copies without decrypting them.
  * Version 1 also listed copies stored automatically, so it is not trusted. */
 interface ArticleUse { id: string; usedAt: number; bytes: number }
-const MAX_CACHED_ARTICLES = 200, MAX_CACHED_ARTICLE_BYTES = 50 * 1024 * 1024, ARTICLE_INDEX_VERSION = 2;
+const ARTICLE_INDEX_VERSION = 2;
 
 function articleUses(value: unknown): Map<string, ArticleUse>;
 function articleUses(value: unknown, strict: true): Map<string, ArticleUse> | undefined;
@@ -209,10 +209,10 @@ function articleUses(value: unknown, strict = false): Map<string, ArticleUse> | 
 }
 
 /**
- * Saves an offline copy the user asked for. Copies are never evicted: a save that
- * would pass the limits is refused instead. `etag` is the server revision the copy
- * came from. `refresh` only replaces an existing saved copy. Resolves to whether
- * the copy is saved.
+ * Saves an offline copy the user asked for. Copies are never evicted; only the
+ * browser's storage quota limits them. `etag` is the server revision the copy came
+ * from. `refresh` only replaces an existing saved copy. Resolves to whether the copy
+ * is saved.
  */
 export async function cacheReadingArticle(session: ReadingSession, item: ReadingItem, markdown: string,
 	{ etag, refresh = false }: { etag?: string; refresh?: boolean } = {}): Promise<boolean> {
@@ -229,22 +229,12 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
 		const copy = saved as ReadingArticleCache | undefined, replaced = copy?.offline ? copy : undefined;
 		if (refresh && !replaced) { await tx.done; return false; }
 		const usedAt = replaced?.usedAt ?? Date.now(), bytes = new TextEncoder().encode(markdown).byteLength;
-		let indexed: Map<string, ArticleUse>;
-		try { indexed = articleUses(decodeReadingValue(indexKey, await tx.store.get(indexKey))); } catch { indexed = new Map(); }
-		const uses: ArticleUse[] = [{ id: item.crate_reading_id, usedAt, bytes }];
-		for (const stored of await tx.store.getAllKeys()) {
-			if (!stored.startsWith(prefix) || stored === key) continue;
-			const id = stored.slice(prefix.length), use = indexed.get(id);
-			if (use) { uses.push(use); continue; }
-			let value: unknown;
-			try { value = decodeReadingValue(stored, await tx.store.get(stored)); } catch { continue; }
-			// Unreadable copies stay for recovery and do not count.
-			if (isReadingArticleCache(value, readingNoteFolder(session)) && value.offline) uses.push({ id, usedAt: value.usedAt, bytes: new TextEncoder().encode(value.markdown).byteLength });
-		}
-		// A refresh of a saved copy is always kept; a new save must fit.
-		if (!replaced && (uses.length > MAX_CACHED_ARTICLES || uses.reduce((sum, use) => sum + use.bytes, 0) > MAX_CACHED_ARTICLE_BYTES)) { await tx.done; return false; }
+		let indexed: Map<string, ArticleUse> | undefined;
+		try { indexed = articleUses(decodeReadingValue(indexKey, await tx.store.get(indexKey)), true); } catch { indexed = undefined; }
+		// Without a current index, the next library commit rebuilds it from every copy.
+		if (indexed) indexed.set(item.crate_reading_id, { id: item.crate_reading_id, usedAt, bytes });
 		await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt, offline: true, ...etag ? { etag } : {} }), key);
-		await tx.store.put(encodeReadingValue(indexKey, { version: ARTICLE_INDEX_VERSION, entries: uses }), indexKey);
+		if (indexed) await tx.store.put(encodeReadingValue(indexKey, { version: ARTICLE_INDEX_VERSION, entries: [...indexed.values()] }), indexKey);
 		assertReadingSession(session);
 		await tx.done;
 	} catch (error) { await abortTransaction(tx); throw error; }

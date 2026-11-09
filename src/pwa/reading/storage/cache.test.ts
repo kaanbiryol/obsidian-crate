@@ -40,40 +40,32 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-it('refuses a save past the limits instead of evicting a saved copy', async () => {
-	vi.useFakeTimers();
-	for (let n = 0; n < 199; n++) values.set(articleKey(n), { item: item(n), markdown: `Body ${n}`, usedAt: n, offline: true });
-	vi.setSystemTime(1_000);
-	expect(await cacheReadingArticle(session, item(199), 'Body 199')).toBe(true);
-	// A missing index is rebuilt once from the saved copies.
-	expect(articleDecodes()).toBe(199);
-
-	vi.mocked(decodeReadingValue).mockClear();
-	expect(await cacheReadingArticle(session, item(200), 'Body 200')).toBe(false);
-	// Once indexed, no saved copy is decoded, and none is removed.
-	expect(articleDecodes()).toBe(0);
-	expect(values.has(articleKey(200))).toBe(false);
-	expect(articleKeys()).toHaveLength(200);
-	// A refresh of a saved copy is always kept.
-	expect(await cacheReadingArticle(session, item(0), 'Changed', { refresh: true })).toBe(true);
-	expect(values.get(articleKey(0))).toMatchObject({ markdown: 'Changed', offline: true, usedAt: 0 });
-});
-
-it('indexes saved copies stored outside the index and refuses a save past the byte limit', async () => {
+it('keeps every saved copy, with no count or size limit of its own', async () => {
 	vi.useFakeTimers(); vi.setSystemTime(1_000);
-	values.set(articleKey(1), { item: item(1), markdown: 'One', usedAt: 1, offline: true });
-	await cacheReadingArticle(session, item(2), 'Two');
-	values.delete(articleKey(1));
-	values.set(articleKey(3), { item: item(3), markdown: 'x'.repeat(50 * 1024 * 1024), usedAt: 3, offline: true });
-	expect(await cacheReadingArticle(session, item(4), 'Four')).toBe(false);
-	expect(values.has(articleKey(3))).toBe(true);
-	expect(values.get(`article-index:${session.id}`)).toMatchObject({ version: 2, entries: [{ id: item(2).crate_reading_id, bytes: 3 }, { id: item(1).crate_reading_id, bytes: 3 }] });
+	const items = Array.from({ length: 250 }, (_, n) => item(n));
+	for (const entry of items) expect(await cacheReadingArticle(session, entry, `Body ${entry.title}`)).toBe(true);
+	expect(await cacheReadingArticle(session, item(250), 'x'.repeat(60 * 1024 * 1024))).toBe(true);
+	// Before: copies past 200 articles or 50 MB were refused.
+	expect(articleKeys()).toHaveLength(251);
+	// The first library commit indexes them; later commits and saves decode none.
+	await commitReadingCache(session, { items: [...items, item(250)], issues: [], savedAt: 1 });
+	expect(values.get(`article-index:${session.id}`)).toMatchObject({ version: 2, entries: expect.arrayContaining([expect.objectContaining({ id: item(0).crate_reading_id })]) as unknown });
+	vi.mocked(decodeReadingValue).mockClear();
+	await cacheReadingArticle(session, item(251), 'Another');
+	await commitReadingCache(session, { items: [...items, item(250), item(251)], issues: [], savedAt: 2 });
+	expect(articleDecodes()).toBe(0);
+	expect((values.get(`article-index:${session.id}`) as { entries: unknown[] }).entries).toHaveLength(252);
+	// A refresh keeps the copy's save time.
+	expect(await cacheReadingArticle(session, item(0), 'Changed', { refresh: true })).toBe(true);
+	expect(values.get(articleKey(0))).toMatchObject({ markdown: 'Changed', offline: true, usedAt: 1_000 });
 });
 
-it('preserves unreadable article copies and rebuilds a malformed index', async () => {
+it('preserves unreadable article copies and leaves a malformed index for the next commit to rebuild', async () => {
 	values.set(articleKey(1), { item: { ...item(1), path: 'Other/article.md' }, markdown: 'Wrong folder', usedAt: 1 });
 	values.set(`article-index:${session.id}`, { version: 2, entries: [{ id: 'damaged' }] });
 	await cacheReadingArticle(session, item(2), 'Two');
+	expect(values.has(articleKey(1))).toBe(true);
+	await commitReadingCache(session, { items: [item(2)], issues: [], savedAt: 1 });
 	expect(values.has(articleKey(1))).toBe(true);
 	expect(values.get(`article-index:${session.id}`)).toMatchObject({ entries: [{ id: item(2).crate_reading_id }] });
 });
@@ -114,6 +106,7 @@ it('removes copies earlier versions stored without being asked and keeps saved o
 it('removes a saved copy and its index entry', async () => {
 	await cacheReadingArticle(session, item(1), 'One');
 	await cacheReadingArticle(session, item(2), 'Two');
+	await commitReadingCache(session, { items: [item(1), item(2)], issues: [], savedAt: 1 });
 	await removeReadingArticle(session, item(1).crate_reading_id);
 	expect(articleKeys()).toEqual([articleKey(2)]);
 	expect(values.get(`article-index:${session.id}`)).toMatchObject({ entries: [{ id: item(2).crate_reading_id }] });

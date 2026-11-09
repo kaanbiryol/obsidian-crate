@@ -303,8 +303,8 @@ an offline copy asks the server only whether that revision is current (an `ETag`
 the file revision in an encrypted vault, from an inventory confirmed in the last 30
 seconds) and downloads the text only when it changed. Only articles saved with **Save for
 offline** have a copy: an opened article stays in memory, nothing downloads in the
-background, and a save past 200 articles or 50 MB is refused instead of removing another
-copy. Copies earlier versions stored automatically are removed. A load failure
+background, and saved copies are never evicted: only the browser's storage quota limits
+them, and a save past it reports that the device is out of storage. Copies earlier versions stored automatically are removed. A load failure
 shows the article metadata and original source alongside the error and retry action.
 A floating highlighter/count button opens the article highlights in a full-height
 PWA sheet using the same sizing as Settings. Its zero-height sticky layer overlays the full reading viewport; it

@@ -138,13 +138,13 @@ it('keeps an opened article only in memory until it is saved for offline, with i
 	expect(hook.current.reader).toMatchObject({ availableOffline: false });
 });
 
-it('reports a full offline storage instead of removing another saved copy', async () => {
+it('reports a device out of storage instead of removing another saved copy', async () => {
 	vi.mocked(readReadingArticle).mockResolvedValue(undefined);
 	network.mockResolvedValue(Response.json({ item, markdown: 'Online text.' }));
 	const { hook } = harness();
 	await act(async () => { await hook.current.open(item); });
-	vi.mocked(cacheReadingArticle).mockResolvedValue(false);
-	await expect(hook.current.setOffline(true)).rejects.toThrow('Offline storage is full');
+	vi.mocked(cacheReadingArticle).mockRejectedValueOnce(new DOMException('Quota exceeded', 'QuotaExceededError'));
+	await expect(hook.current.setOffline(true)).rejects.toThrow('out of storage');
 	expect(hook.current.reader).toMatchObject({ availableOffline: false });
 });
 

@@ -281,7 +281,7 @@ Both stopped:
 
 - Opening an article downloads it and keeps it in memory for the session only.
 - **Save for offline** in the article stores that article on the device, and **Remove offline
-  copy** deletes it. A save past 200 articles or 50 MB is refused; no saved copy is evicted.
+  copy** deletes it. Only the browser's storage quota limits saved copies, and none is evicted.
 - A saved copy is checked when it is opened, with one conditional request, never in the
   background. It downloads again only when its note changed.
 - Removed: background prefetch (`src/pwa/reading/prefetch.ts`) and storing articles on open.

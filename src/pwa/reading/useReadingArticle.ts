@@ -170,7 +170,12 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 		if (!session || !reader?.item.path || reader.markdown === null) return;
 		const { item, markdown, etag } = reader;
 		if (keep) {
-			if (!await cacheReadingArticle(session, item, markdown, { etag })) throw new Error('Offline storage is full. Remove an offline copy to save this one.');
+			// Only the browser's storage quota limits saved copies.
+			try { await cacheReadingArticle(session, item, markdown, { etag }); }
+			catch (error) {
+				if (error instanceof DOMException && error.name === 'QuotaExceededError') throw new Error('This device is out of storage. Remove an offline copy to save this one.');
+				throw error;
+			}
 		} else await removeReadingArticle(session, item.crate_reading_id);
 		assertReadingSession(session);
 		setReader(current => current?.item.crate_reading_id === item.crate_reading_id ? { ...current, availableOffline: keep } : current);
