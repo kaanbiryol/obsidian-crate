@@ -5,11 +5,12 @@ import { SettingsContext } from '../settings/settings-context';
 import { createSettingsStore } from '../settings/settings-store';
 import { pwaSyncState } from '../sync/state';
 import { ReadingRuntimeProvider, useReadingRuntime } from './ReadingRuntime';
-import { readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, readingLock, saveReadingDraft, savePendingReading } from './storage/storage';
+import { readReadingDraft, readReadingShare, removeReadingShare, readingLock, saveReadingDraft, savePendingReading } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { AUTH_TOKEN_KEY } from '../config';
 import type { PendingReading, ReadingCommand } from './outbox';
 import type { ReadingItem } from '@/reading/core/model';
+import { queryReadingItems } from './api';
 
 vi.mock('../shared-features', () => ({ useSharedFeatures: () => ({ reading: true }) }));
 vi.mock('../sync/SyncFeedback', () => ({ useSyncFeedback: () => showToast }));
@@ -24,9 +25,9 @@ vi.mock('./useReadingSync', async () => {
 		retryAt: Math.min(...pending.map(op => readingRetryAt(op) ?? Infinity)),
 	}) };
 });
+vi.mock('./api', async importOriginal => ({ ...await importOriginal<typeof import('./api')>(), queryReadingItems: vi.fn(async () => ({ items: [], issues: [], cursor: null })) }));
 vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),
-	readReadingCache: vi.fn(async () => ({ items: [], issues: [], savedAt: 1 })),
 	pendingReading: vi.fn(async () => []), readReadingDraft: vi.fn(async () => undefined),
 	hasEarlierReadingChanges: vi.fn(async () => false), saveReadingDraft: vi.fn(async () => {}), savePendingReading: vi.fn(async () => {}),
 	readReadingShare: vi.fn(async () => undefined), removeReadingShare: vi.fn(async () => {}),
@@ -191,7 +192,8 @@ it('owns save preparation while storage is delayed and prevents duplicate captur
 });
 
 it.each([false, true])('opens an existing shared link and guards delayed completion (session replaced: %s)', async replaced => {
-	vi.mocked(readReadingCache).mockResolvedValueOnce({ items: [article], issues: [], savedAt: 1 });
+	// The library is on the server, which finds the saved link.
+	vi.mocked(queryReadingItems).mockResolvedValueOnce({ items: [article], issues: [], cursor: null });
 	vi.mocked(readReadingDraft).mockResolvedValueOnce(undefined);
 	vi.mocked(readReadingShare).mockResolvedValueOnce({ url: `${article.source_url}#section` });
 	vi.stubGlobal('location', { href: 'https://example.test/notifications?share=shared' });

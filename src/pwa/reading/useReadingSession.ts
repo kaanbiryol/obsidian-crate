@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReadingConnection } from './session/useReadingConnection';
 import type { PendingReading } from './outbox';
-import { adoptEarlierReadingCaptures, hasEarlierReadingChanges, newestReadingShare, pendingReading, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, saveReadingDraft, type ReadingCache } from './storage/storage';
+import { adoptEarlierReadingCaptures, hasEarlierReadingChanges, newestReadingShare, pendingReading, readReadingDraft, readReadingShare, removeReadingShare, saveReadingDraft, type ReadingCache } from './storage/storage';
 import { assertReadingSession, isReadingSessionCurrent, type ReadingSession } from './session/session';
 import { sameReadingSession } from './session/session';
 
@@ -98,15 +98,11 @@ export function useReadingSession(connection: ReadingConnection) {
 			if (!currentRequest()) return;
 			// Read each lifetime separately: a disposable cache failure must not hide a
 			// saved draft, and an unreadable draft must never be replaced by empty input.
-			const results = await Promise.allSettled([
-				readReadingCache(current), pendingReading(current), readReadingDraft(current), hasEarlierReadingChanges(current.id),
-			]);
+			const results = await Promise.allSettled([pendingReading(current), readReadingDraft(current), hasEarlierReadingChanges(current.id)]);
 			if (!currentRequest()) return;
-			const [saved, work, draft, earlier] = results;
-			setCache(saved.status === 'fulfilled' ? saved.value ?? null : null);
+			const [work, draft, earlier] = results;
 			setPending(work.status === 'fulfilled' ? work.value : []);
 			setRecovery(earlier.status === 'fulfilled' ? earlier.value : true);
-			if (saved.status === 'rejected') setError(saved.reason instanceof Error ? saved.reason.message : 'The saved Reading library could not be read.');
 			const failure = [work, draft, earlier].find(result => result.status === 'rejected');
 			if (failure?.status === 'rejected') {
 				setStorageError(failure.reason instanceof Error ? failure.reason.message : 'Reading storage could not be read. Export your Reading data before changing browser storage.');

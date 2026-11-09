@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AUTH_TOKEN_KEY, PWA_AUTH_CHANGED_EVENT, PWA_LOGOUT_KEY } from '../config';
 import { loadReading } from './api';
 import { connectReadingFromReminders } from './session/reminders-session';
-import { pendingReading, readingLock, readReadingCache, type ReadingCache } from './storage/storage';
+import { pendingReading, readingLock, type ReadingCache } from './storage/storage';
 import { assertReadingSession, READING_CHANGED_EVENT, readingSession, READING_SESSION_KEY, sameReadingSession, type ReadingSession } from './session/session';
 import type { useReadingSession } from './useReadingSession';
 import { requestSharedFeaturesRefresh } from '../shared-features';
@@ -52,7 +52,8 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 				if (confirmed) data = confirmed;
 				else if (navigator.onLine && enabledRef.current) {
 					data = await loadReading(current);
-				} else data = await readReadingCache(current);
+				// Offline, nothing of the library is stored: the app lists saved articles instead.
+				} else data = { items: [], issues: [], savedAt: Date.now() };
 				completed = true;
 			} finally {
 				// Publish the latest durable queue even when refreshing the list fails.

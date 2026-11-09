@@ -9,7 +9,7 @@ import { assertReadingSession, READING_CHANGED_EVENT, READING_SESSION_KEY, type 
 import { readingKeys, isPendingReadingKey } from './storage-keys';
 import { exportWrappedLocalKeys } from '../../encryption/encryption-keys';
 
-export { readReadingCache, readReadingArticle, commitReadingCache, cacheReadingArticle, removeReadingArticle, readOfflineReadingItems, type ReadingCache } from './cache';
+export { readReadingArticle, removeEarlierReadingCopies, cacheReadingArticle, removeReadingArticle, readOfflineReadingItems, type ReadingCache } from './cache';
 
 // Feature callers use these scoped operations; database keys remain inside storage.
 interface ReadingDraft { url: string }

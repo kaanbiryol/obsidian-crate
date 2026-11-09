@@ -4,7 +4,7 @@ import { renderHook } from '../../test/react-hooks';
 import { useReadingConnection } from './session/useReadingConnection';
 import { useReadingSession } from './useReadingSession';
 import { AUTH_TOKEN_KEY } from '../config';
-import { adoptEarlierReadingCaptures, newestReadingShare, readReadingCache, readReadingDraft, readReadingShare, removeReadingShare, saveReadingDraft } from './storage/storage';
+import { adoptEarlierReadingCaptures, newestReadingShare, readReadingDraft, readReadingShare, removeReadingShare, saveReadingDraft } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { connectReadingFromReminders } from './session/reminders-session';
 import { prepareReadingEncryption } from './session/encryption-session';
@@ -17,7 +17,7 @@ vi.mock('./session/reminders-session', async importOriginal => ({
 }));
 vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),
-	readReadingCache: vi.fn(async () => undefined), pendingReading: vi.fn(async () => []),
+	pendingReading: vi.fn(async () => []),
 	readReadingDraft: vi.fn(async () => undefined), readReadingShare: vi.fn(async () => undefined), hasEarlierReadingChanges: vi.fn(async () => false),
 	saveReadingDraft: vi.fn(async () => {}), removeReadingShare: vi.fn(async () => {}), newestReadingShare: vi.fn(async () => undefined),
 	adoptEarlierReadingCaptures: vi.fn(async () => {}),
@@ -88,7 +88,7 @@ describe('Reading session authority', () => {
 
 	it('fences delayed hydration after reset and preserves an unreadable draft', async () => {
 		const cache = deferred<undefined>();
-		vi.mocked(readReadingCache).mockReturnValueOnce(cache.promise);
+		vi.mocked(readReadingDraft).mockReturnValueOnce(cache.promise);
 		const h = start();
 		await act(async () => { h.release(session); });
 		await act(async () => h.rendered.current.resetSession());
@@ -112,7 +112,7 @@ describe('Reading session authority', () => {
 		await act(async () => h.rendered.current.resetSession());
 		await act(async () => encryption.resolve(null));
 		expect(h.rendered.current.session).toBeNull();
-		expect(readReadingCache).not.toHaveBeenCalled();
+		expect(readReadingDraft).not.toHaveBeenCalled();
 	});
 
 	it('retries an unavailable encryption check when the app comes back online', async () => {
@@ -125,16 +125,14 @@ describe('Reading session authority', () => {
 		expect(prepareReadingEncryption).toHaveBeenCalledTimes(2);
 	});
 
-	it('hydrates the plaintext offline copy read-only when an unanswered check finds no encryption evidence', async () => {
-		const cache = { items: [], issues: [], savedAt: 5 };
+	it('opens read-only when an unanswered check finds no encryption evidence', async () => {
 		// Read once read-only, then again after the check is answered.
-		vi.mocked(readReadingCache).mockResolvedValueOnce(cache).mockResolvedValueOnce(cache);
 		vi.mocked(readReadingDraft).mockResolvedValueOnce({ url: 'https://saved.example/draft' }).mockResolvedValueOnce({ url: 'https://saved.example/draft' });
 		vi.mocked(prepareReadingEncryption).mockRejectedValueOnce(new EncryptionVerificationUnavailableError('Could not verify encryption. Check your connection and retry.', undefined, true));
 		const h = start();
 		await act(async () => { h.release(session); });
-		// Before: an unanswered check hid the saved library behind a full-screen error.
-		expect(h.rendered.current).toMatchObject({ ready: true, session, readOnly: true, lockedSession: session, cache, adding: false, url: '' });
+		// Before: an unanswered check hid Reading behind a full-screen error.
+		expect(h.rendered.current).toMatchObject({ ready: true, session, readOnly: true, lockedSession: session, cache: null, adding: false, url: '' });
 		expect(saveReadingDraft).not.toHaveBeenCalled();
 		expect(adoptEarlierReadingCaptures).not.toHaveBeenCalled();
 		expect(readReadingShare).not.toHaveBeenCalled();

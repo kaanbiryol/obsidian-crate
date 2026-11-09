@@ -68,6 +68,9 @@ independent security review listed in [Reading and encryption](reading-e2ee-asse
   picker lists tags on the pages it loaded.
 - **Offline**: the library shows articles saved with **Save for offline**, and search matches
   their titles on the device.
+- **Stored on the device**: only articles saved for offline, the queue of changes not yet sent,
+  and an unsent link in the save form. Library pages stay in memory and are read again on each
+  visit.
 - Edits keep the pending-change queue, operation IDs and receipts. A pending edit is shown over
   the page that lists its note.
 - Saving a link checks for a duplicate with a link-term query in encrypted vaults, and with the

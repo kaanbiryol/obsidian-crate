@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from '../outbox';
-import { adoptEarlierReadingCaptures, clearReadingData, earlierReadingChanges, exportReadingData, newestReadingShare, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare } from './storage';
+import { adoptEarlierReadingCaptures, clearReadingData, earlierReadingChanges, exportReadingData, newestReadingShare, pendingReading, removeEarlierReadingChanges, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare } from './storage';
 import { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { AUTH_TOKEN_KEY } from '../../config';
-import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
+import { isPendingReading, isReadingSession } from './storage-validation';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
 const download = vi.hoisted(() => vi.fn());
@@ -114,15 +114,10 @@ it('validates session fields without removing an unreadable sign-in', () => {
 	expect(readingSession).toThrow('Reading sign-in could not be read');
 });
 
-it('rejects malformed cache envelopes and drafts without overwriting either', async () => {
-	const cache = { items: [], issues: [{ path: 'Reading/x.md', message: 123 }], savedAt: 1 };
-	values.set(`list:${session.id}`, cache);
+it('rejects a malformed draft without overwriting it', async () => {
 	values.set(`draft:${session.id}`, { url: { private: 'saved text' } });
-	await expect(readReadingCache(session)).rejects.toThrow('saved Reading library');
 	await expect(readReadingDraft(session)).rejects.toThrow('saved Reading draft');
-	expect(values.get(`list:${session.id}`)).toBe(cache);
 	expect(values.get(`draft:${session.id}`)).toEqual({ url: { private: 'saved text' } });
-	expect(isReadingCache({ items: [], issues: [], savedAt: 1 }, 'Reading')).toBe(true);
 });
 
 it('removes queues from earlier sign-ins only while they match the reviewed export', async () => {

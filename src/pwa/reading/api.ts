@@ -2,7 +2,7 @@ import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection
 import { onReadingEncryptionReset } from './session/encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders, readingNoteFolder } from './session/encryption-session';
 import { readReadingAttempt, writeReadingAttempt } from './storage/storage';
-import { cacheReadingArticle, commitReadingCache, readReadingArticle, type ReadingCache } from './storage/storage';
+import { cacheReadingArticle, readReadingArticle, removeEarlierReadingCopies, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
 import type { ReadingItem } from '@/reading/core/model';
@@ -94,12 +94,14 @@ export async function queryReadingItems(session: ReadingSession, query: ReadingI
 	return { items: page.items, issues: page.issues, cursor: page.cursor };
 }
 
-/** The library's first inbox page and its issues, saved so the next visit opens at once.
- * The library itself stays on the server; sections and searches read their own pages. */
+/** The library's first inbox page and its issues, kept in memory. The library stays on the
+ * server; sections and searches read their own pages. A confirmed page also lets earlier
+ * sign-ins' offline copies go. */
 export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
 	const page = await queryReadingItems(session, { section: 'inbox' });
 	if (new Set(page.items.map(item => item.crate_reading_id)).size !== page.items.length) throw new Error('Reading library response is unreadable.');
-	return commitReadingCache(session, { items: page.items, issues: page.issues, savedAt: Date.now(), cursor: page.cursor });
+	await removeEarlierReadingCopies(session);
+	return { items: page.items, issues: page.issues, savedAt: Date.now(), cursor: page.cursor };
 }
 
 /** A confirmed edit and the library revisions the server reported around it. `article`

@@ -4,20 +4,13 @@ import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import { readingDatabase, readReadingValue } from './database';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
-import { isReadingArticleCache, isReadingCache, type ReadingArticleCache } from './storage-validation';
+import { isReadingArticleCache, type ReadingArticleCache } from './storage-validation';
 import { isArticleReadingKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { readingNoteFolder } from '../session/encryption-session';
 
-/** The library's first inbox page and its issues, as last read. The library stays on the
- * server; offline, only saved articles are listed. */
+/** The library's first inbox page and its issues, kept in memory only. The library stays on
+ * the server; this device stores only articles saved for offline. */
 export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; cursor?: string | null }
-
-export async function readReadingCache(session: ReadingSession): Promise<ReadingCache | undefined> {
-	const value = await readReadingValue(readingKeys.list(session.id));
-	if (value === undefined) return undefined;
-	if (!isReadingCache(value, readingNoteFolder(session))) throw new Error('The saved Reading library could not be read. Refresh when connected.');
-	return value;
-}
 
 export async function readReadingArticle(session: ReadingSession, id: string) {
 	const value = await readReadingValue(`${readingKeys.articlePrefix(session.id)}${id}`);
@@ -27,13 +20,9 @@ export async function readReadingArticle(session: ReadingSession, id: string) {
 	return value.offline ? value : undefined;
 }
 
-/** Offline copies saved under an earlier sign-in; session IDs change with the
- * token and the folder generation. Queues, drafts and attempts are not copies. */
-function isEarlierCopyKey(key: string, sessionId: string): boolean {
-	if (isArticleReadingKey(key)) return !key.startsWith(readingKeys.articlePrefix(sessionId));
-	return [readingKeys.list]
-		.some(build => key.startsWith(build('')) && key !== build(sessionId));
-}
+/** Offline copies saved under an earlier sign-in; session IDs change with the token and the
+ * folder generation. Queues, drafts and attempts are not copies. */
+const isEarlierCopyKey = (key: string, sessionId: string) => isArticleReadingKey(key) && !key.startsWith(readingKeys.articlePrefix(sessionId));
 
 /** A copy this version can read; unknown or undecodable records stay exportable. */
 function isReadableCopy(key: string, raw: unknown): boolean {
@@ -43,34 +32,23 @@ function isReadableCopy(key: string, raw: unknown): boolean {
 	if (isRecord(raw) && 'encryptedReading' in raw) {
 		try { value = decodeReadingValue(key, raw); } catch { return false; }
 	}
-	if (!isRecord(value)) return false;
-	if (isArticleReadingKey(key)) return isRecord(value.item) && typeof value.markdown === 'string';
-	return Array.isArray(value.items);
+	return isRecord(value) && isRecord(value.item) && typeof value.markdown === 'string';
 }
 
-/** Saves the first page and removes earlier sign-ins' offline copies. Saved copies of this
- * session are kept whatever the page lists, since a page is not the whole library. */
-export async function commitReadingCache(session: ReadingSession, cache: ReadingCache): Promise<ReadingCache> {
+/** Removes readable offline copies an earlier sign-in saved, once this session is confirmed. */
+export async function removeEarlierReadingCopies(session: ReadingSession): Promise<void> {
 	const db = await readingDatabase(); assertReadingSession(session);
 	const tx = db.transaction('values', 'readwrite');
 	try {
-		try { decodeReadingValue(readingKeys.list(session.id), await tx.store.get(readingKeys.list(session.id))); }
-		catch {
-			// Network results remain usable, but preserve opaque local bytes for export.
-			assertReadingSession(session); await tx.done;
-			return { ...cache, issues: [...cache.issues, { path: readingNoteFolder(session), message: 'The saved library needs recovery. Export Reading data before clearing this device’s storage.' }] };
-		}
 		for (const key of await tx.store.getAllKeys()) {
 			if (isEarlierCopyKey(key, session.id) && isReadableCopy(key, await tx.store.get(key))) await tx.store.delete(key);
 		}
 		assertReadingSession(session);
-		await tx.store.put(encodeReadingValue(readingKeys.list(session.id), cache), readingKeys.list(session.id));
 		await tx.done;
 	} catch (error) {
 		await abortTransaction(tx);
 		throw error;
 	}
-	return cache;
 }
 
 /** Items of the articles saved for offline reading, newest first: the library while offline. */

@@ -3,8 +3,7 @@ import { isRecord, isSha256Hex } from '@/platform/validation';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { readingHighlights } from '@/reading/core/highlights';
 import { MAX_READING_TITLE_LENGTH, readingTimestamp, readingUrl } from '@/reading/core/model';
-import { isReadingItem, isReadingArticle, type ReadingArticle } from './record-validation';
-import type { ReadingCache } from './cache';
+import { isReadingArticle, type ReadingArticle } from './record-validation';
 import type { ReadingSession } from '../session/session';
 
 const nonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
@@ -13,16 +12,6 @@ const nonNegativeNumber = (value: unknown): value is number => typeof value === 
 export function isReadingSession(value: unknown): value is ReadingSession {
 	return isRecord(value) && nonEmptyString(value.token) && nonEmptyString(value.id)
 		&& nonEmptyString(value.folderPath) && nonEmptyString(value.generation) && nonNegativeNumber(value.expiresAt);
-}
-
-export function isReadingCache(value: unknown, folder: string): value is ReadingCache {
-	if (!isRecord(value) || !nonNegativeNumber(value.savedAt) || !Array.isArray(value.items) || !Array.isArray(value.issues)
-		|| (value.cursor !== undefined && value.cursor !== null && (typeof value.cursor !== 'string' || !value.cursor || value.cursor.length > 4096))) return false;
-	const ids = new Set<string>();
-	return value.items.every((item: unknown) => {
-		if (!isReadingItem(item, folder) || ids.has(item.crate_reading_id)) return false;
-		ids.add(item.crate_reading_id); return true;
-	}) && value.issues.every((issue: unknown) => isRecord(issue) && typeof issue.path === 'string' && typeof issue.message === 'string');
 }
 
 /** `offline` marks a copy the user saved for offline reading. Copies without it were

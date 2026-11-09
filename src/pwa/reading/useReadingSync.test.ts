@@ -30,7 +30,6 @@ vi.mock('./storage/storage', async importOriginal => ({
 	readingLock: async <T>(action: () => Promise<T>) => action(),
 	readingDrainLock: async <T>(action: () => Promise<T>) => action(),
 	pendingReading: async () => structuredClone(stored.queue),
-	readReadingCache: async () => cache,
 	readReadingDraft: async () => undefined,
 	hasEarlierReadingChanges: async () => false,
 	savePendingReading: async (_session: ReadingSession, value: PendingReading[]) => { stored.queue = structuredClone(value); },
