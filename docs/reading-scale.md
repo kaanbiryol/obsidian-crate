@@ -241,8 +241,9 @@ work in `src/reading/runtime.ts`:
   (`/reading/index/file`) instead of listing the folder. Shards are kept in IndexedDB by hash
   (`card-shard:`), and the manifest, position and opened changes in `card-index:`.
 - A tail past 1,000 notes or older than the changelog keeps the index as it is and shows "Open
-  Obsidian to update this library" among the issues. Without an index the encrypted client
-  lists files as in step 2.
+  Obsidian to update this library" among the issues. Without an index, or with one that fails
+  to load or verify, both clients list the library as before (step 2 for encrypted vaults); the
+  index only saves reads.
 - Search, filters, tags and counts run on the device over the whole library, on every field.
   The duplicate-link check and the sealed-note check cover the whole library in both modes.
 
