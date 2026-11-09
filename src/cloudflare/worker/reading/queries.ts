@@ -170,7 +170,7 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	const last = results.at(-1);
 	const cursor = results.length === READING_ITEMS_PAGE && last ? JSON.stringify([last.saved_at, last.portable_path]) : null;
 	// The device checks the fields the page was sorted and filtered by against each card.
-	if (encrypted) return { cards: results.map(row => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, card: row.card!, stale: row.stale === 1,
+	if (encrypted) return { cards: results.map(row => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, ...JSON.parse(row.card!) as { card: string; seal?: unknown }, stale: row.stale === 1,
 		fields: { item_id: row.item_id, saved_at: row.saved_at, status: row.status, favorite: row.favorite === 1, highlighted: row.highlighted === 1 } })), cursor };
 	const listed = listedPage(current, results, queuedRows?.results ?? []);
 	return { items: listed.items, issues: issueRows ? listedPage(current, issueRows.results, []).issues : [], cursor };

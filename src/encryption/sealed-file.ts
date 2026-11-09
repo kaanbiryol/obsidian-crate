@@ -6,12 +6,13 @@ import { sealedFileKey } from './sealed-file-key';
 export interface SealRecipient { vaultId: string; keyId: string; publicKey: string }
 
 /** Lets a party holding only the public key create a file that unlocked clients can
- * open. It cannot read the file back. Sealed files never carry scheduling data. */
-export async function sealFileForVault(input: { path: string; content: Uint8Array<ArrayBuffer>; contentType: string }, recipient: SealRecipient) {
+ * open. It cannot read the file back. Sealed files never carry scheduling data; a sealed
+ * Reading note may carry its card, itself sealed to the vault (`sealedReadingCardData`). */
+export async function sealFileForVault(input: { path: string; content: Uint8Array<ArrayBuffer>; contentType: string; publicData?: unknown }, recipient: SealRecipient) {
 	const objectId = crypto.randomUUID();
 	const ephemeral = await generateEphemeralP256();
 	const key = await sealedFileKey(await deriveP256Secret(ephemeral.privateKey, recipient.publicKey),
 		{ vaultId: recipient.vaultId, objectId, keyId: recipient.keyId, epk: ephemeral.publicKey, recipient: recipient.publicKey });
-	return sealFileWithHeader({ ...input, publicData: null },
+	return sealFileWithHeader({ ...input, publicData: input.publicData ?? null },
 		{ version: 1, vaultId: recipient.vaultId, scopeId: 'vault', objectId, keyId: recipient.keyId, seal: { epk: ephemeral.publicKey } }, key);
 }

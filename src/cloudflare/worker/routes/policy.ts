@@ -115,12 +115,10 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reading/delete': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 30, plaintextOnly: true },
 	'POST /reading/policy': { scopes: VAULT, execution: COORDINATOR, rateLimit: 10 },
 	'GET /reading/policy': { scopes: VAULT },
-	// The library a page at a time, in either vault mode. In an encrypted vault, devices post
-	// the cards the server lists (`reading/cards.ts`).
+	// The library a page at a time, in either vault mode. In an encrypted vault, each note's
+	// upload carries the card the server lists (`reading/library-index.ts`).
 	'GET /reading/items': { scopes: LIBRARY },
-	'GET /reading/cards/stale': { scopes: LIBRARY },
-	'GET /reading/cards/exists': { scopes: LIBRARY },
-	'POST /reading/cards': { scopes: LIBRARY, rateLimit: 600 },
+	'GET /reading/taken': { scopes: LIBRARY },
 	'GET /reading/session': { scopes: LIBRARY, keylessEncryptedRead: true },
 	// Plaintext list and item reads authenticate here and answer a complete index from one D1
 	// snapshot. An index rebuild, which writes, and full list pages run under the coordinator

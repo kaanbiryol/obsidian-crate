@@ -39,7 +39,7 @@ import { importEncryptionSecret, type EncryptionKey } from '../../encryption/env
 import type { PathTags } from '../../encryption/path-tags';
 import { openFolderLabel, sealFolderLabel } from '../../encryption/folder-label';
 import { deriveReadingSearchKey } from '../../encryption/reading-search';
-import type { ReadingCardKeys } from '../../reading/core/reading-card';
+import { readingUploadCard } from '../../reading/core/reading-card-upload';
 
 export { HttpError, SyncTransportError } from './http';
 
@@ -51,32 +51,21 @@ export class SyncApiClient {
 	 * server sealed to the vault are accepted only inside `readingFolder()`. */
 	async configureEncryption(bundle: VaultKeyBundle, reminderFolders: () => readonly string[], readingFolder?: () => string | null): Promise<void> {
 		const notifications = await importNotificationKeys(bundle.vaultId, bundle.notifications);
-		const encryption = await EncryptedFiles.create(this.http, bundle, (path, bytes) => createReminderProjection(notifications, reminderFolders(), path, bytes), readingFolder);
+		let cardKeys: Parameters<typeof readingUploadCard>[4] | undefined;
+		// A reminder note carries its schedules and a Reading note its card, so the server can
+		// schedule and list them without reading the note.
+		const encryption = await EncryptedFiles.create(this.http, bundle, async (path, bytes, wire) =>
+			(cardKeys ? await readingUploadCard(readingFolder?.(), path, wire, bytes, cardKeys) : null) ?? createReminderProjection(notifications, reminderFolders(), path, bytes), readingFolder);
 		const folderKey = await importEncryptionSecret(bundle.vault);
-		const searchKey = await deriveReadingSearchKey(bundle.vaultId, bundle.vault);
+		cardKeys = { vaultId: bundle.vaultId, key: folderKey, keyGeneration: bundle.generation, searchKey: await deriveReadingSearchKey(bundle.vaultId, bundle.vault) };
 		// Assign only after every key imports, so a failure leaves no request encrypted.
 		this.syncApi.setEncryption(encryption);
 		this.sharedHistory.setEncryption(encryption);
 		this.sharedSettingsApi.setEncryption(encryption);
 		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
-		this.folderKeys = { tags: encryption.paths.tags, key: folderKey, vaultId: bundle.vaultId, generation: bundle.generation, searchKey };
+		this.folderKeys = { tags: encryption.paths.tags, key: folderKey, vaultId: bundle.vaultId };
 	}
-	private folderKeys?: { tags: PathTags; key: EncryptionKey; vaultId: string; generation: number; searchKey: CryptoKey };
-
-	/** The keys Reading cards are sealed and their terms hashed with, or null in an unencrypted vault. */
-	readingCardKeys(): (ReadingCardKeys & { searchKey: CryptoKey }) | null {
-		const keys = this.folderKeys;
-		return keys ? { vaultId: keys.vaultId, key: keys.key, keyGeneration: keys.generation, searchKey: keys.searchKey } : null;
-	}
-	/** See `SyncWorkerApi.encryptedServerPath`. */
-	encryptedServerPath(path: string): Promise<string | undefined> { return this.syncApi.encryptedServerPath(path); }
-	/** Encrypted Reading notes whose current revision has no card, after server path `after`. */
-	staleReadingCards(after: string): Promise<{ files: Array<{ path: string; revision: string }>; cursor: string | null }> {
-		return this.http.requestJson(`/reading/cards/stale?${new URLSearchParams({ after })}`);
-	}
-	async postReadingCards(cards: unknown[]): Promise<void> {
-		await this.http.requestJson('/reading/cards', { method: 'POST', body: JSON.stringify({ cards }) });
-	}
+	private folderKeys?: { tags: PathTags; key: EncryptionKey; vaultId: string };
 
 	isEncrypted(): boolean { return this.folderKeys !== undefined; }
 

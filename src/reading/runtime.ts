@@ -6,18 +6,10 @@ import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { shouldIgnoreSyncPath, createIgnoreMatcherContext } from '../sync/local/ignore';
 import { ReadingLibrary } from './data/library';
 import { ReadingMaintenance } from './data/maintenance';
-import { ReadingCardPublisher } from './data/card-publisher';
-import { decodePendingChange } from '../sync/pending/pending-change';
-import { createScopedLogger, errorMessage } from '../platform/logger';
-import type { SyncResult } from '../sync/types';
 import { createObsidianReadingVault } from './data/obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
 
-const logger = createScopedLogger('reading', 'cards');
 export const READING_VIEW_TYPE = 'crate-reading';
-/** Cards are posted this long after a sync completes, so a burst of syncs posts once. */
-const CARD_PUBLISH_DELAY_MS = 5_000;
-const CARD_FIRST_DELAY_MS = 30_000;
 /** Vault events settle this long before a refresh; a burst, such as a sync download,
  * still refreshes at least every `REFRESH_MAX_WAIT_MS`. */
 const REFRESH_DELAY_MS = 400;
@@ -135,34 +127,6 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 			return captureDesktopArticle(url, signal);
 		} },
 	}, folder, controller.signal, maintenance, startAfter);
-	// In an encrypted vault, the cards the web app lists for the notes this device synced.
-	const cardPublisher = new ReadingCardPublisher(readingVault, folder);
-	let cardTimer: number | undefined, publishingCards = false, cardsAgain = false;
-	const publishCards = async () => {
-		cardTimer = undefined;
-		if (controller.signal.aborted) return;
-		if (publishingCards) { cardsAgain = true; return; }
-		const api = plugin.syncRuntime.getApiClient();
-		if (!api?.readingCardKeys()) return;
-		if (plugin.syncRuntime.getState().status !== 'idle' || plugin.syncRuntime.isWritingVault()) { scheduleCards(); return; }
-		publishingCards = true;
-		try {
-			// Only notes whose local copy is the synced one describe the server's revision.
-			const pending = new Set(plugin.syncRuntime.getPendingKeys().map(key => decodePendingChange(key).path));
-			await cardPublisher.publish(api, path => !pending.has(path), controller.signal);
-		} catch (error) {
-			if (!controller.signal.aborted) logger.warn(`Reading cards were not posted: ${errorMessage(error)}`);
-		} finally {
-			publishingCards = false;
-			if (cardsAgain) { cardsAgain = false; scheduleCards(); }
-		}
-	};
-	const scheduleCards = (delay = CARD_PUBLISH_DELAY_MS) => {
-		if (controller.signal.aborted) return;
-		window.clearTimeout(cardTimer);
-		cardTimer = window.setTimeout(() => { void publishCards(); }, delay);
-	};
-	const onSyncResult = (result: SyncResult) => { if (result.outcome === 'completed') scheduleCards(); };
 	let timer: number | undefined;
 	let scheduledAt = 0;
 	let lastErrorAt = 0;
@@ -241,10 +205,8 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	// Closing an editor lets waiting imports and highlight records proceed; other layout changes need no work.
 	const layoutRef = plugin.app.workspace.on('layout-change', () => { if (maintenance.waitingForEditor) { retry = true; schedule(); } });
 	plugin.syncRuntime.addStateChangeListener(onSyncStateChange);
-	plugin.syncRuntime.addSyncResultListener(onSyncResult);
 	const stop = () => {
-		controller.abort(); window.clearTimeout(timer); window.clearTimeout(cardTimer);
-		plugin.syncRuntime.removeSyncResultListener(onSyncResult);
+		controller.abort(); window.clearTimeout(timer);
 		for (const ref of refs) vault.offref(ref);
 		plugin.app.workspace.offref(layoutRef);
 		plugin.app.metadataCache.offref(metadataRef);
@@ -256,7 +218,7 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	lifetime.addEventListener('abort', onAbort, { once: true });
 	readingState(plugin).runtime = { library, stop };
 	notifyRuntime(plugin);
-	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) { schedule(); scheduleCards(CARD_FIRST_DELAY_MS); } });
+	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) schedule(); });
 }
 
 /** Applies changed Reading settings; open views close because they hold the previous library. */

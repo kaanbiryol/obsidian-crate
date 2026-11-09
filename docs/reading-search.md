@@ -29,27 +29,20 @@ its term exactly.
 
 ## Encrypted vaults
 
-The server cannot read notes, so the device that writes a note also writes its card. Only a
-device holding the vault key can, which is why this is not done on the server:
+The server cannot read notes, so the device that encrypts a note also builds its card, the same
+way a reminder note carries its notification schedules:
 
-- **A commit marks the row stale.** In the same batch as any file write in the Reading folder, the
-  Worker records the path and its new revision, keeps the last card listed and marks it
-  `stale = 1`. Deleting the note removes the row and its terms.
-- **The web app sends the card with its commit.** An encrypted Reading commit
-  (`POST /reading/encrypted-commit`) carries `cards`, one per note it writes, and the server stores
-  each for the revision that commit writes, in the same transaction. The note is current the moment
-  the commit succeeds.
-- **Obsidian posts cards after each sync** (`src/reading/data/card-publisher.ts`). Sync uploads
-  are unchanged; a few seconds after a sync completes, Obsidian lists stale rows
-  (`GET /reading/cards/stale`), and for each note it holds with no change waiting to upload, reads
-  it and posts its card (`POST /reading/cards`). A first encrypted upload of a large library is
-  carded this way, without the web app downloading any note.
-- **The web app fills what is left** when it opens Reading: stale rows no device posted, such as
-  Shortcut saves the server sealed while Obsidian was closed. It downloads, checks and opens each.
-- The server accepts a card only while its row still names that path and revision, so a card can
-  never describe another version of the note.
-- **The card** is the note's listed item (`ReadingItem`), sealed with the vault key and bound to
-  the server path and revision.
+- **The card travels in the upload.** When Obsidian's sync or the web app encrypts a Reading
+  note, it attaches the card, the plaintext list fields and the hashed terms as the file's public
+  data (`src/reading/core/reading-card-upload.ts`). The server validates it and writes the row and
+  terms in the same batch as the file commit. Nothing else is sent and nothing runs in the
+  background. A note that is not a valid Reading note uploads without a card and is not listed.
+- **The card** is the note's listed item (`ReadingItem`) and plaintext hash, sealed with the
+  vault key and bound to the note's server path.
+- **Shortcut saves** are created by the server, which cannot use the vault key. It seals the card
+  to the vault seal key, like the note itself, so the note is listed at once. The server cannot
+  hash terms, so the note is found by search once a device saves it again. Opening or editing a
+  sealed note checks that it does not replace a note or take another note's name.
 - **List fields in plaintext**: saved date, status, favorite, whether the note has highlights and
   its Reading ID. The server sorts and filters by them; the device checks them against the card it
   decrypts and drops rows that disagree.
@@ -86,4 +79,4 @@ independent security review listed in [Reading and encryption](reading-e2ee-asse
   with the library.
 - A new or retitled note writes about two terms per title word; status and favorite edits keep
   the same terms and leave them untouched, but move the note between section indexes (two rows).
-- An encrypted library is indexed once: each note is opened by one device and its card posted.
+- An encrypted library is indexed as it uploads: each note's card adds nothing beyond its upload.

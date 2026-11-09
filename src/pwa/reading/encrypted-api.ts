@@ -9,23 +9,16 @@ import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } f
 import { readingCapturePath, retitledCapturePath } from '../../reading/core/filename';
 import { READING_DUPLICATE_ID_ISSUE } from '../../reading/core/inventory';
 import { normalizedTag, titleMatches } from '../../reading/core/search-terms';
-import { openReadingCard, readingCardFields, sameReadingCardFields, sealReadingCard, type ReadingCardFields, type ReadingCardKeys } from '../../reading/core/reading-card';
-import { hashedQueryTerms, hashedReadingTerms } from '@/encryption/reading-search';
+import { openReadingCard, sameReadingCardFields, type ReadingCardData, type ReadingCardFields } from '../../reading/core/reading-card';
+import { readingUploadCard } from '../../reading/core/reading-card-upload';
+import { hashedQueryTerms } from '@/encryption/reading-search';
 import { type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '@/encryption/file-inventory';
-import { mapBounded } from '@/platform/map-bounded';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
 import { responseError } from '@/pwa/connection/response-error';
 import type { PathTags } from '@/encryption/path-tags';
-import { sealedNoteRefusal } from '@/encryption/sealed-note';
 import { encryptedFilePath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 
-// Notes waiting for a card are opened a few at a time.
-const SOURCE_CONCURRENCY = 6;
-// One refresh posts at most this many cards; the next refresh continues.
-const MAX_FILLED_PER_REFRESH = 500;
-// A card post stays under the Worker's body limit.
-const MAX_CARD_POST_BYTES = 200 * 1024;
 const SEALED_ISSUE = 'The server created a note that would replace or take the name of another note. It was not opened.';
 
 /** `hash` is the authenticated plaintext hash; `sealed` marks a note the server sealed. */
@@ -58,22 +51,18 @@ class NoteUnavailableError extends Error {}
 export const ENCRYPTED_READING_ACTIONS: readonly string[] = ['items', 'item', 'capture', 'update', 'retry', 'delete'];
 
 interface ItemsPage { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: string | null }
-interface StaleFile extends WireFile { card?: string }
 
 /**
  * Plaintext only exists in the trusted client. The server lists encrypted cards a page at a
- * time; this client opens them, posts cards for notes that changed (`fill`), and persists
- * every mutation as exact ciphertext first, including its authenticated receipt.
+ * time and this client opens them. Every note it writes carries its card as public data, and
+ * every mutation is persisted as exact ciphertext first, including its authenticated receipt.
  */
 export class EncryptedReadingApi {
 	private sources = new Map<string, Source>();
 	// Notes this client listed, by Reading ID, so an open or an edit finds its file.
 	private listed = new Map<string, Listed>();
-	// Notes that could not be opened or were refused at the last fill, by server path.
-	private unreadable = new Map<string, { message: string; id?: string }>();
-	private filling?: Promise<void>;
 	constructor(private options: EncryptedReadingOptions) {}
-	private get cardKeys(): ReadingCardKeys { return { vaultId: this.options.authority.vaultId, key: this.options.authority.key, keyGeneration: this.options.generation }; }
+	private get cardKeys() { return { vaultId: this.options.authority.vaultId, key: this.options.authority.key, keyGeneration: this.options.generation, seal: this.options.authority.seal, searchKey: this.options.searchKey }; }
 	private async json<T>(path: string, body?: string): Promise<T> {
 		const response = await this.options.request(path, body);
 		if (!response.ok) {
@@ -102,75 +91,33 @@ export class EncryptedReadingApi {
 		return source;
 	}
 
-	/** Posts cards for notes the server lists as changed since their card, then lists. One
-	 * fill runs at a time; a later caller waits for it. */
-	fill(): Promise<void> {
-		this.filling ??= this.fillStale().finally(() => { this.filling = undefined; });
-		return this.filling;
-	}
-	private async fillStale(): Promise<void> {
-		const unreadable = new Map<string, { message: string; id?: string }>();
-		let after: string | null = '', filled = 0;
-		while (after !== null && filled < MAX_FILLED_PER_REFRESH) {
-			const page: { files: StaleFile[]; cursor: string | null } = await this.json(`/reading/cards/stale?${new URLSearchParams({ after })}`);
-			after = page.cursor;
-			const opened = await mapBounded(page.files, SOURCE_CONCURRENCY, async file => {
-				try { return { file, card: await this.cardFor(file) }; }
-				catch (error) { return { file, error: error instanceof Error ? error.message : 'Article could not be opened.' }; }
-			});
-			const cards: unknown[] = [];
-			for (const result of opened) {
-				if ('error' in result) { unreadable.set(result.file.path, { message: result.error! }); continue; }
-				cards.push(result.card);
-			}
-			for (let start = 0; start < cards.length;) {
-				let bytes = 0, end = start;
-				while (end < cards.length && (end === start || bytes + JSON.stringify(cards[end]).length < MAX_CARD_POST_BYTES)) bytes += JSON.stringify(cards[end++]).length;
-				// A card for a revision that changed meanwhile is skipped; the next fill posts it.
-				await this.json('/reading/cards', JSON.stringify({ cards: cards.slice(start, end) }));
-				start = end;
-			}
-			filled += page.files.length;
-		}
-		this.unreadable = unreadable;
-	}
-	/** The card a device posts for a changed note, after the sealed-note rule. */
-	private async cardFor(file: StaleFile) {
-		const source = await this.source(file);
-		if (source.sealed) {
-			// The server may only create sealed notes: never replace a note listed at this
-			// path, nor take the name of a note stored at another server path.
-			const held = file.card ? await openReadingCard(file.card, file.path, this.cardKeys).catch(() => undefined) : undefined;
-			const own = { wire: file.path, path: source.item.path, hash: source.hash };
-			const known = held ? [{ wire: file.path, path: held.item.path, hash: held.hash }] : [];
-			const named = await this.options.paths.wire(source.item.path);
-			if (!held && named !== file.path && (await this.existing([named])).has(named)) known.push({ wire: named, path: source.item.path, hash: '' });
-			if (sealedNoteRefusal(own, known)) throw new Error(SEALED_ISSUE);
-		}
-		const item = source.item;
-		return { path: file.path, revision: file.revision, card: await sealReadingCard(item, file.path, source.hash, this.cardKeys),
-			terms: await hashedReadingTerms(this.options.searchKey, item), ...readingCardFields(item) };
+	/** The server may only create sealed notes. One is opened only under a random server name,
+	 * never at the tag of a name (which would replace a note), nor under the name of a note
+	 * stored at another server path. */
+	private async checkSealed(source: Source): Promise<void> {
+		if (!source.sealed) return;
+		const named = await this.options.paths.wire(source.item.path);
+		if (named === source.file.path || (await this.existing([named])).has(named)) throw new Error(SEALED_ISSUE);
 	}
 	private async existing(wires: string[]): Promise<Set<string>> {
 		const params = new URLSearchParams(); for (const wire of wires) params.append('path', wire);
-		return new Set((await this.json<{ paths: string[] }>(`/reading/cards/exists?${params}`)).paths);
+		return new Set((await this.json<{ paths: string[] }>(`/reading/taken?${params}`)).paths);
 	}
 
 	/** One page of the library: the server matches hashed terms, and each card is opened and
 	 * rechecked here, so a page can hold fewer items than the server listed. */
 	private async items(params: URLSearchParams): Promise<ItemsPage> {
 		const q = params.get('q') ?? '', tag = params.get('tag') ?? '', url = params.get('url') ?? '', cursor = params.get('cursor') ?? '', id = params.get('id');
-		if (!cursor) await this.fill();
 		const query = new URLSearchParams({ section: params.get('section') ?? 'inbox', ...cursor ? { cursor } : {}, ...id ? { id } : {} });
 		for (const term of await hashedQueryTerms(this.options.searchKey, { q, tag, url })) query.append('term', term);
-		const page: { cards: Array<WireFile & { card: string; stale: boolean; fields: Partial<ReadingCardFields> }>; cursor: string | null } = await this.json(`/reading/items?${query}`);
+		const page: { cards: Array<WireFile & { card: string; seal?: ReadingCardData['seal']; stale: boolean; fields: Partial<ReadingCardFields> }>; cursor: string | null } = await this.json(`/reading/items?${query}`);
 		const items: ReadingItem[] = [], issues: ItemsPage['issues'] = [];
 		const ids = new Map<string, number>();
 		for (const listed of page.cards) {
-			const { card, stale, fields, ...file } = listed;
+			const { card, seal, stale, fields, ...file } = listed;
 			let item: ReadingItem;
 			try {
-				item = (await openReadingCard(card, file.path, this.cardKeys)).item;
+				item = (await openReadingCard(card, file.path, this.cardKeys, seal)).item;
 				// The server sorts by the listed fields; one that disagrees with its card is not trusted.
 				if (!sameReadingCardFields(item, fields ?? {})) throw new Error();
 			} catch { issues.push({ path: file.path, message: 'This Reading card is unreadable. Open the note in Obsidian.' }); continue; }
@@ -182,7 +129,6 @@ export class EncryptedReadingApi {
 			this.listed.set(item.crate_reading_id, { file, item, stale });
 			items.push(item);
 		}
-		for (const [path, problem] of this.unreadable) if (!cursor) issues.push({ path, message: problem.message });
 		const unique = items.filter(item => {
 			if (ids.get(item.crate_reading_id)! === 1) return true;
 			issues.push({ path: item.path, message: READING_DUPLICATE_ID_ISSUE });
@@ -249,13 +195,13 @@ export class EncryptedReadingApi {
 		const etag = `"e2ee-file-${this.options.generation}-${(await sha256Hex(`${file.path}\n${file.revision}\n${file.hash}`)).slice(0, 32)}"`;
 		if (etag === savedEtag) return null;
 		const source = await this.source(file);
+		await this.checkSealed(source);
 		if (source.item.crate_reading_id !== id) throw this.options.error('Article is unavailable or has an identity conflict.', 409, 'reading_conflict');
 		return { article: { item: source.item, markdown: readReadingFrontmatter(source.content)!.body }, etag };
 	}
 	/** Build and persist exact ciphertext for one operation against the current
 	 * notes, or answer from a receipt the operation already committed. */
 	private async prepare(action: string, body: Record<string, unknown>, id: string, rawBody: string, requestHash: string): Promise<{ attempt: Attempt } | { response: unknown }> {
-		await this.fill();
 		const plan = action === 'capture' ? await this.planCapture(body, id, rawBody) : await this.planEdit(action, body);
 		if ('response' in plan) return plan;
 		const { itemId } = plan;
@@ -283,17 +229,15 @@ export class EncryptedReadingApi {
 			const renamed = await retitledCapturePath(path, this.options.folderPath, { title: plan.before.title, url: plan.before.source_url }, source, itemId, occupied);
 			if (renamed) { removed = previous; previous = undefined; path = renamed; wire = await this.options.paths.wire(renamed); }
 		}
-		const sealed = await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: null }, this.options.authority);
+		// The note's card is its public data, so the server lists the new revision in the same commit.
+		const bytes = new TextEncoder().encode(content);
+		const publicData = await readingUploadCard(this.options.folderPath, path, wire, bytes, this.cardKeys);
+		const sealed = await sealFile({ path, content: bytes, contentType: 'text/markdown', publicData }, this.options.authority);
 		const file = { path: wire, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) };
-		// The note's card rides along, so the server lists the new revision in the same transaction.
-		const item = { ...parseReadingNote(content)!, path };
-		const card = { path: wire, card: await sealReadingCard(item, wire, sealed.metadata.hash, this.cardKeys), terms: await hashedReadingTerms(this.options.searchKey, item), ...readingCardFields(item) };
-		return { attempt: await this.persistAttempt(id, requestHash, { saved: true, id: itemId }, [file], removed ? [removed] : [], [card]) };
+		return { attempt: await this.persistAttempt(id, requestHash, { saved: true, id: itemId }, [file], removed ? [removed] : []) };
 	}
 	/** A new note for a captured link, or the answer when a note already saves it. */
 	private async planCapture(body: Record<string, unknown>, id: string, rawBody: string): Promise<PreparedPlan> {
-		// Any unreadable note may already save this link; a new note would duplicate it.
-		if (this.unreadable.size) throw this.unavailable();
 		const link = readingUrl(body.url);
 		const { items, issues } = await this.items(new URLSearchParams({ section: 'all', url: link }));
 		if (items.length > 1) throw this.options.error('Several notes already save this link.', 409);
@@ -309,10 +253,9 @@ export class EncryptedReadingApi {
 	private async planEdit(action: string, body: Record<string, unknown>): Promise<PreparedPlan> {
 		if (typeof body.id !== 'string') throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
 		const listed = await this.find(body.id);
-		// An unreadable note may be the target when the target is not listed.
-		if (!listed && this.unreadable.size) throw this.unavailable();
 		if (!listed) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
 		const source = await this.source(listed.file);
+		await this.checkSealed(source);
 		// The card may describe an earlier revision; the edit applies to the note as it is now.
 		const item = source.item;
 		if (item.crate_reading_id !== body.id) throw this.unavailable(READING_DUPLICATE_ID_ISSUE);
@@ -331,10 +274,10 @@ export class EncryptedReadingApi {
 		return this.options.error(message, 503, 'reading_unavailable');
 	}
 	/** Stores the exact commit body, with the encrypted receipt `response` answers with. */
-	private async persistAttempt(id: string, requestHash: string, response: unknown, files: unknown[], remove: WireFile[], cards: unknown[] = []): Promise<Attempt> {
+	private async persistAttempt(id: string, requestHash: string, response: unknown, files: unknown[], remove: WireFile[]): Promise<Attempt> {
 		const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
 		const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id, files,
-			...(remove.length ? { remove: remove.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) } : {}), ...(cards.length ? { cards } : {}), acknowledgment }) };
+			...(remove.length ? { remove: remove.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) } : {}), acknowledgment }) };
 		await this.options.writeAttempt(id, attempt);
 		return attempt;
 	}

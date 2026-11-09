@@ -16,6 +16,8 @@ import { resolveEncryptedPath } from '@/encryption/path-binding';
 import { sealFolderLabel } from '@/encryption/folder-label';
 import { importEncryptionSecret } from '@/encryption/envelope';
 import { deriveReadingSearchKey } from '@/encryption/reading-search';
+import { createReadingNote } from '@/reading/core/notes';
+import { commitSealedReadingNote } from './sealed-note';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
@@ -228,24 +230,23 @@ it('finds encrypted notes by title words, tags and links without sending them', 
 	for (const secret of ['javas', 'learn', 'Languages', 'languages', 'private.example']) expect(h.requests.join() + JSON.stringify((await env.DB.prepare('SELECT * FROM note_terms').all()).results)).not.toContain(secret);
 });
 
-it('lists a note Obsidian synced once another client posts its card', async () => {
-	const h = await setup(), writer = h.api();
-	const saved = await writer.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/synced', title: 'Synced elsewhere', fetchArticle: false })) as { id: string };
-	// A sync commit leaves the row without a card for the new revision.
-	await env.DB.prepare('UPDATE reading_items SET stale = 1, card = NULL').run();
-	const reader = h.api();
-	expect((await reader.request('/reading/items?section=inbox') as { items: ReadingItem[] }).items.map(item => item.crate_reading_id)).toEqual([saved.id]);
-	expect(await env.DB.prepare('SELECT stale FROM reading_items').first()).toEqual({ stale: 0 });
+it('lists a Shortcut note by the card the server sealed, and makes it searchable once a device saves it', async () => {
+	const h = await setup(), id = crypto.randomUUID();
+	const note = createReadingNote({ id, url: 'https://private.example/shared', title: 'Shared from phone', savedAt: new Date().toISOString() });
+	expect(await commitSealedReadingNote(env, { id, content: note, folder: h.folder.wire, generation: 'policy' })).toBe(true);
+	const titles = async (query: string) => (await h.api().request(`/reading/items?${query}`) as { items: ReadingItem[] }).items.map(item => item.title);
+	expect(await titles('section=inbox')).toEqual(['Shared from phone']);
+	// The server cannot hash terms, so search finds it once a device saves the note.
+	expect(await titles('section=inbox&q=shared')).toEqual([]);
+	await h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id, changes: { favorite: true }, before: { favorite: false } }));
+	expect(await titles('section=inbox&q=shared')).toEqual(['Shared from phone']);
+	expect(JSON.stringify((await env.DB.prepare('SELECT * FROM reading_items').all()).results)).not.toContain('Shared');
 });
 
-it('stores a web app save with its card in the same commit, without a separate card post', async () => {
+it('stores a web app save with its card in the same commit', async () => {
 	const h = await setup();
 	await h.api().request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/at-once', title: 'Listed at once', fetchArticle: false }));
 	expect(await env.DB.prepare('SELECT stale, card IS NOT NULL AS carded FROM reading_items').first()).toEqual({ stale: 0, carded: 1 });
-	expect(h.requests.some(body => body.startsWith('{"cards"'))).toBe(false);
-	// A card for a note the commit does not write is refused.
-	const commit = JSON.parse(h.requests.find(body => body.startsWith('{"folderPath"'))!) as { cards: Array<{ path: string }> };
-	expect(commit.cards).toHaveLength(1);
-	const forged = await h.request('/reading/encrypted-commit', JSON.stringify({ ...commit, operationId: operation(), cards: [{ ...commit.cards[0], path: `${h.folder.wire}/other.md` }] }));
-	expect(forged.status).toBe(400);
+	// The commit is the only write: no card is posted separately.
+	expect(h.requests.filter(body => !body.startsWith('{"folderPath"'))).toEqual([]);
 });

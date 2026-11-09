@@ -11,6 +11,12 @@ import { getStoredFileRow } from '../sync/storage';
 import type { ReadingItem } from '@/reading/core/model';
 import type { EncryptionServerState } from '@/encryption/server-state';
 import { ensureReadingIndex } from './library-index';
+import { createVaultKeyBundle } from '@/encryption/key-bundle';
+import { importEncryptionSecret } from '@/encryption/envelope';
+import { deriveReadingSearchKey, hashedQueryTerms } from '@/encryption/reading-search';
+import { sealFile } from '@/encryption/file-codec';
+import { readingUploadCard } from '@/reading/core/reading-card-upload';
+import { openReadingCard } from '@/reading/core/reading-card';
 import { readStoredNote } from './common';
 
 const principal = { tokenId: 'vault', scope: 'vault' as const };
@@ -77,29 +83,27 @@ it('pages by cursor and removes a deleted note from search', async () => {
 	expect(await env.DB.prepare("SELECT count(*) AS n FROM note_terms WHERE portable_path = 'reading/note 0.md'").first()).toMatchObject({ n: 0 });
 });
 
-it('lists an encrypted note only once a device posts its card for the current revision', async () => {
-	// Encrypted notes are stored as envelopes the server cannot parse.
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/tag.md', 'CRATE-E2EE/1\n{}', null);
-	const row = await env.DB.prepare('SELECT stale, card, storage_key FROM reading_items').first<{ stale: number; card: string | null; storage_key: string }>();
-	expect(row).toMatchObject({ stale: 1, card: null });
+it('lists an encrypted note from the card its upload carries, and keeps that card for an upload without one', async () => {
+	const bundle = await createVaultKeyBundle(), key = await importEncryptionSecret(bundle.vault);
+	const keys = { vaultId: bundle.vaultId, key, keyGeneration: 1, searchKey: await deriveReadingSearchKey(bundle.vaultId, bundle.vault) };
+	const upload = async (title: string, card = true) => {
+		const content = createReadingNote({ id: '00000000-0000-4000-8000-000000000001', url: 'https://example.invalid/e', title, savedAt: '2026-01-01T00:00:00.000Z' });
+		const bytes = new TextEncoder().encode(content);
+		const publicData = card ? await readingUploadCard('Reading', 'Reading/plain name.md', 'Reading/tag.md', bytes, keys) : null;
+		const sealed = await sealFile({ path: 'Reading/plain name.md', content: bytes, contentType: 'text/markdown', publicData }, { vaultId: bundle.vaultId, scopeId: 'vault', key });
+		const previous = await getStoredFileRow(env.DB, 'Reading/tag.md');
+		await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/tag.md', new TextDecoder().decode(sealed.bytes), previous?.hash ?? null);
+	};
 	const encrypted = { encryption: { mode: 'active' } as unknown as EncryptionServerState };
-	const route = (path: string, body?: unknown) => handleReadingRoute(new Request(`https://test${path}`, body ? { method: 'POST', body: JSON.stringify(body) } : {}), env, principal, encrypted);
-	expect(await (await route('/reading/cards/stale')).json()).toMatchObject({ files: [{ path: 'Reading/tag.md', revision: row!.storage_key }] });
-	const card = { path: 'Reading/tag.md', revision: row!.storage_key, card: 'a.b.c.d.e', terms: ['aaaaaaaaaaaa', 'bbbbbbbbbbbb'], item_id: crypto.randomUUID(),
-		saved_at: '2026-01-01T00:00:00Z', status: 'inbox', favorite: false, highlighted: false };
-	// A card for another revision is skipped.
-	expect(await (await route('/reading/cards', { cards: [{ ...card, revision: `${row!.storage_key.slice(0, -1)}0` }] })).json()).toEqual({ accepted: [] });
-	expect(await (await route('/reading/items?section=inbox')).json()).toEqual({ cards: [], cursor: null });
-	expect(await (await route('/reading/cards', { cards: [card] })).json()).toEqual({ accepted: ['Reading/tag.md'] });
-	const listed = { cards: [{ path: 'Reading/tag.md', revision: row!.storage_key, card: 'a.b.c.d.e', stale: false }], cursor: null };
-	expect(await (await route('/reading/items?section=inbox&term=aaaaaaaaaaaa')).json()).toMatchObject(listed);
-	expect(await (await route('/reading/items?section=inbox&term=cccccccccccc')).json()).toEqual({ cards: [], cursor: null });
-	// A new revision keeps the last card listed, marked stale, until a device posts the next one.
-	const file = (await getStoredFileRow(env.DB, 'Reading/tag.md'))!;
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/tag.md', 'CRATE-E2EE/1\n{"v":2}', file.hash);
-	const stale = await (await route('/reading/items?section=inbox&term=bbbbbbbbbbbb')).json() as { cards: Array<{ stale: boolean; revision: string }> };
-	expect(stale.cards).toMatchObject([{ stale: true }]);
-	expect(stale.cards[0]!.revision).not.toBe(row!.storage_key);
+	const route = (query: string) => handleReadingRoute(new Request(`https://test/reading/items?${query}`), env, principal, encrypted);
+	const listed = async (query: string) => ((await (await route(query)).json()) as { cards: Array<{ card: string; stale: boolean }> }).cards;
+	await upload('Encrypted title');
+	const [found] = await listed(`section=inbox&${(await hashedQueryTerms(keys.searchKey, { q: 'encry' })).map(term => `term=${term}`).join('&')}`);
+	expect((await openReadingCard(found!.card, 'Reading/tag.md', keys)).item.title).toBe('Encrypted title');
+	expect(JSON.stringify((await env.DB.prepare('SELECT * FROM reading_items').all()).results)).not.toContain('Encrypted title');
+	// An upload without a card keeps the last one, marked stale.
+	await upload('Renamed', false);
+	expect(await listed('section=inbox')).toMatchObject([{ stale: true }]);
 });
 
 it('rebuilds an index of encrypted notes as rows waiting for cards', async () => {

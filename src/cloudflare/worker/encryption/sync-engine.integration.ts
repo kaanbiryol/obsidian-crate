@@ -339,6 +339,20 @@ async function forgeSealed(wire: string, name: string, content: string) {
 const rejected = (result: { issues?: Array<{ path?: string; message: string }> }) =>
 	(result.issues ?? []).filter(issue => issue.message.includes('note the server created')).map(issue => issue.path).sort();
 
+it('uploads each Reading note with the card the server lists it by', async () => {
+	await readingFolder();
+	const first = await device('first');
+	await first.disk.vault.adapter.mkdir('Reading');
+	first.disk.write('Reading/Article.md', createReadingNote({ id: crypto.randomUUID(), url: 'https://private.example/a', title: 'Synced article', savedAt: new Date().toISOString() }));
+	first.disk.write('Reading/Plain.md', 'Not a Reading note\n');
+	await sync(first);
+	const rows = (await env.DB.prepare('SELECT stale, card IS NOT NULL AS carded FROM reading_items ORDER BY carded').all()).results;
+	// The plain note uploads without a card and stays unlisted.
+	expect(rows).toEqual([{ stale: 1, carded: 0 }, { stale: 0, carded: 1 }]);
+	expect((await env.DB.prepare('SELECT count(*) AS n FROM note_terms').first<{ n: number }>())!.n).toBeGreaterThan(0);
+	expect(JSON.stringify(rows) + JSON.stringify((await env.DB.prepare('SELECT * FROM reading_items').all()).results)).not.toContain('Synced article');
+});
+
 it('never applies a sealed note over a synced Reading note or under its name, and keeps syncing other files', async () => {
 	const folder = await readingFolder();
 	const first = await device('first'), second = await device('second');

@@ -1,4 +1,6 @@
 import { sealFileForVault } from '@/encryption/sealed-file';
+import { sealedReadingCardData } from '@/reading/core/reading-card';
+import { sha256Hex } from '@/platform/sha256';
 import { readingCapturePath } from '@/reading/core/filename';
 import { parseReadingNote } from '@/reading/core/notes';
 import { createOpaqueWireName } from '@/protocol/encrypted-path';
@@ -21,8 +23,10 @@ export async function commitSealedReadingNote(env: Env, note: SealedReadingNote)
 	const item = parseReadingNote(note.content)!;
 	const sealedPath = await readingCapturePath(current.folder_path, { title: item.title, url: item.source_url }, note.id, () => false);
 	const path = `${current.folder_path}/${createOpaqueWireName()}`;
-	const sealed = await sealFileForVault({ path: sealedPath, content: new TextEncoder().encode(note.content), contentType: 'text/markdown' },
-		{ vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey });
+	const recipient = { vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey }, bytes = new TextEncoder().encode(note.content);
+	// The card lists the note at once; it has no search terms until a device saves the note again.
+	const publicData = await sealedReadingCardData({ ...item, path: sealedPath }, path, await sha256Hex(bytes), recipient);
+	const sealed = await sealFileForVault({ path: sealedPath, content: bytes, contentType: 'text/markdown', publicData }, recipient);
 	const content = new TextDecoder().decode(sealed.bytes);
 	const staged = await stageMarkdownFile(env.BUCKET, env.DB, path, content, null, true);
 	const committed = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, encryptionState: state, sealedReadingFolder: current.folder_path });

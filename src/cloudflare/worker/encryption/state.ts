@@ -7,6 +7,7 @@ import { readServerState, saveServerState, serverStateValue } from '../d1/server
 import { isMarkdownPath } from '../../../protocol/note-paths';
 import { corsResponse } from '../http/cors';
 import type { SqlGuard } from '../d1/db';
+import { isReadingCardKind, validateReadingCardData } from '@/reading/core/reading-card';
 
 /** The stored state JSON, or NULL for a plaintext vault. */
 export const ENCRYPTION_STATE_SQL = serverStateValue('encryption');
@@ -84,6 +85,13 @@ export async function validateUploadEncryption(db: D1Database, files: Array<{
 /** The server's own sealed Reading capture, which may use the seal key in this folder. */
 export interface SealedCommit { readingFolder: string }
 
+/** A server-sealed note carries a card sealed to this vault's seal key, or none. */
+function sealedReadingCard(publicData: unknown, state: EncryptionServerState): boolean {
+	if (publicData === null) return true;
+	try { validateReadingCardData(publicData); } catch { return false; }
+	return publicData.seal?.keyId === state.seal.keyId;
+}
+
 function validateEncryptedContent(state: EncryptionServerState, path: string, content: string | ArrayBuffer | Uint8Array, sealed?: SealedCommit): EncryptedFileDescriptor {
 	// Encrypted vaults store tagged names only; a readable path is never published.
 	if (!isWirePath(path)) throw new EncryptionStateError('Update Crate: this encrypted vault stores encrypted file names', 428);
@@ -93,7 +101,7 @@ function validateEncryptedContent(state: EncryptionServerState, path: string, co
 	if (descriptor.seal || sealed) {
 		if (!descriptor.seal || !sealed || descriptor.vaultId !== state.vaultId || descriptor.scopeId !== 'vault' || descriptor.keyId !== state.seal.keyId
 			|| !path.startsWith(`${sealed.readingFolder}/`) || path.slice(sealed.readingFolder.length + 1).includes('/')
-			|| !path.endsWith('.md') || publicData !== null) {
+			|| !path.endsWith('.md') || !sealedReadingCard(publicData, state)) {
 			throw new EncryptionStateError('Only the server can create sealed Reading notes', 428);
 		}
 		return descriptor;
@@ -101,10 +109,15 @@ function validateEncryptedContent(state: EncryptionServerState, path: string, co
 	if (descriptor.vaultId !== state.vaultId || descriptor.scopeId !== 'vault' || descriptor.keyId !== state.keyId) {
 		throw new EncryptionStateError('File encryption keys do not match this vault', 428);
 	}
-	// Devices decide which notes are reminders. The server only checks that any
-	// published schedules use this vault's notification key.
+	// Devices decide which notes are reminders or Reading notes. The server only checks that
+	// published schedules use this vault's notification key, and that a Reading card is well formed.
 	if (publicData === null) return descriptor;
 	if (!isMarkdownPath(path)) throw new EncryptionStateError('This file must not publish reminder scheduling metadata');
+	if (isReadingCardKind(publicData)) {
+		try { validateReadingCardData(publicData); } catch { throw new EncryptionStateError('Invalid Reading card'); }
+		if (publicData.seal) throw new EncryptionStateError('Only the server can seal Reading cards', 428);
+		return descriptor;
+	}
 	validateEncryptedSchedules(publicData);
 	for (const reminder of publicData.reminders) {
 		if (reminder.notification.vaultId !== state.vaultId || reminder.notification.scopeId !== 'vault'

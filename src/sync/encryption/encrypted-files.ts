@@ -21,7 +21,8 @@ interface WireMetadata { hash: string; size: number; revision?: string }
 const METADATA_CONCURRENCY = 4;
 // Reuse across the overlapping requests of one large inventory.
 const MAX_VERIFIED_METADATA = ENCRYPTION_METADATA_BATCH * METADATA_CONCURRENCY;
-type PublicDataBuilder = (path: string, content: ArrayBuffer) => Promise<unknown>;
+/** Public data for a file: `path` is its plaintext path and `wire` its server path. */
+type PublicDataBuilder = (path: string, content: ArrayBuffer, wire: string) => Promise<unknown>;
 interface VerifiedRevision { metadata: PrivateFileMetadata; wireHash: string; wire: string }
 /** A plaintext precondition to translate into the server's ciphertext hash. */
 export interface ExpectedHashRequest { path: string; expected: string | null; revision?: string | null }
@@ -226,7 +227,7 @@ export class EncryptedFiles {
 		const path = await this.paths.wireFor(file.path);
 		const content = base64ToArrayBuffer(file.content);
 		const sealed = await sealFile({ path: file.path, content: new Uint8Array(content), contentType: file.contentType,
-			publicData: await this.publicData(file.path, content) }, this.keys.forPath(path));
+			publicData: await this.publicData(file.path, content, path) }, this.keys.forPath(path));
 		if (sealed.metadata.hash !== file.hash || sealed.metadata.size !== file.size) throw new Error('File changed before encryption');
 		const wire: EncryptedUploadWire = { format: 'crate-e2ee-v1', generation: this.generation, path, content: arrayBufferToBase64(sealed.bytes.buffer),
 			hash: sealed.hash, size: sealed.bytes.byteLength, contentType: ENCRYPTED_FILE_CONTENT_TYPE, expectedHash };

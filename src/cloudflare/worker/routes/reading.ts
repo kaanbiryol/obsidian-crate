@@ -15,7 +15,7 @@ import { mutateReading } from '../reading/mutations';
 import { extractForEncryptedReading } from '../reading/encrypted-extract';
 import { isLibraryRead, loadLibraryRead, readLibrary } from '../reading/library-read';
 import { PLAINTEXT_ONLY_PATHS } from './policy';
-import { existingReadingPaths, postReadingCards, staleReadingCards } from '../reading/cards';
+import { takenReadingPaths } from '../reading/taken-names';
 
 export interface ReadingRouteOptions {
 	/** The coordinator's state, when the request runs under its lock. */
@@ -53,7 +53,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		// The web app recovers the plaintext folder name from this label with the vault key.
 		return readingResponse({ encryption, ...(encryption ? { folderLabel: await readFolderLabel(env.DB, current.folder_path) } : {}) });
 	}
-	const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' || path === '/reading/delete' || path === '/reading/cards' ? READING_EDIT_JSON_BODY_BYTES : SMALL_JSON_BODY_BYTES);
+	const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' || path === '/reading/delete' ? READING_EDIT_JSON_BODY_BYTES : SMALL_JSON_BODY_BYTES);
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
 	if (shortcut) validateShortcutBody(body, shortcut.kind);
@@ -82,17 +82,9 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 	if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
 	if (path === '/reading/delete' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'delete');
 	if (loaded) return await readLibrary(request, env, current, loaded, state, forward, !!encryption);
-	if (path === '/reading/cards/stale' && request.method === 'GET') {
-		if (!encryption) throw new ReadingError('Reading cards are only for encrypted vaults.', 409);
-		return await staleReadingCards(env, url.searchParams);
-	}
-	if (path === '/reading/cards/exists' && request.method === 'GET') {
-		if (!encryption) throw new ReadingError('Reading cards are only for encrypted vaults.', 409);
-		return await existingReadingPaths(env, current, url.searchParams);
-	}
-	if (path === '/reading/cards' && request.method === 'POST') {
-		if (!encryption) throw new ReadingError('Reading cards are only for encrypted vaults.', 409);
-		return await postReadingCards(env, current, body);
+	if (path === '/reading/taken' && request.method === 'GET') {
+		if (!encryption) throw new ReadingError('Name checks are only for encrypted vaults.', 409);
+		return await takenReadingPaths(env, current, url.searchParams);
 	}
 	return readingResponse({ error: 'Not found' }, 404);
 }

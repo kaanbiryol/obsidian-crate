@@ -137,14 +137,13 @@ values, every one of which must match, and answers `{ cards, cursor }`: each car
 revision, hash, size, sealed `card`, `stale` and the plaintext list `fields`. Terms live in
 `note_terms` (scope `reading`), written in the batch of each note commit; see [Reading search](reading-search.md).
 
-In an encrypted vault, each commit in the Reading folder marks its row stale. Devices list stale
-rows with `GET /reading/cards/stale?after=` (50 at a time, with the previous card when there is
-one), check names with `GET /reading/cards/exists?path=…` (up to 20 server paths), and post
-`POST /reading/cards` `{ cards: [{ path, revision, card, terms, item_id, saved_at, status,
-favorite, highlighted }] }` (up to 50, 600 a minute). A card applies only while its row names
-that path and revision; the answer lists the `accepted` paths. `POST /reading/encrypted-commit`
-also takes `cards` (the same fields without `revision`, one per note it writes, refused for any
-other path); each is stored for the revision the commit writes, in its transaction.
+In an encrypted vault, each Reading note's upload carries its card as the file's public data
+(`{ kind: 'reading-card', version: 1, card, terms, fields }`), from Obsidian's sync and the web
+app's encrypted commits alike; the server validates it and lists the note from it in the commit's
+batch. An upload without a card keeps the row's last card, marked `stale`. A note the server
+sealed (a Shortcut save) carries a card sealed to the vault seal key (`seal: { keyId, epk }`) and
+no terms. `GET /reading/taken?path=…` (up to 20 server paths) tells a device which names are
+stored, for naming notes and checking sealed ones.
 
 `GET /reading/list` pages hold up to 1,000 notes, newest `saved_at` first, so the first
 page of a first load is the top of the library. Every index write gives the rows it adds,
