@@ -31,7 +31,7 @@ try {
       context.setDefaultTimeout(10000);
       await context.addInitScript(session => localStorage.setItem('crate-reading-session-v1', JSON.stringify(session)), session);
       await context.route('**/reading/session', route => route.fulfill({ json: session }));
-      await context.route('**/reading/list*', route => route.fulfill({ json: { items, issues: [], cursor: null } }));
+      await context.route('**/reading/items*', route => route.fulfill({ json: { items, issues: [], cursor: null } }));
       await context.route('**/reading/item?*', route => route.fulfill({ json: {
         item: items.find(item => item.crate_reading_id === new URL(route.request().url()).searchParams.get('id')),
         markdown: 'An article for checking saved reading appearance.',

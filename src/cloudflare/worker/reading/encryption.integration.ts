@@ -15,6 +15,7 @@ import { sha256Hex } from '@/platform/sha256';
 import { resolveEncryptedPath } from '@/encryption/path-binding';
 import { sealFolderLabel } from '@/encryption/folder-label';
 import { importEncryptionSecret } from '@/encryption/envelope';
+import { deriveReadingSearchKey } from '@/encryption/reading-search';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
@@ -34,7 +35,8 @@ async function setup(mode: 'active' | 'resetting' = 'active') {
 	const request = (path: string, body?: string) => worker.fetch(new Request('https://test' + path, { method: body ? 'POST' : 'GET', headers, body }), env);
 	const attempts = new Map<string, unknown>(), requests: string[] = [];
 	let loseReply = false, beforeCommit: (() => Promise<unknown>) | undefined;
-	const api = (captureArticle?: (url: string) => Promise<CapturedArticle>) => new EncryptedReadingApi({ captureArticle, folderPath: 'Reading', wireFolder: folder.wire, paths, generation: bundle.generation, authority: keys.forPath(`${folder.wire}/receipt.md`),
+	const searchKey = await deriveReadingSearchKey(bundle.vaultId, bundle.vault);
+	const api = (captureArticle?: (url: string) => Promise<CapturedArticle>) => new EncryptedReadingApi({ captureArticle, searchKey, folderPath: 'Reading', wireFolder: folder.wire, paths, generation: bundle.generation, authority: keys.forPath(`${folder.wire}/receipt.md`),
 		request: async (path, body) => {
 			if (beforeCommit && path.endsWith('encrypted-commit')) { const run = beforeCommit; beforeCommit = undefined; await run(); }
 			if (body) requests.push(body); const response = await request(path, body); if (loseReply && path.endsWith('encrypted-commit') && response.ok) { loseReply = false; throw new Error('Lost reply'); } return response;
@@ -54,7 +56,7 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
 	const receipt = await h.api().request('/reading/capture', body) as { saved: boolean; id: string };
 	expect(receipt.saved).toBe(true); expect(h.requests[0]).toBe(h.requests[1]);
 	expect(h.requests.join()).not.toContain('confidential-article'); expect(h.requests.join()).not.toContain('Private Reading title');
-	const library = await h.api().request('/reading/list') as { items: Array<{ crate_reading_id: string; favorite: boolean }> };
+	const library = await h.api().request('/reading/items?section=inbox') as { items: Array<{ crate_reading_id: string; favorite: boolean }> };
 	expect(library.items).toHaveLength(1); expect(library.items[0]!.crate_reading_id).toBe(receipt.id);
 	await h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id: receipt.id, changes: { favorite: true }, before: { favorite: false } }));
 	await expect(h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id: receipt.id, changes: { favorite: false }, before: { favorite: false } }))).rejects.toThrow('changed on another device');
@@ -68,13 +70,16 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
 	expect(file!.path.startsWith(`${h.folder.wire}/`)).toBe(true);
 	expect(opened.metadata.path.startsWith('Reading/')).toBe(true);
 	expect(h.requests.join()).not.toContain('Reading/');
-	expect((await env.DB.prepare('SELECT * FROM reading_items').all()).results).toHaveLength(0);
+	// The server lists the note by its sealed card and hashed terms.
+	const rows = JSON.stringify((await env.DB.prepare('SELECT * FROM reading_items').all()).results) + JSON.stringify((await env.DB.prepare('SELECT * FROM reading_terms').all()).results);
+	for (const secret of ['confidential', 'Private', 'private.example', 'Reading/']) expect(rows).not.toContain(secret);
+	expect(await env.DB.prepare('SELECT stale, card IS NOT NULL AS carded FROM reading_items').first()).toEqual({ stale: 0, carded: 1 });
 	expect((await env.DB.prepare('SELECT * FROM reading_jobs').all()).results).toHaveLength(0);
 });
 it('deletes an encrypted note once across a lost response and refuses a stale delete', async () => {
 	const h = await setup(), api = h.api();
 	const saved = await api.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/delete', fetchArticle: false })) as { id: string };
-	const { items: [item] } = await api.request('/reading/list') as { items: ReadingItem[] };
+	const { items: [item] } = await api.request('/reading/items?section=inbox') as { items: ReadingItem[] };
 	const before = { reading_status: item!.reading_status, favorite: item!.favorite, tags: item!.tags };
 	const { markdown } = await api.request(`/reading/item?id=${saved.id}`) as { markdown: string };
 	const markdownHash = await sha256Hex(markdown);
@@ -87,12 +92,12 @@ it('deletes an encrypted note once across a lost response and refuses a stale de
 	expect(await api.request('/reading/delete', body)).toEqual({ deleted: true, id: saved.id });
 	expect(h.requests.at(-1)).toBe(h.requests.at(-2));
 	expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
-	expect((await h.api().request('/reading/list') as { items: ReadingItem[] }).items).toEqual([]);
+	expect((await h.api().request('/reading/items?section=inbox') as { items: ReadingItem[] }).items).toEqual([]);
 });
 async function concurrentEdit() {
 	const h = await setup();
 	const saved = await h.api().request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/concurrent' })) as { id: string };
-	const { items: [item] } = await h.api().request('/reading/list') as { items: ReadingItem[] };
+	const { items: [item] } = await h.api().request('/reading/items?section=inbox') as { items: ReadingItem[] };
 	const otherDevice = (changes: object, before: object) => () => h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id: saved.id, changes, before }));
 	const id = operation(), favorite = JSON.stringify({ operationId: id, id: saved.id, changes: { favorite: true }, before: { favorite: item!.favorite } });
 	const sent = () => h.requests.filter(body => (JSON.parse(body) as { operationId: string }).operationId === id);
@@ -152,14 +157,16 @@ it('keeps article highlights, annotations, tags and archive changes encrypted an
 	const h = await setup(), quote = 'Private highlighted passage';
 	const api = h.api(async () => ({ markdown: quote, title: 'Private article' }));
 	const saved = await api.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/highlights' })) as { id: string };
-	const { items: [item] } = await api.request('/reading/list') as { items: ReadingItem[] };
+	const { items: [item] } = await api.request('/reading/items?section=inbox') as { items: ReadingItem[] };
 	const highlight = { start: 0, end: quote.length, text: quote, id: crypto.randomUUID(), note: 'Private annotation' };
 	const update = JSON.stringify({ operationId: operation(), id: saved.id,
 		changes: { highlights: [highlight], tags: ['private-tag'], reading_status: 'archived' },
 		before: { highlights: item!.highlights, tags: item!.tags, reading_status: item!.reading_status } });
 	h.loseNextReply(); await expect(api.request('/reading/update', update)).rejects.toThrow('Lost reply');
 	await api.request('/reading/update', update);
-	expect(h.requests.at(-1)).toBe(h.requests.at(-2));
+	// The retry resends the exact commit; card posts follow each commit.
+	const commits = h.requests.filter(body => body.startsWith('{"folderPath"'));
+	expect(commits.at(-1)).toBe(commits.at(-2));
 	const opened = await h.api().request(`/reading/item?id=${saved.id}`) as { item: ReadingItem; markdown: string };
 	expect(opened.item.highlights?.[0]).toMatchObject({ text: quote, note: highlight.note });
 	expect(opened.item.tags).toEqual(['private-tag']);
@@ -199,7 +206,34 @@ it('names captures after their title and renames a link-named note once a retry 
 	await h.api(async () => ({ markdown: 'Later text.', title: 'Later headline' })).request('/reading/retry', JSON.stringify({ operationId: operation(), id: bare.id }));
 	expect((await names()).sort()).toEqual([`Reading/Later headline - private.example - ${bare.id.slice(0, 8)}.md`, `Reading/Private headline - private.example - ${titled.id.slice(0, 8)}.md`]);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM file_deletion_receipts').first()).toEqual({ count: 1 });
-	const library = await h.api().request('/reading/list') as { items: ReadingItem[] };
+	const library = await h.api().request('/reading/items?section=inbox') as { items: ReadingItem[] };
 	expect(library.items.find(item => item.crate_reading_id === bare.id)).toMatchObject({ title: 'Later headline', extraction_status: 'ready' });
 	expect(h.requests.join()).not.toContain('headline');
+});
+
+it('finds encrypted notes by title words, tags and links without sending them', async () => {
+	const h = await setup(), api = h.api();
+	const save = (url: string, title: string) => api.request('/reading/capture', JSON.stringify({ operationId: operation(), url, title, fetchArticle: false })) as Promise<{ id: string }>;
+	const java = await save('https://private.example/java', 'Learning JavaScript deeply');
+	await save('https://private.example/rust', 'Rust ownership');
+	const titles = async (query: string) => (await h.api().request(`/reading/items?${query}`) as { items: ReadingItem[] }).items.map(item => item.title);
+	expect(await titles('section=inbox')).toEqual(['Rust ownership', 'Learning JavaScript deeply']);
+	expect(await titles('section=inbox&q=javas')).toEqual(['Learning JavaScript deeply']);
+	expect(await titles('section=inbox&q=ja')).toEqual([]);
+	expect(await titles('section=inbox&q=learn%20deep')).toEqual(['Learning JavaScript deeply']);
+	await api.request('/reading/update', JSON.stringify({ operationId: operation(), id: java.id, changes: { tags: ['Languages'], favorite: true }, before: { tags: [], favorite: false } }));
+	expect(await titles('section=favorites&tag=languages')).toEqual(['Learning JavaScript deeply']);
+	// Saving the same link again finds it on the server.
+	expect(await save('https://private.example/java#later', 'Again')).toMatchObject({ alreadySaved: true, id: java.id });
+	for (const secret of ['javas', 'learn', 'Languages', 'languages', 'private.example']) expect(h.requests.join() + JSON.stringify((await env.DB.prepare('SELECT * FROM reading_terms').all()).results)).not.toContain(secret);
+});
+
+it('lists a note Obsidian synced once another client posts its card', async () => {
+	const h = await setup(), writer = h.api();
+	const saved = await writer.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/synced', title: 'Synced elsewhere', fetchArticle: false })) as { id: string };
+	// A sync commit leaves the row without a card for the new revision.
+	await env.DB.prepare('UPDATE reading_items SET stale = 1, card = NULL').run();
+	const reader = h.api();
+	expect((await reader.request('/reading/items?section=inbox') as { items: ReadingItem[] }).items.map(item => item.crate_reading_id)).toEqual([saved.id]);
+	expect(await env.DB.prepare('SELECT stale FROM reading_items').first()).toEqual({ stale: 0 });
 });

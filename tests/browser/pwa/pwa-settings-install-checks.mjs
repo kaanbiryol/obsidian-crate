@@ -11,7 +11,7 @@ export async function checkInstallSettings(browser, origin, name) {
 			await page.route('**/reading/session', route => route.fulfill({ json: {
 				id: 'settings-install', folderPath: 'Reading', generation: 'settings-install', expiresAt: Date.now() + 86400000,
 			} }));
-			await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+			await page.route('**/reading/items*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
 			await page.goto(origin + '/notifications?tab=inbox');
 			await page.getByRole('button', { name: 'Open settings', exact: true }).click();
 			const settings = page.getByRole('dialog', { name: 'Settings', exact: true });

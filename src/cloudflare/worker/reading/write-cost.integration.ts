@@ -31,8 +31,9 @@ it('keeps the rows a web app favorite or archive writes to the file edit and its
 	};
 	const favorite = await measure({ favorite: true }, { favorite: false });
 	const archive = await measure({ reading_status: 'archived' }, { reading_status: 'inbox' });
-	// Before: every index on the row was rewritten, 22 and 19 rows.
-	expect(favorite.written).toBeLessThanOrEqual(18);
-	expect(archive.written).toBeLessThanOrEqual(15);
+	// Before: every index on the row was rewritten, 22 and 19 rows. A favorite or archive now also
+	// moves the note between section indexes (two rows); its search terms are unchanged.
+	expect(favorite.written).toBeLessThanOrEqual(20);
+	expect(archive.written).toBeLessThanOrEqual(17);
 	await context.annotate(JSON.stringify({ favorite, archive }), 'writes');
 });

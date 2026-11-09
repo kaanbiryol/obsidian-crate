@@ -30,7 +30,7 @@ beforeEach(async () => {
 	vi.stubGlobal('navigator', {});
 	const bundle = await createVaultKeyBundle();
 	const pathTag = await derivePathTagKey(bundle.vaultId, bundle.vault), paths = new PathTags(pathTag);
-	keys = { version: 1, vaultId: bundle.vaultId, folderPath: 'Reminders', wireFolder: await paths.wire('Reminders'), paths, pathTag,
+	keys = { version: 1, vaultId: bundle.vaultId, folderPath: 'Reminders', wireFolder: await paths.wire('Reminders'), paths, pathTag, readingSearch: pathTag,
 		generation: bundle.generation, vault: await importEncryptionSecret(bundle.vault),
 		notifications: await importEncryptionSecret(bundle.notifications),
 		notificationFingerprint: await importNotificationFingerprintKey(bundle.vaultId, bundle.notifications),

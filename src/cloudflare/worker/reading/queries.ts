@@ -4,7 +4,10 @@ import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { parseReadingNote } from '@/reading/core/notes';
 import { READING_DUPLICATE_ID_ISSUE } from '@/reading/core/inventory';
-import { validateReadingMetadata } from '@/reading/core/model';
+import { readingUrlIdentity, validateReadingMetadata } from '@/reading/core/model';
+import type { ReadingSection } from '@/reading/core/reading-presentation';
+import { MAX_QUERY_WORDS, normalizedTag, searchWords } from '@/reading/core/search-terms';
+import { isHashedReadingTerm } from '@/encryption/reading-search';
 import { sha256Hex } from '@/platform/sha256';
 import { ARTICLE_EDITED_ERROR, readingIndexScope, readingIndexStatement, type ReadingIndexRow, type ReadingIndexState } from './library-index';
 
@@ -50,12 +53,12 @@ export const etagMatches = (header: string | null, etag: string) => header?.spli
 // requests for a 10,000-item library.
 export const READING_LIST_PAGE = 1000;
 
-export interface ReadingRow { portable_path: string; path: string; metadata_json: string | null; error: string | null; article_edited: number; duplicate: number; saved_at: string }
-export const ROW_COLUMNS = 'portable_path, path, metadata_json, error, article_edited, duplicate, saved_at';
-export const queuedStatement = (env: Env, current: ReadingPolicy) =>
+interface ReadingRow { portable_path: string; path: string; metadata_json: string | null; error: string | null; article_edited: number; duplicate: number; saved_at: string }
+const ROW_COLUMNS = 'portable_path, path, metadata_json, error, article_edited, duplicate, saved_at';
+const queuedStatement = (env: Env, current: ReadingPolicy) =>
 	env.DB.prepare('SELECT note FROM reading_captures WHERE generation=? ORDER BY available_at LIMIT 1000').bind(current.generation);
 
-export function listedPage(current: ReadingPolicy, rows: ReadingRow[], queued: Array<{ note: string }>) {
+function listedPage(current: ReadingPolicy, rows: ReadingRow[], queued: Array<{ note: string }>) {
 	const issue = (row: ReadingRow) => row.error
 		?? (row.article_edited && current.enabled ? ARTICLE_EDITED_ERROR : null)
 		?? (row.duplicate ? READING_DUPLICATE_ID_ISSUE : null);
@@ -107,4 +110,68 @@ export async function readingListDelta(env: Env, current: ReadingPolicy, index: 
 	if (!snapshot || since < snapshot.removedSeq || rows.length > READING_LIST_PAGE || removed.length > READING_LIST_PAGE) return null;
 	const changedPaths = [...new Set([...removed.map(row => row.path), ...rows.map(row => row.path)])];
 	return { delta: true as const, changedPaths, ...listedPage(current, rows, queued), cursor: null };
+}
+
+/** One page of the library view. Small, so a visit reads about one page of rows. */
+const READING_ITEMS_PAGE = 50;
+const MAX_READING_QUERY_TERMS = 10;
+/** `all` lists every section, for a link or ID lookup. */
+const SECTION_FILTERS: Record<ReadingSection | 'all', string> = {
+	inbox: "status = 'inbox'", archived: "status = 'archived'", favorites: 'favorite = 1', highlights: 'highlighted = 1', all: 'status IS NOT NULL',
+};
+/** Above every code point, so `term < prefix + TERM_END` keeps every word that starts with `prefix`. */
+const TERM_END = '\u{10FFFF}';
+
+export interface ReadingItemsQuery {
+	section: ReadingSection | 'all'; cursor: string;
+	/** A Reading ID, to find one note. */
+	id?: string;
+	/** Unencrypted vaults: query words, a tag and a link. */
+	q?: string; tag?: string; url?: string;
+	/** Encrypted vaults: hashed terms; every one must match. */
+	terms?: string[];
+}
+
+export function parseReadingItemsQuery(params: URLSearchParams, encrypted: boolean): ReadingItemsQuery {
+	const section = params.get('section') ?? 'inbox';
+	if (!(section in SECTION_FILTERS)) throw new ReadingError('Unknown Reading section.');
+	const text = (name: string, max: number) => { const value = params.get(name) ?? ''; if (value.length > max) throw new ReadingError('Search is too long.'); return value || undefined; };
+	const id = params.get('id');
+	const common = { section: section as ReadingSection | 'all', cursor: params.get('cursor') ?? '', ...id !== null ? { id: readingItemId(id) } : {} };
+	if (!encrypted) return { ...common, q: text('q', 500), tag: text('tag', 500), url: text('url', 8192) };
+	const terms = params.getAll('term');
+	if (terms.length > MAX_READING_QUERY_TERMS || !terms.every(isHashedReadingTerm)) throw new ReadingError('Invalid search terms.');
+	return { ...common, terms };
+}
+
+interface ItemsRow extends ReadingRow { card: string | null; storage_key: string; stale: number; hash: string; size: number; item_id: string; status: string; favorite: number; highlighted: number }
+
+/** Newest first. Each term narrows the page through `reading_terms`, so a search reads the
+ * notes it matches, not the library. The first unfiltered inbox page carries the capture queue
+ * and the issues; an encrypted page carries each card for the device to open. */
+export async function readingItems(env: Env, current: ReadingPolicy, encrypted: boolean, query: ReadingItemsQuery) {
+	const after = parseListCursor(query.cursor), where = [SECTION_FILTERS[query.section]], args: unknown[] = [];
+	where.push(encrypted ? 'card IS NOT NULL' : 'metadata_json IS NOT NULL AND duplicate = 0');
+	if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
+	if (query.id) { where.push('item_id = ?'); args.push(query.id); }
+	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS);
+	for (const word of words) { where.push('portable_path IN (SELECT portable_path FROM reading_terms WHERE term >= ? AND term < ?)'); args.push(`w:${word}`, `w:${word}${TERM_END}`); }
+	const exact = encrypted ? query.terms ?? [] : query.tag ? [`t:${normalizedTag(query.tag)}`] : [];
+	for (const term of exact) { where.push('portable_path IN (SELECT portable_path FROM reading_terms WHERE term = ?)'); args.push(term); }
+	if (!encrypted && query.url) {
+		let identity: string; try { identity = readingUrlIdentity(query.url); } catch { throw new ReadingError('Enter a valid web link.'); }
+		where.push('url_identity = ?'); args.push(identity);
+	}
+	const page = env.DB.prepare(`SELECT ${ROW_COLUMNS}, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted FROM reading_items WHERE ${where.join(' AND ')}
+    ORDER BY saved_at DESC, portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args);
+	const first = !after && query.section === 'inbox' && !words.length && !exact.length && !query.url && !query.id && !encrypted;
+	const [{ results }, queuedRows, issueRows] = await env.DB.batch(first ? [page, queuedStatement(env, current),
+		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1 LIMIT 1000`)] : [page]) as [Rows<ItemsRow>, Rows<{ note: string }>?, Rows<ReadingRow>?];
+	const last = results.at(-1);
+	const cursor = results.length === READING_ITEMS_PAGE && last ? JSON.stringify([last.saved_at, last.portable_path]) : null;
+	// The device checks the fields the page was sorted and filtered by against each card.
+	if (encrypted) return { cards: results.map(row => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, card: row.card!, stale: row.stale === 1,
+		fields: { item_id: row.item_id, saved_at: row.saved_at, status: row.status, favorite: row.favorite === 1, highlighted: row.highlighted === 1 } })), cursor };
+	const listed = listedPage(current, results, queuedRows?.results ?? []);
+	return { items: listed.items, issues: issueRows ? listedPage(current, issueRows.results, []).issues : [], cursor };
 }

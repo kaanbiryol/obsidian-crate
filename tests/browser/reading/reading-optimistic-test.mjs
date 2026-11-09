@@ -43,7 +43,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         if (req.url === '/reading/update' && loseUpdateReplies) {
           return Response.json({ error: 'Update acknowledgement interrupted' }, { status: 503 });
         }
-        if (req.url.startsWith('/reading/list')) listResponses++;
+        if (req.url.startsWith('/reading/items')) listResponses++;
         return response;
       },
     });

@@ -27,7 +27,7 @@ try {
         let checks = 0;
         await page.route('**/notifications/version.json*', route => { checks++; return route.fulfill({ json: { assetVersion: available } }); });
         await page.route('**/reading/session', route => route.fulfill({ json: { id: 'update-notice', folderPath: 'Reading', generation: 'notice-generation', expiresAt: Date.now() + 86400000 } }));
-        await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+        await page.route('**/reading/items*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
         await page.clock.install();
         await page.goto(origin + '/notifications?section=reading');
         await expect(page.locator('.crate-reading__mobile-nav')).toBeVisible();

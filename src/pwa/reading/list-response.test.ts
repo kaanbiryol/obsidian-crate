@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
-import { loadReading, MAX_READING_LIST_ISSUES, MAX_READING_LIST_ITEMS, MAX_READING_LIST_PAGES } from './api';
+import { loadReading, queryReadingItems } from './api';
 import { commitReadingCache, type ReadingCache } from './storage/storage';
 import { type ReadingSession } from './session/session';
 
@@ -21,7 +21,7 @@ const issue = { path: 'Reading/Damaged.md', message: 'Source could not be read.'
 function item(index: number, path = `Reading/${index}.md`): ReadingItem {
 	return {
 		crate_reading_version: 1, crate_reading_id: `00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`,
-		title: `Article ${index}`, source_url: `https://example.com/${index}`, saved_at: '2026-10-01T12:00:00Z',
+		title: `Article ${index}`, source_url: `https://example.com/${index}`, saved_at: '2026-10-01T12:00:00.000Z',
 		reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready', path,
 	};
 }
@@ -31,9 +31,7 @@ function respond(...pages: unknown[]) {
 beforeEach(() => {
 	vi.clearAllMocks(); network.mockReset();
 	network.mockImplementation(async () => { throw new Error('Unexpected extra list request'); });
-	// These libraries have no card index, so a first load lists pages; `network` sees only those.
-	vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => (typeof input === 'string' ? input : input instanceof URL ? input.href : input.url).startsWith('/reading/index')
-		? Promise.resolve(Response.json({ error: 'Missing', code: 'reading_index_missing' }, { status: 404 })) : network(input, init));
+	vi.stubGlobal('fetch', network);
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -54,147 +52,16 @@ it.each([
 	expect(commitReadingCache).not.toHaveBeenCalled();
 });
 
-it('accepts queued captures, source issues and an empty terminal page as one revision', async () => {
-	const queued = item(1, ''), article = item(2);
-	respond({ items: [queued, article], issues: [issue], cursor: 'Reading/Last source.md' }, { items: [], issues: [], cursor: null });
-	const cache = await loadReading(session);
-	expect(network.mock.calls.map(([path]) => path)).toEqual(['/reading/list', '/reading/list?cursor=Reading%2FLast%20source.md']);
-	expect(cache).toMatchObject({ items: [
-		{ ...queued, saved_at: '2026-10-01T12:00:00.000Z' },
-		{ ...article, saved_at: '2026-10-01T12:00:00.000Z' },
-	], issues: [issue] });
-	expect(commitReadingCache).toHaveBeenCalledExactlyOnceWith(session, cache);
+it('saves the first inbox page and its issues, and rejects repeated Reading IDs', async () => {
+	respond({ items: [item(2), item(1)], issues: [issue], cursor: '["2026","reading/1.md"]' });
+	await expect(loadReading(session)).resolves.toMatchObject({ items: [item(2), item(1)], issues: [issue] });
+	expect(network.mock.calls[0]![0]).toBe('/reading/items?section=inbox');
+	respond({ items: [item(1), item(1)], issues: [], cursor: null });
+	await expect(loadReading(session)).rejects.toThrow('Reading library response is unreadable.');
 });
 
-it('rejects a bad later page without publishing the valid prefix', async () => {
-	respond({ items: [item(1)], issues: [], cursor: 'next' }, { items: [], issues: [], cursor: {} });
-	await expect(loadReading(session)).rejects.toThrow('unreadable');
-	expect(network).toHaveBeenCalledTimes(2);
-	expect(commitReadingCache).not.toHaveBeenCalled();
-});
-
-it.each([['A', 'A'], ['A', 'B', 'A']])('stops a cursor cycle: %j', async (...cursors) => {
-	respond(...cursors.map(cursor => ({ items: [], issues: [], cursor })));
-	await expect(loadReading(session)).rejects.toThrow('Reading library did not advance.');
-	expect(network).toHaveBeenCalledTimes(cursors.length);
-	expect(commitReadingCache).not.toHaveBeenCalled();
-});
-
-it('bounds empty pages even when every cursor is different', async () => {
-	network.mockImplementation(async () => Response.json({ items: [], issues: [], cursor: `page-${network.mock.calls.length}` }));
-	await expect(loadReading(session)).rejects.toThrow('too large');
-	expect(network).toHaveBeenCalledTimes(MAX_READING_LIST_PAGES);
-	expect(commitReadingCache).not.toHaveBeenCalled();
-});
-
-it.each(['items', 'issues'] as const)('rejects cumulative %s overflow on the terminal page', async field => {
-	const limit = field === 'items' ? MAX_READING_LIST_ITEMS : MAX_READING_LIST_ISSUES;
-	const records = field === 'items' ? Array.from({ length: limit + 1 }, (_, index) => item(index)) : Array.from({ length: limit + 1 }, () => issue);
-	respond({ items: [], issues: [], [field]: records.slice(0, limit - 100), cursor: 'next' },
-		{ items: [], issues: [], [field]: records.slice(limit - 100), cursor: null });
-	await expect(loadReading(session)).rejects.toThrow('too large');
-	expect(network).toHaveBeenCalledTimes(2);
-	expect(commitReadingCache).not.toHaveBeenCalled();
-});
-
-it('accepts the item and issue budgets exactly, including a terminal page', async () => {
-	const items = Array.from({ length: 10_000 }, (_, index) => item(index));
-	const issues = Array.from({ length: 10_000 }, () => issue);
-	respond({ items: items.slice(0, 6000), issues: issues.slice(0, 6000), cursor: 'next' },
-		{ items: items.slice(6000), issues: issues.slice(6000), cursor: null });
-	const cache = await loadReading(session);
-	expect(cache.items).toHaveLength(10_000);
-	expect(cache.issues).toHaveLength(10_000);
-	expect(commitReadingCache).toHaveBeenCalledExactlyOnceWith(session, cache);
-});
-
-it('retains duplicate-identity validation across otherwise valid pages', async () => {
-	respond({ items: [item(1)], issues: [], cursor: 'next' }, { items: [item(1)], issues: [], cursor: null });
-	await expect(loadReading(session)).rejects.toThrow('unreadable');
-	expect(commitReadingCache).not.toHaveBeenCalled();
-});
-
-it('keeps the previous library when the server reports it unchanged', async () => {
-	const previous: ReadingCache = { items: [item(1)], issues: [], savedAt: 1, revision: '"etag"' };
-	network.mockResolvedValueOnce(new Response(null, { status: 304 }));
-	expect(await loadReading(session, previous)).toBe(previous);
-	expect(new Headers(network.mock.calls[0]![1]!.headers).get('If-None-Match')).toBe('"etag"');
-	expect(commitReadingCache).not.toHaveBeenCalled();
-});
-
-it('stores the first page ETag with a reloaded library', async () => {
-	network.mockResolvedValueOnce(Response.json({ items: [item(1)], issues: [], cursor: null }, { headers: { ETag: '"next"' } }));
-	expect(await loadReading(session, { items: [], issues: [], savedAt: 1, revision: '"old"' })).toMatchObject({ revision: '"next"', items: [{ path: 'Reading/1.md' }] });
-});
-
-const BASE = '7.0123456789abcdef0123456789abcdef', NEXT = '9.0123456789abcdef0123456789abcdef';
-const withBase = (page: unknown, base = BASE, etag = '"next"') => Response.json(page, { headers: { ETag: etag, 'X-Crate-Delta-Base': base } });
-const requested = (index: number) => network.mock.calls[index]![0];
-
-it('keeps the delta base and asks for changes since it', async () => {
-	network.mockResolvedValueOnce(withBase({ items: [item(1)], issues: [], cursor: 'next' }))
-		.mockResolvedValueOnce(Response.json({ items: [item(2)], issues: [], cursor: null }));
-	const cache = await loadReading(session);
-	expect(cache).toMatchObject({ revision: '"next"', deltaBase: BASE });
-	network.mockResolvedValueOnce(new Response(null, { status: 304 }));
-	await loadReading(session, cache);
-	expect(requested(2)).toBe(`/reading/list?since=${encodeURIComponent(BASE)}`);
-});
-
-it('replaces changed notes and the capture queue from a delta', async () => {
-	const kept = item(1), edited = item(2), removed = item(3), oldQueued = item(4, ''), newQueued = item(5, ''), added = item(6);
-	const previous: ReadingCache = { items: [oldQueued, kept, edited, removed], issues: [{ path: 'Reading/3.md', message: 'Old' }, issue], savedAt: 1, revision: '"old"', deltaBase: BASE };
-	network.mockResolvedValueOnce(withBase({ delta: true, changedPaths: ['Reading/2.md', 'Reading/3.md', 'Reading/6.md'],
-		items: [newQueued, { ...edited, favorite: true }, added], issues: [], cursor: null }, NEXT));
-	const cache = await loadReading(session, previous);
-	expect(requested(0)).toBe(`/reading/list?since=${encodeURIComponent(BASE)}`);
-	expect(network).toHaveBeenCalledOnce();
-	expect(cache.items.map(entry => [entry.crate_reading_id, entry.favorite]).sort()).toEqual(
-		[newQueued, { ...edited, favorite: true }, added, kept].map(entry => [entry.crate_reading_id, entry.favorite]).sort());
-	expect(cache).toMatchObject({ issues: [issue], revision: '"next"', deltaBase: NEXT });
-	expect(commitReadingCache).toHaveBeenCalledExactlyOnceWith(session, cache);
-});
-
-it.each([
-	['an item outside its changed paths', { items: [item(9)], changedPaths: [] }],
-	['an issue outside its changed paths', { items: [], issues: [issue], changedPaths: [] }],
-	['an identity an unchanged note holds', { items: [item(1, 'Reading/Moved.md')], changedPaths: ['Reading/Moved.md'] }],
-])('relists instead of applying a delta with %s', async (_name, delta) => {
-	const previous: ReadingCache = { items: [item(1)], issues: [], savedAt: 1, revision: '"old"', deltaBase: BASE };
-	network.mockResolvedValueOnce(withBase({ delta: true, issues: [], cursor: null, ...delta }))
-		.mockResolvedValueOnce(withBase({ items: [item(2)], issues: [], cursor: null }, NEXT));
-	expect(await loadReading(session, previous)).toMatchObject({ items: [{ path: 'Reading/2.md' }], deltaBase: NEXT });
-	expect(requested(1)).toBe('/reading/list');
-	expect(new Headers(network.mock.calls[1]![1]!.headers).has('If-None-Match')).toBe(false);
-});
-
-it.each([
-	{ delta: true, items: [], issues: [], cursor: 'next', changedPaths: [] },
-	{ delta: true, items: [], issues: [], cursor: null },
-	{ delta: true, items: [], issues: [], cursor: null, changedPaths: [42] },
-])('rejects a malformed delta envelope: %#', async page => {
-	respond(page);
-	await expect(loadReading(session, { items: [], issues: [], savedAt: 1, deltaBase: BASE })).rejects.toThrow('unreadable');
-	expect(commitReadingCache).not.toHaveBeenCalled();
-});
-
-it('shows the pages of a first load before the library is saved', async () => {
-	const progress = vi.fn();
-	respond({ items: [item(1)], issues: [], cursor: 'a' }, { items: [item(2)], issues: [issue], cursor: 'b' }, { items: [item(3)], issues: [], cursor: null });
-	const cache = await loadReading(session, undefined, progress);
-	expect(progress.mock.calls.map(([partial]) => (partial as ReadingCache).items.length)).toEqual([1, 2]);
-	expect(progress.mock.calls[1]![0]).toMatchObject({ issues: [issue] });
-	expect(cache.items).toHaveLength(3);
-	// A reload keeps showing the saved library until the new one is complete.
-	progress.mockClear();
-	respond({ items: [item(1)], issues: [], cursor: 'a' }, { items: [item(2)], issues: [], cursor: null });
-	await loadReading(session, cache, progress);
-	expect(progress).not.toHaveBeenCalled();
-});
-
-it('keeps how many older notes a limited encrypted library left out, and ignores an invalid count', async () => {
-	respond({ items: [item(1)], issues: [], cursor: null, omitted: 40_000 });
-	expect((await loadReading(session)).omitted).toBe(40_000);
-	respond({ items: [item(1)], issues: [], cursor: null, omitted: -1 });
-	expect((await loadReading(session)).omitted).toBeUndefined();
+it('asks the server for one page of a section, search and tag', async () => {
+	respond({ items: [item(1)], issues: [], cursor: null });
+	await expect(queryReadingItems(session, { section: 'archived', q: 'java mem', tag: 'Code', cursor: 'next' })).resolves.toEqual({ items: [item(1)], issues: [], cursor: null });
+	expect(network.mock.calls[0]![0]).toBe('/reading/items?section=archived&q=java+mem&tag=Code&cursor=next');
 });

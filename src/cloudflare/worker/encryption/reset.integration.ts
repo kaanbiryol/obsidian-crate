@@ -56,7 +56,7 @@ it('requires vault authority, the current encryption identity and explicit destr
 });
 
 it('resumes bounded deletion, revokes old devices and grants, and never repeats a completed wipe', async () => {
-	const readingTables = ['reading_policy', 'reading_items', 'reading_removals', 'reading_index', 'reading_jobs', 'reading_operations', 'reading_enrollments', 'reading_handoffs', 'reading_captures'];
+	const readingTables = ['reading_policy', 'reading_items', 'reading_terms', 'reading_removals', 'reading_index', 'reading_jobs', 'reading_operations', 'reading_enrollments', 'reading_handoffs', 'reading_captures'];
 	await env.DB.batch([
 		env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')"),
 		env.DB.prepare("INSERT INTO reading_items(portable_path,path,storage_key,hash,size,metadata_json) VALUES ('reading/private.md','Reading/private.md','r','hash',1,'private metadata')"),

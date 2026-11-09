@@ -60,7 +60,7 @@ try {
       page.on('pageerror', error => errors.push(error.message));
       await page.addInitScript(session => localStorage.setItem('crate-reading-session-v1', JSON.stringify(session)), session);
       await page.route('**/reading/session', route => route.fulfill({ json: session }));
-      await page.route('**/reading/list*', route => route.fulfill({ json: { items, issues: [], cursor: null } }));
+      await page.route('**/reading/items*', route => route.fulfill({ json: { items, issues: [], cursor: null } }));
       let heldArticle;
       await page.route('**/reading/item?*', async route => {
         if (heldArticle) {

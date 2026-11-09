@@ -11,15 +11,13 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { FOREGROUND_REFRESH_GAP_MS, onAppResume, type AppResumeReason } from '../shell/app-resume';
 
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
-export function useReadingSync({ session, ready, readOnly, pending, publishSyncResult, publishPartialCache, isCurrentSession, run, resetSession, retryVerification }: Pick<ReturnType<typeof useReadingSession>,
-	'session' | 'ready' | 'readOnly' | 'pending' | 'publishSyncResult' | 'publishPartialCache' | 'isCurrentSession' | 'run' | 'resetSession' | 'retryVerification'>, enabled = true) {
+export function useReadingSync({ session, ready, readOnly, pending, publishSyncResult, isCurrentSession, run, resetSession, retryVerification }: Pick<ReturnType<typeof useReadingSession>,
+	'session' | 'ready' | 'readOnly' | 'pending' | 'publishSyncResult' | 'isCurrentSession' | 'run' | 'resetSession' | 'retryVerification'>, enabled = true) {
 	const enabledRef = useRef(enabled);
 	enabledRef.current = enabled;
 	const [syncing, setSyncing] = useState(false), [syncedSession, setSyncedSession] = useState<ReadingSession | null>(null);
 	const isOffline = !useOnlineStatus(() => setSyncedSession(null));
 	const refreshing = useRef(false), refreshQueued = useRef<{ session: ReadingSession; mode: ReadingRetryMode } | null>(null);
-	// The last confirmed library, so a conditional reload can keep it without decoding storage.
-	const confirmedCache = useRef<{ session: ReadingSession; cache: ReadingCache } | null>(null);
 	const completedAt = useRef<{ session: ReadingSession; at: number } | null>(null);
 	const refresh = useCallback(async (current = session, mode: ReadingRetryMode = 'automatic') => {
 		if (!current || !enabledRef.current || !isCurrentSession(current)) return;
@@ -48,21 +46,17 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 				if (connected?.day !== undefined) verified = { day: connected.day, generation: current.generation };
 			}
 			let data: ReadingCache | undefined;
-			let completed = false, partial = false;
+			let completed = false;
 			try {
 				const confirmed = await drainReading(current, mode, () => enabledRef.current, verified);
 				if (confirmed) data = confirmed;
 				else if (navigator.onLine && enabledRef.current) {
-					const previous = confirmedCache.current?.session === current ? confirmedCache.current.cache : await readReadingCache(current).catch(() => undefined);
-					data = await loadReading(current, previous, pages => { partial = true; publishPartialCache(current, pages); });
+					data = await loadReading(current);
 				} else data = await readReadingCache(current);
-				if (data) confirmedCache.current = { session: current, cache: data };
 				completed = true;
 			} finally {
 				// Publish the latest durable queue even when refreshing the list fails.
 				// Queue edits and this read share a lock so a stale refresh cannot hide new work.
-				// A failed first load must not leave its first pages looking like the whole library.
-				if (partial && !completed) publishPartialCache(current, null);
 				await readingLock(async () => {
 					const work = await pendingReading(current);
 					assertReadingSession(current);
@@ -77,7 +71,7 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 			refreshQueued.current = null;
 			if (queued && isCurrentSession(queued.session)) void run(() => refresh(queued.session, queued.mode));
 		}
-	}, [session, readOnly, run, isCurrentSession, publishSyncResult, publishPartialCache, resetSession, retryVerification]);
+	}, [session, readOnly, run, isCurrentSession, publishSyncResult, resetSession, retryVerification]);
 	const retryAt = Math.min(...pending.map(op => readingRetryAt(op) ?? Infinity));
 	useEffect(() => {
 		if (!enabled || !session || !ready || readOnly || isOffline || !Number.isFinite(retryAt)) return;

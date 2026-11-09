@@ -17,9 +17,7 @@ export function isReadingSession(value: unknown): value is ReadingSession {
 
 export function isReadingCache(value: unknown, folder: string): value is ReadingCache {
 	if (!isRecord(value) || !nonNegativeNumber(value.savedAt) || !Array.isArray(value.items) || !Array.isArray(value.issues)
-		|| (value.revision !== undefined && (typeof value.revision !== 'string' || value.revision.length > 128))
-		|| (value.deltaBase !== undefined && (typeof value.deltaBase !== 'string' || value.deltaBase.length > 128))
-		|| (value.omitted !== undefined && !(Number.isSafeInteger(value.omitted) && (value.omitted as number) > 0))) return false;
+		|| (value.cursor !== undefined && value.cursor !== null && (typeof value.cursor !== 'string' || !value.cursor || value.cursor.length > 4096))) return false;
 	const ids = new Set<string>();
 	return value.items.every((item: unknown) => {
 		if (!isReadingItem(item, folder) || ids.has(item.crate_reading_id)) return false;

@@ -12,7 +12,7 @@ export async function checkDisabledReading(browser, origin, name) {
 		if (holdReadingCheck) await new Promise(resolve => { releaseReadingCheck = resolve; });
 		await route.fulfill(readingEnabled ? { json: { id: 'enabled-reading', folderPath: 'Reading', generation: 'enabled-generation', expiresAt: Date.now() + 86400000 } } : { status: 403, json: { error: 'Choose a Reading folder in Obsidian’s Crate settings first.', code: 'reading_not_configured' } });
 	});
-	await disabledPage.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+	await disabledPage.route('**/reading/items*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
 	await disabledPage.goto(origin + '/notifications?tab=inbox');
 	await disabledPage.getByRole('button', { name: 'Open settings', exact: true }).click();
 	const disabledSheet = disabledPage.getByRole('dialog', { name: 'Settings', exact: true });

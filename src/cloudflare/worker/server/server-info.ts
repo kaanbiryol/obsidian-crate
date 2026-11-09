@@ -5,7 +5,6 @@ import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 import release from '../../server-release.json';
 import type { Env } from '../types';
 import { BULK_NEW_UPLOAD_CAPABILITY } from '../../../protocol/sync-limits';
-import { READING_INDEX_CAPABILITY } from '../../../protocol/reading-index';
 import {
 	CRATE_PLUGIN_PROTOCOL,
 	CRATE_SERVICE_ID,
@@ -39,7 +38,6 @@ export const CRATE_SERVER_INFO: Omit<CrateServerInfo, 'serverRevision' | 'remind
 		INITIAL_IMPORT_CAPABILITY,
 		BULK_NEW_UPLOAD_CAPABILITY,
 		'sync-v1',
-		READING_INDEX_CAPABILITY,
 		'file-revision-deletes',
 		'upload-operation-receipts',
 		'restore-operation-receipts',

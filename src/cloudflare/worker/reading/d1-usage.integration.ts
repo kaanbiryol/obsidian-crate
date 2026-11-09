@@ -24,8 +24,9 @@ const NOTES = 10_000;
 const UNRELATED_FILES = 10_000;
 // Reads cost authentication, the Reading policy and index rows, and the item itself.
 const MAX_READ_ROWS = 20;
-// Saves add the file commit, its version, changelog and receipt rows, and the index update.
-const MAX_WRITE_ROWS = 80;
+// Saves add the file commit, its version, changelog and receipt rows, the index update and the
+// checks that skip unchanged section columns and search terms.
+const MAX_WRITE_ROWS = 120;
 const policy = { enabled: 1, folder_path: 'Reading', generation: 'g', revision: 'r' };
 const operationId = () => createReminderOperationId(Math.floor(Date.now() / 86400_000));
 

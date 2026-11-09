@@ -36,7 +36,8 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 - [Reading highlights](reading-highlights.md) - how highlights are stored in article Markdown and edited safely.
 - [Reading shortcuts](reading-shortcuts.md) - maintaining the iPhone shortcut and its capture contract.
 - [Reading and encryption](reading-e2ee-assessment.md) - how Reading works with end-to-end encryption.
-- [Reading at large library sizes](reading-scale.md) - 50,000-note libraries: what is built, the chosen card index design, offline copies on request, tradeoffs, and how to measure D1 costs.
+- [Reading library and search on the server](reading-search.md) - the web app's paged library and title search in both vault modes, what an encrypted vault reveals, and costs.
+- [Reading at large library sizes](reading-scale.md) - 50,000-note libraries: plugin work, offline copies on request, earlier designs, and how to measure D1 costs.
 - `shortcuts/save-to-crate.plist` is the iPhone shortcut source file, not a document.
 
 ## PWA and shared UI

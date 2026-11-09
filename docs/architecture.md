@@ -490,8 +490,8 @@ and writes go through `reminders/data/vault-markdown.ts`, so a note that is not 
 is listed as an issue instead of being rewritten with replacement characters. `reading/runtime.ts`
 owns configuration, policy refresh, scheduling and lifecycle cleanup.
 Reading's background work runs whether or not Reading is open: `reading/data/maintenance.ts`
-imports clips, records highlight markers and runs the strict check on each changed note, and
-`reading/data/card-index-publisher.ts` publishes the card index the web apps read. The card list,
+imports clips, records highlight markers and runs the strict check on each changed note. The web
+app reads the library from the server a page at a time ([Reading search](reading-search.md)). The card list,
 `reading/data/library.ts`, is built only while a Reading view or an action uses it, from
 Obsidian's frontmatter cache through the adapter's `cachedProperties`, and reads only notes the
 cache has not indexed or fails to validate, or that changed while it exists. Vault events and

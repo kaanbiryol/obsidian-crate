@@ -4,11 +4,12 @@ Target: 50,000 Reading notes with the fewest reads and writes: no slow startup o
 Obsidian, and web app visits whose D1 and R2 cost does not grow with the library.
 
 **Status.** Built: the local benchmark (step 0), the plugin list from Obsidian's frontmatter cache
-(step 1), the encrypted web app loading its most recent notes (step 2), fewer rows written per
-web app edit, [offline copies only on request](#offline-copies-on-request),
-[plugin background work apart from the card list](#plugin-background-work-apart-from-the-card-list),
-and a [card index the plugin writes](#chosen-design-a-card-index-the-plugin-writes) for both web
-apps. Not measured yet on a hosted server or a phone.
+(step 1), fewer rows written per web app edit, [offline copies only on request](#offline-copies-on-request)
+and [plugin background work apart from the card list](#plugin-background-work-apart-from-the-card-list).
+The web app no longer holds the library: it reads pages and searches titles on the server in
+both vault modes, as described in [Reading library and search on the server](reading-search.md).
+That replaced step 2 and the card index below, which are kept here as history. Not measured yet
+on a hosted server or a phone.
 Measurements are also in [sync capacity](sync-capacity.md#reading-capacity-measurements).
 
 ## Problem
@@ -33,8 +34,9 @@ Every client built the complete Reading library locally.
 - No migration code. When a schema change is needed, servers are deleted and created again.
 - Fewest reads and writes and robustness come first. Offline use does not shape the list: the
   web app keeps an article offline only when the user saves it.
-- Both web apps read the library from a card index the plugin writes. The server stores it and
-  never reads it; the notes stay the source of truth.
+- The web app reads the library a page at a time and searches titles on the server
+  ([Reading library and search on the server](reading-search.md)). This replaced an earlier
+  decision for a card index the plugin writes; the notes stay the source of truth.
 - Not planned: server-side search (option S), a 10,000-note cap for unencrypted vaults (option
   U), per-note encrypted records, plaintext status or keyword hashes for encrypted vaults (both
   reveal note contents to the server), substring (trigram) matching, and splitting the Reading
@@ -164,115 +166,12 @@ would still need a receipt. Rejected. Dropping the staging record for edits the 
 itself would save 3 rows but needs another way to clean up a stored copy left by a failed save;
 not done.
 
-## Chosen design: a card index the plugin writes
+## Superseded: a card index the plugin writes
 
-Built. Rows in the comparison below are estimates except where the Worker suite measures them
-(`card-index.integration.ts`: a tail over a 10,000-note library reads fewer than 40 rows).
-
-### Why
-
-Every other web app path reads something that grows with the library:
-
-- Encrypted, as built in step 2: any vault change makes the next refresh list every Reading
-  file (about one D1 row each), and a new device downloads up to 10,000 whole notes, article
-  text included, to read their frontmatter.
-- Option U: about 10,100 rows and 10 requests on every first load, capped at 10,000 notes.
-- Option S: about 110 rows per page, 6,000 to 8,000 per common search, about 5 more rows written
-  per edit, and about 550,000 rows to build. Unencrypted vaults only.
-
-The plugin already keeps every card in memory (step 1) and holds the vault key. Writing those
-cards once, as a few objects the web app downloads, makes a web app visit cost the same at 1,000
-and 50,000 notes, and gives both vault modes one path.
-
-### Shape
-
-Format in `src/protocol/reading-index.ts` (manifest, shard number, limits) and
-`src/reading/core/card-index.ts` (cards, shard bytes, sealing).
-
-- **Card**: the note's listed item, highlights included, and in an encrypted vault its server
-  path (`wire`). Highlights stay in cards: R2 bills per operation, not per byte, so separate
-  highlight shards would only add writes when highlights change.
-- **Shards**: 64, by an FNV-1a hash of the note's portable path, so a note always lands in the
-  same shard and one edit rewrites one shard. Cards are sorted by path, so equal notes give
-  equal bytes. A shard is `{ format: 1, shard, cards }` as JSON; in an encrypted vault, a
-  vault-key envelope (`purpose: 'reading-index'`) whose object ID binds the shard number, key
-  generation and folder generation. Not compressed (see [privacy](#privacy-encrypted-vaults)).
-- **Shard objects**: `__crate__/reading-index/shards/<sha256 of the stored bytes>`, immutable.
-- **Manifest**: one R2 object, `__crate__/reading-index/manifest.json`: format, folder
-  generation, `basis` (the vault changelog `seq` the cards reflect) and the 64 shard hashes. An
-  encrypted vault adds the key generation and `sealed`: the same fields plus each shard's
-  plaintext hash, encrypted, so the server cannot point the web app at other shards or another
-  basis. The Worker adds the vault's reset and import generations, which a later GET must match,
-  and the replaced shards waiting to be deleted. No D1 table or schema change.
-
-### Writing (plugin)
-
-`ReadingIndexPublisher` (`src/reading/data/card-index-publisher.ts`), run by the background
-work in `src/reading/runtime.ts`:
-
-- Cards come from Obsidian's frontmatter cache; a note is read only when the cache has not
-  indexed it. Notes not imported yet and notes the background work flagged are left out.
-- Publishes when sync is idle, nothing in the Reading folder waits to upload, and Reading
-  changes have been quiet for 10 seconds, so the cache has indexed what sync wrote; at most
-  once a minute, the first time 30 seconds after startup. `basis` is the plugin's `lastSeq`.
-- Reads the manifest, uploads only shards whose plaintext hash differs, then writes the
-  manifest conditionally on the ETag it read. Encrypted envelopes are random, so equal content
-  is detected from the sealed plaintext hashes. A newer manifest from another device wins
-  (`behind`); a lost race (`conflict`) retries a minute later. With no card change, the manifest
-  moves its basis forward only once it is 500 changes behind.
-- Replaced shards are deleted by a publish a day later, so a web app reading the old manifest
-  still finds them.
-- Cost per publish: one manifest read and write in R2, one R2 write per changed shard, and the
-  change state read (a few D1 rows). A first build writes the non-empty shards and the manifest.
-- Only after the server lists `reading-index-v1` in its capabilities.
-
-### Reading (web app)
-
-- Unencrypted (`loadReadingFromIndex` in `src/pwa/reading/api.ts`): a first load, or one whose
-  saved copy cannot be revalidated, reads the manifest, every shard and the tail. The tail
-  returns the changed cards, the list ETag and the change base, so later refreshes use the
-  ordinary conditional list and its delta. Without an index, or with a tail the changelog cannot
-  replay, it lists every page as before.
-- Encrypted (`src/pwa/reading/encrypted-card-index.ts` and `EncryptedReadingApi`): every
-  refresh reads the manifest conditionally, downloads only shards it does not have, and reads
-  the tail after the last position it read (the basis after a new manifest). Changed files in
-  the tail are downloaded and opened; a note the server sealed may not replace or take the name
-  of a listed note. Opening or editing a note reads that one file's server entry
-  (`/reading/index/file`) instead of listing the folder. Shards are kept in IndexedDB by hash
-  (`card-shard:`), and the manifest, position and opened changes in `card-index:`.
-- A tail past 1,000 notes or older than the changelog keeps the index as it is and shows "Open
-  Obsidian to update this library" among the issues. Without an index, or with one that fails
-  to load or verify, both clients list the library as before (step 2 for encrypted vaults); the
-  index only saves reads.
-- Search, filters, tags and counts run on the device over the whole library, on every field.
-  The duplicate-link check and the sealed-note check cover the whole library in both modes.
-
-### Robustness
-
-- Notes stay the only source of truth; the index is derived. A lost, damaged or stale index costs
-  a rebuild, never data. A shard that fails its hash or decryption is ignored and reported, and
-  the next publish replaces it.
-- The manifest write is the only commit. A reader sees the whole old index or the whole new one.
-- The format is versioned with frozen fixtures, like other stored formats. A reader that does not
-  know a version uses the fallback.
-- An encryption reset changes the generation, and a manifest from another generation is ignored.
-- Web app edits keep their current guarantees: operation IDs, receipts and the outbox.
-
-### Privacy (encrypted vaults)
-
-- The server learns shard count, sizes and which shard changed when. It already sees each Reading
-  file's size and write time.
-- Shards are not compressed before sealing. The server can create notes (sealed captures) whose
-  titles would be compressed next to private titles, and size changes could then confirm guesses
-  about them.
-- Belongs in the independent security review that [Reading and encryption](reading-e2ee-assessment.md)
-  already lists.
-
-### Size
-
-The unencrypted list response measured about 325 bytes per card (16.2 MB for 50,000), so 50,000
-cards are about 16 MB: about 3 to 5 MB gzipped, and about 16 MB sealed. A new device downloads that
-once; afterwards a change costs other devices one shard, about 250 KB.
+Built and then removed. Obsidian wrote every card into 64 shards in R2 with a manifest, and both
+web apps downloaded the whole index once (about 16 MB at 50,000 notes) and searched it on the
+device. It was replaced by [server pages and title search](reading-search.md), which needs no
+whole-library download and no Obsidian device to keep the web app current.
 
 ## Offline copies on request
 
@@ -303,7 +202,7 @@ not Reading was open, and it imported clips and recorded highlights as part of t
 
 - Imports clips (notes without `crate_reading_version`) and records stable IDs for highlights
   typed in Obsidian, so the web app and other devices see them without Reading being opened.
-  Later, it also publishes the [card index](#chosen-design-a-card-index-the-plugin-writes).
+  It also published the [card index](#superseded-a-card-index-the-plugin-writes), since removed.
 - At startup: one pass over cached frontmatter finds clips waiting for import. No note reads,
   no card list. A note the cache has not indexed yet is checked when Obsidian indexes it.
 - Its input is Obsidian's metadata cache `changed` event, which fires after every change and
@@ -417,31 +316,18 @@ wrap `env.DB` with `meterD1Usage` and delete the file afterwards.
 
 ## Next steps
 
-Done: committing the built work, offline copies on request, the plugin split, and the card index
-(format, Worker, plugin publisher, both web apps).
+Done: committing the built work, offline copies on request and the plugin split. The web app's
+library and search moved to the server ([Reading search](reading-search.md)).
 
-1. Try both web apps and the plugin with a large library on a phone, against a test server.
-2. Decide whether `/reading/list` and the encrypted inventory listing can be limited to the
-   fallback, and whether the unencrypted Reading index in D1 is still needed beyond the capture
-   duplicate check, article jobs and the tail.
-3. Shards uploaded by a publish that then lost its race are never named, so never deleted; a
-   periodic listing of the shard prefix could remove them.
-4. The public docs site's Worker API reference (`docs-site/.../reference/worker-api.md`) is
-   maintained apart from `docs/worker-api.md` and does not list the index routes yet.
+1. Try the web app and the plugin with a large library on a phone, against a test server.
+2. Measure D1 rows per page, search and card post on a hosted server, with 50,000 notes.
+3. Let Obsidian post encrypted cards from its own notes, so a new encrypted library does not
+   wait for the web app to open each note once.
+4. Remove `/reading/list` and its delta tables once nothing reads them.
 
 ## User-facing notes
 
-- Documented in [Reading and encryption](reading-e2ee-assessment.md) and the public docs site's
-  practical limits: with encryption, the web app shows the 10,000 most recently changed notes,
-  older notes are searched in Obsidian, and it cannot detect duplicate links among older notes.
-- With the card index, both limits go away once Obsidian has published it. The docs say the web
-  app's library follows what Obsidian published plus later changes, and asks to open Obsidian
-  when it falls too far behind.
+- The public limits page says web app search matches title words, and in encrypted vaults short
+  words match only whole words.
 - Offline copies on request: the web app keeps articles offline only when **Save for offline**
-  is selected.
-
-## Open questions
-
-- Shard count (64), publish interval (once a minute), shard grace period (1 day) and tail cap
-  (1,000 notes), until measured on a phone and a hosted server.
-- How the list marks articles saved for offline.
+  is selected, and lists only those while offline.

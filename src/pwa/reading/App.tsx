@@ -30,6 +30,11 @@ import { useReadingArticle } from './useReadingArticle';
 import { pendingReadingHighlights, readerStatus, readingItemSyncStatus } from './reader-feedback';
 import { useReaderSyncFeedback } from './useReaderSyncFeedback';
 import type { PendingReading } from './outbox';
+import type { ReadingLibrarySource } from '@/reading/ui/useLibraryPages';
+import { queryReadingItems } from './api';
+import { readOfflineReadingItems } from './storage/storage';
+import type { ReadingItem } from '@/reading/core/model';
+import type { ReadingSession } from './session/session';
 
 export default function ReadingApp() {
 	return <ReadingDialogHost.Provider value={PwaReadingDialog}><ReadingAppContent /></ReadingDialogHost.Provider>;
@@ -52,7 +57,18 @@ function ReadingAppContent() {
 	const canSaveLink = (() => {
 		try { readingUrl(url); return !saving; } catch { return false; }
 	})();
-	const visibleItems = useMemo(() => presentReadingItems(cache?.items ?? [], pending), [cache, pending]);
+	// Offline, the library is the articles saved on this device; online, the server lists it page by page.
+	const offlineItems = useOfflineReadingItems(session, isOffline, reader?.availableOffline);
+	const visibleItems = useMemo(() => presentReadingItems((isOffline ? offlineItems : cache?.items) ?? [], pending), [isOffline, offlineItems, cache, pending]);
+	const source = useMemo<ReadingLibrarySource | undefined>(() => session && !isOffline && !readOnly && cache ? {
+		load: async ({ section, q, tag, cursor }) => {
+			// The sync just read the first inbox page; the library shows it without asking again.
+			if (section === 'inbox' && !q.trim() && !tag && !cursor) return { items: cache.items, cursor: cache.cursor ?? null };
+			const page = await queryReadingItems(session, { section, q, tag: tag ?? undefined, cursor: cursor ?? undefined });
+			return { items: page.items, cursor: page.cursor };
+		},
+		revision: cache, present: items => presentReadingItems(items, pending),
+	} : undefined, [session, isOffline, readOnly, cache, pending]);
 	// A shared link saves at once, like the iPhone shortcut. Its draft keeps it until
 	// the save succeeds, and a failure opens the form with the error beside the link.
 	useEffect(() => {
@@ -81,14 +97,14 @@ function ReadingAppContent() {
 	// A share stays staged until a connected Reading session copies it into its draft.
 	const share = new URL(location.href).searchParams.has('share');
 	const notices = <ReadingNotices recovery={recovery} error={error} showError={!readingDisabled && !adding} readOnly={readOnly}
-		syncIssue={pending.find(op => op.error || op.review)} limited={cache?.omitted ? cache.items.length : undefined} onExport={() => void run(exportReadingData)}
+		syncIssue={pending.find(op => op.error || op.review)} offline={isOffline && !!session} onExport={() => void run(exportReadingData)}
 		onRetry={() => { if (session) void run(refreshManually); else void connect(); }} onReview={() => setSettingsOpen(true)} />;
 	return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
 		{!session && !readingDisabled ? <ReadingWelcome share={share} notices={notices} /> : <>
 			<ReadingLibraryPanel listStyle={preferences.reminderListStyle} initialSection={featureNavigation?.readingTab}
 				renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
 				renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} onAdd={openCapture} />}
-				snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length,
+				source={source} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length,
 					error: !readingDisabled && !cache && error ? 'Your library is unavailable. Retry when connected.' : null }}
 				onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }}
 				onRefresh={refreshManually} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />}
@@ -141,13 +157,13 @@ function ReadingWelcome({ share, notices }: { share: boolean; notices: ReactNode
 }
 
 /** Earlier-session recovery, then a connection error or else the first change that needs attention. */
-function ReadingNotices({ recovery, error, showError, readOnly, syncIssue, limited, onExport, onRetry, onReview }: {
+function ReadingNotices({ recovery, error, showError, readOnly, syncIssue, offline, onExport, onRetry, onReview }: {
 	recovery: boolean; error: string | null; showError: boolean; readOnly: boolean; syncIssue: PendingReading | undefined;
-	/** Notes shown when an encrypted library exceeds this device's limit. */
-	limited: number | undefined; onExport: () => void; onRetry: () => void; onReview: () => void;
+	/** Offline, only articles saved on this device are listed. */
+	offline: boolean; onExport: () => void; onRetry: () => void; onReview: () => void;
 }) {
 	return <>
-		{limited !== undefined && <p className="crate-reading__notice">{`Showing your ${limited.toLocaleString()} most recently changed notes. Search older notes in Obsidian.`}</p>}
+		{offline && <p className="crate-reading__notice">Showing articles saved for offline. Connect to see your whole library.</p>}
 		{recovery && <p className="crate-reading__notice">{'Changes from an earlier sign-in are still stored here. '}
 			<Button variant="outline" onClick={onExport}>Export earlier changes</Button></p>}
 		{error && showError && <p className="crate-reading__notice" role="alert">{readOnly && <strong>Unable to connect. </strong>}{error}{' '}
@@ -155,4 +171,16 @@ function ReadingNotices({ recovery, error, showError, readOnly, syncIssue, limit
 		{!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'}{' '}
 			<Button variant="outline" onClick={onReview}>Review changes</Button></p>}
 	</>;
+}
+
+/** The articles saved on this device, read again when the app goes offline or a copy is saved or removed. */
+function useOfflineReadingItems(session: ReadingSession | null, offline: boolean, savedChanged: unknown): ReadingItem[] {
+	const [items, setItems] = useState<ReadingItem[]>([]);
+	useEffect(() => {
+		if (!session) { setItems([]); return; }
+		let active = true;
+		readOfflineReadingItems(session).then(next => { if (active) setItems(next); }, () => { if (active) setItems([]); });
+		return () => { active = false; };
+	}, [session, offline, savedChanged]);
+	return items;
 }

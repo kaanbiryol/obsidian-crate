@@ -9,7 +9,7 @@ export async function checkWarmTabDestinations(browser, origin) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion, serviceWorkers: 'block' });
     try {
       await context.route('**/reading/session', route => route.fulfill({ json: { id: 'warm-reading', folderPath: 'Reading', generation: 'one', expiresAt: Date.now() + 86400000 } }));
-      await context.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+      await context.route('**/reading/items*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));

@@ -43,7 +43,7 @@ beforeEach(() => {
 	vi.stubGlobal('fetch', network);
 	network.mockReset().mockImplementation(async path => {
 		if (path === '/reading/session') return response({ day: 20_000, generation: session.generation });
-		if (path === '/reading/list') return response({ items: [], issues: [], cursor: null });
+		if (path === '/reading/items?section=inbox') return response({ items: [], issues: [], cursor: null });
 		return response({ saved: true });
 	});
 });
@@ -256,11 +256,11 @@ it('reloads the library when an update returns no committed item', async () => {
 	const cache = await drainReading(session);
 	expect(cache).toMatchObject({ items: [{ crate_reading_id: item.crate_reading_id, favorite: true }] });
 	const paths = network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path);
-	expect(paths).toContain('/reading/list');
+	expect(paths).toContain('/reading/items');
 	expect(paths).not.toContain('/reading/item');
 });
 
-it('applies the committed item an update returns, without reading the item again', async () => {
+it('moves a saved copy to the committed item an update returns, without reading the item again', async () => {
 	const item = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000003', title: 'Article', path: 'Reading/article.md',
 		source_url: 'https://example.com/article', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
 	const highlights = [{ start: 0, end: 4, text: 'Body' }];
@@ -273,13 +273,11 @@ it('applies the committed item an update returns, without reading the item again
 		return response({ items: [], issues: [], cursor: null });
 	});
 	await queueReading(session, { action: 'update', intent: { id: item.crate_reading_id, before: { highlights: [] }, changes: { highlights } } });
-	const cache = await drainReading(session);
-	expect(cache).toMatchObject({ revision: '"r2"', items: [{ crate_reading_id: item.crate_reading_id, highlights }] });
+	await drainReading(session);
 	// The unchanged body moves to the committed revision, so an open reader keeps it.
 	expect(storage.values.get(`article:${item.crate_reading_id}`)).toMatchObject({ item: { highlights }, markdown: 'Body', etag: '"new"' });
 	const paths = network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path);
 	expect(paths).not.toContain('/reading/item');
-	expect(paths).not.toContain('/reading/list');
 });
 
 it('keeps a saved body the committed item no longer matches', async () => {
@@ -294,30 +292,24 @@ it('keeps a saved body the committed item no longer matches', async () => {
 		return response({ items: [], issues: [], cursor: null });
 	});
 	await queueReading(session, { action: 'update', intent: { id: item.crate_reading_id, before: { favorite: false }, changes: { favorite: true } } });
-	expect(await drainReading(session)).toMatchObject({ items: [{ favorite: true }] });
+	await drainReading(session);
 	expect(storage.values.get(`article:${item.crate_reading_id}`)).toMatchObject({ markdown: 'Older body', etag: '"old"' });
 });
 
-it('reloads a library after a capture from the saved copy, so the new note arrives as a delta', async () => {
-	const kept = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000005', title: 'Kept', path: 'Reading/kept.md',
-		source_url: 'https://example.com/kept', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
-	storage.values.set('cache', { items: [kept], issues: [], savedAt: 1, revision: '"r1"', deltaBase: '7.base' });
-	const captured = { ...kept, crate_reading_id: '12345678-1234-4123-8123-000000000006', title: 'Captured', path: '', source_url: 'https://example.com/new', extraction_status: 'pending' };
+it('reloads the first page after a capture, so the new note is listed', async () => {
+	const captured = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000006', title: 'Captured', path: '',
+		source_url: 'https://example.com/new', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'pending' };
 	network.mockImplementation(async path => {
 		if (path === '/reading/session') return response({ day: 20_000, generation: session.generation });
 		if (path === '/reading/capture') return response({ saved: true, alreadySaved: false, id: captured.crate_reading_id });
-		if (typeof path === 'string' && path.startsWith('/reading/list')) return response({ delta: true, changedPaths: [], items: [captured], issues: [], cursor: null });
+		if (path === '/reading/items?section=inbox') return response({ items: [captured], issues: [], cursor: null });
 		return response({});
 	});
 	await queueReading(session, { action: 'capture', intent: { url: 'https://example.com/new' } });
-	const cache = await drainReading(session);
-	expect(cache?.items.map(item => item.crate_reading_id)).toEqual([captured.crate_reading_id, kept.crate_reading_id]);
-	const list = network.mock.calls.find(([path]) => typeof path === 'string' && path.startsWith('/reading/list'))!;
-	expect(list[0]).toBe('/reading/list?since=7.base');
-	expect(new Headers(list[1]!.headers).get('If-None-Match')).toBe('"r1"');
+	expect((await drainReading(session))?.items.map(item => item.crate_reading_id)).toEqual([captured.crate_reading_id]);
 });
 
-it('drops a deleted item from the cached library without reloading it', async () => {
+it('sends a delete once and reloads the first page without it', async () => {
 	const item = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-000000000002', title: 'Article', path: 'Reading/article.md',
 		source_url: 'https://example.com/article', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' };
 	storage.values.set('cache', { items: [item], issues: [], savedAt: 1, revision: '"r1"' });
@@ -332,9 +324,8 @@ it('drops a deleted item from the cached library without reloading it', async ()
 	// A deleted item accepts no further edits.
 	await expect(queueReading(session, { action: 'update', intent: { id: item.crate_reading_id, before: { favorite: false }, changes: { favorite: true } } })).rejects.toThrow();
 	const cache = await drainReading(session);
-	expect(cache).toMatchObject({ revision: '"r2"', items: [] });
+	expect(cache).toMatchObject({ items: [] });
 	expect(JSON.parse(network.mock.calls.find(([path]) => path === '/reading/delete')![1]!.body as string)).toMatchObject({ id: item.crate_reading_id, before, markdownHash });
-	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/list');
 	expect(network.mock.calls.map(([path]) => typeof path === 'string' ? path.split('?')[0] : path)).not.toContain('/reading/item');
 	expect(await pendingReading(session)).toEqual([]);
 });

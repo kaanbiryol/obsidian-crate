@@ -34,7 +34,7 @@ try {
 			await page.route('**/reading/session', route => route.fulfill({ json: {
 				id: 'settings-test', folderPath: 'Reading', generation: 'settings-generation', expiresAt: Date.now() + 86400000,
 			} }));
-			await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+			await page.route('**/reading/items*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
 			await page.goto(origin + '/notifications?tab=inbox');
 			const gear = page.getByRole('button', { name: 'Open settings', exact: true });
 			await gear.click();
@@ -175,7 +175,7 @@ try {
 			let releaseRefresh;
 			const refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
 			const delayedList = async route => { await refreshGate; await route.fulfill({ json: { items: [], issues: [], cursor: null } }); };
-			await page.route('**/reading/list*', delayedList);
+			await page.route('**/reading/items*', delayedList);
 			await sheet.getByRole('button', { name: 'Refresh all', exact: true }).click();
 			await expect(sheet.getByRole('button', { name: 'Refresh all', exact: true })).toBeDisabled();
 			for (const label of ['Copy diagnostics', 'Close settings', 'Log out']) {
@@ -189,7 +189,7 @@ try {
 			await pendingLogout.getByRole('button', { name: 'Cancel', exact: true }).click();
 			releaseRefresh();
 			await expect(sheet.getByRole('button', { name: 'Refresh all', exact: true })).toBeEnabled();
-			await page.unroute('**/reading/list*', delayedList);
+			await page.unroute('**/reading/items*', delayedList);
 			await expect(sheet.getByRole('button', { name: 'Close settings', exact: true })).toBeEnabled();
 			await sheet.getByRole('button', { name: 'Dark', exact: true }).click();
 			await expect(sheet.getByRole('button', { name: 'Dark', exact: true })).toHaveClass(/is-active/);
@@ -235,7 +235,7 @@ try {
 
 			// The saved opening preference must select Reading before its first mount.
 			await page.waitForLoadState('networkidle');
-			const readingLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/reading/list');
+			const readingLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/reading/items');
 			await page.goto(origin + '/notifications');
 			await expect(page.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reading');
 			await expect(page.getByRole('heading', { name: 'Favorites', exact: true })).toBeVisible();

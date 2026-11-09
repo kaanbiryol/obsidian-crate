@@ -41,7 +41,7 @@ async function openApp(userAgent, path, { statusBarInset = 0 } = {}) {
     document.documentElement.setAttribute('data-pwa-ios27-standalone', 'true');
   }));
   await context.route('**/reading/session', route => route.fulfill({ json: readingSession }));
-  await context.route('**/reading/list*', route => route.fulfill({ json: { items: articles, issues: [], cursor: null } }));
+  await context.route('**/reading/items*', route => route.fulfill({ json: { items: articles, issues: [], cursor: null } }));
   await context.route('**/reading/item?*', route => route.fulfill({ json: {
     item: articles.find(item => item.crate_reading_id === new URL(route.request().url()).searchParams.get('id')),
     markdown: 'A long article for document scrolling. '.repeat(600),

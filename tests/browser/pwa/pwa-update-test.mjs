@@ -417,7 +417,7 @@ async function testPreparingReadingUpdate(browser) {
     const path = new URL(req.url, 'http://127.0.0.1').pathname;
     if (path === '/reading/session') sendJson(res, 200, { id: 'update-reading', folderPath: 'Reading', generation: 'one',
       expiresAt: Date.now() + 86400000, day: Math.floor(Date.now() / 86400000) });
-    else if (path === '/reading/list') sendJson(res, 200, { items: [item], issues: [], cursor: null });
+    else if (path === '/reading/items') sendJson(res, 200, { items: [item], issues: [], cursor: null });
     else if (path === '/reading/item') sendJson(res, 200, { item, markdown: 'An article to keep while updating.' });
     else if (path === '/reading/update') {
       const body = await readJson(req); Object.assign(item, body.changes); writes++;

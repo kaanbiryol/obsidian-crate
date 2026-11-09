@@ -4,11 +4,6 @@ export const readingKeys = {
 	list: (sessionId: string) => `list:${sessionId}`,
 	draft: (sessionId: string) => `draft:${sessionId}`,
 	pending: (sessionId: string) => `pending:${sessionId}`,
-	articleIndex: (sessionId: string) => `article-index:${sessionId}`,
-	encryptedIndex: (sessionId: string) => `encrypted-index:${sessionId}`,
-	/** The encrypted card index's state, and its opened shards by stored hash. */
-	cardIndex: (sessionId: string) => `card-index:${sessionId}`,
-	cardShardPrefix: (sessionId: string) => `card-shard:${sessionId}:`,
 	articlePrefix: (sessionId: string) => `article:${sessionId}:`,
 	attemptPrefix: (sessionId: string) => `attempt:${sessionId}:`,
 	share: (id: string) => `share:${id}`,
@@ -18,10 +13,9 @@ export const isPendingReadingKey = (key: string) => key.startsWith('pending:');
 /** An offline article copy from any session. */
 export const isArticleReadingKey = (key: string) => key.startsWith('article:');
 
-/** Records written for one Reading session, plus shared incoming shares. The encrypted
- * index is only written while storage is unlocked, so migration never needs it. */
+/** Records written for one Reading session, plus shared incoming shares. */
 export function isSessionReadingKey(key: string, sessionId: string): boolean {
-	return [readingKeys.list, readingKeys.draft, readingKeys.pending, readingKeys.articleIndex].some(build => key === build(sessionId))
+	return [readingKeys.list, readingKeys.draft, readingKeys.pending].some(build => key === build(sessionId))
 		|| key.startsWith(readingKeys.articlePrefix(sessionId)) || key.startsWith(readingKeys.attemptPrefix(sessionId))
 		|| key.startsWith('share:');
 }

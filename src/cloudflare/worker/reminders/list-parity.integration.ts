@@ -38,7 +38,7 @@ async function listEncrypted(): Promise<unknown> {
 	const bundle = await createVaultKeyBundle();
 	const pathTag = await derivePathTagKey(bundle.vaultId, bundle.vault), paths = new PathTags(pathTag);
 	const keys = { version: 1 as const, vaultId: bundle.vaultId, generation: bundle.generation, folderPath: 'Reminders',
-		wireFolder: await paths.wire('Reminders'), paths, pathTag,
+		wireFolder: await paths.wire('Reminders'), paths, pathTag, readingSearch: pathTag,
 		vault: await importEncryptionSecret(bundle.vault), notifications: await importEncryptionSecret(bundle.notifications),
 		notificationFingerprint: await importNotificationFingerprintKey(bundle.vaultId, bundle.notifications),
 		seal: { keyId: bundle.seal.id, publicKey: bundle.seal.publicKey, privateKey: await importSealPrivateKey(bundle.seal) }, localState: 'unused' };

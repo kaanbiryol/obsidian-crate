@@ -505,9 +505,10 @@ boundaries.
 
 ### Reading pagination and checkpoint boundaries
 
-`pwa/reading/list-response.test.ts` exercises malformed page envelopes and cursors,
-cursor cycles, cumulative item, issue and request limits, delta merges and their
-fallback to a full list, and first-load progress. `reading/list-delta.integration.ts`
+`pwa/reading/list-response.test.ts` exercises malformed page envelopes, the saved first page
+and library queries. `reading/reading-search.integration.ts` checks title, tag and link search,
+sections, paging and encrypted cards through D1, and `reading/encryption.integration.ts` checks
+hashed search and card filling end to end. `reading/list-delta.integration.ts`
 checks newest-first paging and deltas against full lists through D1, including the
 capture queue, shared Reading IDs, pruned removals, oversized deltas and rebuilt indexes.
 `tests/browser/reading/reading-cache-recovery-test.mjs` verifies that rejected pagination

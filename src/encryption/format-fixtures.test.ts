@@ -14,8 +14,8 @@ import { importNotificationKeys, openNotification } from './notification-keys';
 import { createReminderProjection } from '../reminders/core/encrypted-schedule-projection';
 import { sealFileForVault } from './sealed-file';
 import type { EncryptedSchedules } from './notification-format';
-import { buildReadingIndexShards, openReadingIndexShard, readingIndexContentHashes, sealReadingIndexManifest, storedReadingIndexShard } from '../reading/core/card-index';
-import { READING_INDEX_SHARDS, readingIndexShard } from '../protocol/reading-index';
+import { openReadingCard, sealReadingCard } from '../reading/core/reading-card';
+import { deriveReadingSearchKey, hashedReadingTerms } from './reading-search';
 
 /**
  * Frozen samples of every encrypted format that released clients have written.
@@ -65,8 +65,8 @@ const tagPaths = ['Note.md', 'folder/Note.md', 'Folder/NOTE.md', 'Reminders/Pers
 const localState = { vaultId: bundle.vaultId, scopeId: 'vault', storageKey: 'crate-outbox', value: '{"pending":[{"id":"op-1"}]}' };
 const pairingContext: PairingContext = { version: 1, id: 'fixture-pairing', origin: 'https://crate.example.test', vaultId: bundle.vaultId, generation: 1 };
 const reminderMarkdown = '- [ ] Dentist 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->\n- [x] Groceries 2099-01-01 <!-- crate-id:r2 -->\n';
-const readingIndexCard = { crate_reading_version: 1 as const, crate_reading_id: '00000000-0000-4000-8000-000000000001', title: 'Saved article', source_url: 'https://example.test/article',
-	saved_at: '2026-01-01T00:00:00.000Z', reading_status: 'inbox' as const, favorite: false, tags: ['fixture'], extraction_status: 'ready' as const, path: 'Reading/Saved article.md', wire: 'tagged/opaque.md' };
+const readingCard = { crate_reading_version: 1 as const, crate_reading_id: '00000000-0000-4000-8000-000000000001', title: 'Saved article', source_url: 'https://example.test/article',
+	saved_at: '2026-01-01T00:00:00.000Z', reading_status: 'inbox' as const, favorite: false, tags: ['fixture'], extraction_status: 'ready' as const, path: 'Reading/Saved article.md' };
 const withoutEnvelopes = (value: EncryptedSchedules) => ({ ...value, reminders: value.reminders.map(item => ({ ...item, notification: { ...item.notification, envelope: '' } })) });
 
 const fixtures: Record<string, Fixture<unknown>> = {
@@ -145,21 +145,18 @@ const fixtures: Record<string, Fixture<unknown>> = {
 			expect(titles).toEqual([{ title: 'Dentist', body: 'Personal' }, { title: 'Groceries', body: 'Personal' }]);
 		},
 	}),
-	// The Reading card index: one sealed shard and the sealed manifest naming it.
-	'reading-index-v1': fixture<{ shard: number; bytes: string; manifest: { basis: number; shards: string[]; sealed: string } }>({
+	// A Reading card a device posts for one encrypted note, and the hashed search terms beside it.
+	'reading-card-v1': fixture<{ wire: string; card: string; terms: string[] }>({
 		generate: async () => {
 			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1 };
-			const built = await buildReadingIndexShards([readingIndexCard]);
-			const shard = readingIndexShard(readingIndexCard.path), bytes = await storedReadingIndexShard(built[shard]!.json, shard, 'fixture-generation', keys);
-			const shards = Array.from({ length: READING_INDEX_SHARDS }, (_, index) => index === shard ? 'f'.repeat(64) : '');
-			const sealed = await sealReadingIndexManifest({ generation: 'fixture-generation', basis: 7, shards, content: built.map(entry => entry.content) }, keys);
-			return { shard, bytes: new TextDecoder().decode(bytes), manifest: { basis: 7, shards, sealed } };
+			const wire = 'tagtagtagtagtagtagtagtagta/cardcardcardcardcardcardca.md';
+			return { wire, card: await sealReadingCard(readingCard, wire, 'a'.repeat(64), keys),
+				terms: await hashedReadingTerms(await deriveReadingSearchKey(bundle.vaultId, bundle.vault), readingCard) };
 		},
-		verify: async ({ shard, bytes, manifest }) => {
+		verify: async ({ wire, card, terms }) => {
 			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1 };
-			expect(await openReadingIndexShard(text(bytes), shard, 'fixture-generation', keys)).toEqual([readingIndexCard]);
-			const content = await readingIndexContentHashes({ format: 1, generation: 'fixture-generation', keyGeneration: 1, ...manifest }, keys);
-			expect(content[shard]).toMatch(/^[a-f0-9]{64}$/);
+			expect(await openReadingCard(card, wire, keys)).toEqual({ item: readingCard, hash: 'a'.repeat(64) });
+			expect(await hashedReadingTerms(await deriveReadingSearchKey(bundle.vaultId, bundle.vault), readingCard)).toEqual(terms);
 		},
 	}),
 	'pairing-commitment-v1': fixture<{ commitment: string }>({

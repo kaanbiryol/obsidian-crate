@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readingUrlIdentity, type ReadingItem } from '@/reading/core/model';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
-import { loadReadingArticle } from './api';
+import { loadReadingArticle, queryReadingItems } from './api';
 import { readReadingArticle, cacheReadingArticle, removeReadingArticle, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { presentReadingItems } from './pending-view';
@@ -124,9 +124,14 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 		return () => { active = false; };
 	}, [reader, session, reportSessionError]);
 	useEffect(() => {
-		const item = presentReadingItems(cache?.items ?? [], pending).find(item => item.crate_reading_id === requestedItem);
-		if (!session || !item) return; setRequestedItem(null);
-		void run(() => open(item, false));
+		if (!session || !requestedItem || !cache) return;
+		const item = presentReadingItems(cache.items, pending).find(item => item.crate_reading_id === requestedItem);
+		setRequestedItem(null);
+		// An article past the first page is looked up on the server.
+		void run(async () => {
+			const found = item ?? (navigator.onLine ? (await queryReadingItems(session, { section: 'all', id: requestedItem })).items[0] : undefined);
+			if (found) await open(found, false);
+		});
 	}, [cache, pending, session, open, run, requestedItem]);
 	useEffect(() => {
 		if (!reader || reader.item.path) return;

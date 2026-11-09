@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { renderHook } from '../../test/react-hooks';
 import { queueReading } from './outbox';
+import { queryReadingItems } from './api';
 import type { ReadingSession } from './session/session';
 import { useReadingMutations } from './useReadingMutations';
 
 vi.mock('./outbox', () => ({ queueReading: vi.fn() }));
+vi.mock('./api', () => ({ queryReadingItems: vi.fn() }));
 vi.mock('./storage/storage', () => ({ removeReadingShare: vi.fn() }));
 vi.mock('./session/session', () => ({ assertReadingSession: vi.fn() }));
 
@@ -28,7 +30,10 @@ function setup(items: ReadingItem[], url: string) {
 	return { hook, showToast };
 }
 
-beforeEach(() => { vi.mocked(queueReading).mockReset(); });
+beforeEach(() => {
+	vi.mocked(queueReading).mockReset();
+	vi.mocked(queryReadingItems).mockReset().mockResolvedValue({ items: [], issues: [], cursor: null });
+});
 
 describe('reading mutations', () => {
 	it('opens an already saved link instead of capturing it again', async () => {
@@ -39,6 +44,17 @@ describe('reading mutations', () => {
 		expect(openSaved).toHaveBeenCalledWith(saved);
 		expect(queueReading).not.toHaveBeenCalled();
 		expect(showToast).toHaveBeenCalledWith('info', 'Opened your saved link');
+	});
+
+	it('opens a link saved past the first page, found on the server', async () => {
+		const saved = item(1, 'https://example.com/older');
+		vi.mocked(queryReadingItems).mockResolvedValue({ items: [saved], issues: [], cursor: null });
+		const { hook } = setup([], 'https://example.com/older');
+		const openSaved = vi.fn(async () => {});
+		await act(async () => { expect(await hook.current.saveLink(openSaved)).toBe(true); });
+		expect(queryReadingItems).toHaveBeenCalledWith(session, { section: 'all', url: 'https://example.com/older' });
+		expect(openSaved).toHaveBeenCalledWith(saved);
+		expect(queueReading).not.toHaveBeenCalled();
 	});
 
 	it('refuses to choose between duplicate notes for one link', async () => {
@@ -55,6 +71,7 @@ describe('reading mutations', () => {
 		const { hook, showToast } = setup([], 'https://example.com/new');
 		let saving!: Promise<boolean>;
 		act(() => { saving = hook.current.saveLink(async () => {}); });
+		await vi.waitFor(() => expect(queueReading).toHaveBeenCalled());
 		expect(hook.current.canApplyUpdate()).toBe(false);
 		await act(async () => { finish(); expect(await saving).toBe(true); });
 		expect(hook.current.canApplyUpdate()).toBe(true);

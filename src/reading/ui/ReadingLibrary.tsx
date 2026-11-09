@@ -18,10 +18,14 @@ import { HighlightGroups } from './HighlightGroups';
 import { HighlightArticleFilter } from './HighlightArticleFilter';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
+import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
+import { titleMatches, normalizedTag } from '../core/search-terms';
 
 export interface ReadingLibraryProps {
 	listStyle?: ListStyle;
 	snapshot: ReadingSnapshot;
+	/** A library kept on a server. Without one, `snapshot` holds the whole library. */
+	source?: ReadingLibrarySource;
 	initialSection?: ReadingSection;
 	renderNavigation?: (props: { items: readonly NavigationItem<ReadingSection>[]; activeTab: ReadingSection; onTabChange: (section: ReadingSection) => void; onAdd: () => void; inert: boolean; disabled: boolean }) => React.ReactNode;
 	/** Host-owned transitions can retain the previous library while changing sections. */
@@ -53,7 +57,7 @@ const PAGE_SIZE = 100;
 
 /** Shared workspace. Uses the same stacked app layout at every width. */
 export function ReadingLibraryPanel({
-	listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich,
+	listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, source, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich,
 	onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false,
 	notice, beforeListContent, listContent,
 }: ReadingLibraryProps) {
@@ -95,15 +99,24 @@ export function ReadingLibraryPanel({
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
 	// Filter on a deferred query so typing never waits for the list to re-render.
 	const listQuery = useDeferredValue(query);
-	const items = useMemo(() => filterReadingItems(snapshot.items, section, listQuery, tag), [snapshot.items, section, listQuery, tag]);
+	// A server library lists pages the server matched; local changes then move or hide items.
+	const pages = useLibraryPages(source, section, listQuery, tag);
+	const present = source?.present;
+	const loaded = useMemo(() => present ? present(pages.items) : snapshot.items, [present, pages.items, snapshot.items]);
+	const items = useMemo(() => present
+		? filterReadingItems(loaded, section, '', null).filter(item => (!listQuery.trim() || titleMatches(item.title, listQuery)) && (!tag || item.tags.some(value => normalizedTag(value) === normalizedTag(tag))))
+		: filterReadingItems(snapshot.items, section, listQuery, tag), [present, loaded, snapshot.items, section, listQuery, tag]);
 	const excerpts = useMemo(() => filterReadingHighlights(items, listQuery, articleFilter), [items, articleFilter, listQuery]);
 	const excerptGroups = useMemo(() => groupReadingHighlights(excerpts), [excerpts]);
 	const count = section === 'highlights' ? excerpts.length : items.length;
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
-	const tags = useMemo(() => [...new Set(snapshot.items.flatMap(item => item.tags))].sort((a, b) => a.localeCompare(b)), [snapshot.items]);
+	// A server library knows the tags of the pages it loaded.
+	const tags = useMemo(() => [...new Set([...snapshot.items, ...loaded].flatMap(item => item.tags).concat(tag ? [tag] : []))].sort((a, b) => a.localeCompare(b)), [snapshot.items, loaded, tag]);
+	const loading = source ? pages.loading && !pages.items.length : snapshot.loading;
+	const more = source ? !!pages.cursor : false;
 	useEffect(() => {
-		if (articleFilter && !snapshot.loading && !snapshot.items.some(item => item.crate_reading_id === articleFilter && item.highlights?.length)) { setArticleFilter(''); setVisible(PAGE_SIZE); }
-	}, [articleFilter, snapshot.items, snapshot.loading]);
+		if (articleFilter && !loading && !loaded.some(item => item.crate_reading_id === articleFilter && item.highlights?.length)) { setArticleFilter(''); setVisible(PAGE_SIZE); }
+	}, [articleFilter, loaded, loading]);
 	useEffect(() => {
 		if (tag && !tags.includes(tag)) { setTag(null); setVisible(PAGE_SIZE); }
 	}, [tag, tags]);
@@ -133,7 +146,7 @@ export function ReadingLibraryPanel({
 			<div className="crate-reading__library" aria-busy={busy.size > 0} inert={readerMotion !== undefined && (!!reader || readerClosing)}>
 				{renderLibrary(<>
 				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} count={count}
-					countUnit={section === 'highlights' ? 'highlight' : 'saved link'} showMeta={!snapshot.loading} reserveMetaSpace rightContent={<div className="crate-view-header-actions">
+					countUnit={section === 'highlights' ? 'highlight' : 'saved link'} showMeta={!loading && !more} reserveMetaSpace rightContent={<div className="crate-view-header-actions">
 						{headerStatus}
 						{onSettings && <IconButton size="large" iconSize="l" icon="settings" label={settingsLabel} onClick={onSettings} />}
 						<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" onClick={onAdd} />
@@ -148,19 +161,19 @@ export function ReadingLibraryPanel({
 					<option value="">All tags</option>
 					{tags.map(value => <option key={value} value={value}>{value}</option>)}
 				</select><ThemeIcon id="chevron-down" size="s" aria-hidden="true" /></label>}
-				{section === 'highlights' && <HighlightArticleFilter items={snapshot.items} value={articleFilter} onChange={value => { setArticleFilter(value); resetList(); }} />}
+				{section === 'highlights' && <HighlightArticleFilter items={loaded} value={articleFilter} onChange={value => { setArticleFilter(value); resetList(); }} />}
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1}>
 					{notice}
 					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, section))}
 						onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
-					{(error || snapshot.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error}{' '}
+					{(error || snapshot.error || pages.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error || pages.error}{' '}
 						<Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <ReadingIssues issues={snapshot.issues} />}
 					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}>
 						<ThemeIcon id="hash" size="xs" aria-hidden="true" />{tag}<ThemeIcon id="x" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">Clear tag filter</span>
 					</Button>}
-					{listContent ?? (snapshot.loading ? <LoadingIndicator label="Loading Reading" /> : <>
+					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" /> : <>
 						{section === 'highlights' && (count > 0
 							? <HighlightGroups key={`${listQuery}:${articleFilter}:${tag ?? ''}`} disabled={busy.has('open')}
 								entries={excerptGroups.slice(0, visible).flatMap(group => group.entries)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />
@@ -179,7 +192,8 @@ export function ReadingLibraryPanel({
 								</Button>
 							</li>)}</ul>
 						</section>)}
-						{visible < (section === 'highlights' ? excerptGroups.length : count) && <Button variant="outline" className="crate-reading__more" onClick={() => setVisible(value => value + PAGE_SIZE)}>Show more</Button>}
+						{(visible < (section === 'highlights' ? excerptGroups.length : count) || more) && <Button variant="outline" className="crate-reading__more" aria-busy={pages.loading}
+							onClick={() => { if (visible >= (section === 'highlights' ? excerptGroups.length : count)) pages.loadMore(); setVisible(value => value + PAGE_SIZE); }}>Show more</Button>}
 					</>)}
 				</div>
 				{!renderNavigation && <FloatingActionButton className="crate-reading__mobile-add" aria-label="Save a link" onClick={onAdd} animateOnMount={false} />}

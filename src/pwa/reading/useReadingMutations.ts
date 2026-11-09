@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { queryReadingItems } from './api';
 import { findSavedReadingLink } from '@/reading/core/inventory';
 import { readingUrl, validateReadingMetadata, type ReadingChanges, type ReadingItem } from '@/reading/core/model';
 import { youtubeVideoId } from '@/reading/core/youtube';
@@ -56,7 +57,12 @@ export function useReadingMutations(connection: ReadingMutationSession, { refres
 		const link = readingUrl(url);
 		savingRef.current = true; setSaving(true); reportSessionError(session, null);
 		try {
-			const saved = findSavedReadingLink(presentReadingItems(cache?.items ?? [], pending), link);
+			let saved = findSavedReadingLink(presentReadingItems(cache?.items ?? [], pending), link);
+			// The library is on the server, so a link saved further back is found there. Saving
+			// still checks for it, so a failed lookup only skips opening the saved copy.
+			if (saved.kind === 'none' && navigator.onLine) {
+				try { saved = findSavedReadingLink((await queryReadingItems(session, { section: 'all', url: link })).items, link); } catch { /* The save checks again. */ }
+			}
 			if (saved.kind === 'many') throw new Error('Several notes save this link. Review duplicates in Reading.');
 			if (saved.kind === 'one') {
 				await openSaved(saved.item);

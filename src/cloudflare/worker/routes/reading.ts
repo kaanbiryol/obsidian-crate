@@ -15,7 +15,7 @@ import { mutateReading } from '../reading/mutations';
 import { extractForEncryptedReading } from '../reading/encrypted-extract';
 import { isLibraryRead, loadLibraryRead, readLibrary } from '../reading/library-read';
 import { PLAINTEXT_ONLY_PATHS } from './policy';
-import { handleReadingIndex } from '../reading/card-index';
+import { existingReadingPaths, postReadingCards, staleReadingCards } from '../reading/cards';
 
 export interface ReadingRouteOptions {
 	/** The coordinator's state, when the request runs under its lock. */
@@ -47,19 +47,13 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		}
 		return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
 	}
-	if (path === '/reading/index' || path.startsWith('/reading/index/')) {
-		if (!principal || principal.scope === 'reading_capture') throw new ReadingError('Library access is required.', 403);
-		const current = await authority(env.DB, principal, featurePolicyValue);
-		const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
-		return await handleReadingIndex(request, env, principal, current, encryption);
-	}
 	if (encryption && (shortcut?.kind === 'prepare' || PLAINTEXT_ONLY_PATHS.includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
 	if (path === '/reading/encryption' && request.method === 'GET' && principal) {
 		const current = await authority(env.DB, principal, featurePolicyValue); // Reading access only.
 		// The web app recovers the plaintext folder name from this label with the vault key.
 		return readingResponse({ encryption, ...(encryption ? { folderLabel: await readFolderLabel(env.DB, current.folder_path) } : {}) });
 	}
-	const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' || path === '/reading/delete' ? READING_EDIT_JSON_BODY_BYTES : SMALL_JSON_BODY_BYTES);
+	const parsed = request.method === 'GET' ? { ok: true as const, value: {} } : await parseJsonObject(request, path === '/reading/update' || path === '/reading/delete' || path === '/reading/cards' ? READING_EDIT_JSON_BODY_BYTES : SMALL_JSON_BODY_BYTES);
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
 	if (shortcut) validateShortcutBody(body, shortcut.kind);
@@ -87,6 +81,18 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 	if (path === '/reading/update' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'update');
 	if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
 	if (path === '/reading/delete' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'delete');
-	if (loaded) return await readLibrary(request, env, current, loaded, state, forward);
+	if (loaded) return await readLibrary(request, env, current, loaded, state, forward, !!encryption);
+	if (path === '/reading/cards/stale' && request.method === 'GET') {
+		if (!encryption) throw new ReadingError('Reading cards are only for encrypted vaults.', 409);
+		return await staleReadingCards(env, url.searchParams);
+	}
+	if (path === '/reading/cards/exists' && request.method === 'GET') {
+		if (!encryption) throw new ReadingError('Reading cards are only for encrypted vaults.', 409);
+		return await existingReadingPaths(env, current, url.searchParams);
+	}
+	if (path === '/reading/cards' && request.method === 'POST') {
+		if (!encryption) throw new ReadingError('Reading cards are only for encrypted vaults.', 409);
+		return await postReadingCards(env, current, body);
+	}
 	return readingResponse({ error: 'Not found' }, 404);
 }

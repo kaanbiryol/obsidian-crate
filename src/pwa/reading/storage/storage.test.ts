@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { drainReading } from '../outbox';
-import { adoptEarlierReadingCaptures, clearReadingData, earlierReadingChanges, exportReadingData, newestReadingShare, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare, readEncryptedReadingIndex, writeEncryptedReadingIndex } from './storage';
+import { adoptEarlierReadingCaptures, clearReadingData, earlierReadingChanges, exportReadingData, newestReadingShare, pendingReading, removeEarlierReadingChanges, readReadingCache, readReadingDraft, saveReadingDraft, savePendingReading, readReadingAttempt, writeReadingAttempt, removeReadingShare } from './storage';
 import { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { AUTH_TOKEN_KEY } from '../../config';
-import { createReadingNote, parseReadingNote } from '@/reading/core/notes';
 import { isPendingReading, isReadingCache, isReadingSession } from './storage-validation';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
@@ -124,25 +123,6 @@ it('rejects malformed cache envelopes and drafts without overwriting either', as
 	expect(values.get(`list:${session.id}`)).toBe(cache);
 	expect(values.get(`draft:${session.id}`)).toEqual({ url: { private: 'saved text' } });
 	expect(isReadingCache({ items: [], issues: [], savedAt: 1 }, 'Reading')).toBe(true);
-});
-
-it('reuses the encrypted Reading index only for the same encryption identity and valid entries', async () => {
-	const item = parseReadingNote(createReadingNote({ id: '00000000-0000-4000-8000-000000000001', url: 'https://example.com/a', title: 'A', savedAt: '2026-10-01T12:00:00Z' }))!;
-	// The plaintext hash lets a sealed note at a known server path be compared with the held one.
-	const entry = { file: { path: 'Reading/A.md', hash: 'hash', size: 10, revision: 'r1' }, item: { ...item, path: 'Reading/A.md' }, hash: 'a'.repeat(64) };
-	await writeEncryptedReadingIndex(session, 'identity-a', [entry]);
-	await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toEqual([entry]);
-	await expect(readEncryptedReadingIndex(session, 'identity-b', 'Reading')).resolves.toBeUndefined();
-	for (const hash of ['hash', undefined]) {
-		await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, hash } as never]);
-		await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
-	}
-	// Entries list server paths, but every note must belong to the plaintext Reading folder.
-	await writeEncryptedReadingIndex(session, 'identity-a', [{ ...entry, item: { ...entry.item, path: 'Elsewhere/Other.md' } }]);
-	await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
-	// No index can outgrow the library it describes.
-	await writeEncryptedReadingIndex(session, 'identity-a', Array.from({ length: 10_001 }, () => entry));
-	await expect(readEncryptedReadingIndex(session, 'identity-a', 'Reading')).resolves.toBeUndefined();
 });
 
 it('removes queues from earlier sign-ins only while they match the reviewed export', async () => {

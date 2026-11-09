@@ -4,6 +4,7 @@ import { validateVaultKeyBundle, type VaultKeyBundle } from '../../encryption/ke
 import { LocalStateCipher } from '../../encryption/local-state';
 import { importNotificationFingerprintKey } from '../../encryption/notification-keys';
 import { derivePathTagKey, type PathTags } from '../../encryption/path-tags';
+import { deriveReadingSearchKey } from '../../encryption/reading-search';
 import { importSealPrivateKey } from '../../encryption/seal-key';
 import { validateP256PublicKey } from '../../encryption/p256';
 import { isEncryptionId } from '../../encryption/encoding';
@@ -20,6 +21,8 @@ export interface StoredVaultKeys {
 	notificationFingerprint: CryptoKey;
 	/** Turns file and folder names into the tags the server stores. */
 	pathTag: CryptoKey;
+	/** Hashes Reading search terms, so the server matches searches it cannot read. */
+	readingSearch: CryptoKey;
 	seal: { keyId: string; publicKey: string; privateKey: CryptoKey };
 	/** A random secret for private browser data, wrapped by the vault key. */
 	localState: string;
@@ -54,7 +57,7 @@ function validateStoredIdentity(value: StoredVaultKeys, vaultId: string): void {
 function validateStoredKeys(value: StoredVaultKeys, vaultId: string): void {
 	validateStoredIdentity(value, vaultId);
 	const seal = value.seal;
-	if (!wrappingKey(value.vault) || !wrappingKey(value.notifications) || !signingKey(value.notificationFingerprint) || !signingKey(value.pathTag)
+	if (!wrappingKey(value.vault) || !wrappingKey(value.notifications) || !signingKey(value.notificationFingerprint) || !signingKey(value.pathTag) || !signingKey(value.readingSearch)
 		|| !seal || !isEncryptionId(seal.keyId) || seal.privateKey?.type !== 'private' || seal.privateKey.extractable
 		|| seal.privateKey.algorithm?.name !== 'ECDH') throw damaged();
 	validateP256PublicKey(seal.publicKey);
@@ -78,12 +81,13 @@ export async function rememberVaultKeys(bundle: VaultKeyBundle, isCurrent = () =
 		const notifications = await importEncryptionSecret(bundle.notifications);
 		const notificationFingerprint = await importNotificationFingerprintKey(bundle.vaultId, bundle.notifications);
 		const pathTag = await derivePathTagKey(bundle.vaultId, bundle.vault);
+		const readingSearch = await deriveReadingSearchKey(bundle.vaultId, bundle.vault);
 		const seal = { keyId: bundle.seal.id, publicKey: bundle.seal.publicKey, privateKey: await importSealPrivateKey(bundle.seal) };
 		const localSecret = previous ? await decryptBytes(previous.localState, vault, context(bundle.vaultId)) : crypto.getRandomValues(new Uint8Array(32));
 		try {
 			if (localSecret.length !== 32) throw new Error('Damaged browser encryption key. Preserve pending changes before recovery.');
 			const stored: StoredVaultKeys = { version: 1, vaultId: bundle.vaultId, generation: bundle.generation,
-				vault, notifications, notificationFingerprint, pathTag, seal, localState: await encryptBytes(localSecret, vault, context(bundle.vaultId)) };
+				vault, notifications, notificationFingerprint, pathTag, readingSearch, seal, localState: await encryptBytes(localSecret, vault, context(bundle.vaultId)) };
 			if (!isCurrent()) throw new Error('Session changed before enrollment');
 			const tx = database.transaction('keys', 'readwrite');
 			const current = await tx.store.get(bundle.vaultId);

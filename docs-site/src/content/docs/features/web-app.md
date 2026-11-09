@@ -43,13 +43,13 @@ To save links from other apps, see the [Reading share options](/docs/features/re
 
 ## Before going offline
 
-Open the web app while you're online so it can catch up. It saves your newest inbox articles in the background and keeps the articles you open, up to a limit. It doesn't download your whole library.
+Your library stays on your server, and the web app loads it a page at a time. Offline, it lists only the articles you saved with **Save for offline**, and search looks through their titles.
 
 | What you're doing | Offline |
 | --- | --- |
 | Viewing reminders | Reminders you've already loaded stay readable. |
 | Creating, editing, or completing a reminder | Reconnect first. A change you already submitted stays pending until it's confirmed. |
-| Reading articles | Articles you saved with **Save for offline** stay readable. Other articles need a connection. |
+| Reading articles | Articles you saved with **Save for offline** are listed and stay readable. The rest of your library needs a connection. |
 | Saving links or editing saved articles | Changes wait on this device until you reconnect. Downloading new article text needs a connection. |
 | Playing a saved YouTube video | Needs internet; Crate doesn't download videos. Saved transcripts stay readable. |
 

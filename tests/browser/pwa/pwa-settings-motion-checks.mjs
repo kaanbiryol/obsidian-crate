@@ -12,7 +12,7 @@ export async function checkSettingsMotion(browser, origin) {
 		await page.route('**/reading/session', route => route.fulfill({ json: {
 			id: 'settings-motion', folderPath: 'Reading', generation: 'settings-motion', expiresAt: Date.now() + 86400000,
 		} }));
-		await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+		await page.route('**/reading/items*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
 		await page.goto(origin + '/notifications?tab=inbox');
 		const gear = page.getByRole('button', { name: 'Open settings', exact: true });
 		await gear.waitFor();

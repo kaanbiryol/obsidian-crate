@@ -6,27 +6,14 @@ import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { shouldIgnoreSyncPath, createIgnoreMatcherContext } from '../sync/local/ignore';
 import { ReadingLibrary } from './data/library';
 import { ReadingMaintenance } from './data/maintenance';
-import { ReadingIndexPublisher } from './data/card-index-publisher';
-import { READING_INDEX_CAPABILITY } from '../protocol/reading-index';
-import { decodePendingChange } from '../sync/pending/pending-change';
-import { createScopedLogger, errorMessage } from '../platform/logger';
 import { createObsidianReadingVault } from './data/obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
 
-const logger = createScopedLogger('reading', 'card-index');
 export const READING_VIEW_TYPE = 'crate-reading';
 /** Vault events settle this long before a refresh; a burst, such as a sync download,
  * still refreshes at least every `REFRESH_MAX_WAIT_MS`. */
 const REFRESH_DELAY_MS = 400;
 const REFRESH_MAX_WAIT_MS = 2_000;
-/** The card index publishes once Reading changes settle, at most this often. Obsidian's
- * cache must have indexed every synced write before its cards are read. */
-const PUBLISH_QUIET_MS = 10_000;
-const PUBLISH_INTERVAL_MS = 60_000;
-/** After a failure or a server without the index, publishing waits this long. */
-const PUBLISH_RETRY_MS = 5 * 60_000;
-/** The first publish lists every card, so it waits until startup work is done. */
-const PUBLISH_FIRST_DELAY_MS = 30_000;
 
 /** The plugin settings, vault, sync state and server credentials Reading runs on. */
 type ReadingRuntimeHost = Pick<CratePlugin, 'app' | 'settings' | 'remindersSettings' | 'secretStorage' | 'syncRuntime' | 'writeSettings'>;
@@ -140,48 +127,6 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 			return captureDesktopArticle(url, signal);
 		} },
 	}, folder, controller.signal, maintenance, startAfter);
-	// The card index for the web app, built from the cache like the background work.
-	const publisher = new ReadingIndexPublisher(readingVault, folder, path => maintenance.issues.has(path));
-	let publishTimer: number | undefined, lastPublishAt = 0, publishBlockedUntil = Date.now() + PUBLISH_FIRST_DELAY_MS, publishing = false;
-	let indexGeneration: string | undefined, indexSupported: boolean | undefined;
-	// The changelog position this device's Reading notes match: sync is idle and nothing in
-	// the folder waits to upload. Null while that is not known.
-	const publishBasis = (): number | null => {
-		const state = plugin.syncRuntime.getState();
-		if (state.status !== 'idle' || plugin.syncRuntime.isWritingVault()) return null;
-		if (plugin.syncRuntime.getPendingKeys().some(key => decodePendingChange(key).path.startsWith(`${folder}/`))) return null;
-		return plugin.settings.lastSeq;
-	};
-	const publishIndex = async () => {
-		publishTimer = undefined;
-		if (controller.signal.aborted || publishing || !plugin.settings.workerUrl || !plugin.app.workspace.layoutReady) return;
-		const api = plugin.syncRuntime.getApiClient(), basis = publishBasis();
-		if (!api || basis === null || !publisher.pending) return;
-		const wait = Math.max(publishBlockedUntil, lastPublishAt + PUBLISH_INTERVAL_MS) - Date.now();
-		if (wait > 0) { schedulePublish(wait); return; }
-		publishing = true;
-		try {
-			indexSupported ??= (await api.getServerInfo()).capabilities.includes(READING_INDEX_CAPABILITY);
-			if (!indexSupported) { publishBlockedUntil = Date.now() + PUBLISH_RETRY_MS; return; }
-			indexGeneration ??= (await readReadingPolicy(plugin))?.generation;
-			controller.signal.throwIfAborted();
-			if (!indexGeneration || plugin.syncRuntime.getApiClient() !== api) return;
-			lastPublishAt = Date.now();
-			const outcome = await publisher.publish(api, indexGeneration, basis);
-			// Another device published newer cards or at the same time: try again later.
-			if (outcome === 'conflict' || outcome === 'behind') schedulePublish(PUBLISH_INTERVAL_MS);
-		} catch (error) {
-			if (controller.signal.aborted) return;
-			publishBlockedUntil = Date.now() + PUBLISH_RETRY_MS;
-			indexSupported = undefined;
-			logger.warn(`Reading index was not published: ${errorMessage(error)}`);
-		} finally { publishing = false; }
-	};
-	const schedulePublish = (delay = PUBLISH_QUIET_MS) => {
-		if (controller.signal.aborted) return;
-		window.clearTimeout(publishTimer);
-		publishTimer = window.setTimeout(() => { void publishIndex(); }, delay);
-	};
 	let timer: number | undefined;
 	let scheduledAt = 0;
 	let lastErrorAt = 0;
@@ -234,8 +179,6 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		if (phase === syncPhase) return;
 		syncPhase = phase;
 		retry = true; schedule();
-		// Publishing waits for sync to finish and the cache to index what it wrote.
-		if (publisher.pending) schedulePublish();
 	};
 	const inFolder = (path: string) => path === folder || path.startsWith(`${folder}/`) || folder.startsWith(`${path}/`);
 	const changed = (path: string) => {
@@ -245,7 +188,6 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		// note, such as a renamed folder, lists the folder again.
 		readingVault.changed(path); library.invalidate(path);
 		changedPaths.add(path); schedule();
-		publisher.changed([path]); schedulePublish();
 	};
 	const refs = [
 		vault.on('create', file => { changed(file.path); }),
@@ -259,13 +201,12 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	const metadataRef = plugin.app.metadataCache.on('changed', file => {
 		if (!inFolder(file.path)) return;
 		reindexedPaths.add(file.path); checkPaths.add(file.path); schedule();
-		publisher.changed([file.path]); schedulePublish();
 	});
 	// Closing an editor lets waiting imports and highlight records proceed; other layout changes need no work.
 	const layoutRef = plugin.app.workspace.on('layout-change', () => { if (maintenance.waitingForEditor) { retry = true; schedule(); } });
 	plugin.syncRuntime.addStateChangeListener(onSyncStateChange);
 	const stop = () => {
-		controller.abort(); window.clearTimeout(timer); window.clearTimeout(publishTimer);
+		controller.abort(); window.clearTimeout(timer);
 		for (const ref of refs) vault.offref(ref);
 		plugin.app.workspace.offref(layoutRef);
 		plugin.app.metadataCache.offref(metadataRef);
@@ -277,7 +218,7 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	lifetime.addEventListener('abort', onAbort, { once: true });
 	readingState(plugin).runtime = { library, stop };
 	notifyRuntime(plugin);
-	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) { schedule(); schedulePublish(PUBLISH_FIRST_DELAY_MS); } });
+	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) schedule(); });
 }
 
 /** Applies changed Reading settings; open views close because they hold the previous library. */

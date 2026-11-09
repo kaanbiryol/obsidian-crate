@@ -15,7 +15,7 @@ async function setup(browser, { reading = true, reminders = true, pendingReading
 	const features = { reading, reminders };
 	await page.route('**/features', route => route.fulfill({ json: features }));
 	await page.route('**/reading/session', route => route.fulfill({ json: { ...session, id: 'coordinator', day: Math.floor(Date.now() / 86400000) } }));
-	await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+	await page.route('**/reading/items*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
 	await page.goto(origin + '/health');
 	await page.evaluate(async ({ session, features, pendingReading, pendingReminder }) => {
 		localStorage.setItem('crate-reminders-auth-token', session.token);
@@ -115,7 +115,7 @@ try {
 			}
 			{
 				const { page, context, errors } = await setup(browser, { pendingReminder: true });
-				await page.route('**/reading/list*', route => route.fulfill({ status: 503, json: { error: 'Reading temporarily unavailable' } }));
+				await page.route('**/reading/items*', route => route.fulfill({ status: 503, json: { error: 'Reading temporarily unavailable' } }));
 				await page.goto(origin + '/notifications?section=reading');
 				await expect.poll(() => reminderCount(page)).toBe(0);
 				await expect(page.locator('.pwa-reminders-view')).toHaveCount(0);

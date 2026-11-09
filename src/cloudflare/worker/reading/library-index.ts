@@ -1,6 +1,7 @@
 import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { MAX_READING_BYTES, readingUrlIdentity } from '@/reading/core/model';
+import { readingTerms } from '@/reading/core/search-terms';
 import { portablePathKey } from '@/protocol/portable-path';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { sha256Hex } from '@/platform/sha256';
@@ -12,8 +13,10 @@ import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-p
 /** `reading_items` holds one row per Reading note in the Reading folder, written in the
  * same D1 batch as the file commit, so reads never re-check `files`. Only a new scope
  * (folder, generation or format), a restore or an initial import rebuilds it from R2. */
-const INDEX_FORMAT = 1;
+const INDEX_FORMAT = 2;
 const REBUILD_PAGE = 25;
+// An encrypted rebuild reads no note, only `files` rows.
+const ENCRYPTED_REBUILD_PAGE = 200;
 const MAX_READING_JOBS = 1000;
 export const readingIndexScope = (current: Pick<ReadingPolicy, 'folder_path' | 'generation'>) => `${current.folder_path}\n${current.generation}\n${INDEX_FORMAT}`;
 
@@ -37,15 +40,28 @@ interface IndexRow {
 	path: string; portable: string; storage_key: string | null; keep: 0 | 1;
 	hash?: string; size?: number; item_id?: string | null; url_identity?: string | null; url?: string | null;
 	metadata_json?: string | null; error?: string | null; article_hash?: string | null; article_edited?: 0 | 1; saved_at?: string;
+	status?: string | null; favorite?: 0 | 1; highlighted?: 0 | 1; terms?: string | null;
+	/** An encrypted note: the row keeps its last card and waits for a device to post the new one. */
+	stale?: 0 | 1;
+}
+
+const ENCRYPTED_FILE_PREFIX = new TextEncoder().encode('CRATE-E2EE/1\n');
+function isEncryptedContent(content: string | ArrayBuffer | null | undefined): boolean {
+	if (content == null) return false;
+	if (typeof content === 'string') return content.startsWith('CRATE-E2EE/1\n');
+	const bytes = new Uint8Array(content, 0, Math.min(content.byteLength, ENCRYPTED_FILE_PREFIX.length));
+	return bytes.length === ENCRYPTED_FILE_PREFIX.length && bytes.every((byte, index) => byte === ENCRYPTED_FILE_PREFIX[index]);
 }
 
 /** The row for a file revision; `keep: 0` when the file is not a Reading note. */
-async function indexRow(change: ReadingFileChange): Promise<IndexRow | 'unknown'> {
+async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<IndexRow | 'unknown'> {
 	const base = { path: change.path, portable: portablePathKey(change.path), storage_key: change.storageKey };
 	if (change.storageKey === null) return { ...base, keep: 0 };
 	const { hash, size, content } = change;
 	if (hash === undefined || size === undefined) return 'unknown';
 	const row = { ...base, keep: 1 as const, hash, size };
+	// The server cannot read an encrypted note; a device posts its card for this revision.
+	if (encrypted || isEncryptedContent(content)) return { ...row, stale: 1 };
 	if (size > MAX_READING_BYTES) return { ...row, error: READING_SIZE_ERROR };
 	if (content == null || typeof content !== 'string' && content.byteLength !== size) return 'unknown';
 	const text = typeof content === 'string' ? content : decodeReadingNote(content);
@@ -60,20 +76,22 @@ async function indexRow(change: ReadingFileChange): Promise<IndexRow | 'unknown'
 		else article_hash = await sha256Hex(block.text);
 	}
 	return { ...row, item_id: metadata.crate_reading_id, url_identity: metadata.source_url ? readingUrlIdentity(metadata.source_url) : null, url: metadata.source_url || null,
-		metadata_json: JSON.stringify(metadata), article_hash, article_edited, saved_at: metadata.saved_at };
+		metadata_json: JSON.stringify(metadata), article_hash, article_edited, saved_at: metadata.saved_at,
+		status: metadata.reading_status, favorite: metadata.favorite ? 1 : 0, highlighted: metadata.highlights?.length ? 1 : 0, terms: JSON.stringify(readingTerms(metadata)) };
 }
 
 /** Statements to place after the file writes in the same batch. Each row change applies
  * only if its file write committed and the Reading folder is still `policy`'s, so a
- * rejected or raced commit leaves the index untouched. Encrypted vaults keep no index. */
+ * rejected or raced commit leaves the index untouched. In an encrypted vault the rows only
+ * record each note's revision; devices post the cards (`cards.ts`). */
 export async function readingIndexStatements(db: D1Database, changes: ReadingFileChange[], options: { policy?: ReadingIndexPolicy; encrypted?: boolean; revision?: string } = {}): Promise<D1PreparedStatement[]> {
-	if (options.encrypted || !changes.some(change => isMarkdownPath(change.path))) return [];
+	if (!changes.some(change => isMarkdownPath(change.path))) return [];
 	const policy = options.policy !== undefined ? options.policy
 		: await db.prepare('SELECT folder_path FROM reading_policy WHERE id = 1').first<{ folder_path: string }>();
 	if (!policy) return [];
 	const rows: IndexRow[] = [];
 	for (const change of changes.filter(change => isReadingNotePath(change.path, policy.folder_path))) {
-		const row = await indexRow(change);
+		const row = await indexRow(change, options.encrypted === true);
 		// Without the bytes, the only safe outcome is a rebuild from R2.
 		if (row === 'unknown') return [db.prepare('DELETE FROM reading_index')];
 		rows.push(row);
@@ -85,18 +103,27 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
       json_extract(value, '$.size') AS size, json_extract(value, '$.item_id') AS item_id, json_extract(value, '$.url_identity') AS url_identity,
       json_extract(value, '$.url') AS url, json_extract(value, '$.metadata_json') AS metadata_json, json_extract(value, '$.error') AS error,
       json_extract(value, '$.article_hash') AS article_hash, COALESCE(json_extract(value, '$.article_edited'), 0) AS article_edited,
-      COALESCE(json_extract(value, '$.saved_at'), '') AS saved_at FROM json_each(?1)),
+      COALESCE(json_extract(value, '$.saved_at'), '') AS saved_at, json_extract(value, '$.status') AS status,
+      COALESCE(json_extract(value, '$.favorite'), 0) AS favorite, COALESCE(json_extract(value, '$.highlighted'), 0) AS highlighted,
+      json_extract(value, '$.terms') AS terms, COALESCE(json_extract(value, '$.stale'), 0) AS stale FROM json_each(?1)),
     committed AS (SELECT i.* FROM input i WHERE EXISTS (SELECT 1 FROM reading_policy WHERE id = 1 AND folder_path = ?2)
       AND CASE WHEN i.storage_key IS NULL THEN NOT EXISTS (SELECT 1 FROM files f WHERE f.portable_path = i.portable AND f.path = i.path)
         ELSE EXISTS (SELECT 1 FROM files f WHERE f.portable_path = i.portable AND f.path = i.path AND f.storage_key = i.storage_key) END) `;
 	const statement = (sql: string, ...args: unknown[]) => db.prepare(committed + sql).bind(json, policy.folder_path, ...args);
-	const removes = rows.some(row => !row.keep), keeps = rows.filter(row => row.keep);
+	const removes = rows.some(row => !row.keep), keeps = rows.filter(row => row.keep), plain = keeps.filter(row => !row.stale);
 	const removed = `portable_path IN (SELECT portable FROM committed WHERE keep = 0 AND storage_key IS NOT NULL)
         OR (portable_path, path) IN (SELECT portable, path FROM committed WHERE storage_key IS NULL)`;
 	return [
 		// Every row this batch writes, removes or flags takes the next change number. The library
 		// revision changes in the same statement, one written row instead of two.
 		db.prepare('UPDATE reading_index SET seq = seq + 1, revision = coalesce(?, lower(hex(randomblob(16)))) WHERE id = 1').bind(options.revision ?? null),
+		// Terms change only when a note leaves or its terms differ; a status edit keeps them.
+		...(removes ? [statement(`DELETE FROM reading_terms WHERE portable_path IN (SELECT portable_path FROM reading_items WHERE ${removed})`)] : []),
+		...(plain.length ? [statement(`DELETE FROM reading_terms WHERE portable_path IN (SELECT c.portable FROM committed c JOIN reading_items i ON i.portable_path = c.portable
+        WHERE c.keep = 1 AND c.stale = 0 AND i.terms IS NOT c.terms)`)] : []),
+		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO reading_terms(term, portable_path)
+        SELECT t.value, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable, json_each(c.terms) t
+        WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND i.terms IS NOT c.terms`)] : []),
 		...(removes ? [
 			statement(`INSERT INTO reading_removals(path, change_seq, removed_at) SELECT path, ${CHANGE_SEQ}, ?3 FROM reading_items WHERE ${removed}
         ON CONFLICT(path) DO UPDATE SET change_seq = excluded.change_seq, removed_at = excluded.removed_at`, Date.now()),
@@ -114,17 +141,28 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 		// indexed columns change first, and only on rows where they differ; the upsert then sets
 		// only unindexed columns and the change number. A favorite rewrites the row and its change
 		// number, not every index.
-		...(keeps.length ? [
-			statement(`UPDATE reading_items SET path = c.path, item_id = c.item_id, url_identity = c.url_identity, saved_at = c.saved_at,
-        article_hash = c.article_hash, article_edited = c.article_edited
-        FROM committed c WHERE c.keep = 1 AND reading_items.portable_path = c.portable
-        AND (reading_items.path, reading_items.item_id, reading_items.url_identity, reading_items.saved_at, reading_items.article_hash, reading_items.article_edited)
-          IS NOT (c.path, c.item_id, c.url_identity, c.saved_at, c.article_hash, c.article_edited)`),
-			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at, change_seq)
-        SELECT portable, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at, ${CHANGE_SEQ} FROM committed WHERE keep = 1
-        ON CONFLICT(portable_path) DO UPDATE SET storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
-          metadata_json = excluded.metadata_json, error = excluded.error, change_seq = excluded.change_seq`),
+		...(plain.length ? [statement(`UPDATE reading_items SET path = c.path, item_id = c.item_id, url_identity = c.url_identity, saved_at = c.saved_at,
+        article_hash = c.article_hash, article_edited = c.article_edited, stale = 0
+        FROM committed c WHERE c.keep = 1 AND c.stale = 0 AND reading_items.portable_path = c.portable
+        AND (reading_items.path, reading_items.item_id, reading_items.url_identity, reading_items.saved_at, reading_items.article_hash, reading_items.article_edited, reading_items.stale)
+          IS NOT (c.path, c.item_id, c.url_identity, c.saved_at, c.article_hash, c.article_edited, 0)`),
+			// Each section column has its own index, so each changes only where it differs.
+			...(['status', 'favorite', 'highlighted'] as const).map(column => statement(`UPDATE reading_items SET ${column} = c.${column}
+        FROM committed c WHERE c.keep = 1 AND c.stale = 0 AND reading_items.portable_path = c.portable AND reading_items.${column} IS NOT c.${column}`)),
 		] : []),
+		// An encrypted note keeps its last card, list fields and terms until a device posts new ones.
+		...(keeps.length > plain.length ? [statement(`UPDATE reading_items SET path = c.path, stale = 1
+        FROM committed c WHERE c.keep = 1 AND c.stale = 1 AND reading_items.portable_path = c.portable AND (reading_items.path, reading_items.stale) IS NOT (c.path, 1)`)] : []),
+		...(keeps.length ? [
+			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at,
+          status, favorite, highlighted, stale, terms, change_seq)
+        SELECT portable, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at,
+          status, favorite, highlighted, stale, terms, ${CHANGE_SEQ} FROM committed WHERE keep = 1
+        ON CONFLICT(portable_path) DO UPDATE SET storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
+          metadata_json = excluded.metadata_json, error = excluded.error, change_seq = excluded.change_seq,
+          terms = CASE WHEN excluded.stale = 1 THEN reading_items.terms ELSE excluded.terms END`),
+		] : []),
+
 		// Recount the IDs this batch wrote and every flagged row: a row that changed or left
 		// can only end a duplicate, and flagged rows are rare. Each branch uses an index;
 		// an OR would scan the table.
@@ -182,8 +220,9 @@ export function completeReadingIndex(current: ReadingPolicy, index: ReadingIndex
 
 /** The index state for `current`. While the index is being rebuilt, each call indexes
  * the next files from R2; a failed read keeps the position and reports `unavailable`.
- * `loaded` is the index row when the caller already read it in a batch. */
-export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readBytes: (file: StoredReadingFile) => Promise<ArrayBuffer>, loaded?: ReadingIndexRow | null): Promise<ReadingIndexState> {
+ * `loaded` is the index row when the caller already read it in a batch.
+ * In an encrypted vault no note is read: each row records its revision for a device to fill. */
+export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readBytes: (file: StoredReadingFile) => Promise<ArrayBuffer>, loaded?: ReadingIndexRow | null, encrypted = false): Promise<ReadingIndexState> {
 	const db = env.DB, scope = readingIndexScope(current);
 	let index = loaded !== undefined ? loaded : await readingIndexStatement(db).first<ReadingIndexRow>();
 	const complete = completeReadingIndex(current, index);
@@ -193,6 +232,7 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 		index = { scope, revision: crypto.randomUUID(), cursor: '', epoch: crypto.randomUUID(), seq: 0, removedSeq: 0 };
 		await db.batch([
 			db.prepare('DELETE FROM reading_items'),
+			db.prepare('DELETE FROM reading_terms'),
 			db.prepare('DELETE FROM reading_removals'),
 			db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
 			db.prepare(`INSERT INTO reading_index(id, scope, revision, cursor, epoch, seq, removed_seq) VALUES (1, ?, ?, '', ?, 0, 0)
@@ -201,14 +241,14 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 		]);
 	}
 	const { results } = await db.prepare(`SELECT path, portable_path, hash, size, storage_key FROM files WHERE ${FILE_FOLDER_MATCH} AND portable_path > ?
-    ORDER BY portable_path LIMIT ${REBUILD_PAGE}`).bind(...fileFolderArgs(current.folder_path), index.cursor ?? '')
+    ORDER BY portable_path LIMIT ${encrypted ? ENCRYPTED_REBUILD_PAGE : REBUILD_PAGE}`).bind(...fileFolderArgs(current.folder_path), index.cursor ?? '')
 		.all<{ path: string; portable_path: string; hash: string; size: number; storage_key: string }>();
 	const changes: ReadingFileChange[] = [];
 	let cursor = index.cursor ?? '', unavailable = false;
 	for (const file of results) {
 		if (isReadingNotePath(file.path, current.folder_path)) {
 			const change: ReadingFileChange = { path: file.path, storageKey: file.storage_key, hash: file.hash, size: file.size };
-			if (file.size <= MAX_READING_BYTES) {
+			if (!encrypted && file.size <= MAX_READING_BYTES) {
 				try { change.content = await readBytes({ path: file.path, storageKey: file.storage_key, hash: file.hash, size: file.size }); }
 				catch { unavailable = true; break; }
 			}
@@ -216,9 +256,9 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 		}
 		cursor = file.portable_path;
 	}
-	const next = !unavailable && results.length < REBUILD_PAGE ? null : cursor, revision = crypto.randomUUID();
+	const next = !unavailable && results.length < (encrypted ? ENCRYPTED_REBUILD_PAGE : REBUILD_PAGE) ? null : cursor, revision = crypto.randomUUID();
 	const written = await db.batch<{ results?: Array<{ seq: number }> }>([
-		...await readingIndexStatements(db, changes, { policy: current }),
+		...await readingIndexStatements(db, changes, { policy: current, encrypted }),
 		db.prepare('UPDATE reading_index SET cursor = ?, revision = ? WHERE id = 1 AND scope = ? RETURNING seq').bind(next, revision, scope),
 	]);
 	const seq = written.at(-1)?.results?.[0]?.seq ?? 0;

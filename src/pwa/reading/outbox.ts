@@ -3,7 +3,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { MAX_READING_TITLE_LENGTH, readingUrl, type ReadingChanges } from '@/reading/core/model';
 import { loadReading, readingRequest, reloadReadingAfterWrites, type ReadingWrite } from './api';
 import { ReadingApiError } from './session/api-error';
-import { readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, readReadingCache, savePendingReading, type ReadingCache } from './storage/storage';
+import { readingDrainLock, readingLock, pruneReadingAttempts, pendingReading, savePendingReading, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { isReadingCommand } from './storage/storage-validation';
 import { hasAutomaticRetry, automaticRetryDelayMs } from '@/pwa/sync/retry-policy';
@@ -147,9 +147,7 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
 		if (!confirmed.size) return undefined;
 		// Confirm once for this batch before removing any durable command. Another
 		// tab may have queued more work while the network requests were in flight.
-		// Captures add items the cache does not have yet, so they reload the library. From the
-		// saved copy that is a delta, which lists new notes and the whole capture queue.
-		const cache = onlyEdits ? await reloadReadingAfterWrites(session, writes) : await loadReading(session, await readReadingCache(session).catch(() => undefined));
+		const cache = onlyEdits ? await reloadReadingAfterWrites(session, writes) : await loadReading(session);
 		await readingLock(async () => {
 			const current = await pendingReading(session);
 			await savePendingReading(session, current.filter(op => !confirmed.has(op.id)));

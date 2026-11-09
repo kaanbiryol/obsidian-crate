@@ -115,14 +115,12 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reading/delete': { scopes: LIBRARY, execution: COORDINATOR, rateLimit: 30, plaintextOnly: true },
 	'POST /reading/policy': { scopes: VAULT, execution: COORDINATOR, rateLimit: 10 },
 	'GET /reading/policy': { scopes: VAULT },
-	// The card index: Obsidian publishes it, both web apps read it, in either vault mode.
-	'GET /reading/index': { scopes: LIBRARY },
-	'PUT /reading/index': { scopes: VAULT, rateLimit: 30 },
-	'GET /reading/index/shard': { scopes: LIBRARY },
-	// A first publish uploads every shard.
-	'PUT /reading/index/shard': { scopes: VAULT, rateLimit: 160 },
-	'GET /reading/index/changes': { scopes: LIBRARY },
-	'GET /reading/index/file': { scopes: LIBRARY },
+	// The library a page at a time, in either vault mode. In an encrypted vault, devices post
+	// the cards the server lists (`reading/cards.ts`).
+	'GET /reading/items': { scopes: LIBRARY },
+	'GET /reading/cards/stale': { scopes: LIBRARY },
+	'GET /reading/cards/exists': { scopes: LIBRARY },
+	'POST /reading/cards': { scopes: LIBRARY, rateLimit: 600 },
 	'GET /reading/session': { scopes: LIBRARY, keylessEncryptedRead: true },
 	// Plaintext list and item reads authenticate here and answer a complete index from one D1
 	// snapshot. An index rebuild, which writes, and full list pages run under the coordinator

@@ -305,7 +305,7 @@ async function openReadingBrowserFixture(t, name, engine, contextOptions = {}) {
       if (req.url === '/notifications/test-share') return new Response('<!doctype html><title>Share fixture</title><body>Share fixture</body>', { headers: { 'Content-Type': 'text/html' } });
       if (req.url === '/reading/encryption' && faults.encryptionUnavailable) return Response.json({ error: 'Temporarily unavailable' }, { status: 503 });
       const response = await dispatch();
-      const kind = req.url.startsWith('/reading/item?') ? 'article' : req.url === '/reading/update' ? 'update' : req.url === '/reading/list' ? 'list' : null;
+      const kind = req.url.startsWith('/reading/item?') ? 'article' : req.url === '/reading/update' ? 'update' : req.url.startsWith('/reading/items') ? 'list' : null;
       if (kind && faults[kind]) {
         const held = faults[kind]; faults[kind] = null;
         held.started(); await held.release;
@@ -995,7 +995,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       source_url: 'https://example.com/article', saved_at: '2026-09-21T10:00:00.000Z', reading_status: 'inbox', favorite: false,
       tags: [], extraction_status: status, capture_method: 'url', path: 'Reading/Article.md' });
     await page.route('**/reading/session', route => route.fulfill({ json: { id: 'extraction-test', folderPath: 'Reading', generation: 'generation', expiresAt: Date.now() + 86400000 } }));
-    await page.route('**/reading/list*', route => route.fulfill({ json: { items: [item()], issues: [], cursor: null } }));
+    await page.route('**/reading/items*', route => route.fulfill({ json: { items: [item()], issues: [], cursor: null } }));
     await page.route('**/reading/item?*', route => route.fulfill({ json: { item: item(), markdown: status === 'ready' ? 'The extracted article is now available.' : '' } }));
     await page.goto(`${origin}/notifications?section=reading`);
     await page.getByRole('button', { name: /Extraction fixture/ }).click();

@@ -14,7 +14,7 @@ try {
 			await page.route('**/reading/session', route => route.fulfill({ json: {
 				id: 'sheet-focus-test', folderPath: 'Reading', generation: 'sheet-focus-generation', expiresAt: Date.now() + 86400000,
 			} }));
-			await page.route('**/reading/list*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
+			await page.route('**/reading/items*', route => route.fulfill({ json: { items: [], issues: [], cursor: null } }));
 			await page.goto(`${origin}/notifications?section=reading`);
 			await page.evaluate(() => {
 				window.caretFrames = [];
