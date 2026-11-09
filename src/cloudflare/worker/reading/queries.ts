@@ -50,12 +50,12 @@ export const etagMatches = (header: string | null, etag: string) => header?.spli
 // requests for a 10,000-item library.
 export const READING_LIST_PAGE = 1000;
 
-interface ReadingRow { portable_path: string; path: string; metadata_json: string | null; error: string | null; article_edited: number; duplicate: number; saved_at: string }
-const ROW_COLUMNS = 'portable_path, path, metadata_json, error, article_edited, duplicate, saved_at';
-const queuedStatement = (env: Env, current: ReadingPolicy) =>
+export interface ReadingRow { portable_path: string; path: string; metadata_json: string | null; error: string | null; article_edited: number; duplicate: number; saved_at: string }
+export const ROW_COLUMNS = 'portable_path, path, metadata_json, error, article_edited, duplicate, saved_at';
+export const queuedStatement = (env: Env, current: ReadingPolicy) =>
 	env.DB.prepare('SELECT note FROM reading_captures WHERE generation=? ORDER BY available_at LIMIT 1000').bind(current.generation);
 
-function listedPage(current: ReadingPolicy, rows: ReadingRow[], queued: Array<{ note: string }>) {
+export function listedPage(current: ReadingPolicy, rows: ReadingRow[], queued: Array<{ note: string }>) {
 	const issue = (row: ReadingRow) => row.error
 		?? (row.article_edited && current.enabled ? ARTICLE_EDITED_ERROR : null)
 		?? (row.duplicate ? READING_DUPLICATE_ID_ISSUE : null);

@@ -15,6 +15,7 @@ import { mutateReading } from '../reading/mutations';
 import { extractForEncryptedReading } from '../reading/encrypted-extract';
 import { isLibraryRead, loadLibraryRead, readLibrary } from '../reading/library-read';
 import { PLAINTEXT_ONLY_PATHS } from './policy';
+import { handleReadingIndex } from '../reading/card-index';
 
 export interface ReadingRouteOptions {
 	/** The coordinator's state, when the request runs under its lock. */
@@ -45,6 +46,12 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 			return await extractForEncryptedReading(request, env);
 		}
 		return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
+	}
+	if (path === '/reading/index' || path.startsWith('/reading/index/')) {
+		if (!principal || principal.scope === 'reading_capture') throw new ReadingError('Library access is required.', 403);
+		const current = await authority(env.DB, principal, featurePolicyValue);
+		const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
+		return await handleReadingIndex(request, env, principal, current, encryption);
 	}
 	if (encryption && (shortcut?.kind === 'prepare' || PLAINTEXT_ONLY_PATHS.includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
 	if (path === '/reading/encryption' && request.method === 'GET' && principal) {

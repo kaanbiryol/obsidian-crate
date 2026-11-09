@@ -4,6 +4,9 @@ export const SHARED_SETTINGS_KEY = '__crate__/settings.json';
 export const HISTORY_INDEX_KEY = '__crate__/history/index.json';
 export const HISTORY_CHECKPOINT_PREFIX = '__crate__/history/checkpoints/';
 export const BACKUPS_PREFIX = '__crate__/backups/';
+/** The Reading card index: a manifest and content-addressed shards. */
+export const READING_INDEX_MANIFEST_KEY = '__crate__/reading-index/manifest.json';
+export const readingIndexShardKey = (hash: string) => `__crate__/reading-index/shards/${hash}`;
 export const UPGRADE_BACKUP_PREFIX = `${BACKUPS_PREFIX}schema-upgrade-`;
 /**
  * Content-addressed file copies shared by upgrade backups. The reserved all-f

@@ -38,6 +38,9 @@ import { readServerEncryption } from '../encryption/server-encryption';
 import { importEncryptionSecret, type EncryptionKey } from '../../encryption/envelope';
 import type { PathTags } from '../../encryption/path-tags';
 import { openFolderLabel, sealFolderLabel } from '../../encryption/folder-label';
+import { HttpError } from './http';
+import { parseReadingIndexManifest, type ReadingIndexManifest } from '../../protocol/reading-index';
+import type { ReadingIndexKeys } from '../../reading/core/card-index';
 
 export { HttpError, SyncTransportError } from './http';
 
@@ -56,9 +59,41 @@ export class SyncApiClient {
 		this.sharedHistory.setEncryption(encryption);
 		this.sharedSettingsApi.setEncryption(encryption);
 		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);
-		this.folderKeys = { tags: encryption.paths.tags, key: folderKey, vaultId: bundle.vaultId };
+		this.folderKeys = { tags: encryption.paths.tags, key: folderKey, vaultId: bundle.vaultId, generation: bundle.generation };
 	}
-	private folderKeys?: { tags: PathTags; key: EncryptionKey; vaultId: string };
+	private folderKeys?: { tags: PathTags; key: EncryptionKey; vaultId: string; generation: number };
+
+	/** The keys the Reading card index is sealed with, or null in an unencrypted vault. */
+	readingIndexKeys(): ReadingIndexKeys | null {
+		return this.folderKeys ? { vaultId: this.folderKeys.vaultId, key: this.folderKeys.key, keyGeneration: this.folderKeys.generation } : null;
+	}
+	/** See `SyncWorkerApi.opaqueServerPath`. */
+	opaqueServerPath(path: string): Promise<string | undefined> { return this.syncApi.opaqueServerPath(path); }
+	/** The published card index, or null before one exists for this folder and key. */
+	async getReadingIndex(): Promise<{ manifest: ReadingIndexManifest; etag: string } | null> {
+		try {
+			const answer = await this.http.requestJson<{ manifest?: unknown; etag?: unknown }>('/reading/index');
+			const manifest = parseReadingIndexManifest(answer.manifest);
+			if (!manifest || typeof answer.etag !== 'string') throw new Error('The server returned an unreadable Reading index.');
+			return { manifest, etag: answer.etag };
+		} catch (error) {
+			if (error instanceof HttpError && error.status === 404) return null;
+			throw error;
+		}
+	}
+	async putReadingIndexShard(hash: string, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
+		await this.http.requestBinary(`/reading/index/shard?hash=${hash}`, { method: 'PUT', body: bytes.buffer, contentType: 'application/octet-stream' });
+	}
+	/** Publishes over `expected`, the version read; false when another device published first. */
+	async putReadingIndex(manifest: ReadingIndexManifest, expected: string | null): Promise<boolean> {
+		try {
+			await this.http.requestJson('/reading/index', { method: 'PUT', body: JSON.stringify({ manifest, expected }) });
+			return true;
+		} catch (error) {
+			if (error instanceof HttpError && error.code === 'reading_index_conflict') return false;
+			throw error;
+		}
+	}
 
 	isEncrypted(): boolean { return this.folderKeys !== undefined; }
 

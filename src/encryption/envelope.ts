@@ -8,7 +8,7 @@ const MAX_ENCRYPTED_PLAINTEXT_BYTES = 25 * 1024 * 1024;
 const MAX_ENVELOPE_CHARACTERS = Math.ceil(MAX_ENCRYPTED_PLAINTEXT_BYTES * 4 / 3) + 4096;
 const TYPE = 'crate-e2ee+jwe';
 
-type EncryptionPurpose = 'file' | 'file-metadata' | 'settings' | 'reminder' | 'notification' | 'local-state' | 'key-bundle';
+type EncryptionPurpose = 'file' | 'file-metadata' | 'settings' | 'reminder' | 'notification' | 'local-state' | 'key-bundle' | 'reading-index';
 export interface EncryptionContext {
 	vaultId: string;
 	scopeId: string;
@@ -41,7 +41,7 @@ export async function importEncryptionSecret(secret: EncryptionSecret): Promise<
 
 function protectedHeader(context: EncryptionContext, keyId: string) {
 	if (![context.vaultId, context.scopeId, context.objectId, keyId].every(isEncryptionId)
-		|| !['file', 'file-metadata', 'settings', 'reminder', 'notification', 'local-state', 'key-bundle'].includes(context.purpose)) {
+		|| !['file', 'file-metadata', 'settings', 'reminder', 'notification', 'local-state', 'key-bundle', 'reading-index'].includes(context.purpose)) {
 		throw new Error('Invalid encryption context');
 	}
 	return { alg: 'A256KW', enc: 'A256GCM', typ: TYPE, v: ENCRYPTION_VERSION, kid: keyId,
