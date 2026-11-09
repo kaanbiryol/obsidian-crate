@@ -5,7 +5,6 @@ import { loadReading } from './api';
 import { connectReadingFromReminders } from './session/reminders-session';
 import { pendingReading, readingLock, readReadingCache, type ReadingCache } from './storage/storage';
 import { assertReadingSession, READING_CHANGED_EVENT, readingSession, READING_SESSION_KEY, sameReadingSession, type ReadingSession } from './session/session';
-import { prefetchReadingArticles } from './prefetch';
 import type { useReadingSession } from './useReadingSession';
 import { requestSharedFeaturesRefresh } from '../shared-features';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -22,7 +21,6 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 	// The last confirmed library, so a conditional reload can keep it without decoding storage.
 	const confirmedCache = useRef<{ session: ReadingSession; cache: ReadingCache } | null>(null);
 	const completedAt = useRef<{ session: ReadingSession; at: number } | null>(null);
-	const prefetching = useRef(false);
 	const refresh = useCallback(async (current = session, mode: ReadingRetryMode = 'automatic') => {
 		if (!current || !enabledRef.current || !isCurrentSession(current)) return;
 		// A read-only offline copy waits for an answered encryption check; nothing is sent.
@@ -71,12 +69,6 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 					if (!publishSyncResult(current, { pending: work, cache: data, completed })) return;
 					if (completed && enabledRef.current && navigator.onLine && data) { setSyncedSession(current); completedAt.current = { session: current, at: Date.now() }; }
 				});
-			}
-			if (data && navigator.onLine && !prefetching.current) {
-				// Offline copies fill in after the library is shown; failures wait for the next refresh.
-				prefetching.current = true;
-				void prefetchReadingArticles(current, data.items, () => enabledRef.current && isCurrentSession(current))
-					.catch(() => {}).finally(() => { prefetching.current = false; });
 			}
 		} finally {
 			refreshing.current = false;

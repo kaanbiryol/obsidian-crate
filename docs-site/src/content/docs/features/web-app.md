@@ -49,7 +49,7 @@ Open the web app while you're online so it can catch up. It saves your newest in
 | --- | --- |
 | Viewing reminders | Reminders you've already loaded stay readable. |
 | Creating, editing, or completing a reminder | Reconnect first. A change you already submitted stays pending until it's confirmed. |
-| Reading articles | Opened articles and your newest inbox articles are kept, up to 200 articles or 50 MB. Background copies are removed before articles you opened. |
+| Reading articles | Articles you saved with **Save for offline** stay readable, up to 200 articles or 50 MB. Other articles need a connection. |
 | Saving links or editing saved articles | Changes wait on this device until you reconnect. Downloading new article text needs a connection. |
 | Playing a saved YouTube video | Needs internet; Crate doesn't download videos. Saved transcripts stay readable. |
 

@@ -35,7 +35,7 @@ export function ReadingReader({
 	item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onDelete,
 	onSaveComplete, onCopyComplete, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.',
 	mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false,
-	floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange, syncStatus, pendingHighlights,
+	floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange, syncStatus, pendingHighlights, savedOffline, onOfflineChange,
 }: {
 	appearance?: ReadingAppearance; onAppearanceChange?: (appearance: ReadingAppearance) => void;
 	item: ReadingMetadata; markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
@@ -57,6 +57,8 @@ export function ReadingReader({
 	syncStatus?: { state: SyncIndicatorState; label: string };
 	/** Highlights still waiting to sync render in a lighter style. */
 	pendingHighlights?: ReadingHighlight[];
+	/** Whether this device keeps a copy for offline reading; with `onOfflineChange`, the reader offers to save or remove it. */
+	savedOffline?: boolean; onOfflineChange?: (keep: boolean) => Promise<void>;
 }) {
 	const body = useRef<HTMLDivElement>(null);
 	const tagsFormId = useId(), noteFormId = useId(), deleteFormId = useId(), deleteItemFormId = useId();
@@ -175,6 +177,8 @@ export function ReadingReader({
 					{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}
 					{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : `Share ${kind}`} aria-disabled={sharing}
 						onClick={() => void shareLink(article.current?.ownerDocument.defaultView, readingTitle(item), item.source_url)} />}
+					{onOfflineChange && <IconButton size="large" icon="download" label={savedOffline ? 'Remove offline copy' : 'Save for offline'} aria-pressed={!!savedOffline} data-filled={savedOffline} disabled={busy || markdown === null}
+						onClick={() => void run(() => onOfflineChange(!savedOffline))} />}
 					{onDelete && <IconButton size="large" icon="trash-2" tone="danger" label={`Delete ${kind}`} disabled={mutationPending} onClick={() => setDialog('delete')} />}
 				</div>
 				{item.tags.length > 0 && <div className="crate-reading-reader__tags">{item.tags.map(tag => <span key={tag}>#{tag}</span>)}</div>}

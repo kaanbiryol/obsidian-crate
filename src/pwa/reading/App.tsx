@@ -45,7 +45,7 @@ function ReadingAppContent() {
 	const { session, readOnly, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, run, connect,
 		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture, sharedLinkReady, takeSharedLink } = connection;
 	const { refreshManually, isOffline } = sync;
-	const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose } = useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run });
+	const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose, setOffline } = useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run });
 	const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
 	const [settingsOpen, setSettingsOpen] = useSettingsOpen();
 	useDocumentReaderScroll(ready && !!session && active && !!reader, reader?.item.crate_reading_id);
@@ -107,6 +107,7 @@ function ReadingAppContent() {
 					revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight}
 					item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }}
 					status={readerStatus(reader, cache)} notice={notices}
+					savedOffline={reader.availableOffline} onOfflineChange={reader.item.path ? setOffline : undefined}
 					mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)}
 					onBack={closeReader} onUpdate={changes => updateFromReader(visibleReader, changes)}
 					syncStatus={reader.item.path ? readingItemSyncStatus(pending, reader.item.crate_reading_id, isOffline) : undefined} pendingHighlights={readerHighlights}

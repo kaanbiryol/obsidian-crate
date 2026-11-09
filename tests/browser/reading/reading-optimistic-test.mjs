@@ -63,14 +63,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const readingUrl = await readingAppUrl();
     browser = await engine.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-    // Background prefetch would save the article before its first visit. These
-    // checks cover an article that is not on the device yet; prefetch has unit tests.
-    await context.addInitScript(() => Object.defineProperty(navigator, 'connection', { configurable: true, value: { saveData: true } }));
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(readingUrl);
     const sync = page.locator('.pwa-reading-root .pwa-tab-panel:not([data-leaving]) .pwa-sync-indicator');
     const toast = page.locator('.toast');
+    // The article text is shown once its offline action is available.
+    const articleShown = () => expect(page.locator('button[aria-label="Save for offline"], button[aria-label="Remove offline copy"]')).toBeEnabled();
     await expect(sync).toHaveAttribute('data-sync-state', 'synced');
     const saveLink = async (url, offline = false) => {
       await page.getByRole('button', { name: 'Save a link', exact: true }).click();
@@ -166,7 +165,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.equal(published.status, 204);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await expect(page.getByRole('heading', { name: 'Fetched article title', exact: true })).toBeVisible();
-    await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
+    await articleShown();
     row = page.getByRole('button', { name: 'queued.example.invalid Fetched article title', exact: true });
     assert.notEqual(new URL(page.url()).searchParams.get('item'), (await pending(page))[0]?.id);
     await back();
@@ -187,6 +186,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await noteSheet.getByRole('button', { name: 'Close highlight note', exact: true }).click();
     await closeHighlights();
     opening.release();
+    await articleShown();
+    // Opening keeps the article in memory only; saving it is a choice.
+    await expect(page.getByText('Available offline', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save for offline', exact: true }).click();
     await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
     await expect(toast).toHaveCount(0);
     // One delayed request must not block further edits to any article field.
@@ -252,7 +255,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // Persisted retry limits survive background events and reload. A manual
     // refresh resends the exact receipt bytes after the automatic budget stops.
     await page.getByRole('button', { name: 'example.invalid Optimistic article', exact: true }).click();
-    await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
+    await articleShown();
     loseUpdateReplies = true;
     const beforeRetry = requests.filter(req => req.path === '/reading/update').length;
     await setTags('retry-budget');
@@ -286,7 +289,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
 
     // A real compare-and-swap conflict rolls back optimistic dependents, retaining their bytes.
     await page.getByRole('button', { name: 'example.invalid Optimistic article', exact: true }).click();
-    await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
+    await articleShown();
     const conflict = hold('/reading/update');
     await setTags('local'); await conflict.started;
     await page.locator('.crate-reading__reader-pane').getByRole('button', { name: 'Remove favorite', exact: true }).click();

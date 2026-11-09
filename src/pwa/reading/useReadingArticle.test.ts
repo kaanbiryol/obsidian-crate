@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { renderHook } from '../../test/react-hooks';
 import { loadReadingArticle } from './api';
-import { cacheReadingArticle, readReadingArticle, type ReadingCache } from './storage/storage';
+import { cacheReadingArticle, readReadingArticle, removeReadingArticle, type ReadingCache } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { AUTH_TOKEN_KEY } from '../config';
 import { useReadingArticle } from './useReadingArticle';
@@ -11,7 +11,7 @@ import { useReadingArticle } from './useReadingArticle';
 vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingEncryptionKeys: () => null, readingNoteFolder: ({ folderPath }: { folderPath: string }) => folderPath, readingEncryptionHeaders: () => ({}) }));
 vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),
-	readReadingArticle: vi.fn(), cacheReadingArticle: vi.fn(async () => {}),
+	readReadingArticle: vi.fn(), cacheReadingArticle: vi.fn(async () => true), removeReadingArticle: vi.fn(async () => {}),
 }));
 vi.mock('./storage/article-history', () => ({
 	openReadingArticleHistory: async (id: string) => {
@@ -115,17 +115,37 @@ it('keeps a saved copy the server reports unchanged, without downloading its bod
 	await act(async () => { await hook.current.open(item); });
 	expect(new Headers(network.mock.calls[0]![1]!.headers).get('If-None-Match')).toBe('"current"');
 	expect(hook.current.reader).toMatchObject({ item, markdown: saved.markdown, availableOffline: true });
-	expect(cacheReadingArticle).toHaveBeenCalledWith(session, item, saved.markdown, { etag: '"current"' });
+	// An unchanged copy is not written again.
+	expect(cacheReadingArticle).not.toHaveBeenCalled();
 	expect(reportSessionError).toHaveBeenLastCalledWith(session, null);
 });
 
-it('saves the ETag of a downloaded article with its offline copy', async () => {
+it('keeps an opened article only in memory until it is saved for offline, with its ETag', async () => {
 	vi.mocked(readReadingArticle).mockResolvedValue(undefined);
 	network.mockResolvedValue(Response.json({ item, markdown: 'Online text.' }, { headers: { ETag: '"revision"' } }));
 	const { hook } = harness();
 	await act(async () => { await hook.current.open(item); });
 	expect(new Headers(network.mock.calls[0]![1]!.headers).has('If-None-Match')).toBe(false);
+	// Before: every opened article was stored on the device.
+	expect(cacheReadingArticle).not.toHaveBeenCalled();
+	expect(hook.current.reader).toMatchObject({ markdown: 'Online text.', availableOffline: false });
+	vi.mocked(cacheReadingArticle).mockResolvedValue(true);
+	await act(async () => { await hook.current.setOffline(true); });
 	expect(cacheReadingArticle).toHaveBeenCalledWith(session, item, 'Online text.', { etag: '"revision"' });
+	expect(hook.current.reader).toMatchObject({ availableOffline: true });
+	await act(async () => { await hook.current.setOffline(false); });
+	expect(removeReadingArticle).toHaveBeenCalledWith(session, item.crate_reading_id);
+	expect(hook.current.reader).toMatchObject({ availableOffline: false });
+});
+
+it('reports a full offline storage instead of removing another saved copy', async () => {
+	vi.mocked(readReadingArticle).mockResolvedValue(undefined);
+	network.mockResolvedValue(Response.json({ item, markdown: 'Online text.' }));
+	const { hook } = harness();
+	await act(async () => { await hook.current.open(item); });
+	vi.mocked(cacheReadingArticle).mockResolvedValue(false);
+	await expect(hook.current.setOffline(true)).rejects.toThrow('Offline storage is full');
+	expect(hook.current.reader).toMatchObject({ availableOffline: false });
 });
 
 it('shows a saved copy already moved to an edited item instead of downloading it again', async () => {

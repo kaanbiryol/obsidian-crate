@@ -260,16 +260,17 @@ once; afterwards a change costs other devices one shard, about 250 KB.
 
 ## Offline copies on request
 
-Today the web app stores every opened article and prefetches others in the background. Both
-stop:
+Built. The web app used to store every opened article and prefetch others in the background.
+Both stopped:
 
 - Opening an article downloads it and keeps it in memory for the session only.
 - **Save for offline** in the article stores that article on the device, and **Remove offline
-  copy** deletes it. Saved articles are marked in the list.
+  copy** deletes it. A save past 200 articles or 50 MB is refused; no saved copy is evicted.
 - A saved copy is checked when it is opened, with one conditional request, never in the
   background. It downloads again only when its note changed.
 - Removed: background prefetch (`src/pwa/reading/prefetch.ts`) and storing articles on open.
-  Copies an older version stored automatically are deleted on upgrade; they were a cache.
+  Copies an older version stored automatically are deleted with the next library refresh
+  (`commitReadingCache`); saved copies carry `offline: true`.
 - Unchanged: the pending-change queue, which keeps edits safe across reloads, and the card list
   cache above.
 

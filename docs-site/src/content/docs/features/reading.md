@@ -117,7 +117,7 @@ In browsers that support sharing to web apps, install the web app, then select *
 
 In Obsidian, article text lives in your vault, so it's always available offline.
 
-The web app keeps up to 200 articles or 50 MB of article text. Articles you open are kept first. While the app is open and online, it also saves a few of your newest inbox articles each time it refreshes, so you can read them offline without opening them first. Archived articles are saved only when you open them, and Data Saver turns background saving off.
+The web app keeps an article on your device only when you ask: open it and select **Save for offline**. Select it again (**Remove offline copy**) to delete the copy. Up to 200 articles or 50 MB of article text can be saved; past that, remove a copy to save another. A saved article is checked for changes when you open it, never in the background.
 
 Saves and edits you make offline stay pending until your server confirms them. Export pending work before clearing browser data or signing out. If something gets stuck, see [Recovery](/docs/troubleshooting/recovery/#pending-work-in-the-web-app).
 

@@ -27,11 +27,13 @@ export function isReadingCache(value: unknown, folder: string): value is Reading
 	}) && value.issues.every((issue: unknown) => isRecord(issue) && typeof issue.path === 'string' && typeof issue.message === 'string');
 }
 
-/** `prefetched` marks a copy saved in the background rather than opened on this device.
- * `etag` is the server revision it came from, absent on copies saved before it was kept. */
-export interface ReadingArticleCache extends ReadingArticle { usedAt: number; prefetched?: true; etag?: string }
+/** `offline` marks a copy the user saved for offline reading. Copies without it were
+ * stored automatically by earlier versions (`prefetched` ones in the background) and are
+ * removed. `etag` is the server revision it came from, absent on copies saved before it was kept. */
+export interface ReadingArticleCache extends ReadingArticle { usedAt: number; offline?: true; prefetched?: true; etag?: string }
 export function isReadingArticleCache(value: unknown, folder: string): value is ReadingArticleCache {
 	return isReadingArticle(value, folder) && 'usedAt' in value && nonNegativeNumber(value.usedAt)
+		&& (!('offline' in value) || value.offline === true)
 		&& (!('prefetched' in value) || value.prefetched === true)
 		&& (!('etag' in value) || typeof value.etag === 'string' && value.etag.length <= 128);
 }

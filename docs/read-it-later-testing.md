@@ -6,7 +6,7 @@ Reading covers the plugin, server, web library, background extraction, automatic
 
 Run `npm run preview:reading`, then open <http://localhost:8877/preview/start>. This starts the real built server in an isolated `.crate/reading-preview` directory. The link creates fresh Reading access on each visit. It does not connect to your real vault or deployment. Stop the command with Ctrl+C; its test data remains for the next run.
 
-Save a public article, wait for extraction, open it, favorite it, add tags, archive it, and restore it to the inbox. Open an article once before testing offline reading. Offline changes remain listed as pending until the server confirms them. The exported recovery JSON contains saved articles and pending work, so keep it private.
+Save a public article, wait for extraction, open it, favorite it, add tags, archive it, and restore it to the inbox. Open an article and select **Save for offline** before testing offline reading. Offline changes remain listed as pending until the server confirms them. The exported recovery JSON contains saved articles and pending work, so keep it private.
 
 ## Test in Obsidian
 
