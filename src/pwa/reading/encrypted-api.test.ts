@@ -40,18 +40,22 @@ it('bounds empty advancing encrypted pages independently of the item budget', as
 	expect(request).toHaveBeenCalledTimes(1000);
 });
 
-it('rejects a library larger than the documented 10,000-file budget', async () => {
+it('opens only the 10,000 most recently changed notes of a larger library', async () => {
 	const { api, request } = harness();
-	const hash = 'a'.repeat(64);
-	let pages = 0;
+	const hash = 'a'.repeat(64), oldest = `${wireFolder}/oldest.md`;
+	const files = Array.from({ length: 10_000 }, (_, file) => ({ path: `${wireFolder}/${file}.md`, hash, size: 1, revision: `r-${file}`, modified: `2026-01-01 00:00:${String(file % 60).padStart(2, '0')}` }));
+	files.splice(5_000, 0, { path: oldest, hash, size: 1, revision: 'r-oldest', modified: '2020-01-01 00:00:00' });
+	const opened: string[] = [];
 	request.mockImplementation(async path => {
-		if (!path.startsWith('/reading/encrypted-files')) return Response.json({ error: 'Not found' }, { status: 404 });
-		const index = pages++;
-		const files = Array.from({ length: 1000 }, (_, file) => ({ path: `${wireFolder}/${index}-${file}.md`, hash, size: 1, revision: `${index}-${file}` }));
-		return Response.json(page(files, `cursor-${String(index).padStart(3, '0')}`));
+		if (path.startsWith('/reading/encrypted-file?')) { opened.push(new URL(path, 'https://crate.invalid').searchParams.get('path')!); return Response.json({ error: 'Not found' }, { status: 404 }); }
+		const after = Number(new URL(path, 'https://crate.invalid').searchParams.get('after') ?? 0);
+		return Response.json(page(files.slice(after, after + 1000), after + 1000 < files.length ? String(after + 1000).padStart(6, '0') : null));
 	});
-	await expect(api.request('/reading/list')).rejects.toThrow('limit');
-	expect(pages).toBe(11);
+	// Before: a library over the limit failed to load at all.
+	const listed = await api.request('/reading/list') as { omitted?: number };
+	expect(listed.omitted).toBe(1);
+	expect(opened).toHaveLength(10_000);
+	expect(opened).not.toContain(oldest);
 });
 
 it.each([['A', 'A'], ['A', 'B', 'A']])('rejects an encrypted cursor cycle: %j', async (...cursors) => {
@@ -76,13 +80,12 @@ it.each(['later page', 'confirmation'])('rejects a sequence change on the %s', a
 	expect(request).toHaveBeenCalledTimes(2);
 });
 
-it('rejects repeated file paths across encrypted pages', async () => {
+it('rejects repeated file paths across encrypted pages before opening any note', async () => {
 	const { api, request } = harness(), saved = await article('Saved');
 	request.mockResolvedValueOnce(Response.json(page([saved.file], 'A')))
-		.mockResolvedValueOnce(new Response(saved.bytes))
 		.mockResolvedValueOnce(Response.json(page([saved.file])));
 	await expect(api.request('/reading/list')).rejects.toThrow('repeated a file');
-	expect(request).toHaveBeenCalledTimes(3);
+	expect(request).toHaveBeenCalledTimes(2);
 });
 
 it.each(['malformed later page', 'changed confirmation'])('retains the complete inventory and article after a %s', async failure => {

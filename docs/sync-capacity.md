@@ -77,3 +77,31 @@ Installed iPhone momentum scrolling still requires a physical-device check.
 | DOM elements | 160,114 | 3,372 |
 
 These are unthrottled local samples from September 7, 2026, with service workers disabled, not physical-device or network guarantees. The server still returns the full folder response. Reordering now accepts up to 10,000 IDs while retaining the 1 MiB request limit, stale-order checks and idempotent receipts; a real D1/R2 regression verifies reordering inside a 1,000-reminder project without changing other rows.
+
+### Reading capacity measurements
+
+```bash
+npm run benchmark:reading
+```
+
+The plugin case builds a synthetic Reading library in memory, with Obsidian's frontmatter cache already computed, and times startup, a favorite, a status change, two saved links and a search. It counts note reads and full folder listings. The ordinary unit suite runs it with 2,000 notes; the benchmark script sets `READING_CAPACITY_NOTES=50000`. The Worker case seeds 10,000 and 50,000 indexed notes in local workerd and D1 and lists them the way the web app does, page by page. Rows read come from D1's own billing metadata. Neither touches a deployed server.
+
+On November 8, 2026, with 50,000 notes, using Node 26.10.0 and local workerd:
+
+| Plugin step | Before | After cached frontmatter |
+| --- | --- | --- |
+| Startup | 3,186 ms, 50,000 reads, 1 listing | 381–484 ms, 0 reads, 1 listing |
+| Favorite | 93 ms, 3 listings | 23–66 ms, no listing |
+| Status change | 84 ms, 3 listings | 14–37 ms, no listing |
+| Save a link | 117 ms, 2 listings | First 72–131 ms, then 10 ms, no listing |
+| Search | 11 ms | 12–16 ms |
+
+Reads in memory are instant, so a vault on disk, and especially on mobile, spends more on the reads that were removed. Each edit reads its note before and after writing it.
+
+| Web app list (unencrypted) | 10,000 notes | 50,000 notes |
+| --- | --- | --- |
+| First page | 321 KB, 1,010 rows read | 324 KB, 1,010 rows read |
+| Whole library, as the app loads it today | 11 requests, 3.2 MB, 10,100 rows read | 51 requests, 16.2 MB, 50,460 rows read |
+| Unchanged library | 4 rows read | 4 rows read |
+
+A full last page still returns a cursor, so a library of an exact number of pages costs one empty request more. These are local samples, not latency guarantees.

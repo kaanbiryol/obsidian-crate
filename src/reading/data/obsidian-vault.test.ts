@@ -98,3 +98,35 @@ it('rejects an update when the note changes after its bytes were verified', asyn
 	expect(update).not.toHaveBeenCalled();
 	expect(h.content()).toBe('edited');
 });
+
+it('looks up one note with the same folder, Markdown and exclusion checks as a listing', () => {
+	const h = harness();
+	const other = Object.assign(new TFile(), { path: 'Elsewhere/note.md', extension: 'md', stat: { size: 4, mtime: 1 } });
+	const image = Object.assign(new TFile(), { path: 'Reading/image.png', extension: 'png', stat: { size: 4, mtime: 1 } });
+	h.entries.set(other.path, other); h.entries.set(image.path, image);
+	expect(h.adapter.file('Reading/note.md')).toMatchObject({ path: 'Reading/note.md', revision: h.adapter.files()[0]!.revision });
+	expect(h.adapter.file('Elsewhere/note.md')).toBeNull();
+	expect(h.adapter.file('Reading/image.png')).toBeNull();
+	expect(h.adapter.file('Reading/missing.md')).toBeNull();
+	h.exclude();
+	expect(h.adapter.file('Reading/note.md')).toBeNull();
+});
+
+it('reports cached frontmatter, an indexed note without it, and an unindexed note', () => {
+	const file = Object.assign(new TFile(), { path: 'Reading/note.md', extension: 'md', stat: { size: 4, mtime: 1 } });
+	const folder = Object.assign(new TFolder(), { path: 'Reading', children: [file] });
+	const vault = { getAbstractFileByPath: (path: string) => path === 'Reading' ? folder : path === file.path ? file : null };
+	let cache: { frontmatter?: Record<string, unknown> } | null = { frontmatter: { title: 'Cached' } };
+	const adapter = createObsidianReadingVault(vault as unknown as Vault, 'Reading', {
+		signal: new AbortController().signal, allowed: () => true, validate: () => {}, fileManager: { renameFile: vi.fn() },
+		metadataCache: { getFileCache: () => cache },
+	});
+	const listed = adapter.files()[0]!;
+	expect(adapter.cachedProperties(listed)).toEqual({ title: 'Cached' });
+	cache = {};
+	expect(adapter.cachedProperties(listed)).toEqual({});
+	cache = null;
+	expect(adapter.cachedProperties(listed)).toBeUndefined();
+	// A file the adapter did not list has no identity to check, so it is read instead.
+	expect(adapter.cachedProperties({ path: 'Reading/note.md', size: 4, modifiedAt: 1 })).toBeUndefined();
+});

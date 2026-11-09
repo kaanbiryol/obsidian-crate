@@ -189,3 +189,10 @@ it('shows the pages of a first load before the library is saved', async () => {
 	await loadReading(session, cache, progress);
 	expect(progress).not.toHaveBeenCalled();
 });
+
+it('keeps how many older notes a limited encrypted library left out, and ignores an invalid count', async () => {
+	respond({ items: [item(1)], issues: [], cursor: null, omitted: 40_000 });
+	expect((await loadReading(session)).omitted).toBe(40_000);
+	respond({ items: [item(1)], issues: [], cursor: null, omitted: -1 });
+	expect((await loadReading(session)).omitted).toBeUndefined();
+});

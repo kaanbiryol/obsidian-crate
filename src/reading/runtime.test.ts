@@ -9,6 +9,7 @@ import { changeReadingFolder, getReadingLibrary, restartReading, startReading, s
 import { readReadingPolicy, writeReadingPolicy } from './server';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { DEFAULT_READING_SETTINGS } from './settings';
+import { readReadingFrontmatter } from './core/frontmatter';
 
 vi.mock('./desktop-capture', () => ({ captureDesktopArticle: vi.fn(async () => ({ markdown: 'Downloaded article text from the desktop.', title: 'Desktop article' })) }));
 vi.mock('./server', () => ({ readReadingPolicy: vi.fn(), writeReadingPolicy: vi.fn() }));
@@ -33,16 +34,51 @@ function harness() {
 		adapter: { readBinary: async (path: string) => new TextEncoder().encode(await vault.read(Object.assign(new TFile(), { path }))).buffer },
 	};
 	const workspace = { layoutReady: false, on: () => ({}), offref: vi.fn(), getLeavesOfType: () => [], onLayoutReady: (callback: () => void) => { callbacks.push(callback); if (workspace.layoutReady) callback(); } };
+	const metadataCache = { getFileCache: vi.fn((): { frontmatter?: Record<string, unknown> } | null => null), on: vi.fn((_name: string, _callback: (file: TFile) => void) => ({})), offref: vi.fn() };
 	const plugin = { secretStorage: { get: () => null }, settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading', confirmed: true } }, '.obsidian'),
-		remindersSettings: { remindersFolderPath: 'Reminders' }, app: { vault, workspace }, registerEvent: vi.fn(),
+		remindersSettings: { remindersFolderPath: 'Reminders' }, app: { vault, workspace, metadataCache }, registerEvent: vi.fn(),
 		syncRuntime: { getState: () => ({ status }), isWritingVault: () => status === 'syncing' && writesVault, addStateChangeListener: (listener: () => void) => { syncListeners.add(listener); }, removeStateChangeListener: (listener: () => void) => { syncListeners.delete(listener); } },
 	} as unknown as CratePlugin;
-	return { plugin, file, vault, workspace, callbacks, events, syncListeners,
+	return { plugin, file, vault, workspace, callbacks, events, syncListeners, metadataCache,
 		setStatus: (next: string, writes = true) => { status = next; writesVault = writes; for (const listener of syncListeners) listener(); },
 		edit: (update: (source: string) => string) => { content = update(content); for (const listener of events.get('modify') ?? []) listener(file); },
 	};
 }
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
+
+describe('Reading runtime with Obsidian\'s frontmatter cache', () => {
+	it('lists notes without reading them and reads only a note that changes', async () => {
+		const h = harness();
+		const properties = readReadingFrontmatter(await h.vault.read())!.value;
+		h.vault.read.mockClear();
+		h.metadataCache.getFileCache.mockImplementation(() => ({ frontmatter: properties }));
+		h.workspace.layoutReady = true; startReading(h.plugin);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(getReadingLibrary(h.plugin)!.getSnapshot().items).toHaveLength(1);
+		// Before: startup read every note.
+		expect(h.vault.read).not.toHaveBeenCalled();
+		h.edit(source => source + '\nEdited in Obsidian.');
+		await vi.advanceTimersByTimeAsync(500);
+		expect(h.vault.read).toHaveBeenCalledOnce();
+		stopReading(h.plugin);
+	});
+	it('takes properties Obsidian re-indexed without reading the note', async () => {
+		const h = harness();
+		const properties = { current: readReadingFrontmatter(await h.vault.read())!.value };
+		h.vault.read.mockClear();
+		h.metadataCache.getFileCache.mockImplementation(() => ({ frontmatter: properties.current }));
+		h.workspace.layoutReady = true; startReading(h.plugin);
+		await vi.advanceTimersByTimeAsync(500);
+		const reindexed = h.metadataCache.on.mock.calls.find(([name]) => name === 'changed')?.[1];
+		properties.current = { ...properties.current, title: 'Changed while Obsidian was closed' };
+		reindexed?.(h.file);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(getReadingLibrary(h.plugin)!.getSnapshot().items[0]?.title).toBe('Changed while Obsidian was closed');
+		expect(h.vault.read).not.toHaveBeenCalled();
+		stopReading(h.plugin);
+		expect(h.metadataCache.offref).toHaveBeenCalled();
+	});
+});
 
 describe('Reading runtime lifecycle', () => {
 	it.each(['create', 'process'] as const)('drains an accepted host %s before completing shutdown or reading its replacement', async operation => {

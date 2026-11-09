@@ -19,6 +19,8 @@ export interface ReadingListPage {
 	cursor: string | null;
 	/** Set on a delta: every listed path whose items and issues this page replaces. */
 	changedPaths?: string[];
+	/** Older notes left out because the library exceeds this device's limit. */
+	omitted?: number;
 }
 
 // A delta holds at most one page of changed notes and one page of removed paths.
@@ -39,7 +41,8 @@ export function parseReadingListPage(value: unknown, folder: string): ReadingLis
 		if (!item) return null;
 		items.push(item);
 	}
-	return { items, issues: value.issues, cursor: value.cursor, ...(delta ? { changedPaths: value.changedPaths as string[] } : {}) };
+	const omitted = Number.isSafeInteger(value.omitted) && (value.omitted as number) > 0 ? value.omitted as number : undefined;
+	return { items, issues: value.issues, cursor: value.cursor, ...(delta ? { changedPaths: value.changedPaths as string[] } : {}), ...(omitted ? { omitted } : {}) };
 }
 
 export interface ReadingArticle { item: ReadingItem; markdown: string }

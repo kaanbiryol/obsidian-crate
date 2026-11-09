@@ -11,8 +11,9 @@ import { isArticleReadingKey, readingKeys } from '@/pwa/reading/storage/storage-
 import { readingNoteFolder } from '../session/encryption-session';
 
 /** `revision` is the server's list ETag for this snapshot, sent back to skip unchanged reloads.
- * `deltaBase` is the server's changelog position for it, sent back to receive only changed notes. */
-export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; revision?: string; deltaBase?: string }
+ * `deltaBase` is the server's changelog position for it, sent back to receive only changed notes.
+ * `omitted` counts older notes an encrypted library left out at this device's limit. */
+export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; revision?: string; deltaBase?: string; omitted?: number }
 
 export async function readReadingCache(session: ReadingSession): Promise<ReadingCache | undefined> {
 	const value = await readReadingValue(readingKeys.list(session.id));

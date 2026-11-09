@@ -81,7 +81,7 @@ function ReadingAppContent() {
 	// A share stays staged until a connected Reading session copies it into its draft.
 	const share = new URL(location.href).searchParams.has('share');
 	const notices = <ReadingNotices recovery={recovery} error={error} showError={!readingDisabled && !adding} readOnly={readOnly}
-		syncIssue={pending.find(op => op.error || op.review)} onExport={() => void run(exportReadingData)}
+		syncIssue={pending.find(op => op.error || op.review)} limited={cache?.omitted ? cache.items.length : undefined} onExport={() => void run(exportReadingData)}
 		onRetry={() => { if (session) void run(refreshManually); else void connect(); }} onReview={() => setSettingsOpen(true)} />;
 	return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
 		{!session && !readingDisabled ? <ReadingWelcome share={share} notices={notices} /> : <>
@@ -140,11 +140,13 @@ function ReadingWelcome({ share, notices }: { share: boolean; notices: ReactNode
 }
 
 /** Earlier-session recovery, then a connection error or else the first change that needs attention. */
-function ReadingNotices({ recovery, error, showError, readOnly, syncIssue, onExport, onRetry, onReview }: {
+function ReadingNotices({ recovery, error, showError, readOnly, syncIssue, limited, onExport, onRetry, onReview }: {
 	recovery: boolean; error: string | null; showError: boolean; readOnly: boolean; syncIssue: PendingReading | undefined;
-	onExport: () => void; onRetry: () => void; onReview: () => void;
+	/** Notes shown when an encrypted library exceeds this device's limit. */
+	limited: number | undefined; onExport: () => void; onRetry: () => void; onReview: () => void;
 }) {
 	return <>
+		{limited !== undefined && <p className="crate-reading__notice">{`Showing your ${limited.toLocaleString()} most recently changed notes. Search older notes in Obsidian.`}</p>}
 		{recovery && <p className="crate-reading__notice">{'Changes from an earlier sign-in are still stored here. '}
 			<Button variant="outline" onClick={onExport}>Export earlier changes</Button></p>}
 		{error && showError && <p className="crate-reading__notice" role="alert">{readOnly && <strong>Unable to connect. </strong>}{error}{' '}

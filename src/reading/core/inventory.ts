@@ -16,10 +16,11 @@ export function filterUniqueReadingIds<T extends Pick<ReadingItem, 'crate_readin
 export type SavedReadingLink<T> = { kind: 'none' } | { kind: 'one'; item: T } | { kind: 'many' };
 
 /** Find the item that already saves `url`. Several matches are ambiguous and
- * callers must not pick one. */
-export function findSavedReadingLink<T extends Pick<ReadingItem, 'source_url'>>(items: readonly T[], url: string): SavedReadingLink<T> {
+ * callers must not pick one. `identityOf` lets a caller reuse identities it computed before. */
+export function findSavedReadingLink<T extends Pick<ReadingItem, 'source_url'>>(items: readonly T[], url: string,
+	identityOf: (item: T) => string = item => readingUrlIdentity(item.source_url)): SavedReadingLink<T> {
 	const identity = readingUrlIdentity(url);
-	const matches = items.filter(item => item.source_url && readingUrlIdentity(item.source_url) === identity);
+	const matches = items.filter(item => item.source_url && identityOf(item) === identity);
 	if (matches.length > 1) return { kind: 'many' };
 	return matches[0] ? { kind: 'one', item: matches[0] } : { kind: 'none' };
 }

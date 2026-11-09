@@ -1,4 +1,4 @@
-import { TFile, TFolder, type FileManager, type TAbstractFile, type Vault } from 'obsidian';
+import { TFile, TFolder, type FileManager, type MetadataCache, type TAbstractFile, type Vault } from 'obsidian';
 import { portablePathKey } from '@/protocol/portable-path';
 import { isCurrentVaultFile } from '@/sync/local/vault-file-identity';
 import { processVaultMarkdown, readVaultMarkdown } from '@/reminders/data/vault-markdown';
@@ -16,8 +16,10 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 	allowed: (path: string) => boolean;
 	validate: () => void;
 	fileManager: Pick<FileManager, 'renameFile'>;
-}): Pick<ReadingVault, 'files' | 'occupied' | 'read' | 'process' | 'create' | 'rename'> & { changed(path: string): void } {
-	const { signal, allowed, validate, fileManager } = options;
+	/** Obsidian's frontmatter cache, which lets Reading list notes without reading them. */
+	metadataCache?: Pick<MetadataCache, 'getFileCache'>;
+}): Pick<ReadingVault, 'files' | 'occupied' | 'read' | 'process' | 'create' | 'rename'> & Required<Pick<ReadingVault, 'file' | 'cachedProperties'>> & { changed(path: string): void } {
+	const { signal, allowed, validate, fileManager, metadataCache } = options;
 	const fileRefs = new WeakMap<ReadingFile, TFile>();
 	const fileIds = new WeakMap<TFile, number>();
 	const fileEvents = new WeakMap<TFile, number>();
@@ -28,6 +30,12 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 		if (!ref || !isCurrentVaultFile(vault, file.path, ref) || !allowed(file.path)) throw new Error('Reading note moved, was deleted, or is excluded from sync.');
 		return ref;
 	};
+	const readingFile = (entry: TFile): ReadingFile => {
+		if (!fileIds.has(entry)) fileIds.set(entry, ++nextFileId);
+		const file = { path: entry.path, size: entry.stat.size, modifiedAt: entry.stat.mtime, revision: `${fileIds.get(entry)}:${entry.stat.mtime}:${entry.stat.size}:${fileEvents.get(entry) ?? 0}` };
+		fileRefs.set(file, entry);
+		return file;
+	};
 	return {
 		files: () => {
 			signal.throwIfAborted();
@@ -36,15 +44,27 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 			const walk = (entry: TAbstractFile) => {
 				if (!allowed(entry.path)) return;
 				if (entry instanceof TFolder) for (const child of entry.children) walk(child);
-				else if (entry instanceof TFile && entry.extension.toLowerCase() === 'md') {
-					if (!fileIds.has(entry)) fileIds.set(entry, ++nextFileId);
-					const file = { path: entry.path, size: entry.stat.size, modifiedAt: entry.stat.mtime, revision: `${fileIds.get(entry)}:${entry.stat.mtime}:${entry.stat.size}:${fileEvents.get(entry) ?? 0}` };
-					fileRefs.set(file, entry); result.push(file);
-				}
+				else if (entry instanceof TFile && entry.extension.toLowerCase() === 'md') result.push(readingFile(entry));
 			};
 			const root = vault.getAbstractFileByPath(folder);
 			if (root) walk(root);
 			return result;
+		},
+		file: path => {
+			signal.throwIfAborted();
+			validate();
+			const entry = vault.getAbstractFileByPath(path);
+			// The same checks as a listing: inside the folder, allowed at every level, Markdown.
+			if (!(entry instanceof TFile) || entry.extension.toLowerCase() !== 'md' || !path.startsWith(`${folder}/`)) return null;
+			for (let parent = path; parent.includes('/'); parent = parent.slice(0, parent.lastIndexOf('/'))) if (!allowed(parent)) return null;
+			return allowed(folder) ? readingFile(entry) : null;
+		},
+		cachedProperties: file => {
+			const ref = fileRefs.get(file);
+			if (!ref || !metadataCache) return undefined;
+			const cache = metadataCache.getFileCache(ref);
+			// An indexed note without frontmatter has no properties to list.
+			return cache ? cache.frontmatter ?? {} : undefined;
 		},
 		changed: path => {
 			const file = vault.getAbstractFileByPath(path);

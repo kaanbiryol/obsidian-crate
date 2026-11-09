@@ -53,12 +53,14 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 		// its own rows. The cursor is opaque to clients.
 		const [keyStart = '', keyEnd, pathStart, pathEnd] = fileFolderArgs(folder);
 		const [lower, lowerBound] = after >= keyStart ? ['portable_path > ?', after] : ['portable_path >= ?', keyStart];
-		const rows = await env.DB.prepare(`SELECT path, portable_path, hash, size, storage_key AS revision FROM files
+		const rows = await env.DB.prepare(`SELECT path, portable_path, hash, size, storage_key AS revision, modified FROM files
 			WHERE ${lower} AND portable_path < ? AND path >= ? AND path < ? AND lower(path) LIKE '%.md'
 			ORDER BY portable_path LIMIT ${ENCRYPTED_INVENTORY_PAGE}`)
-			.bind(lowerBound, keyEnd, pathStart, pathEnd).all<{ path: string; portable_path: string; hash: string; size: number; revision: string }>();
+			.bind(lowerBound, keyEnd, pathStart, pathEnd).all<{ path: string; portable_path: string; hash: string; size: number; revision: string; modified: string }>();
+		// `modified` is the server's own time of the last write, which it already knows; the
+		// Reading app keeps the most recently changed notes when a library exceeds its limit.
 		const files = rows.results.filter(file => scopedPath(file.path, folder))
-			.map(({ path, hash, size, revision }) => ({ path, hash, size, revision }));
+			.map(({ path, hash, size, revision, modified }) => ({ path, hash, size, revision, modified }));
 		return corsResponse({ files, sequence: sequence?.seq ?? 0, generation: state.generation,
 			nextCursor: rows.results.length === ENCRYPTED_INVENTORY_PAGE ? rows.results.at(-1)!.portable_path : null });
 	}

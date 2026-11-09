@@ -94,8 +94,9 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 	const removed = `portable_path IN (SELECT portable FROM committed WHERE keep = 0 AND storage_key IS NOT NULL)
         OR (portable_path, path) IN (SELECT portable, path FROM committed WHERE storage_key IS NULL)`;
 	return [
-		// Every row this batch writes, removes or flags takes the next change number.
-		db.prepare('UPDATE reading_index SET seq = seq + 1 WHERE id = 1'),
+		// Every row this batch writes, removes or flags takes the next change number. The library
+		// revision changes in the same statement, one written row instead of two.
+		db.prepare('UPDATE reading_index SET seq = seq + 1, revision = coalesce(?, lower(hex(randomblob(16)))) WHERE id = 1').bind(options.revision ?? null),
 		...(removes ? [
 			statement(`INSERT INTO reading_removals(path, change_seq, removed_at) SELECT path, ${CHANGE_SEQ}, ?3 FROM reading_items WHERE ${removed}
         ON CONFLICT(path) DO UPDATE SET change_seq = excluded.change_seq, removed_at = excluded.removed_at`, Date.now()),
@@ -109,11 +110,21 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
       ON CONFLICT(path) DO UPDATE SET item_id = excluded.item_id, generation = excluded.generation, source_revision = excluded.source_revision,
         block_hash = excluded.block_hash, url = excluded.url, attempts = 0, available_at = excluded.available_at
       WHERE reading_jobs.source_revision != excluded.source_revision`, Date.now())] : []),
-		...(keeps.length ? [statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at, change_seq)
-      SELECT portable, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at, ${CHANGE_SEQ} FROM committed WHERE keep = 1
-      ON CONFLICT(portable_path) DO UPDATE SET path = excluded.path, storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
-        item_id = excluded.item_id, url_identity = excluded.url_identity, metadata_json = excluded.metadata_json, error = excluded.error,
-        article_hash = excluded.article_hash, article_edited = excluded.article_edited, saved_at = excluded.saved_at, change_seq = excluded.change_seq`)] : []),
+		// Setting an indexed column rewrites its index entry even when the value is the same. So
+		// indexed columns change first, and only on rows where they differ; the upsert then sets
+		// only unindexed columns and the change number. A favorite rewrites the row and its change
+		// number, not every index.
+		...(keeps.length ? [
+			statement(`UPDATE reading_items SET path = c.path, item_id = c.item_id, url_identity = c.url_identity, saved_at = c.saved_at,
+        article_hash = c.article_hash, article_edited = c.article_edited
+        FROM committed c WHERE c.keep = 1 AND reading_items.portable_path = c.portable
+        AND (reading_items.path, reading_items.item_id, reading_items.url_identity, reading_items.saved_at, reading_items.article_hash, reading_items.article_edited)
+          IS NOT (c.path, c.item_id, c.url_identity, c.saved_at, c.article_hash, c.article_edited)`),
+			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at, change_seq)
+        SELECT portable, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at, ${CHANGE_SEQ} FROM committed WHERE keep = 1
+        ON CONFLICT(portable_path) DO UPDATE SET storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
+          metadata_json = excluded.metadata_json, error = excluded.error, change_seq = excluded.change_seq`),
+		] : []),
 		// Recount the IDs this batch wrote and every flagged row: a row that changed or left
 		// can only end a duplicate, and flagged rows are rare. Each branch uses an index;
 		// an OR would scan the table.
@@ -122,7 +133,6 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
       WHERE portable_path IN (SELECT portable_path FROM reading_items WHERE item_id IN (SELECT value FROM json_each(?))
         UNION ALL SELECT portable_path FROM reading_items WHERE duplicate = 1)
         AND duplicate != ((SELECT count(*) FROM reading_items d WHERE d.item_id = reading_items.item_id) > 1)`).bind(JSON.stringify(keeps.flatMap(row => row.item_id ? [row.item_id] : []))),
-		bumpReadingRevision(db, options.revision),
 	];
 }
 

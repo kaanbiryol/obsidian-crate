@@ -106,6 +106,7 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		allowed: path => allowedReadingPath(plugin, path),
 		validate: () => { validateReadingConfiguration(plugin, plugin.settings.reading); },
 		fileManager: plugin.app.fileManager,
+		metadataCache: plugin.app.metadataCache,
 	});
 	let policyChecked = !plugin.settings.workerUrl;
 	let checkedAt = 0;
@@ -125,6 +126,10 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	let scheduledAt = 0;
 	let lastErrorAt = 0;
 	const refreshes = new Set<Promise<void>>();
+	// The first refresh lists the folder; later ones load only notes that changed, and
+	// retry imports or highlight records that waited for sync or an editor.
+	let listAll = true, retry = false;
+	const changedPaths = new Set<string>(), reindexedPaths = new Set<string>();
 	const refresh = () => {
 		timer = undefined;
 		if (controller.signal.aborted || !plugin.app.workspace.layoutReady) return;
@@ -137,10 +142,20 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 				return reconcileReadingPolicy(plugin, folder, () => { controller.signal.throwIfAborted(); connection.assertCurrent(); });
 			})().then(adopted => {
 				if (adopted) startReading(plugin);
-				else { policyChecked = true; schedule(); }
+				else { policyChecked = true; retry = true; schedule(); }
 			}).catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
 		}
-		const work = library.refresh().catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not refresh Reading.'); } });
+		const all = listAll, paths = [...changedPaths], retrying = retry;
+		const reindexed = [...reindexedPaths].filter(path => !changedPaths.has(path));
+		listAll = false; retry = false; changedPaths.clear(); reindexedPaths.clear();
+		const work = (async () => {
+			if (all) await library.refresh();
+			else {
+				if (paths.length) await library.refreshPaths(paths);
+				if (reindexed.length) await library.refreshProperties(reindexed);
+			}
+			if (retrying) await library.retryPending();
+		})().catch(error => { if (!controller.signal.aborted && Date.now() - lastErrorAt > 60_000) { lastErrorAt = Date.now(); new Notice(error instanceof Error ? error.message : 'Could not refresh Reading.'); } });
 		refreshes.add(work); void work.finally(() => refreshes.delete(work));
 	};
 	const schedule = () => {
@@ -156,13 +171,16 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		const phase = `${plugin.syncRuntime.getState().status}:${plugin.syncRuntime.isWritingVault()}`;
 		if (phase === syncPhase) return;
 		syncPhase = phase;
-		schedule();
+		retry = true; schedule();
 	};
 	const inFolder = (path: string) => path === folder || path.startsWith(`${folder}/`) || folder.startsWith(`${path}/`);
 	const changed = (path: string) => {
 		if (!inFolder(path)) return;
-		// The event changes the file's revision; renamed paths are new cache keys and the scan prunes old ones.
-		readingVault.changed(path); schedule();
+		// The event changes the file's revision, and the note is read rather than taken from
+		// Obsidian's frontmatter cache, which updates after the event. A path that is not a
+		// note, such as a renamed folder, lists the folder again.
+		readingVault.changed(path); library.invalidate(path);
+		changedPaths.add(path); schedule();
 	};
 	const refs = [
 		vault.on('create', file => { changed(file.path); }),
@@ -170,13 +188,20 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		vault.on('delete', file => { changed(file.path); }),
 		vault.on('rename', (file, oldPath) => { changed(oldPath); changed(file.path); }),
 	];
+	// Obsidian re-indexes notes changed while it was closed after startup; their cards then
+	// take the fresh properties without reading the notes.
+	const metadataRef = plugin.app.metadataCache.on('changed', file => {
+		if (!inFolder(file.path)) return;
+		reindexedPaths.add(file.path); schedule();
+	});
 	// Closing an editor lets deferred imports and highlight records proceed; other layout changes need no scan.
-	const layoutRef = plugin.app.workspace.on('layout-change', () => { if (library.waitingForEditor) schedule(); });
+	const layoutRef = plugin.app.workspace.on('layout-change', () => { if (library.waitingForEditor) { retry = true; schedule(); } });
 	plugin.syncRuntime.addStateChangeListener(onSyncStateChange);
 	const stop = () => {
 		controller.abort(); window.clearTimeout(timer);
 		for (const ref of refs) vault.offref(ref);
 		plugin.app.workspace.offref(layoutRef);
+		plugin.app.metadataCache.offref(metadataRef);
 		plugin.syncRuntime.removeStateChangeListener(onSyncStateChange);
 		lifetime.removeEventListener('abort', onAbort);
 		return Promise.allSettled([library.close(), ...refreshes]).then(() => {});

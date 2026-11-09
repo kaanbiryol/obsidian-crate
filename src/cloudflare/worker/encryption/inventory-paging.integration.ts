@@ -64,3 +64,13 @@ it('reuses the encryption state authentication already read', async () => {
 	expect(response!.status).toBe(200);
 	expect(statements.some(sql => sql.includes('server_state'))).toBe(false);
 });
+
+it('lists each file with the server time of its last write, without reading more rows', async () => {
+	await seed();
+	await env.DB.prepare("UPDATE files SET modified = '2026-11-01 09:30:00' WHERE path = 'Reminders/Note-0000.md'").run();
+	const first = await page();
+	const files = first.files as Array<{ path: string; modified?: string }>;
+	expect(files.find(file => file.path === 'Reminders/Note-0000.md')?.modified).toBe('2026-11-01 09:30:00');
+	expect(files.every(file => typeof file.modified === 'string')).toBe(true);
+	expect(first.rowsRead).toBeLessThanOrEqual(ENCRYPTED_INVENTORY_PAGE + 10);
+});

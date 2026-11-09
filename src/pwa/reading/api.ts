@@ -151,6 +151,7 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
 		if (page.cursor !== null && seenCursors.has(page.cursor)) throw new Error('Reading library did not advance.');
 		if (page.cursor !== null) seenCursors.add(page.cursor);
 		cache.items.push(...page.items); cache.issues.push(...page.issues);
+		if (page.omitted) cache.omitted = page.omitted;
 		cursor = page.cursor;
 		if (cursor && !previous && onProgress) onProgress({ ...cache, items: [...cache.items], issues: [...cache.issues] });
 	} while (cursor);

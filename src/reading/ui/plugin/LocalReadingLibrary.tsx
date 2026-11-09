@@ -32,6 +32,7 @@ export function LocalReadingLibrary({ plugin, library, renderNavigation }: { plu
 		renderNavigation={renderNavigation}
 		readerMotion={reduceMotion ? 'none' : 'slide'}
 		renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
+		onSectionChange={section => { if (section === 'highlights') void library.checkHighlights().catch(() => { /* The library publishes its error. */ }); }}
 		onAdd={() => new AddReadingLinkModal(plugin, open).open()}
 		onOpen={open}
 		onEnrich={async (target, source) => { await library.enrich(target, source); await open(target); }}

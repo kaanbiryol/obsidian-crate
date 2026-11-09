@@ -9,7 +9,7 @@ import { MAX_READING_BYTES, readingUrl, type ReadingItem } from '../../reading/c
 import { readingCapturePath, retitledCapturePath } from '../../reading/core/filename';
 import { filterUniqueReadingIds, findSavedReadingLink, READING_DUPLICATE_ID_ISSUE } from '../../reading/core/inventory';
 import { portablePathKey } from '@/protocol/portable-path';
-import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '@/encryption/file-inventory';
+import { ENCRYPTED_INVENTORY_PAGE, encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '@/encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
@@ -18,16 +18,26 @@ import type { PathTags } from '@/encryption/path-tags';
 import { sealedNoteRefusal } from '@/encryption/sealed-note';
 import { encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 
-// The documented device budget: each refresh seals the whole list and index.
+// The documented device budget: each refresh seals the whole list and index. A larger
+// library lists every file but opens only its most recently changed notes.
 export const MAX_READING_FILES = 10_000;
+// File entries listed per refresh, the same bound as the unencrypted library.
+const MAX_READING_INVENTORY_FILES = 100_000;
 const MAX_READING_METADATA_BYTES = 12 * 1024 * 1024;
 // Changed notes download in parallel, a few at a time, in page order.
 const SOURCE_CONCURRENCY = 6;
 const SEALED_ISSUE = 'The server created a note that would replace or take the name of another note. It was not opened.';
 // Article opens reuse the last confirmed inventory this long; a list refresh or a commit reads it again.
 const ITEM_INVENTORY_REUSE_MS = 30_000;
-/** `revision` fingerprints the Reading files and issues, so edits elsewhere in the vault keep it. */
-interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: null; revision: string }
+/** `revision` fingerprints the Reading files and issues, so edits elsewhere in the vault keep it.
+ * `omitted` counts older notes left out because the library exceeds this device's limit. */
+interface EncryptedReadingInventory { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: null; revision: string; omitted?: number }
+
+/** The most recently changed files first, by the server's write time; ties keep path order. */
+function newestFiles(files: WireFile[], limit: number): WireFile[] {
+	if (files.length <= limit) return files;
+	return [...files].sort((a, b) => (b.modified ?? '').localeCompare(a.modified ?? '') || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)).slice(0, limit);
+}
 
 /** `hash` is the authenticated plaintext hash; `sealed` marks a note the server sealed. */
 interface Source { file: WireFile; content: string; item: ReadingItem; hash: string; sealed: boolean }
@@ -134,21 +144,27 @@ export class EncryptedReadingApi {
 		const newSealed: WireFile[] = [];
 		let downloaded = false, unavailable = false;
 		const nextSources = new Map(this.sources);
-		let metadataBytes = 0;
-		for await (const page of encryptedInventoryPages(fetchPage, {
-			maxFiles: MAX_READING_FILES, first, confirm: true,
-			changed: () => new Error('Reading changed while loading. Refresh again.'),
-		})) {
-			const loaded = await mapBounded(page.files, SOURCE_CONCURRENCY, async file => {
+		const changed = () => new Error('Reading changed while loading. Refresh again.');
+		// The inventory is small metadata, so it is listed whole; only the most recently changed
+		// notes, up to this device's file and metadata limits, are downloaded and opened.
+		const listed: WireFile[] = [];
+		for await (const page of encryptedInventoryPages(fetchPage, { maxFiles: MAX_READING_INVENTORY_FILES, first, changed })) listed.push(...page.files);
+		const chosen = newestFiles(listed, MAX_READING_FILES);
+		let omitted = listed.length - chosen.length, metadataBytes = 0, full = false;
+		for (let offset = 0; offset < chosen.length && !full; offset += ENCRYPTED_INVENTORY_PAGE) {
+			const batch = chosen.slice(offset, offset + ENCRYPTED_INVENTORY_PAGE);
+			const loaded = await mapBounded(batch, SOURCE_CONCURRENCY, async file => {
 				const cached = this.indexed.get(file.path);
 				if (cached && sameInventoryFile(cached.file, file)) return { entry: cached };
 				try { const { item, hash, sealed } = await this.source(file, nextSources); downloaded = true; return { entry: { file, item, hash }, sealed }; }
 				catch (error) { return { error }; }
 			});
-			for (const [index, file] of page.files.entries()) {
+			for (const [index, file] of batch.entries()) {
+				const result = loaded[index]!;
+				// Notes past the metadata budget are older than every note kept; Obsidian still has them.
+				if (full || !('error' in result) && metadataBytes + metadataSize(result.entry.item) > MAX_READING_METADATA_BYTES) { full = true; omitted++; continue; }
 				try {
 					next.set(file.path, file);
-					const result = loaded[index]!;
 					if ('error' in result) throw result.error;
 					const { entry } = result, { item } = entry;
 					if (result.sealed) {
@@ -161,7 +177,6 @@ export class EncryptedReadingApi {
 						if (!held) newSealed.push(file);
 					}
 					metadataBytes += metadataSize(item);
-					if (metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
 					candidates.push(item);
 					nextIndex.set(file.path, entry);
 				} catch (error) {
@@ -175,9 +190,10 @@ export class EncryptedReadingApi {
 					issues.push({ path: previous?.item.path ?? file.path, message: error instanceof Error ? error.message : 'Article could not be opened.' });
 				}
 			}
-			// An oversized library fails after its last page, before the sequence is confirmed.
-			if (!page.nextCursor && metadataBytes > MAX_READING_METADATA_BYTES) throw new Error('Reading metadata exceeds this device’s library limit.');
+			if (full) omitted += chosen.length - offset - batch.length;
 		}
+		// Files read while listing and opening belong to one snapshot.
+		if ((await fetchPage()).sequence !== first.sequence) throw changed();
 		// Nor may it take the name of another note, listed now or kept from a failed download.
 		for (const file of newSealed) {
 			const entry = nextIndex.get(file.path);
@@ -199,9 +215,10 @@ export class EncryptedReadingApi {
 		this.library = { readable: candidates, duplicateIds: new Set(duplicates.map(item => item.crate_reading_id)), unreadable };
 		// Unrelated vault edits advance the sequence; an unchanged fingerprint lets
 		// callers keep their saved library instead of rewriting and redrawing it.
-		const fingerprint = JSON.stringify([[...next.values()].map(file => [file.path, file.revision, file.hash, file.size]), issues.map(issue => [issue.path, issue.message])]);
+		const fingerprint = JSON.stringify([[...next.values()].map(file => [file.path, file.revision, file.hash, file.size]), issues.map(issue => [issue.path, issue.message]), omitted]);
 		const revision = `"e2ee-reading-${this.options.generation}-${(await sha256Hex(fingerprint)).slice(0, 32)}"`;
-		const result: EncryptedReadingInventory = this.confirmed?.result.revision === revision ? this.confirmed.result : { items, issues, cursor: null, revision };
+		const result: EncryptedReadingInventory = this.confirmed?.result.revision === revision ? this.confirmed.result
+			: { items, issues, cursor: null, revision, ...(omitted ? { omitted } : {}) };
 		if (!unavailable) this.confirmed = { sequence: sequence, result };
 		this.confirmedAt = unavailable ? undefined : Date.now();
 		if (downloaded || removed) await this.options.saveIndex?.([...nextIndex.values()]).catch(() => { /* The index is only a cache. */ });
