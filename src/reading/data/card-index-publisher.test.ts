@@ -43,7 +43,7 @@ function server(keys: Awaited<ReturnType<typeof encryptionKeys>> | null = null) 
 			return true;
 		},
 		readingIndexKeys: () => keys,
-		opaqueServerPath: async path => path.endsWith('Sealed.md') ? 'Reading/opaque-name.md' : undefined,
+		encryptedServerPath: async path => keys ? (path.endsWith('Sealed.md') ? 'tagged/opaque-name.md' : `tagged/${path.length}.md`) : undefined,
 	};
 	return { api, shards, uploads, race, manifest: () => stored?.manifest, replace: (manifest: ReadingIndexManifest) => { stored = { manifest, etag: `v${++version}` }; } };
 }
@@ -107,8 +107,8 @@ describe('Reading card index publisher', () => {
 		await publisher.publish(remote.api, 'gen', 5);
 		for (const bytes of remote.shards.values()) expect(new TextDecoder().decode(bytes)).not.toContain('Private title');
 		const opened = await cards(remote, keys);
-		expect(opened.find(card => card.path === 'Reading/Sealed.md')?.wire).toBe('Reading/opaque-name.md');
-		expect(opened.find(card => card.path === 'Reading/A.md')?.wire).toBeUndefined();
+		expect(opened.find(card => card.path === 'Reading/Sealed.md')?.wire).toBe('tagged/opaque-name.md');
+		expect(opened.find(card => card.path === 'Reading/A.md')?.wire).toMatch(/^tagged\//);
 		const manifest = remote.manifest()!;
 		await expect(readingIndexContentHashes(manifest, keys)).resolves.toHaveLength(READING_INDEX_SHARDS);
 		// The server cannot point the web app at other shards or another basis.

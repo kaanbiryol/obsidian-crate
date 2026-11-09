@@ -6,6 +6,9 @@ export const readingKeys = {
 	pending: (sessionId: string) => `pending:${sessionId}`,
 	articleIndex: (sessionId: string) => `article-index:${sessionId}`,
 	encryptedIndex: (sessionId: string) => `encrypted-index:${sessionId}`,
+	/** The encrypted card index's state, and its opened shards by stored hash. */
+	cardIndex: (sessionId: string) => `card-index:${sessionId}`,
+	cardShardPrefix: (sessionId: string) => `card-shard:${sessionId}:`,
 	articlePrefix: (sessionId: string) => `article:${sessionId}:`,
 	attemptPrefix: (sessionId: string) => `attempt:${sessionId}:`,
 	share: (id: string) => `share:${id}`,

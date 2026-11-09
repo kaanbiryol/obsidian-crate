@@ -126,6 +126,34 @@ a page parses up to 1,000 notes, more CPU than the public Worker's budget allows
 and deltas read their rows and the capture queue in one batch as well. A delta's batch also
 rereads the index row, so removals that maintenance pruned after the first read relist.
 
+### Reading card index
+
+Obsidian publishes a card index of the Reading folder; both web apps read it in either vault
+mode, so a first load does not read a row per note. Shards and the manifest live in R2; the
+server never reads a card. See [Reading at large library sizes](reading-scale.md).
+
+- `PUT /reading/index/shard?hash=…` (vault credential, 160 a minute) stores up to 8 MiB under
+  `__crate__/reading-index/shards/<sha256>` after checking the hash. `GET` serves it as
+  immutable bytes to any library credential, or 404.
+- `PUT /reading/index` (vault credential, 30 a minute) takes `{ manifest, expected }`:
+  `manifest` is `{ format: 1, generation, basis, shards }`, with `keyGeneration` and `sealed`
+  in an encrypted vault, and `expected` the ETag of the manifest read, or null. The Worker
+  refuses another folder generation, key generation or a basis past the changelog (409
+  `reading_index_stale`), a shard it does not have (409 `reading_index_shard_missing`), and a
+  version other than `expected` (409 `reading_index_conflict` with the current `etag`), then
+  writes with an R2 conditional put. Replaced shards are deleted by a publish one day later.
+- `GET /reading/index` returns `{ manifest, etag }` with an `ETag`, 304 for `If-None-Match`,
+  and 404 `reading_index_missing` when there is none for this folder, key, reset or import.
+- `GET /reading/index/changes?after=<seq>` returns the Reading notes written or deleted after
+  `seq`: `{ lastSeq, notes, removed }`, where `notes` are the current cards in an unencrypted
+  vault (with `issues`, `changedPaths`, the list `revision` and its `deltaBase`, so the web app
+  continues with `GET /reading/list` deltas) and server file entries in an encrypted one. It
+  reads one changelog row per vault change since `seq` and one row per changed note. More than
+  1,000 notes answers `{ tooMany: true }`; a position the changelog cannot replay, or an
+  unencrypted server index that is not complete, answers `{ expired: true }`.
+- `GET /reading/index/file?path=…` returns one encrypted file's current entry, so the encrypted
+  web app opens or edits a note without listing the folder.
+
 `GET /reading/list` pages hold up to 1,000 notes, newest `saved_at` first, so the first
 page of a first load is the top of the library. Every index write gives the rows it adds,
 changes, removes or flags (including a duplicate flag that flips in an unchanged note)

@@ -31,7 +31,9 @@ function respond(...pages: unknown[]) {
 beforeEach(() => {
 	vi.clearAllMocks(); network.mockReset();
 	network.mockImplementation(async () => { throw new Error('Unexpected extra list request'); });
-	vi.stubGlobal('fetch', network);
+	// These libraries have no card index, so a first load lists pages; `network` sees only those.
+	vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => (typeof input === 'string' ? input : input instanceof URL ? input.href : input.url).startsWith('/reading/index')
+		? Promise.resolve(Response.json({ error: 'Missing', code: 'reading_index_missing' }, { status: 404 })) : network(input, init));
 });
 afterEach(() => vi.unstubAllGlobals());
 

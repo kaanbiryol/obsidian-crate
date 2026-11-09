@@ -489,12 +489,14 @@ discovery, guarded reads/writes, and file-event revisions. Like reminder edits, 
 and writes go through `reminders/data/vault-markdown.ts`, so a note that is not strict UTF-8
 is listed as an issue instead of being rewritten with replacement characters. `reading/runtime.ts`
 owns configuration, policy refresh, scheduling and lifecycle cleanup.
-`reading/data/library.ts` lists the folder once per start, taking each imported note's
-properties from Obsidian's frontmatter cache through the adapter's `cachedProperties`, and reads
-only notes that need it: clips to import, notes the cache has not indexed or fails to validate,
-notes changed in this session and, once the Highlights tab opens, notes with listed highlights.
-Vault events and actions then update one note's entry, keeping the list sorted and duplicate IDs
-current, instead of listing the folder again. See [Reading at large library sizes](reading-scale.md).
+Reading's background work runs whether or not Reading is open: `reading/data/maintenance.ts`
+imports clips, records highlight markers and runs the strict check on each changed note, and
+`reading/data/card-index-publisher.ts` publishes the card index the web apps read. The card list,
+`reading/data/library.ts`, is built only while a Reading view or an action uses it, from
+Obsidian's frontmatter cache through the adapter's `cachedProperties`, and reads only notes the
+cache has not indexed or fails to validate, or that changed while it exists. Vault events and
+actions update one note's entry, keeping the list sorted and duplicate IDs current. See
+[Reading at large library sizes](reading-scale.md).
 `ReadingLibrary.close()` closes admission and drains its accepted mutation and
 capture queues. Runtime shutdown waits for it alongside refreshes;
 replacement libraries defer vault access until the previous runtime has drained.

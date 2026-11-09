@@ -27,10 +27,10 @@ export const bundleBudgets = {
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// Every feature loads at startup. Deleting Reading articles and reader sync
-		// feedback in the web app measure 1.166 MB raw / 380.3 KB gzip.
-		maxBytes: 1185000,
-		maxGzipBytes: 388000,
+		// Every feature loads at startup. Reading the Reading card index in the web app
+		// measures 1.186 MB raw / 388.3 KB gzip.
+		maxBytes: 1188000,
+		maxGzipBytes: 389000,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,

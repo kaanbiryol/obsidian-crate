@@ -9,6 +9,8 @@ import { isReadingArticleCache, isReadingCache, type ReadingArticleCache } from 
 import { isReadingItem } from './record-validation';
 import { isArticleReadingKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { readingNoteFolder } from '../session/encryption-session';
+import { parseReadingIndexManifest, type ReadingIndexManifest } from '@/protocol/reading-index';
+import type { ReadingIndexCard } from '@/reading/core/card-index';
 
 /** `revision` is the server's list ETag for this snapshot, sent back to skip unchanged reloads.
  * `deltaBase` is the server's changelog position for it, sent back to receive only changed notes.
@@ -48,6 +50,53 @@ function isIndexEntry(folder: string) {
 	};
 }
 
+/** What the encrypted web app keeps of the card index between visits: the manifest it read,
+ * the changelog position after it, and the notes changed since its basis. Shards are
+ * stored apart, by hash, so a new manifest rewrites only the shards that changed. */
+export interface StoredCardIndex {
+	version: 1; identity: string; etag: string; httpEtag: string; manifest: ReadingIndexManifest; lastSeq: number;
+	overlay: EncryptedReadingIndexEntry[]; removed: string[];
+}
+
+export async function readCardIndex(session: ReadingSession, identity: string, folder: string): Promise<{ state: StoredCardIndex; shards: Map<string, ReadingIndexCard[]> } | undefined> {
+	const state = await readReadingValue(readingKeys.cardIndex(session.id)) as Partial<StoredCardIndex> | undefined;
+	if (!isRecord(state) || state.version !== 1 || state.identity !== identity || typeof state.etag !== 'string' || typeof state.httpEtag !== 'string'
+		|| typeof state.lastSeq !== 'number' || !Array.isArray(state.overlay) || !Array.isArray(state.removed) || !state.removed.every(path => typeof path === 'string')) return undefined;
+	const manifest = parseReadingIndexManifest(state.manifest);
+	if (!manifest || !(state.overlay as unknown[]).every(isIndexEntry(folder))) return undefined;
+	const shards = new Map<string, ReadingIndexCard[]>();
+	for (const hash of new Set(manifest.shards)) {
+		if (!hash) continue;
+		const stored = await readReadingValue(`${readingKeys.cardShardPrefix(session.id)}${hash}`);
+		if (!isRecord(stored) || !Array.isArray(stored.cards) || !(stored.cards as unknown[]).every(card => isReadingIndexCard(card, folder))) return undefined;
+		shards.set(hash, stored.cards as ReadingIndexCard[]);
+	}
+	return { state: { ...state as StoredCardIndex, manifest }, shards };
+}
+
+export function isReadingIndexCard(value: unknown, folder: string): value is ReadingIndexCard {
+	if (!isRecord(value)) return false;
+	const { wire, ...item } = value;
+	return (wire === undefined || typeof wire === 'string' && wire.length > 0 && wire.length <= 1024) && isReadingItem(item, folder);
+}
+
+/** Writes the state and the shards it names that are not stored yet, and deletes others. */
+export async function writeCardIndex(session: ReadingSession, state: StoredCardIndex, shards: ReadonlyMap<string, ReadingIndexCard[]>, added: ReadonlySet<string>): Promise<void> {
+	const db = await readingDatabase(); assertReadingSession(session);
+	const tx = db.transaction('values', 'readwrite'), prefix = readingKeys.cardShardPrefix(session.id);
+	try {
+		const named = new Set(state.manifest.shards);
+		for (const key of await tx.store.getAllKeys()) if (key.startsWith(prefix) && !named.has(key.slice(prefix.length))) await tx.store.delete(key);
+		for (const hash of added) {
+			const key = `${prefix}${hash}`;
+			await tx.store.put(encodeReadingValue(key, { cards: shards.get(hash) ?? [] }), key);
+		}
+		assertReadingSession(session);
+		await tx.store.put(encodeReadingValue(readingKeys.cardIndex(session.id), state), readingKeys.cardIndex(session.id));
+		await tx.done;
+	} catch (error) { await abortTransaction(tx); throw error; }
+}
+
 export async function readReadingArticle(session: ReadingSession, id: string) {
 	const value = await readReadingValue(`${readingKeys.articlePrefix(session.id)}${id}`);
 	if (value === undefined) return undefined;
@@ -60,7 +109,8 @@ export async function readReadingArticle(session: ReadingSession, id: string) {
  * token and the folder generation. Queues, drafts and attempts are not copies. */
 function isEarlierCopyKey(key: string, sessionId: string): boolean {
 	if (isArticleReadingKey(key)) return !key.startsWith(readingKeys.articlePrefix(sessionId));
-	return [readingKeys.list, readingKeys.articleIndex, readingKeys.encryptedIndex]
+	if (key.startsWith(readingKeys.cardShardPrefix(''))) return !key.startsWith(readingKeys.cardShardPrefix(sessionId));
+	return [readingKeys.list, readingKeys.articleIndex, readingKeys.encryptedIndex, readingKeys.cardIndex]
 		.some(build => key.startsWith(build('')) && key !== build(sessionId));
 }
 
@@ -75,6 +125,8 @@ function isReadableCopy(key: string, raw: unknown): boolean {
 	if (!isRecord(value)) return false;
 	if (isArticleReadingKey(key)) return isRecord(value.item) && typeof value.markdown === 'string';
 	if (key.startsWith(readingKeys.list(''))) return Array.isArray(value.items);
+	if (key.startsWith(readingKeys.cardShardPrefix(''))) return Array.isArray(value.cards);
+	if (key.startsWith(readingKeys.cardIndex(''))) return value.version === 1 && isRecord(value.manifest);
 	return (value.version === 1 || value.version === ARTICLE_INDEX_VERSION) && Array.isArray(value.entries);
 }
 

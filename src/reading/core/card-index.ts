@@ -5,8 +5,8 @@ import {
 	READING_INDEX_EMPTY_SHARD, READING_INDEX_FORMAT, READING_INDEX_SHARDS, readingIndexShard, type ReadingIndexManifest,
 } from '@/protocol/reading-index';
 
-/** One note's card: the listed item, and in an encrypted vault its server path when it is
- * not the path's tag (a note the server sealed keeps a random name). */
+/** One note's card: the listed item, and in an encrypted vault its server path (the path's
+ * tag, or the random name of a note the server sealed). */
 export type ReadingIndexCard = ReadingItem & { wire?: string };
 /** A shard's plaintext. Cards are sorted by path, so equal notes give equal bytes. */
 interface ShardBody { format: typeof READING_INDEX_FORMAT; shard: number; cards: ReadingIndexCard[] }

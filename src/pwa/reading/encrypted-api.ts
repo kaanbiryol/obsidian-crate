@@ -15,7 +15,10 @@ import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
 import { responseError } from '@/pwa/connection/response-error';
 import type { PathTags } from '@/encryption/path-tags';
-import { sealedNoteRefusal } from '@/encryption/sealed-note';
+import { sealedNoteRefusal, type KnownNote } from '@/encryption/sealed-note';
+import { indexedCards, refreshCardIndex, type CardIndexState } from './encrypted-card-index';
+import type { ReadingIndexCard } from '@/reading/core/card-index';
+import type { StoredCardIndex } from './storage/cache';
 import { encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 
 // The documented device budget: each refresh seals the whole list and index. A larger
@@ -27,6 +30,7 @@ const MAX_READING_METADATA_BYTES = 12 * 1024 * 1024;
 // Changed notes download in parallel, a few at a time, in page order.
 const SOURCE_CONCURRENCY = 6;
 const SEALED_ISSUE = 'The server created a note that would replace or take the name of another note. It was not opened.';
+const OUTDATED_ISSUE = 'Open Obsidian to update this library. Recent changes from other devices may be missing.';
 // Article opens reuse the last confirmed inventory this long; a list refresh or a commit reads it again.
 const ITEM_INVENTORY_REUSE_MS = 30_000;
 /** `revision` fingerprints the Reading files and issues, so edits elsewhere in the vault keep it.
@@ -57,12 +61,16 @@ interface EncryptedReadingOptions {
 	/** The plaintext Reading folder; requests name `wireFolder`, its server form. */
 	folderPath: string; wireFolder: string; paths: PathTags; generation: number; authority: FileEncryptionAuthority;
 	captureArticle?(url: string): Promise<CapturedArticle>;
-	request(path: string, body?: string): Promise<Response>;
+	request(path: string, body?: string, headers?: Record<string, string>): Promise<Response>;
 	readAttempt(id: string): Promise<unknown>;
 	writeAttempt(id: string, attempt: Attempt): Promise<void>;
 	/** Optional local copy of the index, so a reload only downloads changed notes. */
 	loadIndex?(): Promise<EncryptedReadingIndexEntry[] | undefined>;
 	saveIndex?(entries: EncryptedReadingIndexEntry[]): Promise<void>;
+	/** The card index kept from the last visit, and saving it after a change. */
+	loadCardIndex?(): Promise<{ state: StoredCardIndex; shards: Map<string, ReadingIndexCard[]> } | undefined>;
+	saveCardIndex?(state: StoredCardIndex, shards: ReadonlyMap<string, ReadingIndexCard[]>, added: ReadonlySet<string>): Promise<void>;
+	isCard?(value: unknown): value is ReadingIndexCard;
 	error(message: string, status: number, code?: string): Error;
 }
 /** A note download that failed in transit. Unlike a rejected note, it is retried
@@ -94,6 +102,12 @@ export class EncryptedReadingApi {
 	// including those sharing a Reading ID, and each unreadable note's last verified ID.
 	private library: { readable: ReadingItem[]; duplicateIds: Set<string>; unreadable: Array<string | undefined> } = { readable: [], duplicateIds: new Set(), unreadable: [] };
 	private indexLoaded = false;
+	// The card index, while the server has one; the inventory listing is used otherwise.
+	private cardIndex?: CardIndexState;
+	private cardIndexLoaded = false;
+	private cardIndexSaved?: string;
+	// Changed notes opened from the tail, by server path, reused while their file is unchanged.
+	private cardEntries = new Map<string, EncryptedReadingIndexEntry>();
 	// The last complete inventory and the vault sequence it was confirmed at. An
 	// unchanged first page answers from it, so polling is one request.
 	private confirmed?: { sequence: number; result: EncryptedReadingInventory };
@@ -128,7 +142,98 @@ export class EncryptedReadingApi {
 		trimContentCache(sources, 100);
 		return source;
 	}
+	/** The library from the card index when the server has one, else from the file listing. */
 	private async inventory(): Promise<EncryptedReadingInventory> {
+		return await this.indexInventory() ?? this.listInventory();
+	}
+	/**
+	 * The card index's library: cards from the shards, with the notes changed since the
+	 * manifest's basis downloaded and opened. Costs a conditional manifest read and a tail
+	 * of rows for the changes since the last refresh, however large the library is.
+	 */
+	private async indexInventory(): Promise<EncryptedReadingInventory | null> {
+		if (!this.options.isCard) return null;
+		if (!this.cardIndexLoaded) {
+			this.cardIndexLoaded = true;
+			try {
+				const stored = await this.options.loadCardIndex?.();
+				if (stored) {
+					const { state, shards } = stored;
+					this.cardIndex = { etag: state.etag, httpEtag: state.httpEtag, manifest: state.manifest, lastSeq: state.lastSeq, shards, outdated: false,
+						overlay: new Map<string, WireFile | null>([...state.overlay.map(entry => [entry.file.path, entry.file] as const), ...state.removed.map(path => [path, null] as const)]) };
+					this.cardEntries = new Map(state.overlay.map(entry => [entry.file.path, entry]));
+				}
+			} catch { /* A missing or unreadable local copy only costs downloads. */ }
+		}
+		const refreshed = await refreshCardIndex({ request: (path, headers) => this.options.request(path, undefined, headers), keys: { vaultId: this.options.authority.vaultId, key: this.options.authority.key, keyGeneration: this.options.generation },
+			wireFolder: this.options.wireFolder, generation: this.options.generation, isCard: (value): value is ReadingIndexCard => this.options.isCard!(value), error: (message, status, code) => this.options.error(message, status, code) }, this.cardIndex);
+		if (!refreshed) { this.cardIndex = undefined; return null; }
+		const { state, added } = refreshed;
+		const cards = indexedCards(state);
+		// Listed notes, for the sealed-note rule; a server write at a listed path replaces it.
+		const listed: KnownNote[] = [...cards.values()].map(card => ({ wire: card.wire!, path: card.path, hash: '' }));
+		const changed = [...state.overlay].flatMap(([wire, file]) => file ? [[wire, file] as const] : []);
+		const loaded = await mapBounded(changed, SOURCE_CONCURRENCY, async ([wire, file]) => {
+			const cached = this.cardEntries.get(wire);
+			if (cached && sameInventoryFile(cached.file, file)) return { entry: cached, sealed: false };
+			try { const { item, hash, sealed } = await this.source(file); return { entry: { file, item, hash }, sealed }; }
+			catch (error) { return { error }; }
+		});
+		const candidates: ReadingItem[] = [], unreadable: Array<string | undefined> = [], issues: Array<{ path: string; message: string }> = [];
+		const wires = new Map<string, string>(), files = new Map<string, WireFile>(), entries = new Map<string, EncryptedReadingIndexEntry>();
+		let unavailable = false;
+		for (const [index, [wire]] of changed.entries()) {
+			const result = loaded[index]!, card = cards.get(wire);
+			if ('error' in result) {
+				if (result.error instanceof NoteUnavailableError) unavailable = true;
+				unreadable.push(card?.crate_reading_id);
+				issues.push({ path: card?.path ?? wire, message: result.error instanceof Error ? result.error.message : 'Article could not be opened.' });
+				continue;
+			}
+			// The server may only create sealed notes, never replace or rename into another.
+			if (result.sealed && sealedNoteRefusal(known(result.entry), listed)) {
+				unreadable.push(undefined);
+				issues.push({ path: wire, message: SEALED_ISSUE });
+				continue;
+			}
+			entries.set(wire, result.entry);
+		}
+		for (const [wire, card] of cards) {
+			if (state.overlay.has(wire)) continue;
+			const { wire: _wire, ...item } = card;
+			candidates.push(item); wires.set(item.path, wire);
+		}
+		for (const [wire, entry] of entries) { candidates.push(entry.item); wires.set(entry.item.path, wire); files.set(wire, entry.file); }
+		if (state.outdated) issues.push({ path: this.options.folderPath, message: OUTDATED_ISSUE });
+		const { unique: items, duplicates } = filterUniqueReadingIds(candidates);
+		for (const item of duplicates) issues.push({ path: item.path, message: READING_DUPLICATE_ID_ISSUE });
+		this.library = { readable: candidates, duplicateIds: new Set(duplicates.map(item => item.crate_reading_id)), unreadable };
+		this.wires = wires; this.files = files; this.cardEntries = entries; this.cardIndex = state;
+		const fingerprint = JSON.stringify([state.etag, [...state.overlay].map(([wire, file]) => [wire, file?.revision ?? null]), issues.map(issue => [issue.path, issue.message])]);
+		const revision = `"e2ee-index-${this.options.generation}-${(await sha256Hex(fingerprint)).slice(0, 32)}"`;
+		const result: EncryptedReadingInventory = this.confirmed?.result.revision === revision ? this.confirmed.result : { items, issues, cursor: null, revision };
+		this.confirmed = { sequence: state.lastSeq, result };
+		this.confirmedAt = unavailable ? undefined : Date.now();
+		const saved = JSON.stringify([revision, state.lastSeq]);
+		if (this.options.saveCardIndex && (added.size || this.cardIndexSaved !== saved)) {
+			this.cardIndexSaved = saved;
+			await this.options.saveCardIndex({ version: 1, identity: '', etag: state.etag, httpEtag: state.httpEtag, manifest: state.manifest, lastSeq: state.lastSeq,
+				overlay: [...entries.values()], removed: [...state.overlay].flatMap(([wire, file]) => file ? [] : [wire]) }, state.shards, added).catch(() => { /* Only a cache. */ });
+		}
+		return result;
+	}
+	/** A file's current server entry. With the card index, read now for that one note. */
+	private async fileFor(wire: string): Promise<WireFile> {
+		if (!this.cardIndex) return this.files.get(wire)!;
+		const response = await this.options.request(`/reading/index/file?path=${encodeURIComponent(wire)}`);
+		if (response.status === 404) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
+		const answer = await response.json().catch(() => null) as { file?: unknown } | null;
+		if (!response.ok || !answer) throw this.options.error('Reading request failed.', response.status);
+		const [file] = parseEncryptedInventoryPage({ files: [answer.file], nextCursor: null, sequence: 0, generation: this.options.generation }, this.options.wireFolder, this.options.generation).files;
+		this.files.set(wire, file!);
+		return file!;
+	}
+	private async listInventory(): Promise<EncryptedReadingInventory> {
 		const fetchPage = async (after?: string) => parseEncryptedInventoryPage(await this.json(encryptedFilesPath('/reading', this.options.wireFolder, after)), this.options.wireFolder, this.options.generation);
 		const first = await fetchPage();
 		if (this.confirmed?.sequence === first.sequence) { if (this.confirmedAt !== undefined) this.confirmedAt = Date.now(); return this.confirmed.result; }
@@ -278,7 +383,7 @@ export class EncryptedReadingApi {
 			const item = list.items.find(item => item.crate_reading_id === id);
 			if (!item && !reused) throw this.options.error('Article is unavailable or has an identity conflict.', 409, 'reading_conflict');
 			if (!item) continue;
-			const file = this.files.get(this.wires.get(item.path)!)!;
+			const file = await this.fileFor(this.wires.get(item.path)!);
 			const etag = `"e2ee-file-${this.options.generation}-${(await sha256Hex(`${file.path}\n${file.revision}\n${file.hash}`)).slice(0, 32)}"`;
 			if (etag === savedEtag) return null;
 			try { return { article: { item, markdown: readReadingFrontmatter((await this.source(file)).content)!.body }, etag }; }
@@ -345,7 +450,7 @@ export class EncryptedReadingApi {
 		if (unreadable.length && (!item || unreadable.includes(item.crate_reading_id))) throw this.unavailable();
 		if (!item) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
 		const wire = this.wires.get(item.path)!;
-		const source = await this.source(this.files.get(wire)!);
+		const source = await this.source(await this.fileFor(wire));
 		const command = action === 'delete' || action === 'retry' ? action : 'update';
 		const plan = await planReadingFileCommand(item, source.content, { action: command, before: body.before, changes: body.changes, markdownHash: body.markdownHash });
 		if (plan.kind === 'issue') {

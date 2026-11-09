@@ -1,7 +1,11 @@
 import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection/expiration';
 import { onReadingEncryptionReset } from './session/encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders, readingNoteFolder } from './session/encryption-session';
-import { readEncryptedReadingIndex, readReadingAttempt, writeEncryptedReadingIndex, writeReadingAttempt } from './storage/storage';
+import { readCardIndex, readEncryptedReadingIndex, readReadingAttempt, writeCardIndex, writeEncryptedReadingIndex, writeReadingAttempt } from './storage/storage';
+import { isReadingIndexCard } from './storage/cache';
+import { openReadingIndexShard, type ReadingIndexCard } from '@/reading/core/card-index';
+import { isReadingIndexHash, parseReadingIndexManifest, READING_INDEX_EMPTY_SHARD } from '@/protocol/reading-index';
+import { filterUniqueReadingIds, READING_DUPLICATE_ID_ISSUE } from '@/reading/core/inventory';
 import { cacheReadingArticle, commitReadingCache, readReadingArticle, readReadingCache, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
@@ -48,11 +52,14 @@ function encryptedReadingApi(session: ReadingSession, keys: FeatureKeys): Encryp
 	if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
 		captureArticle: url => captureServerArticle(url, body => rawReadingRequest('/reading/encrypted-extract', session, body)),
 		folderPath: keys.folderPath, wireFolder: keys.wireFolder, paths: keys.paths, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault, seal: keys.seal },
-		request: (route, wire) => rawReadingRequest(route, session, wire),
+		request: (route, wire, headers) => rawReadingRequest(route, session, wire, headers),
 		readAttempt: id => readReadingAttempt(session, id),
 		writeAttempt: (id, attempt) => writeReadingAttempt(session, id, attempt),
 		loadIndex: () => readEncryptedReadingIndex(session, indexIdentity, keys.folderPath),
 		saveIndex: entries => writeEncryptedReadingIndex(session, indexIdentity, entries),
+		loadCardIndex: () => readCardIndex(session, indexIdentity, keys.folderPath),
+		saveCardIndex: (state, shards, added) => writeCardIndex(session, { ...state, identity: indexIdentity }, shards, added),
+		isCard: (value): value is ReadingIndexCard => isReadingIndexCard(value, keys.folderPath),
 		error: (message, status, code) => new ReadingApiError(message, status, code),
 	}) };
 	return encryptedClient.api;
@@ -123,8 +130,58 @@ function mergeReadingDelta(previous: ReadingCache, page: ReadingListPage & { cha
 	return { items, issues };
 }
 
+// Shards download a few at a time.
+const SHARD_CONCURRENCY = 6;
+
+/**
+ * A first load from the card index Obsidian publishes: the manifest, every shard, and the
+ * notes changed since its basis, which also return the list ETag and change base, so later
+ * refreshes use the ordinary list delta. Reads a few rows instead of one per note. Null
+ * when the server has no index or cannot replay its tail, so the caller lists every page.
+ */
+async function loadReadingFromIndex(session: ReadingSession): Promise<ReadingCache | null> {
+	const folder = readingNoteFolder(session);
+	const response = await rawReadingRequest('/reading/index', session);
+	if (response.status === 404) return null;
+	const answer = await readingResponseJson(response, session) as { manifest?: unknown };
+	const manifest = parseReadingIndexManifest(answer.manifest);
+	// An encrypted index is read by the encrypted client.
+	if (!manifest || manifest.keyGeneration !== undefined) return null;
+	const cards: ReadingIndexCard[] = [];
+	const shards = manifest.shards.flatMap((hash, shard) => hash === READING_INDEX_EMPTY_SHARD ? [] : [{ hash, shard }]);
+	await mapBounded(shards, SHARD_CONCURRENCY, async ({ hash, shard }) => {
+		if (!isReadingIndexHash(hash)) throw new Error('Reading index is unreadable.');
+		const download = await rawReadingRequest(`/reading/index/shard?hash=${hash}`, session);
+		if (!download.ok) throw new ReadingApiError('Reading index is unavailable. Refresh to retry.', download.status);
+		const bytes = new Uint8Array(await download.arrayBuffer());
+		if (await sha256Hex(bytes) !== hash) throw new Error('Reading index failed verification.');
+		const opened = await openReadingIndexShard(bytes, shard, manifest.generation);
+		if (!opened.every(card => isReadingIndexCard(card, folder))) throw new Error('Reading index is unreadable.');
+		cards.push(...opened);
+	});
+	assertReadingSession(session);
+	const tail = await readingRequest<unknown>(`/reading/index/changes?after=${manifest.basis}`, session);
+	if (!tail || typeof tail !== 'object' || 'expired' in tail || 'tooMany' in tail) return null;
+	const { revision, deltaBase, ...changes } = tail as { revision?: unknown; deltaBase?: unknown; notes?: unknown; issues?: unknown; changedPaths?: unknown };
+	const page = parseReadingListPage({ delta: true, items: changes.notes, issues: changes.issues, changedPaths: changes.changedPaths, cursor: null }, folder);
+	if (!page?.changedPaths || typeof revision !== 'string' || typeof deltaBase !== 'string' || revision.length > MAX_REVISION_LENGTH || deltaBase.length > MAX_REVISION_LENGTH) {
+		throw new Error('Reading index changes are unreadable.');
+	}
+	const { unique, duplicates } = filterUniqueReadingIds(cards.map(({ wire: _wire, ...item }) => item));
+	const merged = mergeReadingDelta({ items: unique, issues: duplicates.map(item => ({ path: item.path, message: READING_DUPLICATE_ID_ISSUE })), savedAt: Date.now() },
+		{ ...page, changedPaths: page.changedPaths });
+	if (!merged) return null;
+	return commitReadingCache(session, { ...merged, savedAt: Date.now(), revision, deltaBase });
+}
+
 /** `onProgress` receives the pages read so far when there is no previous copy to show. */
 export async function loadReading(session: ReadingSession, previous?: ReadingCache, onProgress?: (partial: ReadingCache) => void): Promise<ReadingCache> {
+	// Without a copy to revalidate, the card index replaces reading every page. An encrypted
+	// vault's client reads the index itself.
+	if (!previous?.revision && !await prepareReadingEncryption(session, false)) {
+		const indexed = await loadReadingFromIndex(session);
+		if (indexed) return indexed;
+	}
 	const cache: ReadingCache = { items: [], issues: [], savedAt: Date.now() }; let cursor: string | null = null;
 	const seenCursors = new Set<string>();
 	let pages = 0, deltaBase: string | undefined;

@@ -14,7 +14,7 @@ export interface ReadingIndexServer {
 	putReadingIndexShard(hash: string, bytes: Uint8Array<ArrayBuffer>): Promise<void>;
 	putReadingIndex(manifest: ReadingIndexManifest, expected: string | null): Promise<boolean>;
 	readingIndexKeys(): ReadingIndexKeys | null;
-	opaqueServerPath(path: string): Promise<string | undefined>;
+	encryptedServerPath(path: string): Promise<string | undefined>;
 }
 type PublisherVault = Pick<ReadingVault, 'files' | 'read' | 'file' | 'cachedProperties'>;
 export type ReadingIndexOutcome = 'published' | 'current' | 'conflict' | 'behind';
@@ -55,7 +55,7 @@ export class ReadingIndexPublisher {
 			try { metadata = parseReadingNote(await this.vault.read(file)); } catch { metadata = null; }
 		}
 		if (!metadata) return null;
-		const wire = await server.opaqueServerPath(file.path);
+		const wire = await server.encryptedServerPath(file.path);
 		return { ...metadata, tags: [...metadata.tags], path: file.path, ...(wire ? { wire } : {}) };
 	}
 

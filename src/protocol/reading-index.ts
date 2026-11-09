@@ -62,13 +62,3 @@ export function parseReadingIndexManifest(value: unknown): ReadingIndexManifest 
 		...(encrypted ? { keyGeneration: manifest.keyGeneration as number, sealed: manifest.sealed as string } : {}),
 	};
 }
-
-/** The tail after a manifest's basis: notes in the Reading folder written or deleted since. */
-export interface ReadingIndexTail<Note> {
-	/** The changelog position this answer reflects; the next tail starts here. */
-	lastSeq: number;
-	/** Current state of each changed note that exists. */
-	notes: Note[];
-	/** Changed paths that no longer hold a note. */
-	removed: string[];
-}

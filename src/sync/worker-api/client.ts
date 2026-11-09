@@ -67,8 +67,8 @@ export class SyncApiClient {
 	readingIndexKeys(): ReadingIndexKeys | null {
 		return this.folderKeys ? { vaultId: this.folderKeys.vaultId, key: this.folderKeys.key, keyGeneration: this.folderKeys.generation } : null;
 	}
-	/** See `SyncWorkerApi.opaqueServerPath`. */
-	opaqueServerPath(path: string): Promise<string | undefined> { return this.syncApi.opaqueServerPath(path); }
+	/** See `SyncWorkerApi.encryptedServerPath`. */
+	encryptedServerPath(path: string): Promise<string | undefined> { return this.syncApi.encryptedServerPath(path); }
 	/** The published card index, or null before one exists for this folder and key. */
 	async getReadingIndex(): Promise<{ manifest: ReadingIndexManifest; etag: string } | null> {
 		try {
