@@ -4,10 +4,11 @@ Target: 50,000 Reading notes with the fewest reads and writes: no slow startup o
 Obsidian, and web app visits whose D1 and R2 cost does not grow with the library.
 
 **Status.** Built: the local benchmark (step 0), the plugin list from Obsidian's frontmatter cache
-(step 1), the encrypted web app loading its most recent notes (step 2), and fewer rows written
-per web app edit. Chosen, not built: a [card index the plugin writes](#chosen-design-a-card-index-the-plugin-writes)
-for both web apps, [offline copies only on request](#offline-copies-on-request), and
+(step 1), the encrypted web app loading its most recent notes (step 2), fewer rows written per
+web app edit, [offline copies only on request](#offline-copies-on-request), and
 [plugin background work apart from the card list](#plugin-background-work-apart-from-the-card-list).
+Chosen, not built: a [card index the plugin writes](#chosen-design-a-card-index-the-plugin-writes)
+for both web apps.
 Measurements are also in [sync capacity](sync-capacity.md#reading-capacity-measurements).
 
 ## Problem
@@ -93,10 +94,12 @@ once per start.
 Tradeoffs:
 
 - Obsidian's frontmatter parser is more lenient than `readReadingFrontmatter` (duplicate keys,
-  YAML anchors). Such a hand-edited note can appear as a card; opening or editing it still runs
-  the strict check and reports the problem.
-- Listed highlights come from frontmatter until the note is read in the session. A marker
-  deleted while Obsidian was closed still counts until then.
+  YAML anchors). Such a hand-edited note can appear as a card until it changes: the background
+  work then runs the strict check and shows the problem instead of the card. Opening or editing
+  it runs the check too.
+- Listed highlights come from frontmatter. The background work keeps them equal to the note's
+  markers on every change; a marker deleted before this version and not changed since still
+  counts.
 - With an empty metadata cache, such as on a fresh install, notes are read as before, once.
 - Each edit reads its note before and after writing it.
 
@@ -278,55 +281,50 @@ This also removes the article reads and D1 rows each prefetch cost.
 
 ## Plugin: background work apart from the card list
 
-Not built. Today one `ReadingLibrary` does two jobs: it builds the card list at startup, whether
-or not Reading is open, and it imports clips and records highlights as part of the same scan.
-They split into two parts over one shared source.
-
-### Shared source
-
-A thin layer over Obsidian's metadata cache: the Reading folder's note paths, the cached card for
-a path (validated with `validateReadingMetadata`, as in step 1), and one change stream made of
-metadata cache `changed` plus vault `delete` and `rename` in the Reading folder. `changed` fires
-after the cache has the new properties, so a change no longer needs to read the note to stay
-current. Neither part reads notes to list them.
+Built. One `ReadingLibrary` used to do two jobs: it built the card list at startup, whether or
+not Reading was open, and it imported clips and recorded highlights as part of the same scan.
 
 ### Background work (always on, for sync)
+
+`ReadingMaintenance` (`src/reading/data/maintenance.ts`):
 
 - Imports clips (notes without `crate_reading_version`) and records stable IDs for highlights
   typed in Obsidian, so the web app and other devices see them without Reading being opened.
   Later, it also publishes the [card index](#chosen-design-a-card-index-the-plugin-writes).
 - At startup: one pass over cached frontmatter finds clips waiting for import. No note reads,
-  no card list.
-- On a change: a clip is read to import it, and any other changed note is read once to check its
-  highlight markers against its recorded highlights. Unchanged notes are never read.
-- Waits, as now, while sync writes vault files or an editor has the note open, and retries when
-  that ends.
-- Keeps only what it still has to do: a queue of paths with the reason each waits (sync,
-  editor). Later also the hash of each card index shard, so a change rebuilds one shard from the
-  cache.
+  no card list. A note the cache has not indexed yet is checked when Obsidian indexes it.
+- Its input is Obsidian's metadata cache `changed` event, which fires after every change and
+  after re-indexing notes changed while Obsidian was closed, plus notes renamed into the folder.
+  Each such note is read once: a clip to import it, any other note to run the strict check and
+  compare its highlight markers with its recorded highlights.
+- `recordMarkdownHighlights` writes when a marker is new or was deleted, never when markers only
+  moved, so cached properties list the highlights the note shows without a write per edit.
+- Waits while sync writes vault files or an editor has the note open, and retries when sync
+  state or the layout changes.
+- Keeps only a queue of paths and a message per path: waiting for sync, waiting for an editor,
+  or a failed strict check.
 
 ### Card list (only while Reading is used)
 
-- Built from the cache when the Reading view opens or **Add link** needs its duplicate check.
-- Keeps the sorted list, duplicate IDs, issues and the snapshot the UI renders, and follows the
-  change stream only while it exists.
-- Released when the last Reading view closes, after a short delay so reopening stays fast.
-- Actions (favorite, status, tags, add link, delete) write the note as today; the change stream
-  then updates the card.
-- Imports and highlight records waiting in the background show as issues on their cards ("Close
-  this note to add it to Reading.").
+`ReadingLibrary` (`src/reading/data/library.ts`):
 
-### What changes
+- Built from the cache when the Reading view mounts (`retain`) or an action such as **Add link**
+  needs it. Until then vault events cost nothing here.
+- Released 30 seconds after the last view lets go, or after an action without a view, so
+  reopening Reading is instant.
+- Shows the background work's messages as issues; a note it could not check or import shows
+  its reason instead of a card.
+- Reads a note only when the cache has not indexed it, its cached properties fail validation,
+  it changed while the list exists, or an action edits it.
 
-- With Reading enabled, startup costs one cached-frontmatter pass for imports, not a 50,000-card
+### What changed
+
+- With Reading enabled and closed, startup costs one cached-frontmatter pass, not a 50,000-card
   list.
-- The per-card `pending`, `deferred`, `stale` and `cached` flags, and the separate
-  `refreshPaths` and `refreshProperties` paths, give way to the background queue and one change
-  stream.
-- The card index publisher does not depend on the UI.
-- Highlight records follow every change, including edits made while Obsidian was closed, which
-  the metadata cache reports after startup. The Highlights tab no longer rereads notes
-  (`checkHighlights`).
+- The per-card `pending` and `deferred` flags, `retryPending`, `waitingForEditor` on the list and
+  `checkHighlights` are gone. `stale`, `cached` and `refreshProperties` stay: they keep an open
+  list current between a vault event and the cache update after it.
+- Each edit is read twice: once by the open list, once by the background check.
 
 ## Rejected alternatives
 
@@ -406,27 +404,21 @@ wrap `env.DB` with `meterD1Usage` and delete the file afterwards.
 
 ## Next steps
 
-1. Commit the work built so far.
-2. Offline copies on request: remove prefetch and storing on open, add **Save for offline** and
-   **Remove offline copy**, delete automatic copies on upgrade, and update
-   [Reading UI](reading-ui.md) and the public docs.
-3. Plugin: split [background work from the card list](#plugin-background-work-apart-from-the-card-list).
-   Tests: startup with Reading closed reads no notes and builds no list; a clip imports and a
-   typed highlight is recorded with Reading closed; the list appears on open and is released
-   after close.
-4. Card index format: cards, card and highlight shards, manifest, with frozen fixtures and a
-   property test that a shard set equals one rebuilt from the same notes after random edits.
-5. Worker: shard upload, manifest read and conditional write, shard cleanup after the grace
-   period, and the encrypted changelog tail for the Reading folder. Rows read bounded at 10,000
-   and 50,000 notes in the Worker suite; `npm run check:server-revision`.
-6. Plugin: the background work builds shards from the cache, publishes when the Reading folder
+Done: committing the built work, offline copies on request, and the plugin split.
+
+1. Card index format: cards, shards, manifest, with frozen fixtures and a property test that a
+   shard set equals one rebuilt from the same notes after random edits.
+2. Worker: shard upload, manifest read and conditional write, shard cleanup after the grace
+   period, and the changelog tail for the Reading folder. Rows read bounded at 10,000 and
+   50,000 notes in the Worker suite; `npm run check:server-revision`.
+3. Plugin: the background work builds shards from the cache, publishes when the Reading folder
    is synced and settled, and retries on conflict.
-7. Web app: read the manifest, shards and tail; keep today's paths as the fallback; show the
+4. Web app: read the manifest, shards and tail; keep today's paths as the fallback; show the
    out-of-date notice past the tail cap.
-8. Then decide whether `/reading/list` and the encrypted inventory listing can be limited to the
+5. Then decide whether `/reading/list` and the encrypted inventory listing can be limited to the
    fallback, and whether the unencrypted Reading index in D1 is still needed beyond the capture
    duplicate check, article jobs and the change feed.
-9. Measure on a hosted D1 and R2 and on a phone with a large library.
+6. Measure on a phone with a large library, using a test server, not a personal account.
 
 ## User-facing notes
 
