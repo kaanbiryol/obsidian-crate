@@ -56,7 +56,7 @@ test('the distributed pairing and save requests reach a durable Reading receipt'
     assert.equal(saved.status, 200, JSON.stringify(saved));
     assert.equal(saved.body.saved, true);
     assert.deepEqual(await commit(), saved);
-    const listResponse = await runtime.mf.dispatchFetch(`${origin}/reading/list`, { headers: { Authorization: `Bearer ${vault.token}` } });
+    const listResponse = await runtime.mf.dispatchFetch(`${origin}/reading/items?section=inbox`, { headers: { Authorization: `Bearer ${vault.token}` } });
     assert.equal(listResponse.status, 200);
     const list = await listResponse.json();
     assert.equal(list.items.length, 1);

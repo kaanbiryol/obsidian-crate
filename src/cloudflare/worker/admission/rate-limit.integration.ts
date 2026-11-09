@@ -101,7 +101,7 @@ it('edge keys separate senders without placing raw addresses in the key', async 
 	expect(JSON.stringify(edge.limit.mock.calls)).not.toContain('192.0.2.');
 });
 
-it.each(['/sync/manifest', '/sync/changes', '/reminders/list', '/reading/list', '/features', '/diagnostics', '/notifications/vapid-public-key'])('denies %s before D1 or Durable Objects', async path => {
+it.each(['/sync/manifest', '/sync/changes', '/reminders/list', '/reading/items', '/features', '/diagnostics', '/notifications/vapid-public-key'])('denies %s before D1 or Durable Objects', async path => {
 	const prepare = vi.spyOn(env.DB, 'prepare');
 	const get = vi.fn(() => { throw new Error('Coordinator must not be reached'); });
 	const response = await worker.fetch(new Request(`https://denied.test${path}`, { headers: { Authorization: 'Bearer invalid' } }), {

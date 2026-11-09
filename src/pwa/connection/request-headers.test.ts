@@ -14,7 +14,7 @@ it('sends the negotiated protocol for a change and the client protocol for a rea
 	expect(await crateProtocol('/reading/update', 'POST')).toBe(7);
 	expect(await crateProtocol('/encryption/pairing', 'POST')).toBe(7);
 	expect(await crateProtocol('/auth/session', 'DELETE')).toBe(7);
-	expect(await crateProtocol('/reading/list')).toBe(CRATE_PLUGIN_PROTOCOL.current);
+	expect(await crateProtocol('/reading/items')).toBe(CRATE_PLUGIN_PROTOCOL.current);
 	expect(await crateProtocol('/links/title', 'POST')).toBe(CRATE_PLUGIN_PROTOCOL.current);
 	expect(requireCompatibleProtocol).toHaveBeenCalledTimes(3);
 	expect(crateRequestHeaders('token', 7)).toEqual({ Authorization: 'Bearer token', 'X-Crate-Protocol': '7' });

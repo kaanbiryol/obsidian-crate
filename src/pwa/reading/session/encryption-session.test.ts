@@ -46,7 +46,7 @@ it('checks plaintext Reading once for reads and again before each plaintext body
 	const request = vi.fn(async (path: string) => path === '/reading/encryption' ? Response.json({ encryption: null }) : Response.json({ items: [] }));
 	vi.stubGlobal('fetch', request);
 	const probes = () => request.mock.calls.filter(([path]) => path === '/reading/encryption').length;
-	for (const path of ['/reading/list', '/reading/list?cursor=next', '/reading/item?id=a', '/reading/item?id=b']) await readingRequest(path, session);
+	for (const path of ['/reading/items', '/reading/items?cursor=next', '/reading/item?id=a', '/reading/item?id=b']) await readingRequest(path, session);
 	expect(probes()).toBe(1);
 	await readingRequest('/reading/update', session, '{}');
 	expect(probes()).toBe(2);

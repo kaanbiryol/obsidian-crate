@@ -14,8 +14,7 @@ import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-
 import { publishCapture, type PendingCapture } from './captures';
 import { runReadingExtraction } from './extraction/jobs';
 import { readingIndexScope } from './library-index';
-import { READING_LIST_PAGE } from './queries';
-import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
+const PAGE = 50;
 import type { Env } from '../types';
 
 // A full Reading library beside an equally large rest of the vault. Rows read per
@@ -51,7 +50,7 @@ beforeEach(async () => {
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('vault', ?, 'vault')").bind(await sha256Hex('vault-credential')).run();
 	await env.DB.prepare('INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, ?, ?, ?, ?)')
 		.bind(policy.enabled, policy.folder_path, policy.generation, policy.revision).run();
-	await env.DB.prepare("INSERT INTO reading_index(id, scope, revision) VALUES (1, ?, 'seeded')").bind(readingIndexScope(policy)).run();
+	await env.DB.prepare("INSERT INTO reading_index(id, scope) VALUES (1, ?)").bind(readingIndexScope(policy)).run();
 	// Unrelated files sort on both sides of the Reading folder's primary-key range.
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
     INSERT INTO files(path, portable_path, storage_key, hash, size)
@@ -61,50 +60,46 @@ beforeEach(async () => {
 	const template = parseReadingNote(createReadingNote({ id: crypto.randomUUID(), url: 'https://example.invalid/template', savedAt: new Date().toISOString() }))!;
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
     INSERT INTO files(path, portable_path, storage_key, hash, size) SELECT 'Reading/' || x || '.md', 'reading/' || x || '.md', 'reading-key-' || x, '', 0 FROM n`).bind(NOTES).run();
-	await env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json)
+	await env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, saved_at, status, terms, words)
     SELECT portable_path, path, storage_key, hash, size, printf('00000000-0000-4000-8000-%012d', n), 'https://example.invalid/' || n,
-      json_set(?, '$.crate_reading_id', printf('00000000-0000-4000-8000-%012d', n), '$.source_url', 'https://example.invalid/' || n)
+      json_set(?, '$.crate_reading_id', printf('00000000-0000-4000-8000-%012d', n), '$.source_url', 'https://example.invalid/' || n),
+      ?, 'inbox', '["p:exa"]', '["example"]'
     FROM (SELECT *, CAST(substr(path, 9, length(path) - 11) AS INTEGER) AS n FROM files WHERE path >= 'Reading/' AND path < 'Reading0')`)
-		.bind(JSON.stringify(template)).run();
+		.bind(JSON.stringify(template), template.saved_at).run();
+	await env.DB.prepare(`INSERT INTO note_terms(scope, term, saved_at, portable_path) SELECT 'reading', 'p:exa', saved_at, portable_path FROM reading_items`).run();
 });
 afterEach(reset);
 
 it('keeps Reading reads and saves independent of library and vault size', async () => {
 	const id = crypto.randomUUID();
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Target.md', createReadingNote({ id, url: 'https://example.invalid/target', savedAt: new Date().toISOString() }), null);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Target.md', createReadingNote({ id, url: 'https://example.invalid/target', title: 'Target', savedAt: new Date().toISOString() }), null);
 
 	const item = await rowsRead(`item?id=${id}`);
 	expect(item.response.status).toBe(200);
-	const list = await rowsRead('list');
+	const list = await rowsRead('items?section=inbox');
 	expect(list.response.status).toBe(200);
 	const page = await list.response.json() as { items: unknown[]; cursor: string };
-	expect(page.items).toHaveLength(READING_LIST_PAGE);
-	const etag = list.response.headers.get('ETag')!;
-	const unchanged = await rowsRead('list', { headers: { 'If-None-Match': etag } });
-	expect(unchanged.response.status).toBe(304);
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Notes/Elsewhere.md', 'Unrelated edit', null);
-	const unrelated = await rowsRead('list', { headers: { 'If-None-Match': etag } });
-	expect(unrelated.response.status).toBe(304);
-	const next = await rowsRead(`list?cursor=${encodeURIComponent(page.cursor)}`);
+	expect(page.items).toHaveLength(PAGE);
+	const next = await rowsRead(`items?section=inbox&cursor=${encodeURIComponent(page.cursor)}`);
 	expect(next.response.status).toBe(200);
+	// Every note matches this search, so it walks one term and stops after a page.
+	const common = await rowsRead('items?section=inbox&q=example');
+	expect((await common.response.json() as { items: unknown[] }).items).toHaveLength(PAGE);
+	const rare = await rowsRead('items?section=inbox&q=target');
+	expect((await rare.response.json() as { items: unknown[] }).items).toHaveLength(1);
 	const update = await rowsRead('update', { method: 'POST', body: JSON.stringify({ id, before: { favorite: false }, changes: { favorite: true }, operationId: operationId() }) });
 	expect(update.response.status).toBe(200);
 	const afterUpdate = await rowsRead(`item?id=${id}`);
 	expect(await afterUpdate.response.json()).toMatchObject({ item: { favorite: true } });
-	const changed = await rowsRead('list', { headers: { 'If-None-Match': etag } });
-	expect(changed.response.status).toBe(200);
-	// A delta reads only the changelog since its base and the notes it names.
-	const delta = await rowsRead(`list?since=${encodeURIComponent(list.response.headers.get(DELTA_BASE_HEADER)!)}`, { headers: { 'If-None-Match': etag } });
-	expect(await delta.response.json()).toMatchObject({ delta: true, changedPaths: ['Reading/Target.md'], items: [{ crate_reading_id: id, favorite: true }] });
 	const bookmark = await rowsRead('capture', { method: 'POST', body: JSON.stringify({ url: 'https://example.invalid/bookmark', fetchArticle: false, operationId: operationId() }) });
 	expect(await bookmark.response.json()).toMatchObject({ saved: true, alreadySaved: false });
 	const duplicate = await rowsRead('capture', { method: 'POST', body: JSON.stringify({ url: 'https://example.invalid/target', operationId: operationId() }) });
 	expect(await duplicate.response.json()).toMatchObject({ alreadySaved: true, id });
 
-	for (const [step, measured] of Object.entries({ item, unchanged, unrelated, afterUpdate, delta, duplicate })) expect(measured.rows, step).toBeLessThan(MAX_READ_ROWS);
+	for (const [step, measured] of Object.entries({ item, afterUpdate, duplicate, rare })) expect(measured.rows, step).toBeLessThan(MAX_READ_ROWS);
 	for (const [step, measured] of Object.entries({ update, bookmark })) expect(measured.rows, step).toBeLessThan(MAX_WRITE_ROWS);
-	// A page reads the rows it returns, plus the same small fixed cost.
-	for (const [step, measured] of Object.entries({ list, next, changed })) expect(measured.rows, step).toBeLessThan(READING_LIST_PAGE + MAX_READ_ROWS);
+	// A page or a search reads about the rows it returns, plus the same small fixed cost.
+	for (const [step, measured] of Object.entries({ list, next, common })) expect(measured.rows, step).toBeLessThan(2 * PAGE + MAX_READ_ROWS);
 }, 60_000);
 
 it('keeps capture publication and extraction independent of library size', async () => {

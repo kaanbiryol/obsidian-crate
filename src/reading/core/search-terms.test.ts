@@ -1,16 +1,18 @@
 import { expect, it } from 'vitest';
-import { readingTerms, searchWords, titleMatches } from './search-terms';
+import { readingTerms, searchWords, titleMatches, wordTerm } from './search-terms';
 
 it('splits titles into lowercase words without accents or punctuation', () => {
 	expect(searchWords('Café — Crème brûlée, 2nd édition! Café')).toEqual(['cafe', 'creme', 'brulee', '2nd', 'edition']);
 	expect(searchWords('日本語の記事 and C++')).toEqual(['日本語の記事', 'and', 'c']);
 });
 
-it('stores title words, their first three letters, tags and the link identity', () => {
-	expect(readingTerms({ title: 'Go at scale', tags: ['Systems'], source_url: 'https://www.youtube.com/watch?v=abcdefghijk&t=3#x' })).toEqual([
-		'w:go', 'w:at', 'w:scale', 'p:sca', 't:systems', 'u:https://www.youtube.com/watch?v=abcdefghijk',
+it('stores each title word once, by its first three letters or whole when shorter, with tags and the link', () => {
+	expect(readingTerms({ title: 'Go at scale scaling', tags: ['Systems'], source_url: 'https://www.youtube.com/watch?v=abcdefghijk&t=3#x' })).toEqual([
+		'w:go', 'w:at', 'p:sca', 't:systems', 'u:https://www.youtube.com/watch?v=abcdefghijk',
 	]);
-	expect(readingTerms({ title: 'Vault note', tags: [], source_url: '' })).toEqual(['w:vault', 'p:vau', 'w:note', 'p:not']);
+	expect(readingTerms({ title: 'Vault note', tags: [], source_url: '' })).toEqual(['p:vau', 'p:not']);
+	expect(wordTerm('javascript')).toBe('p:jav');
+	expect(wordTerm('ja')).toBe('w:ja');
 });
 
 it('matches when every query word starts a title word', () => {

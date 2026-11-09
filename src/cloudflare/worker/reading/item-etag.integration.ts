@@ -70,7 +70,7 @@ it('answers an unchanged item with 304 before reading R2 and returns the committ
 	expect((await route('item?id=missing')).status).toBe(409);
 });
 
-it('serves unchanged libraries and items at the edge and lists or rebuilds under the coordinator', async () => {
+it('serves pages and unchanged items at the edge and rebuilds under the coordinator', async () => {
 	const note = await savedNote();
 	let forwarded = 0;
 	const namespace = env.REMINDER_ALARMS;
@@ -86,17 +86,15 @@ it('serves unchanged libraries and items at the edge and lists or rebuilds under
 		return { response, forwarded: forwarded - before };
 	};
 	// No index yet: building it writes, so the coordinator builds it.
-	const built = await read('list');
+	const built = await read('items?section=inbox');
 	expect(built).toMatchObject({ response: { status: 200 }, forwarded: 1 });
-	const etag = built.response.headers.get('ETag')!;
 	expect(await built.response.json()).toMatchObject({ items: [{ crate_reading_id: note.crate_reading_id }] });
-	expect(await read('list', { 'If-None-Match': etag })).toMatchObject({ response: { status: 304 }, forwarded: 0 });
+	// A complete index answers a page at the edge.
+	expect(await read('items?section=inbox')).toMatchObject({ response: { status: 200 }, forwarded: 0 });
 	const item = await read(`item?id=${note.crate_reading_id}`);
 	expect(item).toMatchObject({ response: { status: 200 }, forwarded: 0 });
 	expect(await item.response.json()).toMatchObject({ item: { crate_reading_id: note.crate_reading_id }, markdown: 'Article text.' });
 	expect(await read(`item?id=${note.crate_reading_id}`, { 'If-None-Match': item.response.headers.get('ETag')! })).toMatchObject({ response: { status: 304 }, forwarded: 0 });
-	// A changed library's page is parsed by the coordinator.
-	expect(await read('list')).toMatchObject({ response: { status: 200 }, forwarded: 1 });
 	// A new Reading folder generation rebuilds the index under the coordinator again.
 	await env.DB.prepare("UPDATE reading_policy SET generation = 'next' WHERE id = 1").run();
 	expect(await read(`item?id=${note.crate_reading_id}`)).toMatchObject({ response: { status: 200 }, forwarded: 1 });

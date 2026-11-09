@@ -32,7 +32,7 @@ it.each([
 	['POST', '/features', ['vault'], { kind: 'coordinator', wake: true }],
 	['DELETE', '/auth/tokens', ['vault'], { kind: 'coordinator', wake: false }],
 	['DELETE', '/auth/session', ['vault', 'reminders'], { kind: 'coordinator', wake: false }],
-	['GET', '/reading/list', ['vault', 'reminders'], undefined],
+	['GET', '/reading/items', ['vault', 'reminders'], undefined],
 	['GET', '/reading/encrypted-file', ['vault', 'reminders'], undefined],
 	['GET', '/reading/session', ['vault', 'reminders'], undefined],
 	['GET', '/reading/policy', ['vault'], undefined],
@@ -82,7 +82,7 @@ it.each([
 
 it.each([
 	['GET', '/sync/check', true], ['GET', '/sync/manifest', true], ['GET', '/reminders/list', true],
-	['GET', '/sync/changes', false], ['GET', '/reading/list', false], ['POST', '/sync/check', false],
+	['GET', '/sync/changes', false], ['GET', '/reading/items', false], ['POST', '/sync/check', false],
 ] as const)('%s %s initializes projection only when required', (method, path, initialize) => {
 	expect(apiRoutePolicy(path, method)?.initializeProjection ?? false).toBe(initialize);
 });

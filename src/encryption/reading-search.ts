@@ -1,7 +1,7 @@
 import { decodeBase64Url } from './encoding';
 import type { EncryptionSecret } from './envelope';
 import { encodeBase32 } from '../protocol/encrypted-path';
-import { MAX_QUERY_WORDS, SEARCH_PREFIX, normalizedTag, readingTerms, searchWords } from '../reading/core/search-terms';
+import { MAX_QUERY_WORDS, normalizedTag, readingTerms, searchWords, wordTerm } from '../reading/core/search-terms';
 import { readingUrlIdentity } from '../reading/core/model';
 
 /** Derives the key that hashes Reading search terms. Only clients holding the vault key can. */
@@ -28,10 +28,11 @@ export async function hashedReadingTerms(key: CryptoKey, item: Parameters<typeof
 }
 
 /** The hashed terms a query sends: a word of 3 or more letters matches by its first 3, a
- * shorter one exactly, so the device rechecks the titles it decrypts. */
+ * shorter one exactly, so the device rechecks the titles it decrypts. The server walks the
+ * first term in date order, so the most selective comes first: the link, a tag, then the
+ * longest word. */
 export async function hashedQueryTerms(key: CryptoKey, query: { q?: string; tag?: string; url?: string }): Promise<string[]> {
-	const terms = searchWords(query.q ?? '', MAX_QUERY_WORDS).map(word => [...word].length >= SEARCH_PREFIX ? `p:${[...word].slice(0, SEARCH_PREFIX).join('')}` : `w:${word}`);
-	if (query.tag) terms.push(`t:${normalizedTag(query.tag)}`);
-	if (query.url) terms.push(`u:${readingUrlIdentity(query.url)}`);
+	const words = searchWords(query.q ?? '', MAX_QUERY_WORDS).sort((a, b) => [...b].length - [...a].length);
+	const terms = [...query.url ? [`u:${readingUrlIdentity(query.url)}`] : [], ...query.tag ? [`t:${normalizedTag(query.tag)}`] : [], ...words.map(wordTerm)];
 	return [...new Set(await Promise.all(terms.map(term => hashReadingTerm(key, term))))];
 }

@@ -81,12 +81,12 @@ it('wakes notifications from Reading reads only while they rebuild the library i
 	const run = () => runInDurableObject(coordinator, (_instance, state) => state.storage.get('notificationRun'));
 	const read = (path: string) => worker.fetch(new Request(`https://event.test${path}`, { headers }), env);
 	// The first read builds the index, which can queue article extraction.
-	expect((await read('/reading/list')).status).toBe(200);
+	expect((await read('/reading/items')).status).toBe(200);
 	expect(await run()).toBeDefined();
 	// Let the armed pass finish before clearing its record, so a late alarm cannot recreate it.
 	while (await runDurableObjectAlarm(coordinator)) await coordinator.fetch('https://do/ensure', { method: 'POST' });
 	await runInDurableObject(coordinator, async (_instance, state) => { await state.storage.delete('notificationRun'); await state.storage.deleteAlarm(); });
-	expect((await read('/reading/list')).status).toBe(200);
+	expect((await read('/reading/items')).status).toBe(200);
 	await read('/reading/item?id=missing');
 	expect(await run()).toBeUndefined();
 	expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.getAlarm())).toBeNull();

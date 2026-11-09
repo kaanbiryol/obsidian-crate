@@ -19,7 +19,7 @@ const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 
 const principal = { tokenId: 'vault', scope: 'vault' as const };
 const url = 'https://example.invalid/read';
 const path = 'Reading/Note.md';
-const list = () => handleReadingRoute(new Request('https://test/reading/list'), env, principal);
+const list = () => handleReadingRoute(new Request('https://test/reading/items?section=inbox'), env, principal);
 const index = async (current = policy) => (await ensureReadingIndex(env, current, file => readStoredNote(env, file))).state;
 const capture = () => handleReadingRoute(new Request('https://test/reading/capture', { method: 'POST', body: JSON.stringify({
 	url, fetchArticle: false, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)),
@@ -160,16 +160,3 @@ it('keeps a byte order mark when the Worker updates the note', async () => {
 	expect(new TextDecoder('utf-8', { ignoreBOM: true }).decode(stored)).toBe(`\uFEFF${updateReadingNote(note, id, { favorite: true })}`);
 });
 
-it('reports the library revisions around an edit so a cached library can follow it without a reload', async () => {
-	const { id } = await seed();
-	const first = await list();
-	const before = first.headers.get('ETag');
-	expect(before).toBeTruthy();
-	const response = await handleReadingRoute(new Request('https://test/reading/update', { method: 'POST', body: JSON.stringify({
-		id, changes: { favorite: true }, before: { favorite: false }, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)),
-	}) }), env, principal);
-	const body = await response.json() as { library: { before: string; after: string } };
-	expect(body.library.before).toBe(before);
-	const after = await handleReadingRoute(new Request('https://test/reading/list', { headers: { 'If-None-Match': body.library.after } }), env, principal);
-	expect(after.status).toBe(304);
-});

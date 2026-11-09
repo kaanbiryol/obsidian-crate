@@ -270,49 +270,38 @@ CREATE TABLE IF NOT EXISTS reading_policy (
  folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL
 );
 -- Reading notes in the Reading folder, written in the same batch as each file commit.
--- Lists page by `saved_at` (empty for notes with an issue). Every row change sets
--- `change_seq` to the index's new `seq`, so a delta reads only the rows that changed.
--- `status`, `favorite` and `highlighted` select a section. In an encrypted vault a commit
--- leaves the row `stale` with no card, and a device then posts `card` (sealed with the vault key)
--- and the list fields. `terms` is the JSON array stored in `note_terms` under scope `reading`.
+-- Lists page by `saved_at` (empty for notes with an issue). `status`, `favorite` and
+-- `highlighted` select a section. In an encrypted vault `card` (sealed by a device, or by the
+-- server for a Shortcut save) comes from the note's upload, and `stale` marks an upload that
+-- carried none. `terms` is the JSON array stored in `note_terms` under scope `reading`, and
+-- `words` an unencrypted note's title words, which confirm a search's candidates.
 CREATE TABLE IF NOT EXISTS reading_items (
  portable_path TEXT PRIMARY KEY, path TEXT NOT NULL, storage_key TEXT NOT NULL,
  hash TEXT NOT NULL, size INTEGER NOT NULL, item_id TEXT, url_identity TEXT,
  metadata_json TEXT, error TEXT, article_hash TEXT, article_edited INTEGER NOT NULL DEFAULT 0,
- duplicate INTEGER NOT NULL DEFAULT 0, saved_at TEXT NOT NULL DEFAULT '', change_seq INTEGER NOT NULL DEFAULT 0,
+ duplicate INTEGER NOT NULL DEFAULT 0, saved_at TEXT NOT NULL DEFAULT '',
  status TEXT, favorite INTEGER NOT NULL DEFAULT 0, highlighted INTEGER NOT NULL DEFAULT 0,
- card TEXT, stale INTEGER NOT NULL DEFAULT 0, terms TEXT
+ card TEXT, stale INTEGER NOT NULL DEFAULT 0, terms TEXT, words TEXT
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS reading_items_saved_idx ON reading_items(saved_at, portable_path);
 CREATE INDEX IF NOT EXISTS reading_items_status_idx ON reading_items(status, saved_at, portable_path);
 CREATE INDEX IF NOT EXISTS reading_items_favorite_idx ON reading_items(saved_at, portable_path) WHERE favorite = 1;
 CREATE INDEX IF NOT EXISTS reading_items_highlighted_idx ON reading_items(saved_at, portable_path) WHERE highlighted = 1;
-CREATE INDEX IF NOT EXISTS reading_items_stale_idx ON reading_items(portable_path) WHERE stale = 1;
 CREATE INDEX IF NOT EXISTS reading_items_unindexed_idx ON reading_items(saved_at, portable_path) WHERE terms = '[]';
 CREATE INDEX IF NOT EXISTS reading_items_issue_idx ON reading_items(portable_path) WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1;
--- Search terms of indexed notes, plain or, in an encrypted vault, hashed. `scope` names the
--- index a note belongs to (only `reading` today), so other note indexes can share the table.
-CREATE TABLE IF NOT EXISTS note_terms (
- scope TEXT NOT NULL, term TEXT NOT NULL, portable_path TEXT NOT NULL, PRIMARY KEY (scope, term, portable_path)
-) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS note_terms_path_idx ON note_terms(scope, portable_path);
-CREATE INDEX IF NOT EXISTS reading_items_change_idx ON reading_items(change_seq);
 CREATE INDEX IF NOT EXISTS reading_items_id_idx ON reading_items(item_id);
 CREATE INDEX IF NOT EXISTS reading_items_url_idx ON reading_items(url_identity);
 CREATE INDEX IF NOT EXISTS reading_items_article_idx ON reading_items(article_hash) WHERE article_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS reading_items_duplicate_idx ON reading_items(item_id) WHERE duplicate = 1;
--- Paths removed from reading_items since a delta base, kept for 30 days.
-CREATE TABLE IF NOT EXISTS reading_removals (
- path TEXT PRIMARY KEY, change_seq INTEGER NOT NULL, removed_at INTEGER NOT NULL
+-- Search terms of indexed notes, plain or, in an encrypted vault, hashed. `scope` names the
+-- index a note belongs to (only `reading` today), so other note indexes can share the table.
+-- Each term lists its notes newest first, so a search walks one term and stops after a page.
+CREATE TABLE IF NOT EXISTS note_terms (
+ scope TEXT NOT NULL, term TEXT NOT NULL, saved_at TEXT NOT NULL, portable_path TEXT NOT NULL,
+ PRIMARY KEY (scope, term, saved_at, portable_path)
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS reading_removals_change_idx ON reading_removals(change_seq);
-CREATE INDEX IF NOT EXISTS reading_removals_expiry_idx ON reading_removals(removed_at);
--- The scope reading_items was built for, its rebuild position, and the library revision.
--- `epoch` names one build of the index, `seq` counts its row changes and `removed_seq`
--- is the newest change whose removals were pruned, so older delta bases relist.
+-- The scope reading_items was built for and its rebuild position.
 CREATE TABLE IF NOT EXISTS reading_index (
- id INTEGER PRIMARY KEY CHECK (id = 1), scope TEXT NOT NULL, revision TEXT NOT NULL, cursor TEXT,
- epoch TEXT NOT NULL DEFAULT '', seq INTEGER NOT NULL DEFAULT 0, removed_seq INTEGER NOT NULL DEFAULT 0
+ id INTEGER PRIMARY KEY CHECK (id = 1), scope TEXT NOT NULL, cursor TEXT
 );
 CREATE TABLE IF NOT EXISTS reading_jobs (
  path TEXT PRIMARY KEY, item_id TEXT NOT NULL, generation TEXT NOT NULL,

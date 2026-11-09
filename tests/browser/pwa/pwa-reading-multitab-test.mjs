@@ -120,7 +120,7 @@ async function verifySharedQueue(browser, { api, origin, runtime, readingAppUrl 
 
 		const { results } = await runtime.db.prepare('SELECT operation_id FROM reading_operations').all();
 		assert.deepEqual(results.map(row => row.operation_id).sort(), [...operationIds].sort(), 'Each operation ID has exactly one committed receipt');
-		const { items } = await api('/reading/list');
+		const { items } = await api('/reading/items?section=inbox');
 		assert.deepEqual(items.map(item => item.source_url).sort(), [...urls].sort());
 		const serverIds = items.map(item => item.crate_reading_id).sort();
 		for (const page of pages) await expect.poll(() => libraryIds(page)).toEqual(serverIds);

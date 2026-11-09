@@ -86,11 +86,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.ok(itemId);
     await sheet.reload();
     await expect(sheet.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
-    const library = await runtime.mf.dispatchFetch(`${origin}/reading/list`, { headers: { Authorization: captureRequest.headers.Authorization } });
+    const library = await runtime.mf.dispatchFetch(`${origin}/reading/items?section=inbox`, { headers: { Authorization: captureRequest.headers.Authorization } });
     assert.equal(library.status, 403, 'The shortcut credential cannot read the library');
     const enrolledLibrary = await page.evaluate(async () => {
       const session = JSON.parse(localStorage.getItem('crate-reading-session-v1'));
-      const response = await fetch('/reading/list', { headers: { Authorization: `Bearer ${session.token}` } });
+      const response = await fetch('/reading/items?section=inbox', { headers: { Authorization: `Bearer ${session.token}` } });
       return { status: response.status, body: await response.json() };
     });
     assert.equal(enrolledLibrary.status, 200);

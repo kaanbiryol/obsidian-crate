@@ -113,10 +113,10 @@ export async function drainReading(session: ReadingSession, mode: ReadingRetryMo
 			if (!op) continue;
 			if (!canSend()) break;
 			try {
-				const response = await readingRequest<{ library?: unknown; article?: unknown } | null>(`/reading/${op.action}`, session, op.body);
+				const response = await readingRequest<{ article?: unknown } | null>(`/reading/${op.action}`, session, op.body);
 				confirmed.add(op.id);
 				if (op.action === 'capture') onlyEdits = false;
-				else writes.push({ itemId: op.intent.id, library: response?.library, article: response?.article, ...op.action === 'delete' ? { deleted: true } : {} });
+				else writes.push({ itemId: op.intent.id, article: response?.article, ...op.action === 'delete' ? { deleted: true } : {} });
 			} catch (error) {
 				const review = error instanceof ReadingApiError && [400, 409, 410, 413].includes(error.status);
 				await readingLock(async () => {

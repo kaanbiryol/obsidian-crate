@@ -9,8 +9,6 @@ import { publishExtraction, runReadingExtraction } from './extraction/jobs';
 import type { Publication } from './extraction/jobs';
 import type { Env } from '../types';
 import { policy, readStoredNote } from './common';
-import { READING_LIST_PAGE } from './queries';
-import { meterD1Usage } from '../d1/d1-usage';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { adoptReadingClip, createReadingNote, parseReadingNote, updateReadingNote } from '@/reading/core/notes';
@@ -36,6 +34,7 @@ async function buildIndex() {
 	while ((await ensureReadingIndex(env, current, file => readStoredNote(env, file))).state !== 'complete');
 }
 it('paginates current sources, queues only the first page, and reports duplicate IDs across pages', async () => {
+	const READING_LIST_PAGE = 50;
 	let last = '';
 	const name = (index: number) => `Reading/${String(index).padStart(4, '0')}.md`;
 	for (let index = 0; index < READING_LIST_PAGE; index++) {
@@ -51,18 +50,18 @@ it('paginates current sources, queues only the first page, and reports duplicate
 	const get = (suffix: string) => handleReadingRoute(new Request(`https://test/reading/${suffix}`), env, principal);
 	// Notes saved at the same time page by path, newest first: the copy of the last note
 	// and its original are on the first page with the queue.
-	const first = await (await get('list')).json() as { items: ReadingItem[]; cursor: string; issues: Array<{ path: string }> };
-	expect(first.items).toHaveLength(READING_LIST_PAGE - 1);
+	// Notes sharing an ID are left out of pages, so a page holds 50 listed notes.
+	const first = await (await get('items?section=inbox')).json() as { items: ReadingItem[]; cursor: string | null; issues: Array<{ path: string }> };
+	expect(first.items).toHaveLength(READING_LIST_PAGE);
 	expect(first.items[0]).toMatchObject({ path: '', crate_reading_id: queued.id });
 	expect(first.items[1]).toMatchObject({ path: name(READING_LIST_PAGE - 2) });
-	expect(JSON.parse(first.cursor)).toEqual([first.items.at(-1)!.saved_at, name(1).toLowerCase()]);
-	expect(first.issues).toMatchObject([{ path: name(READING_LIST_PAGE) }, { path: name(READING_LIST_PAGE - 1) }]);
-	const next = await (await get(`list?cursor=${encodeURIComponent(first.cursor)}`)).json() as { items: ReadingItem[] };
-	expect(next).toMatchObject({ items: [{ path: name(0) }], cursor: null, issues: [] });
+	expect(first.items.at(-1)).toMatchObject({ path: name(0) });
+	expect(first.cursor).toBeNull();
+	expect(first.issues).toMatchObject([{ path: name(READING_LIST_PAGE - 1) }, { path: name(READING_LIST_PAGE) }]);
 	expect(await (await get(`item?id=${queued.id}`)).json()).toMatchObject({ item: { path: '', crate_reading_id: queued.id }, markdown: '' });
-	expect(await (await get(`item?id=${next.items[0]!.crate_reading_id}`)).json()).toMatchObject({ item: { path: name(0) }, markdown: 'Note 0.' });
+	expect(await (await get(`item?id=${first.items.at(-1)!.crate_reading_id}`)).json()).toMatchObject({ item: { path: name(0) }, markdown: 'Note 0.' });
 	expect((await get(`item?id=${parseReadingNote(last)!.crate_reading_id}`)).status).toBe(409);
-	expect((await get(`list?cursor=${'x'.repeat(4097)}`)).status).toBe(400);
+	expect((await get(`items?cursor=${'x'.repeat(4097)}`)).status).toBe(400);
 }, 180_000);
 
 it('preserves source bytes and HTTP error distinctions for rejected edits and retries', async () => {
@@ -313,9 +312,7 @@ it('deletes an unchanged note once, replays its receipt and refuses a stale dele
 	const body = { id: item.crate_reading_id, before, markdownHash, operationId: id() };
 	const first = await command('delete', body);
 	expect(first.status).toBe(200);
-	const payload = await first.json() as { deleted: boolean; library: { before: string; after: string } };
-	expect(payload).toMatchObject({ deleted: true, id: item.crate_reading_id });
-	expect(payload.library.before).not.toBe(payload.library.after);
+	expect(await first.json()).toMatchObject({ deleted: true, id: item.crate_reading_id });
 	expect(await getStoredFileRow(env.DB, path)).toBeNull();
 	expect(await env.DB.prepare('SELECT 1 FROM reading_items WHERE item_id = ?').bind(item.crate_reading_id).first()).toBeNull();
 	// The deleted revision stays recoverable, and sync observes an ordinary delete.
@@ -386,7 +383,7 @@ it('commits code annotations with replay receipts while preserving literal sourc
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.hash).toBe(saved.hash);
 	expect(readReadingFrontmatter(saved.content)!.body).toBe(markdown);
 	expect(parseReadingNote(saved.content)!.highlights).toEqual(highlights);
-	const list = await handleReadingRoute(new Request('https://test/reading/list'), env, principal);
+	const list = await handleReadingRoute(new Request('https://test/reading/items?section=inbox'), env, principal);
 	expect(await list.json()).toMatchObject({ items: [{ highlights }] });
 	expect((await command('update', { ...body, operationId: id(), before: { highlights }, changes: { highlights: [] } })).status).toBe(200);
 	const removed = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
@@ -402,7 +399,7 @@ it('rebuilds the index from native markers and observes subsequent vault edits',
 	await env.DB.prepare("UPDATE reading_items SET metadata_json=json_remove(metadata_json, '$.highlights') WHERE path=?").bind(path).run();
 	// Rows from an older format were recorded under a different index scope.
 	await env.DB.prepare('DELETE FROM reading_index').run();
-	const list = () => handleReadingRoute(new Request('https://test/reading/list'), env, principal);
+	const list = () => handleReadingRoute(new Request('https://test/reading/items?section=inbox'), env, principal);
 	const projected = await (await list()).json() as { items: { highlights: { text: string }[] }[] };
 	expect(projected.items[0]?.highlights.map(highlight => highlight.text)).toEqual(['this passage']);
 	const source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
@@ -429,7 +426,7 @@ it('persists source-sensitive text highlights and notes through replay, projecti
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!.hash).toBe(saved.hash);
 	expect(readReadingFrontmatter(saved.content)!.body).toBe(markdown);
 	expect(parseReadingNote(saved.content)!.highlights).toEqual(highlights);
-	const list = await handleReadingRoute(new Request('https://test/reading/list'), env, principal);
+	const list = await handleReadingRoute(new Request('https://test/reading/items?section=inbox'), env, principal);
 	expect(await list.json()).toMatchObject({ items: [{ highlights }] });
 	expect((await command('update', { ...body, operationId: id(), before: { highlights }, changes: { highlights: [] } })).status).toBe(200);
 	const removed = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
@@ -437,22 +434,3 @@ it('persists source-sensitive text highlights and notes through replay, projecti
 	expect(parseReadingNote(removed.content)!.highlights).toEqual([]);
 });
 
-it('answers an unchanged library from its ETag, also after unrelated vault writes', async () => {
-	const path = 'Reading/Kept.md';
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, await adoptReadingClip('Kept.', path, '2026-09-26T00:00:00Z'), null);
-	const list = (etag?: string, db = env.DB) => handleReadingRoute(new Request('https://test/reading/list', { headers: etag ? { 'If-None-Match': etag } : {} }), { ...env, DB: db }, principal);
-	const first = await list();
-	const etag = first.headers.get('ETag')!;
-	expect(etag).toMatch(/^"[a-f0-9]{32}"$/);
-	const meter = meterD1Usage(env.DB);
-	const unchanged = await list(etag, meter.db);
-	expect(unchanged.status).toBe(304);
-	expect(meter.usage.rowsRead).toBeLessThan(20);
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Notes/Elsewhere.md', 'Unrelated', null);
-	const refreshed = await list(etag);
-	expect(refreshed.status).toBe(304);
-	expect(refreshed.headers.get('ETag')).toBe(etag);
-	const source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))!;
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, source.content.replace('Kept.', 'Changed.'), source.hash);
-	expect((await list(refreshed.headers.get('ETag')!)).status).toBe(200);
-});

@@ -30,6 +30,6 @@ it('treats a 428 as an encryption change except from the feature’s own probe',
 
 it('refreshes shared features after a 423', () => {
 	refresh.mockClear();
-	checkEncryptionSignals(new Response(null, { status: 423 }), '/reading/list', { probePath: '/reading/encryption', message: '' });
+	checkEncryptionSignals(new Response(null, { status: 423 }), '/reading/items', { probePath: '/reading/encryption', message: '' });
 	expect(refresh).toHaveBeenCalledWith(true);
 });

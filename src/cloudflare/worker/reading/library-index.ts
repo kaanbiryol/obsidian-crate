@@ -1,7 +1,7 @@
 import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { MAX_READING_BYTES, readingUrlIdentity } from '@/reading/core/model';
-import { readingTerms } from '@/reading/core/search-terms';
+import { readingTerms, searchWords } from '@/reading/core/search-terms';
 import { isReadingCardKind, validateReadingCardData, type ReadingCardData } from '@/reading/core/reading-card';
 import { parseEncryptedFile } from '@/encryption/file-format';
 import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
@@ -10,7 +10,6 @@ import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { sha256Hex } from '@/platform/sha256';
 import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 import type { Env } from '../types';
-import { changedRows } from '../d1/db';
 import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-paths';
 
 /** `reading_items` holds one row per Reading note in the Reading folder, written in the
@@ -44,6 +43,8 @@ interface IndexRow {
 	hash?: string; size?: number; item_id?: string | null; url_identity?: string | null; url?: string | null;
 	metadata_json?: string | null; error?: string | null; article_hash?: string | null; article_edited?: 0 | 1; saved_at?: string;
 	status?: string | null; favorite?: 0 | 1; highlighted?: 0 | 1; terms?: string | null;
+	/** An unencrypted note's title words, which confirm a search's candidates. */
+	words?: string | null;
 	/** An encrypted note's card from its public data, as JSON `{ card, seal? }`. */
 	card?: string | null;
 	/** An encrypted note whose upload carried no card: the row keeps its last one. */
@@ -99,14 +100,15 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 	}
 	return { ...row, item_id: metadata.crate_reading_id, url_identity: metadata.source_url ? readingUrlIdentity(metadata.source_url) : null, url: metadata.source_url || null,
 		metadata_json: JSON.stringify(metadata), article_hash, article_edited, saved_at: metadata.saved_at,
-		status: metadata.reading_status, favorite: metadata.favorite ? 1 : 0, highlighted: metadata.highlights?.length ? 1 : 0, terms: JSON.stringify(readingTerms(metadata)) };
+		status: metadata.reading_status, favorite: metadata.favorite ? 1 : 0, highlighted: metadata.highlights?.length ? 1 : 0,
+		terms: JSON.stringify(readingTerms(metadata)), words: JSON.stringify(searchWords(metadata.title)) };
 }
 
 /** Statements to place after the file writes in the same batch. Each row change applies
  * only if its file write committed and the Reading folder is still `policy`'s, so a
  * rejected or raced commit leaves the index untouched. In an encrypted vault, each row comes
  * from the card the device attached to the note's upload. */
-export async function readingIndexStatements(db: D1Database, changes: ReadingFileChange[], options: { policy?: ReadingIndexPolicy; encrypted?: boolean; revision?: string } = {}): Promise<D1PreparedStatement[]> {
+export async function readingIndexStatements(db: D1Database, changes: ReadingFileChange[], options: { policy?: ReadingIndexPolicy; encrypted?: boolean } = {}): Promise<D1PreparedStatement[]> {
 	if (!changes.some(change => isMarkdownPath(change.path))) return [];
 	const policy = options.policy !== undefined ? options.policy
 		: await db.prepare('SELECT folder_path FROM reading_policy WHERE id = 1').first<{ folder_path: string }>();
@@ -127,7 +129,8 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
       json_extract(value, '$.article_hash') AS article_hash, COALESCE(json_extract(value, '$.article_edited'), 0) AS article_edited,
       COALESCE(json_extract(value, '$.saved_at'), '') AS saved_at, json_extract(value, '$.status') AS status,
       COALESCE(json_extract(value, '$.favorite'), 0) AS favorite, COALESCE(json_extract(value, '$.highlighted'), 0) AS highlighted,
-      json_extract(value, '$.terms') AS terms, json_extract(value, '$.card') AS card, COALESCE(json_extract(value, '$.stale'), 0) AS stale FROM json_each(?1)),
+      json_extract(value, '$.terms') AS terms, json_extract(value, '$.words') AS words, json_extract(value, '$.card') AS card,
+      COALESCE(json_extract(value, '$.stale'), 0) AS stale FROM json_each(?1)),
     committed AS (SELECT i.* FROM input i WHERE EXISTS (SELECT 1 FROM reading_policy WHERE id = 1 AND folder_path = ?2)
       AND CASE WHEN i.storage_key IS NULL THEN NOT EXISTS (SELECT 1 FROM files f WHERE f.portable_path = i.portable AND f.path = i.path)
         ELSE EXISTS (SELECT 1 FROM files f WHERE f.portable_path = i.portable AND f.path = i.path AND f.storage_key = i.storage_key) END) `;
@@ -135,20 +138,18 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 	const removes = rows.some(row => !row.keep), keeps = rows.filter(row => row.keep), plain = keeps.filter(row => !row.stale);
 	const removed = `portable_path IN (SELECT portable FROM committed WHERE keep = 0 AND storage_key IS NOT NULL)
         OR (portable_path, path) IN (SELECT portable, path FROM committed WHERE storage_key IS NULL)`;
+	// A note's terms are keyed by its saved date, so they change only when a note leaves or its
+	// terms or saved date differ; a status edit keeps them. The row's own term list names every
+	// key to delete, so no second index on the terms is needed.
+	const termKeys = (rows: string) => `(term, saved_at, portable_path) IN (SELECT t.value, r.saved_at, r.portable_path FROM (${rows}) r, json_each(r.terms) t)`;
 	return [
-		// Every row this batch writes, removes or flags takes the next change number. The library
-		// revision changes in the same statement, one written row instead of two.
-		db.prepare('UPDATE reading_index SET seq = seq + 1, revision = coalesce(?, lower(hex(randomblob(16)))) WHERE id = 1').bind(options.revision ?? null),
-		// Terms change only when a note leaves or its terms differ; a status edit keeps them.
-		...(removes ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND portable_path IN (SELECT portable_path FROM reading_items WHERE ${removed})`)] : []),
-		...(plain.length ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND portable_path IN (SELECT c.portable FROM committed c JOIN reading_items i ON i.portable_path = c.portable
-        WHERE c.keep = 1 AND c.stale = 0 AND i.terms IS NOT c.terms)`)] : []),
-		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(scope, term, portable_path)
-        SELECT '${READING_TERM_SCOPE}', t.value, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable, json_each(c.terms) t
-        WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND i.terms IS NOT c.terms`)] : []),
+		...(removes ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND ${termKeys(`SELECT terms, saved_at, portable_path FROM reading_items WHERE ${removed}`)}`)] : []),
+		...(plain.length ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND ${termKeys(`SELECT i.terms, i.saved_at, i.portable_path FROM committed c
+        JOIN reading_items i ON i.portable_path = c.portable WHERE c.keep = 1 AND c.stale = 0 AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)`)}`)] : []),
+		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(scope, term, saved_at, portable_path)
+        SELECT '${READING_TERM_SCOPE}', t.value, r.saved_at, r.portable FROM (SELECT c.terms, c.saved_at, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable
+          WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)) r, json_each(r.terms) t`)] : []),
 		...(removes ? [
-			statement(`INSERT INTO reading_removals(path, change_seq, removed_at) SELECT path, ${CHANGE_SEQ}, ?3 FROM reading_items WHERE ${removed}
-        ON CONFLICT(path) DO UPDATE SET change_seq = excluded.change_seq, removed_at = excluded.removed_at`, Date.now()),
 			statement(`DELETE FROM reading_items WHERE ${removed}`),
 			statement('DELETE FROM reading_jobs WHERE path IN (SELECT path FROM committed WHERE keep = 0)'),
 		] : []),
@@ -177,11 +178,11 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
         FROM committed c WHERE c.keep = 1 AND c.stale = 1 AND reading_items.portable_path = c.portable AND (reading_items.path, reading_items.stale) IS NOT (c.path, 1)`)] : []),
 		...(keeps.length ? [
 			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at,
-          status, favorite, highlighted, stale, terms, card, change_seq)
+          status, favorite, highlighted, stale, terms, words, card)
         SELECT portable, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at,
-          status, favorite, highlighted, stale, terms, card, ${CHANGE_SEQ} FROM committed WHERE keep = 1
+          status, favorite, highlighted, stale, terms, words, card FROM committed WHERE keep = 1
         ON CONFLICT(portable_path) DO UPDATE SET storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
-          metadata_json = excluded.metadata_json, error = excluded.error, change_seq = excluded.change_seq,
+          metadata_json = excluded.metadata_json, error = excluded.error, words = excluded.words,
           terms = CASE WHEN excluded.stale = 1 THEN reading_items.terms ELSE excluded.terms END,
           card = CASE WHEN excluded.stale = 1 THEN reading_items.card ELSE excluded.card END`),
 		] : []),
@@ -190,32 +191,12 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 		// can only end a duplicate, and flagged rows are rare. Each branch uses an index;
 		// an OR would scan the table.
 		// Only rows whose flag flips change; a flip also changes the listing of an unchanged note.
-		db.prepare(`UPDATE reading_items SET duplicate = 1 - duplicate, change_seq = ${CHANGE_SEQ}
+		db.prepare(`UPDATE reading_items SET duplicate = 1 - duplicate
       WHERE portable_path IN (SELECT portable_path FROM reading_items WHERE item_id IN (SELECT value FROM json_each(?))
         UNION ALL SELECT portable_path FROM reading_items WHERE duplicate = 1)
         AND duplicate != ((SELECT count(*) FROM reading_items d WHERE d.item_id = reading_items.item_id) > 1)`).bind(JSON.stringify(keeps.flatMap(row => row.item_id ? [row.item_id] : []))),
 	];
 }
-
-/** The index's current change number; 0 while it has no row, which then rebuilds. */
-const CHANGE_SEQ = 'COALESCE((SELECT seq FROM reading_index WHERE id = 1), 0)';
-const REMOVAL_RETENTION_MS = 30 * 86400_000;
-const REMOVAL_PRUNE_LIMIT = 5000;
-
-/** Drops expired removals and records the newest change they covered, so a delta base
- * from before it relists. Returns true when more expired removals may remain. */
-export async function pruneReadingRemovals(db: D1Database, now = Date.now()): Promise<boolean> {
-	const expired = `SELECT path, change_seq FROM reading_removals WHERE removed_at < ?1 ORDER BY removed_at LIMIT ${REMOVAL_PRUNE_LIMIT}`;
-	const [, deleted] = await db.batch([
-		db.prepare(`UPDATE reading_index SET removed_seq = max(removed_seq, COALESCE((SELECT max(change_seq) FROM (${expired})), 0)) WHERE id = 1`).bind(now - REMOVAL_RETENTION_MS),
-		db.prepare(`DELETE FROM reading_removals WHERE path IN (SELECT path FROM (${expired}))`).bind(now - REMOVAL_RETENTION_MS),
-	]);
-	return changedRows(deleted) === REMOVAL_PRUNE_LIMIT;
-}
-
-/** Every change to the listed library (notes and the capture queue) advances its ETag. */
-export const bumpReadingRevision = (db: D1Database, revision?: string) =>
-	db.prepare('UPDATE reading_index SET revision = coalesce(?, lower(hex(randomblob(16)))) WHERE id = 1').bind(revision ?? null);
 
 /** Queue extraction for current URL captures that have no job yet: after fetching is
  * turned on, or once a full queue drains. */
@@ -229,16 +210,15 @@ export function queueReadingArticles(db: D1Database): D1PreparedStatement {
 
 export interface StoredReadingFile { path: string; storageKey: string; hash: string; size: number }
 /** `rebuilt` marks a call that indexed files, which can queue article extraction. */
-/** `epoch`, `seq` and `removedSeq` bound the deltas this index can answer. */
-export type ReadingIndexState = { state: 'complete' | 'pending' | 'unavailable'; revision: string; epoch: string; seq: number; removedSeq: number; rebuilt?: boolean };
+export type ReadingIndexState = { state: 'complete' | 'pending' | 'unavailable'; rebuilt?: boolean };
 
-export interface ReadingIndexRow { scope: string; revision: string; cursor: string | null; epoch: string; seq: number; removedSeq: number }
-export const readingIndexStatement = (db: D1Database) => db.prepare('SELECT scope, revision, cursor, epoch, seq, removed_seq AS removedSeq FROM reading_index WHERE id = 1');
+export interface ReadingIndexRow { scope: string; cursor: string | null }
+export const readingIndexStatement = (db: D1Database) => db.prepare('SELECT scope, cursor FROM reading_index WHERE id = 1');
 
 /** The state of an index row that is complete for `current`, or null when it must be (re)built. */
 export function completeReadingIndex(current: ReadingPolicy, index: ReadingIndexRow | null): ReadingIndexState | null {
 	return index?.scope === readingIndexScope(current) && index.cursor === null
-		? { state: 'complete', revision: index.revision, epoch: index.epoch, seq: index.seq, removedSeq: index.removedSeq } : null;
+		? { state: 'complete' } : null;
 }
 
 /** The index state for `current`. While the index is being rebuilt, each call indexes
@@ -251,16 +231,13 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 	const complete = completeReadingIndex(current, index);
 	if (complete) return complete;
 	if (index?.scope !== scope) {
-		// A new build starts a new epoch, so no delta base from an earlier build applies.
-		index = { scope, revision: crypto.randomUUID(), cursor: '', epoch: crypto.randomUUID(), seq: 0, removedSeq: 0 };
+		index = { scope, cursor: '' };
 		await db.batch([
 			db.prepare('DELETE FROM reading_items'),
 			db.prepare(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}'`),
-			db.prepare('DELETE FROM reading_removals'),
 			db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
-			db.prepare(`INSERT INTO reading_index(id, scope, revision, cursor, epoch, seq, removed_seq) VALUES (1, ?, ?, '', ?, 0, 0)
-        ON CONFLICT(id) DO UPDATE SET scope = excluded.scope, revision = excluded.revision, cursor = excluded.cursor,
-          epoch = excluded.epoch, seq = 0, removed_seq = 0`).bind(scope, index.revision, index.epoch),
+			db.prepare(`INSERT INTO reading_index(id, scope, cursor) VALUES (1, ?, '')
+        ON CONFLICT(id) DO UPDATE SET scope = excluded.scope, cursor = excluded.cursor`).bind(scope),
 		]);
 	}
 	const { results } = await db.prepare(`SELECT path, portable_path, hash, size, storage_key FROM files WHERE ${FILE_FOLDER_MATCH} AND portable_path > ?
@@ -280,11 +257,10 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 		}
 		cursor = file.portable_path;
 	}
-	const next = !unavailable && results.length < REBUILD_PAGE ? null : cursor, revision = crypto.randomUUID();
-	const written = await db.batch<{ results?: Array<{ seq: number }> }>([
+	const next = !unavailable && results.length < REBUILD_PAGE ? null : cursor;
+	await db.batch([
 		...await readingIndexStatements(db, changes, { policy: current, encrypted }),
-		db.prepare('UPDATE reading_index SET cursor = ?, revision = ? WHERE id = 1 AND scope = ? RETURNING seq').bind(next, revision, scope),
+		db.prepare('UPDATE reading_index SET cursor = ? WHERE id = 1 AND scope = ?').bind(next, scope),
 	]);
-	const seq = written.at(-1)?.results?.[0]?.seq ?? 0;
-	return { state: unavailable ? 'unavailable' : next === null ? 'complete' : 'pending', revision, epoch: index.epoch, seq, removedSeq: index.removedSeq, rebuilt: true };
+	return { state: unavailable ? 'unavailable' : next === null ? 'complete' : 'pending', rebuilt: true };
 }

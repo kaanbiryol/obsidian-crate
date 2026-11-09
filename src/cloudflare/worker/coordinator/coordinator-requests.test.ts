@@ -7,7 +7,7 @@ import { scheduleMaintenance } from '../maintenance/schedule';
 import type { Env } from '../types';
 
 it.each([
-	['GET', '/reading/list', false],
+	['GET', '/reading/items', false],
 	['GET', '/encryption/reset', false],
 	['PUT', '/settings', true],
 	['POST', '/reminders/update', true],

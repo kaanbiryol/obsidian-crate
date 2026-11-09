@@ -17,7 +17,7 @@ it('keeps the rows a web app favorite or archive writes to the file edit and its
 	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('vault', 'hash', 'vault')").run();
 	await env.DB.prepare('INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, ?, ?, ?, ?)').bind(policy.enabled, policy.folder_path, policy.generation, policy.revision).run();
-	await env.DB.prepare("INSERT INTO reading_index(id, scope, revision) VALUES (1, ?, 'seeded')").bind(readingIndexScope(policy)).run();
+	await env.DB.prepare("INSERT INTO reading_index(id, scope) VALUES (1, ?)").bind(readingIndexScope(policy)).run();
 	const id = crypto.randomUUID();
 	// An extracted article, as most saved notes are.
 	const note = patchReadingFrontmatter(createReadingNote({ id, url: 'https://example.invalid/target', title: 'Target', savedAt: new Date().toISOString() }), { tags: ['research'], extraction_status: 'ready' });

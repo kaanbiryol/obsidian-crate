@@ -321,7 +321,6 @@ library and search moved to the server ([Reading search](reading-search.md)).
 
 1. Try the web app and the plugin with a large library on a phone, against a test server.
 2. Measure D1 rows per page, search and card post on a hosted server, with 50,000 notes.
-3. Remove `/reading/list` and its delta tables once nothing reads them.
 
 ## User-facing notes
 

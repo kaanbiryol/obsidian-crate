@@ -12,8 +12,8 @@ import type { AuthPrincipal } from '../auth/authenticate';
 import { beginOperation, operationEffects, operationStatement } from './operations';
 import { ReadingError, readingResponse, readStoredNote, sourceById } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
-import { bumpReadingRevision, ensureReadingIndex } from './library-index';
-import { readingItemEtag, readingListEtag } from './queries';
+import { ensureReadingIndex } from './library-index';
+import { readingItemEtag } from './queries';
 
 export async function mutateReading(env: Env, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string): Promise<Response> {
 	const op = await beginOperation(env.DB, principal, current, body, action);
@@ -60,7 +60,6 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 				env.DB.prepare('INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES (?,?,?,?,?)')
 					.bind(id, current.generation, readingUrlIdentity(url), note, Date.now()),
 				operationStatement(env.DB, op, response),
-				bumpReadingRevision(env.DB),
 			]);
 			return readingResponse(response);
 		}
@@ -73,11 +72,6 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 		return readingResponse(response);
 	}
 	const source = await sourceById(env, body.id);
-	// Reading writes run under the coordinator lock, so the library revision cannot move
-	// between the index check above and this commit. A client whose cached library has the
-	// `before` revision then needs only this item again, not the whole library.
-	const revision = crypto.randomUUID().replaceAll('-', '');
-	const library = async () => ({ before: await readingListEtag(current, index.revision), after: await readingListEtag(current, revision) });
 	if (action === 'retry' && !current.enabled) throw new ReadingError('Allow article fetching in Reading settings before retrying.', 403);
 	const command = action === 'delete' || action === 'retry' ? action : 'update';
 	const plan = await planReadingFileCommand(source.item, source.content, { action: command, before: body.before, changes: body.changes, markdownHash: body.markdownHash });
@@ -88,19 +82,19 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	if (plan.kind === 'remove') {
 		const response = { deleted: true, id: source.item.crate_reading_id };
 		const result = await commitFileDelete(env.DB, { path: source.path, expectedHash: source.file.hash, expectedRevision: source.file.storageKey, previousFile: source.file,
-			readingPolicy: current, readingRevision: revision, effects: operationEffects(env.DB, op, response) });
+			readingPolicy: current, effects: operationEffects(env.DB, op, response) });
 		if (!result.committed) throw new ReadingError('This note changed. Refresh before deleting it.', 409);
-		return readingResponse({ ...response, library: await library() });
+		return readingResponse(response);
 	}
 	const content = plan.content;
 	const response = { saved: true, id: source.item.crate_reading_id };
 	const staged = await stageMarkdownFile(env.BUCKET, env.DB, source.path, content, source.file.hash);
-	const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, readingRevision: revision, reminderFolder: op.reminderFolder, encryptionState: null, effects: operationEffects(env.DB, op, response) });
+	const result = await commitStagedFile(env.BUCKET, env.DB, { ...staged, content, expectedRevision: source.file.storageKey, readingPolicy: current, reminderFolder: op.reminderFolder, encryptionState: null, effects: operationEffects(env.DB, op, response) });
 	if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
 	// The note as committed, so the client needs no `GET /reading/item`: `etag` is that item's
 	// ETag and `markdownHash` its body's SHA-256, which tells whether a saved body still matches.
 	const saved = parseReadingNote(content)!;
 	const article = { item: { ...saved, path: source.path }, etag: await readingItemEtag(current, saved.crate_reading_id, { path: source.path, storage_key: staged.objectKey, hash: staged.hash }),
 		markdownHash: await sha256Hex(readReadingFrontmatter(content)?.body ?? '') };
-	return readingResponse({ ...response, library: await library(), article });
+	return readingResponse({ ...response, article });
 }

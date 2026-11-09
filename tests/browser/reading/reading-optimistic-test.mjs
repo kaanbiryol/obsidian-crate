@@ -220,7 +220,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     assert.equal(work.length, 2); assert.equal(work[0].body, firstBody); assert.equal(work[1].body, undefined);
     update.release();
     await expect.poll(async () => (await pending(page)).length).toBe(0);
-    const confirmed = (await api('/reading/list')).items.find(item => item.crate_reading_id === saved.id);
+    const confirmed = (await api('/reading/items?section=inbox')).items.find(item => item.crate_reading_id === saved.id);
     assert.equal(confirmed.favorite, false); assert.equal(confirmed.reading_status, 'inbox');
     assert.deepEqual(confirmed.tags, ['essays']); assert.equal(confirmed.highlights[0].note, 'Latest note');
 

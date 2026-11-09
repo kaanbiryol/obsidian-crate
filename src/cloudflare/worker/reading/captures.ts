@@ -11,7 +11,6 @@ import { policy } from './common';
 import { assembleReadingArticle } from '@/reading/core/article';
 import type { Publication } from './extraction/jobs';
 import { publishReading } from '@/cloudflare/worker/coordinator/coordinator';
-import { bumpReadingRevision } from './library-index';
 
 /** Page fetches per job or capture; failed fetches and failed publications both count. */
 export const MAX_FETCH_ATTEMPTS = 3;
@@ -53,7 +52,7 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
 	const capture = await env.DB.prepare('SELECT * FROM reading_captures WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<PendingCapture>();
 	if (!capture) return;
 	// Queued captures are listed in this order.
-	await env.DB.batch([env.DB.prepare('UPDATE reading_captures SET available_at=?, attempts=attempts+1 WHERE id=?').bind(Date.now() + 60_000, capture.id), bumpReadingRevision(env.DB)]);
+	await env.DB.prepare('UPDATE reading_captures SET available_at=?, attempts=attempts+1 WHERE id=?').bind(Date.now() + 60_000, capture.id).run();
 	await state.storage.setAlarm(Date.now() + 60_000);
 	let result: Publication['result'] = null, resolvedUrl: string | undefined;
 	// After its fetch attempts, a capture that still cannot publish retries as a bookmark only.

@@ -18,7 +18,7 @@ describe('authenticated route scopes', () => {
 		expect(isAuthenticatedRouteAllowed(principal, '/auth/session', 'DELETE')).toBe(true);
 		expect(isAuthenticatedRouteAllowed(principal, '/links/title', 'POST')).toBe(true);
 		expect(isAuthenticatedRouteAllowed(principal, '/reading/session', 'GET')).toBe(true);
-		expect(isAuthenticatedRouteAllowed(principal, '/reading/list', 'GET')).toBe(true);
+		expect(isAuthenticatedRouteAllowed(principal, '/reading/items', 'GET')).toBe(true);
 		expect(isAuthenticatedRouteAllowed(principal, '/reading/capture', 'POST')).toBe(true);
 		expect(isAuthenticatedRouteAllowed(principal, '/reading/shortcut-pairing', 'POST')).toBe(true);
 	});

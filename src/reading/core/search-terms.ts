@@ -2,12 +2,14 @@ import { readingUrlIdentity, type ReadingMetadata } from './model';
 
 /**
  * Title search terms, shared by the Worker (unencrypted vaults), devices (encrypted vaults) and
- * the web app's offline search. A term is `w:<word>` for a title word, `p:<first 3 letters>`
- * for a word of 3 or more letters, `t:<tag>` for a tag and `u:<link identity>`. Encrypted
- * vaults store each term as a keyed hash; see `src/encryption/reading-search.ts`.
+ * the web app's offline search. Each title word is stored once: `p:<first 3 letters>` for a word
+ * of 3 or more letters, `w:<word>` for a shorter one. A tag is `t:<tag>` and the link
+ * `u:<link identity>`. A query word maps to the same term, so a term match is a candidate the
+ * title then confirms. Encrypted vaults store each term as a keyed hash; see
+ * `src/encryption/reading-search.ts`.
  */
 const MAX_SEARCH_WORD = 32;
-export const SEARCH_PREFIX = 3;
+const SEARCH_PREFIX = 3;
 const MAX_TITLE_WORDS = 64;
 export const MAX_QUERY_WORDS = 8;
 
@@ -20,13 +22,13 @@ export function searchWords(text: string, limit = MAX_TITLE_WORDS): string[] {
 
 export const normalizedTag = (tag: string) => tag.normalize('NFKC').toLocaleLowerCase('en-US');
 
+/** The term a title or query word matches by. */
+export const wordTerm = (word: string) => [...word].length >= SEARCH_PREFIX ? `p:${[...word].slice(0, SEARCH_PREFIX).join('')}` : `w:${word}`;
+
 /** Every term stored for a note, without duplicates. */
 export function readingTerms(item: Pick<ReadingMetadata, 'title' | 'tags' | 'source_url'>): string[] {
 	const terms = new Set<string>();
-	for (const word of searchWords(item.title)) {
-		terms.add(`w:${word}`);
-		if ([...word].length >= SEARCH_PREFIX) terms.add(`p:${[...word].slice(0, SEARCH_PREFIX).join('')}`);
-	}
+	for (const word of searchWords(item.title)) terms.add(wordTerm(word));
 	for (const tag of item.tags) terms.add(`t:${normalizedTag(tag)}`);
 	if (item.source_url) { try { terms.add(`u:${readingUrlIdentity(item.source_url)}`); } catch { /* Not a link. */ } }
 	return [...terms];

@@ -119,7 +119,6 @@ export interface StagedFileCommitInput {
 	/** The current Reading policy when the caller already read it. */
 	readingPolicy?: ReadingIndexPolicy;
 	/** The library revision this commit publishes, when the caller reports it. */
-	readingRevision?: string;
 	path: string;
 	hash: string;
 	size: number;
@@ -173,7 +172,7 @@ export async function commitStagedFile(
 		publishedChangelogStatement(db, params),
 		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, { encrypted: Boolean(encryption.state), reminderFolder: params.reminderFolder, size: params.size }),
 		...await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
-			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state), revision: params.readingRevision }),
+			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state) }),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 		finishStagedUpload(db, params.objectKey, params.path),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),
@@ -223,7 +222,6 @@ export async function commitFileDelete(
 		/** The current reminder folder when the caller already read it under the coordinator lock. */
 		reminderFolder?: string | null;
 		readingPolicy?: ReadingIndexPolicy;
-		readingRevision?: string;
 	},
 ): Promise<CommitResult> {
 	// The caller's verified absent snapshot is a valid linearization point for
@@ -247,7 +245,7 @@ export async function commitFileDelete(
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
 		...await enqueueFileProjection(db, params.path, null, null, { reminderFolder: params.reminderFolder }),
-		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }], { policy: params.readingPolicy, revision: params.readingRevision }),
+		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }], { policy: params.readingPolicy }),
 		...(params.effects?.([{ path: params.path, storageKey: null }]) ?? []),
 	]);
 

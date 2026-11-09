@@ -6,10 +6,10 @@ import { parseReadingNote } from '@/reading/core/notes';
 import { READING_DUPLICATE_ID_ISSUE } from '@/reading/core/inventory';
 import { readingUrlIdentity, validateReadingMetadata } from '@/reading/core/model';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
-import { MAX_QUERY_WORDS, normalizedTag, searchWords } from '@/reading/core/search-terms';
+import { MAX_QUERY_WORDS, normalizedTag, searchWords, wordTerm } from '@/reading/core/search-terms';
 import { isHashedReadingTerm } from '@/encryption/reading-search';
 import { sha256Hex } from '@/platform/sha256';
-import { ARTICLE_EDITED_ERROR, READING_TERM_SCOPE, readingIndexScope, readingIndexStatement, type ReadingIndexRow, type ReadingIndexState } from './library-index';
+import { ARTICLE_EDITED_ERROR, READING_TERM_SCOPE, readingIndexScope } from './library-index';
 
 /** A queued capture with this ID and the index rows that name it, read together. */
 export const readingItemStatements = (db: D1Database, id: string) => [
@@ -41,17 +41,7 @@ export async function readingItem(env: Env, current: ReadingPolicy, id: unknown,
 	return readingResponse({ item: { ...source.item, path: source.path }, markdown: readReadingFrontmatter(source.content)?.body ?? '' }, 200, { ETag: etag });
 }
 
-/** The library changes only with its index revision, which every note and capture
- * queue change advances in its own transaction, and with the fetching setting. */
-export async function readingListEtag(current: ReadingPolicy, revision: string): Promise<string> {
-	return `"${(await sha256Hex(`${readingIndexScope(current)}\nenabled:${current.enabled}\nrevision:${revision}`)).slice(0, 32)}"`;
-}
-
-export const etagMatches = (header: string | null, etag: string) => header?.split(',').some(value => value.trim() === etag) ?? false;
-
-// A changed library is reloaded page by page; larger pages keep that to a few
-// requests for a 10,000-item library.
-export const READING_LIST_PAGE = 1000;
+const etagMatches = (header: string | null, etag: string) => header?.split(',').some(value => value.trim() === etag) ?? false;
 
 interface ReadingRow { portable_path: string; path: string; metadata_json: string | null; error: string | null; article_edited: number; duplicate: number; saved_at: string }
 const ROW_COLUMNS = 'portable_path, path, metadata_json, error, article_edited, duplicate, saved_at';
@@ -75,43 +65,6 @@ function parseListCursor(cursor: string): [string, string] | null {
 	return value as [string, string];
 }
 
-/** Pages run newest first, so the first page of a first load is what the library shows on top. */
-export async function readingList(env: Env, current: ReadingPolicy, cursor: string) {
-	const after = parseListCursor(cursor);
-	const page = env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items
-    ${after ? 'WHERE (saved_at, portable_path) < (?, ?)' : ''} ORDER BY saved_at DESC, portable_path DESC LIMIT ${READING_LIST_PAGE}`)
-		.bind(...after ?? []);
-	// The first page and the capture queue come from one snapshot.
-	const [{ results }, queuedRows] = await env.DB.batch(cursor ? [page] : [page, queuedStatement(env, current)]) as [Rows<ReadingRow>, Rows<{ note: string }>?];
-	const queued = queuedRows?.results ?? [];
-	const last = results.at(-1);
-	return { ...listedPage(current, results, queued), cursor: results.length === READING_LIST_PAGE && last ? JSON.stringify([last.saved_at, last.portable_path]) : null };
-}
-
-/** The index position a client can later ask for changes since. A new index build or
- * fetching setting changes its suffix, so an older base relists everything. */
-export async function readingDeltaBase(current: ReadingPolicy, index: Pick<ReadingIndexState, 'epoch' | 'seq'>): Promise<string> {
-	return `${index.seq}.${(await sha256Hex(`reading\n${readingIndexScope(current)}\nenabled:${current.enabled}\nepoch:${index.epoch}`)).slice(0, 32)}`;
-}
-
-/** Rows changed and paths removed after change `since`, plus the whole capture queue.
- * Null when a full list is required: removals since then were pruned, the base is from
- * the future, or more notes changed than one page holds. */
-export async function readingListDelta(env: Env, current: ReadingPolicy, index: Pick<ReadingIndexState, 'seq' | 'removedSeq'>, since: number) {
-	if (since < index.removedSeq || since > index.seq) return null;
-	// One snapshot: changed rows, removals, the capture queue and the pruned position cannot
-	// disagree. Maintenance can prune removals after `index` was read, so this batch rechecks it.
-	const [{ results: rows }, { results: removed }, { results: queued }, { results: [snapshot] }] = await env.DB.batch([
-		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE change_seq > ? ORDER BY change_seq LIMIT ${READING_LIST_PAGE + 1}`).bind(since),
-		env.DB.prepare(`SELECT path FROM reading_removals WHERE change_seq > ? ORDER BY change_seq LIMIT ${READING_LIST_PAGE + 1}`).bind(since),
-		queuedStatement(env, current),
-		readingIndexStatement(env.DB),
-	]) as [Rows<ReadingRow>, Rows<{ path: string }>, Rows<{ note: string }>, Rows<ReadingIndexRow>];
-	if (!snapshot || since < snapshot.removedSeq || rows.length > READING_LIST_PAGE || removed.length > READING_LIST_PAGE) return null;
-	const changedPaths = [...new Set([...removed.map(row => row.path), ...rows.map(row => row.path)])];
-	return { delta: true as const, changedPaths, ...listedPage(current, rows, queued), cursor: null };
-}
-
 /** One page of the library view. Small, so a visit reads about one page of rows. */
 const READING_ITEMS_PAGE = 50;
 const MAX_READING_QUERY_TERMS = 10;
@@ -119,6 +72,7 @@ const MAX_READING_QUERY_TERMS = 10;
 const SECTION_FILTERS: Record<ReadingSection | 'all', string> = {
 	inbox: "status = 'inbox'", archived: "status = 'archived'", favorites: 'favorite = 1', highlights: 'highlighted = 1', all: 'status IS NOT NULL',
 };
+const ITEM_COLUMNS = `${ROW_COLUMNS}, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted`;
 /** Above every code point, so `term < prefix + TERM_END` keeps every word that starts with `prefix`. */
 const TERM_END = '\u{10FFFF}';
 
@@ -150,21 +104,35 @@ interface ItemsRow extends ReadingRow { card: string | null; storage_key: string
  * notes it matches, not the library. The first unfiltered inbox page carries the capture queue
  * and the issues; an encrypted page carries each card for the device to open. */
 export async function readingItems(env: Env, current: ReadingPolicy, encrypted: boolean, query: ReadingItemsQuery) {
-	const after = parseListCursor(query.cursor), where = [SECTION_FILTERS[query.section]], args: unknown[] = [];
-	where.push(encrypted ? 'card IS NOT NULL' : 'metadata_json IS NOT NULL AND duplicate = 0');
-	if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
-	if (query.id) { where.push('item_id = ?'); args.push(query.id); }
-	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS);
-	for (const word of words) { where.push(`portable_path IN (SELECT portable_path FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND term >= ? AND term < ?)`); args.push(`w:${word}`, `w:${word}${TERM_END}`); }
-	const exact = encrypted ? query.terms ?? [] : query.tag ? [`t:${normalizedTag(query.tag)}`] : [];
-	for (const term of exact) { where.push(`portable_path IN (SELECT portable_path FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND term = ?)`); args.push(term); }
-	if (!encrypted && query.url) {
-		let identity: string; try { identity = readingUrlIdentity(query.url); } catch { throw new ReadingError('Enter a valid web link.'); }
-		where.push('url_identity = ?'); args.push(identity);
+	const after = parseListCursor(query.cursor);
+	const visible = encrypted ? 'card IS NOT NULL' : 'metadata_json IS NOT NULL AND duplicate = 0';
+	// A query word matches by its term (its first three letters); an unencrypted title then
+	// confirms the whole word. An encrypted device sends its terms in the same order: link, tag,
+	// longest word first.
+	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS).sort((a, b) => [...b].length - [...a].length);
+	let identity: string | undefined;
+	if (!encrypted && query.url) { try { identity = readingUrlIdentity(query.url); } catch { throw new ReadingError('Enter a valid web link.'); } }
+	const terms = encrypted ? query.terms ?? [] : [...identity ? [`u:${identity}`] : [], ...query.tag ? [`t:${normalizedTag(query.tag)}`] : [], ...words.map(wordTerm)];
+	let page: D1PreparedStatement;
+	if (terms.length) {
+		// Each term lists its notes newest first, so the search walks the first term and stops
+		// after a page; the other terms and words are checked on the row it reaches.
+		const where = [`t.scope = '${READING_TERM_SCOPE}'`, 't.term = ?', ...[SECTION_FILTERS[query.section], visible].map(clause => clause.replace(/\b(status|favorite|highlighted|card|metadata_json|duplicate)\b/g, 'i.$1'))];
+		const args: unknown[] = [terms[0]];
+		if (after) { where.push('(t.saved_at, t.portable_path) < (?, ?)'); args.push(...after); }
+		if (query.id) { where.push('i.item_id = ?'); args.push(query.id); }
+		for (const term of new Set(terms.slice(1))) { where.push('EXISTS (SELECT 1 FROM json_each(i.terms) WHERE value = ?)'); args.push(term); }
+		for (const word of words) { where.push('EXISTS (SELECT 1 FROM json_each(i.words) WHERE value >= ? AND value < ?)'); args.push(word, `${word}${TERM_END}`); }
+		page = env.DB.prepare(`SELECT ${ITEM_COLUMNS.split(', ').map(column => `i.${column}`).join(', ')} FROM note_terms t JOIN reading_items i ON i.portable_path = t.portable_path
+      WHERE ${where.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args);
+	} else {
+		const where = [SECTION_FILTERS[query.section], visible], args: unknown[] = [];
+		if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
+		if (query.id) { where.push('item_id = ?'); args.push(query.id); }
+		page = env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM reading_items WHERE ${where.join(' AND ')}
+      ORDER BY saved_at DESC, portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args);
 	}
-	const page = env.DB.prepare(`SELECT ${ROW_COLUMNS}, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted FROM reading_items WHERE ${where.join(' AND ')}
-    ORDER BY saved_at DESC, portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args);
-	const first = !after && query.section === 'inbox' && !words.length && !exact.length && !query.url && !query.id && !encrypted;
+	const first = !after && query.section === 'inbox' && !terms.length && !query.id && !encrypted;
 	const [{ results }, queuedRows, issueRows] = await env.DB.batch(first ? [page, queuedStatement(env, current),
 		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1 LIMIT 1000`)] : [page]) as [Rows<ItemsRow>, Rows<{ note: string }>?, Rows<ReadingRow>?];
 	const last = results.at(-1);
@@ -175,8 +143,8 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	if (encrypted) {
 		// Notes the server sealed have no terms, so a search cannot match them here. Every one in
 		// this page's date range goes with it, for the device to match itself.
-		const unindexed = exact.length ? await unindexedCards(env, query.section, after, cursor && last ? [last.saved_at, last.portable_path] : null) : [];
-		return { cards: results.map(card), ...exact.length ? { unindexed: unindexed.map(card) } : {}, cursor };
+		const unindexed = terms.length ? await unindexedCards(env, query.section, after, cursor && last ? [last.saved_at, last.portable_path] : null) : [];
+		return { cards: results.map(card), ...terms.length ? { unindexed: unindexed.map(card) } : {}, cursor };
 	}
 	const listed = listedPage(current, results, queuedRows?.results ?? []);
 	return { items: listed.items, issues: issueRows ? listedPage(current, issueRows.results, []).issues : [], cursor };
@@ -190,7 +158,7 @@ async function unindexedCards(env: Env, section: ReadingSection | 'all', after: 
 	const where = [SECTION_FILTERS[section], "card IS NOT NULL AND terms = '[]'"], args: unknown[] = [];
 	if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
 	if (until) { where.push('(saved_at, portable_path) >= (?, ?)'); args.push(...until); }
-	const { results } = await env.DB.prepare(`SELECT ${ROW_COLUMNS}, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted FROM reading_items
+	const { results } = await env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM reading_items
     WHERE ${where.join(' AND ')} ORDER BY saved_at DESC, portable_path DESC LIMIT ${MAX_UNINDEXED}`).bind(...args).all<ItemsRow>();
 	return results;
 }

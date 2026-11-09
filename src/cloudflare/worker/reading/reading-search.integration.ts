@@ -127,7 +127,7 @@ it('sends each search page the notes without terms in its date range, so an old 
 		env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, saved_at, status, card, terms)
       VALUES (?, ?, 'r', 'h', 1, ?, ?, 'inbox', '{"card":"a.b.c.d.e"}', ?)`).bind(`reading/${n}.md`, `Reading/${n}.md`, crypto.randomUUID(),
 			new Date(Date.UTC(2026, 0, 1) + n * 86400_000).toISOString(), JSON.stringify(terms)),
-		...terms.map(term => env.DB.prepare("INSERT INTO note_terms(scope, term, portable_path) VALUES ('reading', ?, ?)").bind(term, `reading/${n}.md`)),
+		...terms.map(term => env.DB.prepare("INSERT INTO note_terms(scope, term, saved_at, portable_path) VALUES ('reading', ?, ?, ?)").bind(term, new Date(Date.UTC(2026, 0, 1) + n * 86400_000).toISOString(), `reading/${n}.md`)),
 	]);
 	for (let n = 10; n < 62; n++) await row(n, ['aaaaaaaaaaaa']);
 	// Shortcut saves: one newer than every indexed note, one older than every indexed note.

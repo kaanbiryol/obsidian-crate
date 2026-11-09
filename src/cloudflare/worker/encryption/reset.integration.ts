@@ -56,11 +56,11 @@ it('requires vault authority, the current encryption identity and explicit destr
 });
 
 it('resumes bounded deletion, revokes old devices and grants, and never repeats a completed wipe', async () => {
-	const readingTables = ['reading_policy', 'reading_items', 'note_terms', 'reading_removals', 'reading_index', 'reading_jobs', 'reading_operations', 'reading_enrollments', 'reading_handoffs', 'reading_captures'];
+	const readingTables = ['reading_policy', 'reading_items', 'note_terms', 'reading_index', 'reading_jobs', 'reading_operations', 'reading_enrollments', 'reading_handoffs', 'reading_captures'];
 	await env.DB.batch([
 		env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')"),
 		env.DB.prepare("INSERT INTO reading_items(portable_path,path,storage_key,hash,size,metadata_json) VALUES ('reading/private.md','Reading/private.md','r','hash',1,'private metadata')"),
-		env.DB.prepare("INSERT INTO reading_index(id,scope,revision) VALUES (1,'scope','revision')"),
+		env.DB.prepare("INSERT INTO reading_index(id,scope) VALUES (1,'scope')"),
 		env.DB.prepare("INSERT INTO reading_jobs(path,item_id,generation,source_revision,block_hash,url,available_at) VALUES ('Reading/private.md','article','reading-generation','r','hash','https://private.example',0)"),
 		env.DB.prepare("INSERT INTO reading_operations VALUES ('operation','original','reading-generation','hash','{}',1)"),
 		env.DB.prepare("INSERT INTO reading_enrollments VALUES (?,'reading-generation','reading',9999999999999)").bind(await sha256Hex('old-reading-grant')),

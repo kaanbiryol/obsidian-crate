@@ -70,7 +70,7 @@ it('keeps the Reading library accessible when article fetching is disabled', asy
 	expect(sessionData.id).toBe('browser');
 	expect(sessionData.folderPath).toBe('Reading');
 	expect(sessionData.expiresAt).toBeGreaterThan(Date.now());
-	expect((await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env)).status).toBe(200);
+	expect((await worker.fetch(request('/reading/items', 'browser', undefined, 'GET'), env)).status).toBe(200);
 	const capture = await worker.fetch(request('/reading/capture', 'browser', {
 		url: 'https://example.invalid/shared-pwa', operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
 	}), env);
@@ -82,12 +82,12 @@ it('keeps the Reading library accessible when article fetching is disabled', asy
 	const policy = await env.DB.prepare('SELECT revision FROM reading_policy').first<{ revision: string }>();
 	expect((await worker.fetch(request('/reading/policy', 'vault', { enabled: false, folderPath: 'Reading', revision: policy!.revision }), env)).status).toBe(200);
 	expect((await worker.fetch(request('/reading/session', 'browser', undefined, 'GET'), env)).status).toBe(200);
-	expect((await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env)).status).toBe(200);
+	expect((await worker.fetch(request('/reading/items', 'browser', undefined, 'GET'), env)).status).toBe(200);
 	const bookmark = await worker.fetch(request('/reading/capture', 'browser', {
 		url: 'https://example.invalid/bookmark', operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
 	}), env);
 	expect(bookmark.status).toBe(200);
-	const library = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
+	const library = await worker.fetch(request('/reading/items', 'browser', undefined, 'GET'), env);
 	const bookmarks = await library.json() as { items: { source_url: string; extraction_status: string }[] };
 	expect(bookmarks.items.find(item => item.source_url === 'https://example.invalid/bookmark')?.extraction_status).toBe('unavailable');
 	const state = await env.DB.prepare('SELECT enabled, revision FROM reading_policy').first<{ enabled: number; revision: string }>();
@@ -98,7 +98,7 @@ it('keeps the Reading library accessible when article fetching is disabled', asy
 		operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)),
 	}), env);
 	expect(explicitBookmark.status).toBe(200);
-	const refreshed = await worker.fetch(request('/reading/list', 'browser', undefined, 'GET'), env);
+	const refreshed = await worker.fetch(request('/reading/items', 'browser', undefined, 'GET'), env);
 	const savedItems = await refreshed.json() as { items: { source_url: string; extraction_status: string }[] };
 	expect(savedItems.items.find(item => item.source_url === 'https://example.invalid/offline-bookmark')?.extraction_status).toBe('unavailable');
 	expect((await worker.fetch(request('/auth/session', 'browser', undefined, 'DELETE'), env)).status).toBe(200);

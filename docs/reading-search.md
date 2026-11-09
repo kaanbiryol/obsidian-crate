@@ -13,19 +13,20 @@ stay.
 - Reading notes stay ordinary synced notes and the only source of truth.
 - `reading_items` holds one row per note: what the web app lists. Rows are derived and can be
   rebuilt.
-- `note_terms` holds each listed note's search terms under scope `reading`: `w:` for a title
-  word, `p:` for its first three letters, `t:` for a tag and `u:` for the link identity
-  (`src/reading/core/search-terms.ts`). The scope lets other note indexes, such as a future
-  vault-wide one, share the table.
+- `note_terms` holds each listed note's search terms under scope `reading`, keyed by saved
+  date: one per title word (`p:` and its first three letters, or `w:` and the whole word when
+  shorter), `t:` for a tag and `u:` for the link identity (`src/reading/core/search-terms.ts`).
+  The scope lets other note indexes, such as a future vault-wide one, share the table.
 - The web app never holds the library. It asks the server for one page at a time:
   `GET /reading/items?section=&q=&tag=&cursor=`, newest first.
 
 ## Unencrypted vaults
 
 The Worker writes the row and its terms in the same D1 batch as the file commit, as it already
-did for `reading_items`. Words are lowercased with diacritics removed. A search matches each query
-word as the start of a title word, with a range over the `w:` terms; a tag or link filter matches
-its term exactly.
+did for `reading_items`. Words are lowercased with diacritics removed. A search walks the term of
+its link, tag or longest word newest first, and confirms the other terms and the whole title
+words (`words`) on each row, so a query word of 3 or more letters matches the start of a title
+word and a shorter one a whole word.
 
 ## Encrypted vaults
 
@@ -82,8 +83,20 @@ independent security review listed in [Reading and encryption](reading-e2ee-asse
 
 ## Cost
 
-- A page or a search reads about one page of rows plus the matched search entries; nothing grows
-  with the library.
-- A new or retitled note writes about two terms per title word; status and favorite edits keep
-  the same terms and leave them untouched, but move the note between section indexes (two rows).
-- An encrypted library is indexed as it uploads: each note's card adds nothing beyond its upload.
+Measured locally at 2,000 notes with 8-word titles (`d1-usage`, `write-cost` and `capacity`
+integration tests keep the bounds):
+
+| | Rows |
+| --- | --- |
+| New Reading note, written | about 22 (7 for any other note) |
+| Favorite or archive, written | about 15 |
+| Delete, written | about 25 |
+| First page, read | about 56, at any library size |
+| Search, read | the rows walked until a page fills: about 50 per match checked; a rare word reads only its matches |
+
+- Each title word is one term, and terms are keyed by saved date with no second index, so a
+  search never scans the library and a term costs one written row.
+- A status or favorite edit keeps the same terms and only moves the note between section
+  indexes.
+- D1 storage is about 2.6 KB per Reading note, most of it the listed item (`metadata_json`,
+  including highlights) and, in an encrypted vault, its card.

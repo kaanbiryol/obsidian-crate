@@ -96,46 +96,37 @@ not protect against a public-looking hostname resolving to a private address.
 
 The Reading index (`reading_items`) holds one row per Reading note in the Reading
 folder. Every file commit, deletion, move, restore and initial import writes that
-row in the same D1 batch as the file, from the bytes it commits, so list and item
-reads never re-check `files`, and `GET /reading/item` reads the note's R2 object by
-the revision its row names. The list ETag changes only with the library revision,
-which every indexed change and capture queue change advances in its own transaction,
-and with the article fetching setting; writes elsewhere in the vault leave it unchanged.
-Successful `POST /reading/update`, `/reading/retry` and `/reading/delete` responses add `library:
-{ before, after }`, the list ETags immediately before and after that edit. Reading
-writes run under the coordinator lock, so a client whose cached library carries
-`before` updates only the edited item (or drops a deleted one) and adopts `after`; any other client, a
-replayed receipt (which omits `library`) or a capture reloads the list.
-Update and retry responses also add `article: { item, etag, markdownHash }`: the committed
-item, its `GET /reading/item` ETag and the SHA-256 of its article body. A client applies
-`item` without reading the item again, and keeps a saved body whose hash matches under the
-new ETag. A replayed receipt omits `article` as well; without a usable `article` the client
-reloads the list.
+row and its search terms in the same D1 batch as the file, from the bytes it commits, so
+page and item reads never re-check `files`, and `GET /reading/item` reads the note's R2
+object by the revision its row names. Update and retry responses add
+`article: { item, etag, markdownHash }`: the committed item, its `GET /reading/item` ETag and
+the SHA-256 of its article body. A client keeps a saved body whose hash matches under the
+new ETag. A replayed receipt omits `article`.
 
 `GET /reading/item` answers an indexed note with an `ETag` derived from the index format,
 Reading folder scope, item ID, path and the file revision its row names. A matching
 `If-None-Match` returns 304 before R2 is read. A queued capture has no file revision and no
 ETag. The web app sends the ETag of its offline copy and keeps that copy on 304.
 
-Plaintext list and item reads authenticate in the public Worker and read the Reading policy,
-index row and (for an item) its capture queue and index rows in one D1 batch, a single
-snapshot, so they do not wait behind writes in the coordinator. While the index is complete,
-the public Worker answers items and unchanged libraries (304) itself. It forwards to the
-coordinator a read that must continue an index rebuild, which writes, and every list body:
-a page parses up to 1,000 notes, more CPU than the public Worker's budget allows. List pages
-and deltas read their rows and the capture queue in one batch as well. A delta's batch also
-rereads the index row, so removals that maintenance pruned after the first read relist.
+Page and item reads authenticate in the public Worker and read the Reading policy, index row
+and (for an item) its capture queue and index rows in one D1 batch, a single snapshot, so they
+do not wait behind writes in the coordinator. While the index is complete, the public Worker
+answers them itself; it forwards to the coordinator a read that must continue an index
+rebuild, which writes.
 
 ### Reading library pages and cards
 
 `GET /reading/items?section=&cursor=` (library credential) returns one page of up to 50 notes,
 newest `saved_at` first. `section` is `inbox`, `archived`, `favorites`, `highlights` or `all`;
-`id` finds one Reading ID. An unencrypted vault also takes `q` (each word matches the start of a
-title word), `tag` and `url`, and answers `{ items, issues, cursor }`; the first unfiltered inbox
-page carries the capture queue and issues. An encrypted vault takes up to 10 hashed `term`
-values, every one of which must match, and answers `{ cards, cursor }`: each card's server path,
-revision, hash, size, sealed `card`, `stale` and the plaintext list `fields`. Terms live in
-`note_terms` (scope `reading`), written in the batch of each note commit; see [Reading search](reading-search.md).
+`id` finds one Reading ID. An unencrypted vault also takes `q` (each word of 3 or more letters
+matches the start of a title word, a shorter one a whole word), `tag` and `url`, and answers
+`{ items, issues, cursor }`; the first unfiltered inbox page carries the capture queue and
+issues. An encrypted vault takes up to 10 hashed `term` values, every one of which must match,
+and answers `{ cards, cursor }`: each card's server path, revision, hash, size, sealed `card`,
+`stale` and the plaintext list `fields`. Terms live in `note_terms` (scope `reading`), one per
+title word, tag and link, keyed by saved date: a search walks its first term newest first and
+stops after a page, checking the other terms and, unencrypted, the title words on each row it
+reaches. See [Reading search](reading-search.md).
 
 In an encrypted vault, each Reading note's upload carries its card as the file's public data
 (`{ kind: 'reading-card', version: 1, card, terms, fields }`), from Obsidian's sync and the web
@@ -145,23 +136,6 @@ sealed (a Shortcut save) carries a card sealed to the vault seal key (`seal: { k
 no terms; a search page (one with `term` values) also returns `unindexed`, every such note in
 that page's saved-date range, for the device to match. `GET /reading/taken?path=…` (up to 20 server paths) tells a device which names are
 stored, for naming notes and checking sealed ones.
-
-`GET /reading/list` pages hold up to 1,000 notes, newest `saved_at` first, so the first
-page of a first load is the top of the library. Every index write gives the rows it adds,
-changes, removes or flags (including a duplicate flag that flips in an unchanged note)
-the index's next change number, and records removed paths in `reading_removals`. The
-first page (no `cursor`) returns `X-Crate-Delta-Base`: that change number, bound to the
-index build, Reading folder, generation, index format and article fetching setting. A
-client holding a complete library may send the base as `since`. When at most 1,000
-notes changed and 1,000 paths were removed since then, and those removals are still
-kept, the response is `{ delta: true, changedPaths, items, issues, cursor: null }`: the
-client replaces its items and issues at `changedPaths`, and its whole capture queue
-(items without a path) with the listed ones, and keeps the rest. Otherwise the first page
-of a full list is returned. Writes elsewhere in the vault never reach a delta. Removals
-are kept for 30 days; maintenance prunes older ones and records the newest change they
-covered, so an older base relists. The ETag check runs first, so an unchanged library
-still answers 304. The web app shows the pages of a first load as they arrive and saves
-the library once all pages are read; a reload keeps showing the saved library until it completes.
 
 `POST /reading/delete` accepts `{ id, before, markdownHash, operationId }` from a library credential.
 `before` holds the `reading_status`, `favorite`, `tags` and `highlights` values the client

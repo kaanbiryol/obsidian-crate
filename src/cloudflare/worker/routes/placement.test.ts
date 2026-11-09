@@ -11,7 +11,7 @@ describe('request placement', () => {
 		['POST', '/reading/handoff', ['forward-grant', 'redeem-grant']],
 		['POST', '/reminders/create', ['forward-before-auth', 'here']],
 		['GET', '/encryption/reset', ['forward-before-auth', 'here']],
-		['GET', '/reading/list', ['here', 'here']],
+		['GET', '/reading/items', ['here', 'here']],
 		['POST', shortcut.preparePath, ['forward-after-auth', 'here']],
 		['PUT', '/sync/upload', ['forward-transfer', 'here']],
 		['GET', '/sync/changes', ['here', 'here']],

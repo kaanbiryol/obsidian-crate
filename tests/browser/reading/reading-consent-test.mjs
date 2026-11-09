@@ -28,20 +28,20 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       await dialog.getByLabel('Link', { exact: true }).fill('https://example.invalid/bookmark');
       await dialog.getByRole('button', { name: 'Save link', exact: true }).click();
       await expect(dialog).toHaveCount(0);
-      await expect.poll(async () => (await api('/reading/list')).items.length).toBe(1);
-      assert.equal((await api('/reading/list')).items[0].capture_method, 'url');
+      await expect.poll(async () => (await api('/reading/items?section=inbox')).items.length).toBe(1);
+      assert.equal((await api('/reading/items?section=inbox')).items[0].capture_method, 'url');
       assert.equal((await api('/reading/policy')).policy.enabled, 1);
       await page.getByRole('button', { name: 'Save a link', exact: true }).click();
       await dialog.getByLabel('Link', { exact: true }).fill('https://example.invalid/article');
       await dialog.getByRole('button', { name: 'Save link', exact: true }).click();
       await expect(dialog).toHaveCount(0);
-      await expect.poll(async () => (await api('/reading/list')).items.length).toBe(2);
+      await expect.poll(async () => (await api('/reading/items?section=inbox')).items.length).toBe(2);
       const { policy } = await api('/reading/policy');
       assert.equal(policy.enabled, 1);
       await api('/reading/policy', { enabled: false, folderPath: 'Reading', revision: policy.revision });
       await page.reload();
       await expect(page.getByRole('button', { name: 'Save a link', exact: true })).toBeVisible();
-      assert.equal((await api('/reading/list')).items.length, 2);
+      assert.equal((await api('/reading/items?section=inbox')).items.length, 2);
       const features = await api('/features');
       await api('/features', { feature: 'reading', enabled: false, revision: features.revision });
       await page.evaluate(() => window.dispatchEvent(new Event('online')));
@@ -52,7 +52,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       await api('/features', { feature: 'reading', enabled: true, revision: paused.revision });
       await page.evaluate(() => window.dispatchEvent(new Event('online')));
       await expect(page.getByRole('button', { name: 'Save a link', exact: true })).toBeVisible();
-      assert.equal((await api('/reading/list')).items.length, 2);
+      assert.equal((await api('/reading/items?section=inbox')).items.length, 2);
 
     } finally {
       await browser?.close();

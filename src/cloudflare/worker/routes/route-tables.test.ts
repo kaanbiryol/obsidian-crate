@@ -29,7 +29,7 @@ describe('worker route tables', () => {
 		expect([...ENCRYPTION_RESET_PATHS].sort()).toEqual(['/encryption', '/encryption/reset', '/health']);
 		expect([...KEYLESS_ENCRYPTED_READ_PATHS].sort()).toEqual(['/features', '/reading/encryption', '/reading/session']);
 		expect([...PLAINTEXT_ONLY_PATHS].sort()).toEqual([
-			'/reading/capture', '/reading/delete', '/reading/handoff', '/reading/item', '/reading/list', '/reading/retry', '/reading/update',
+			'/reading/capture', '/reading/delete', '/reading/handoff', '/reading/item', '/reading/retry', '/reading/update',
 			'/reminders/create', '/reminders/delete', '/reminders/list', '/reminders/reorder', '/reminders/set-completed', '/reminders/update',
 			'/sync/import', '/sync/import/complete', '/sync/import/prune', '/sync/import/readiness', '/sync/import/upload',
 		]);

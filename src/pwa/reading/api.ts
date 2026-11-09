@@ -104,9 +104,9 @@ export async function loadReading(session: ReadingSession): Promise<ReadingCache
 	return { items: page.items, issues: page.issues, savedAt: Date.now(), cursor: page.cursor };
 }
 
-/** A confirmed edit and the library revisions the server reported around it. `article`
+/** A confirmed edit. `article`
  * is the committed item that the server returns with an update. */
-export interface ReadingWrite { itemId: string; library?: unknown; article?: unknown; deleted?: true }
+export interface ReadingWrite { itemId: string; article?: unknown; deleted?: true }
 
 // Saved copies of edited items refresh a few at a time.
 const ITEM_RELOAD_CONCURRENCY = 3;

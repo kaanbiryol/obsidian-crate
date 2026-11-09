@@ -30,12 +30,12 @@ test('Reading recovers an unavailable source across server restart without dupli
     // The next index rebuild must read this source; simulate temporary loss of its object.
     await runtime.db.prepare('DELETE FROM reading_index').run();
     await bucket.delete(file.storage_key);
-    assert.equal((await request('/reading/list')).status, 503);
+    assert.equal((await request('/reading/items?section=inbox')).status, 503);
     const retry = { ...capture, operationId: operation() };
     assert.equal((await request('/reading/capture', retry)).status, 503);
     await runtime.close(); runtime = await openLocalRuntime({ dataDir: dir });
     await (await runtime.mf.getR2Bucket('BUCKET')).put(file.storage_key, bytes);
-    const listed = await request('/reading/list');
+    const listed = await request('/reading/items?section=inbox');
     assert.equal(listed.status, 200); assert.equal(listed.body.items.length, 1);
     assert.equal(listed.body.items[0].crate_reading_id, saved.body.id);
     const deduplicated = await request('/reading/capture', retry);
@@ -69,7 +69,7 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     const pairing = await shortcut('/reading/shortcut-pairing', vault.token, {});
     const { authorization } = await shortcut(contract.exchangePath, '', { token: new URL(pairing.pairingCode).hash.slice(1) });
     const capture = { body: { token: authorization.slice('Bearer '.length) } };
-    assert.equal((await request('/reading/list', capture.body.token)).status, 403);
+    assert.equal((await request('/reading/items?section=inbox', capture.body.token)).status, 403);
     assert.equal((await request('/sync/manifest', browser.body.token)).status, 403);
     const body = { url: 'https://example.invalid/article?secret=never-log-me', fetchArticle: false, operationId: operation() };
     const first = await request('/reading/capture', capture.body.token, body);
@@ -78,14 +78,14 @@ test('built server captures, replays, isolates scopes and confirms browser hando
     assert.equal((await request('/reading/capture', capture.body.token, { ...body, url: 'https://example.invalid/other' })).status, 409);
     const duplicate = await request('/reading/capture', browser.body.token, { ...body, operationId: operation() });
     assert.equal(duplicate.body.id, first.body.id); assert.equal(duplicate.body.alreadySaved, true);
-    let listed = await request('/reading/list', browser.body.token);
+    let listed = await request('/reading/items?section=inbox', browser.body.token);
     assert.equal(listed.body.items.length, 1, JSON.stringify(listed));
     const item = listed.body.items[0];
     const detail = await request(`/reading/item?id=${item.crate_reading_id}`, browser.body.token);
     assert.equal(detail.status, 200); assert.match(detail.body.markdown, /crate:article:start/);
     result = await request('/reading/update', browser.body.token, { id: item.crate_reading_id, changes: { favorite: true }, before: { favorite: false }, operationId: operation() });
     assert.equal(result.status, 200, JSON.stringify(result));
-    listed = await request('/reading/list', browser.body.token); assert.equal(listed.body.items[0].favorite, true);
+    listed = await request('/reading/items?section=inbox', browser.body.token); assert.equal(listed.body.items[0].favorite, true);
     const prepared = await request(contract.preparePath, capture.body.token, { url: 'https://example.invalid/phone', title: 'Phone capture' });
     assert.equal(prepared.status, 200, JSON.stringify(prepared));
     const launch = new URL(prepared.body.launchUrl); assert.equal(launch.pathname, '/notifications/save-reading'); assert.equal(launch.search, `?shortcut=${contract.revision}&contract=${contract.version}`);

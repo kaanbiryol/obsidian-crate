@@ -13,7 +13,7 @@ import { getStoredFileRow } from '../sync/storage';
 const principal = { tokenId: 'vault', scope: 'vault' as const };
 const operation = () => createReminderOperationId(Math.floor(Date.now() / 86400_000));
 const command = (action: string, body: Record<string, unknown>) => handleReadingRoute(new Request(`https://test/reading/${action}`, { method: 'POST', body: JSON.stringify(body) }), env, principal);
-const list = () => handleReadingRoute(new Request('https://test/reading/list'), env, principal);
+const list = () => handleReadingRoute(new Request('https://test/reading/items?section=inbox'), env, principal);
 beforeEach(async () => {
 	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash) VALUES ('vault','hash')").run();

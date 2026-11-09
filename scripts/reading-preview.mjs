@@ -14,7 +14,7 @@ const api = async (path, body) => {
 };
 const { policy } = await api('/reading/policy');
 if (!policy?.enabled) await api('/reading/policy', { enabled: true, folderPath: 'Reading', revision: policy?.revision ?? null });
-if (!(await api('/reading/list')).items.length) await api('/reading/capture', { url: 'https://example.com', title: 'Your first saved link', operationId: `e1_${String(Math.floor(Date.now()/86400000)).padStart(8,'0')}_${randomUUID()}` });
+if (!(await api('/reading/items?section=inbox')).items.length) await api('/reading/capture', { url: 'https://example.com', title: 'Your first saved link', operationId: `e1_${String(Math.floor(Date.now()/86400000)).padStart(8,'0')}_${randomUUID()}` });
 const server = createServer(async (request, response) => {
   try {
     if (request.headers.host !== `localhost:${port}`) { response.writeHead(403); response.end(); return; }

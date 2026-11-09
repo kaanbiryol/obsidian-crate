@@ -1,17 +1,14 @@
 import { armNotificationCoordinator } from '../notifications/lifecycle';
 import type { Env } from '../types';
-import { readingResponse, ReadingError, readStoredNote, policyStatement, readingItemId, readingNotModified } from './common';
-import { parseReadingItemsQuery, readingItems } from './queries';
-import { etagMatches, readingDeltaBase, readingItem, readingItemStatements, readingList, readingListDelta, readingListEtag, type ReadingItemRows } from './queries';
-import { parseDeltaBase } from '../sync/change-token';
-import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
+import { readingResponse, ReadingError, readStoredNote, policyStatement, readingItemId } from './common';
+import { parseReadingItemsQuery, readingItem, readingItemStatements, readingItems, type ReadingItemRows } from './queries';
 import { completeReadingIndex, ensureReadingIndex, readingIndexStatement, type ReadingIndexRow } from './library-index';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 
 export interface LoadedLibraryRead { policy: ReadingPolicy | null; index: ReadingIndexRow | null; item?: ReadingItemRows }
 
-/** Whether `request` reads the library: a list page or one item. */
-export const isLibraryRead = (request: Request, path: string) => request.method === 'GET' && (path === '/reading/item' || path === '/reading/list' || path === '/reading/items');
+/** Whether `request` reads the library: a page or one item. */
+export const isLibraryRead = (request: Request, path: string) => request.method === 'GET' && (path === '/reading/item' || path === '/reading/items');
 
 /** Library reads load the policy, index row and item rows in one round trip and one snapshot. */
 export async function loadLibraryRead(db: D1Database, url: URL): Promise<LoadedLibraryRead> {
@@ -39,15 +36,5 @@ export async function readLibrary(request: Request, env: Env, current: ReadingPo
 	// One small page, so it is answered outside the lock.
 	if (path === '/reading/items') return readingResponse(await readingItems(env, current, encrypted, parseReadingItemsQuery(url.searchParams, encrypted)));
 	if (path === '/reading/item') return await readingItem(env, current, url.searchParams.get('id'), request.headers.get('If-None-Match'), index.rebuilt ? undefined : loaded.item);
-	// The first list page is conditional, so an unchanged library is one cheap request.
-	const cursor = url.searchParams.get('cursor') ?? '';
-	const etag = cursor ? null : await readingListEtag(current, index.revision);
-	if (etag && etagMatches(request.headers.get('If-None-Match'), etag)) return readingNotModified(etag);
-	// A page parses up to 1,000 notes, more CPU than the public Worker allows; the coordinator lists them.
-	if (forward) return await forward();
-	if (cursor) return readingResponse(await readingList(env, current, cursor), 200);
-	// The base is the index position read before listing: later changes replay next time.
-	const base = await readingDeltaBase(current, index), since = parseDeltaBase(url.searchParams.get('since'));
-	const delta = since && since.scope === base.slice(base.indexOf('.') + 1) ? await readingListDelta(env, current, index, since.seq) : null;
-	return readingResponse(delta ?? await readingList(env, current, ''), 200, { ETag: etag!, [DELTA_BASE_HEADER]: base });
+	return readingResponse({ error: 'Not found' }, 404);
 }
