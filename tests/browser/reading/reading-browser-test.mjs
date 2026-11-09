@@ -365,6 +365,9 @@ async function openReadingBrowserFixture(t, name, engine, contextOptions = {}) {
   return { ...fixture, browser, context, page, readingSync, seedArticle, enroll, holdResponse, releases, faults, sent };
 }
 
+/** The article text is shown once its offline action is available. */
+const articleShown = page => expect(page.locator('button[aria-label="Save for offline"], button[aria-label="Remove offline copy"]')).toBeEnabled();
+
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: opening shell, settings and input geometry`, { timeout: 90000 }, async t => {
   const fixture = await openReadingBrowserFixture(t, name, engine);
   const { page, readingSync } = fixture;
@@ -537,7 +540,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await expect(page.getByRole('button', { name: 'Back to reading' })).toBeEnabled();
   const originalArticle = await page.locator('.crate-reading__reader-pane article').elementHandle();
   firstArticle.release();
-  await page.getByText('Available offline',{exact:true}).waitFor();
+  await articleShown(page);
+  // Reopening below shows this saved copy while the download is held.
+  await page.getByRole('button', { name: 'Save for offline', exact: true }).click();
+  await page.getByText('Available offline', { exact: true }).waitFor();
   assert.equal(await originalArticle.evaluate(el => el === document.querySelector('.crate-reading__reader-pane article')), true, 'Loading must resolve in the same article screen');
   await originalArticle.dispose();
   // After visiting Inbox, another tab must not reuse its native Back snapshot.
@@ -584,7 +590,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await expect(readingSync).toHaveAttribute('data-sync-state', 'synced');
   console.log(`${name}: native Back predecessors preserve Favorites and Reading titles across repeated visits`);
   await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
-  await page.getByText('Available offline', { exact: true }).waitFor();
+  await articleShown(page);
   articleHistoryLength = await page.evaluate(() => history.length);
   await checkReaderNavigation(page);
   const articleTitle = page.locator('.crate-reading-reader__header h1');
@@ -631,7 +637,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
   await cachedArticle.started;
   await expect(page.getByRole('heading',{name:'browser.example.invalid',exact:true})).toBeVisible();
-  await expect(page.getByText('Available offline',{exact:true})).toBeVisible();
+  await articleShown(page);
   cachedArticle.release();
   await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => element.getAnimations().length)).toBe(0);
   // Browser Back (including native history gestures) must not start an app exit.
@@ -648,7 +654,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await assertArticleStaysDismissed(page, articleHistoryLength);
   // Reopening is an explicit action and reuses the closed detail slot.
   await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
-  await page.getByText('Available offline',{exact:true}).waitFor();
+  await articleShown(page);
   await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => element.getAnimations().length)).toBe(0);
   await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert', '');
   await page.setViewportSize({width:1280,height:844});
@@ -667,7 +673,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect.poll(() => page.locator('.crate-reading__library').evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(width);
   }
   await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
-  await page.getByText('Available offline',{exact:true}).waitFor();
+  await articleShown(page);
   await expect.poll(() => page.locator('.crate-reading__reader-pane').evaluate(element => element.getAnimations().length)).toBe(0);
   await page.setViewportSize({width:390,height:844});
   await expect(page.locator('.crate-reading__library')).toHaveAttribute('inert', '');
@@ -694,11 +700,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   // Direct links and reloads still open an article; closing them removes Forward too.
   await page.waitForLoadState('networkidle');
   await page.goto(articleUrl);
-  await page.getByText('Available offline',{exact:true}).waitFor();
+  await articleShown(page);
   await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-motion','none');
   await page.waitForLoadState('networkidle');
   await page.reload();
-  await page.getByText('Available offline',{exact:true}).waitFor();
+  await articleShown(page);
   const deepLinkHistoryLength = await page.evaluate(() => history.length);
   const reloadedDocument = await page.evaluate(() => window.__readingDocument);
   assertReaderSlide(await captureReaderMotion(page, 'close'), 'close');
@@ -712,6 +718,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await fixture.seedArticle();
   await fixture.enroll();
   await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
+  await articleShown(page);
+  // Only an article saved for offline opens without a connection.
+  await page.getByRole('button', { name: 'Save for offline', exact: true }).click();
   await page.getByText('Available offline', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
   await page.waitForFunction(() => history.state?.readingLibrary === true);

@@ -165,8 +165,15 @@ export class EncryptedReadingApi {
 				}
 			} catch { /* A missing or unreadable local copy only costs downloads. */ }
 		}
-		const refreshed = await refreshCardIndex({ request: (path, headers) => this.options.request(path, undefined, headers), keys: { vaultId: this.options.authority.vaultId, key: this.options.authority.key, keyGeneration: this.options.generation },
-			wireFolder: this.options.wireFolder, generation: this.options.generation, isCard: (value): value is ReadingIndexCard => this.options.isCard!(value), error: (message, status, code) => this.options.error(message, status, code) }, this.cardIndex);
+		let refreshed: Awaited<ReturnType<typeof refreshCardIndex>>;
+		// The index only saves reads; when it is missing or unusable the files are listed,
+		// which the server cannot forge either. An expired session still fails.
+		try { refreshed = await refreshCardIndex({ request: (path, headers) => this.options.request(path, undefined, headers), keys: { vaultId: this.options.authority.vaultId, key: this.options.authority.key, keyGeneration: this.options.generation },
+			wireFolder: this.options.wireFolder, generation: this.options.generation, isCard: (value): value is ReadingIndexCard => this.options.isCard!(value), error: (message, status, code) => this.options.error(message, status, code) }, this.cardIndex); }
+		catch (error) {
+			if ((error as { status?: unknown }).status === 401) throw error;
+			refreshed = null;
+		}
 		if (!refreshed) { this.cardIndex = undefined; return null; }
 		const { state, added } = refreshed;
 		const cards = indexedCards(state);

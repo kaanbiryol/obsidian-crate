@@ -179,7 +179,10 @@ export async function loadReading(session: ReadingSession, previous?: ReadingCac
 	// Without a copy to revalidate, the card index replaces reading every page. An encrypted
 	// vault's client reads the index itself.
 	if (!previous?.revision && !await prepareReadingEncryption(session, false)) {
-		const indexed = await loadReadingFromIndex(session);
+		// The index only saves reads: any failure but an expired session lists pages instead.
+		let indexed: ReadingCache | null = null;
+		try { indexed = await loadReadingFromIndex(session); }
+		catch (error) { if (error instanceof ReadingApiError && error.status === 401) throw error; }
 		if (indexed) return indexed;
 	}
 	const cache: ReadingCache = { items: [], issues: [], savedAt: Date.now() }; let cursor: string | null = null;

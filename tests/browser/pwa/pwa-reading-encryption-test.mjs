@@ -123,6 +123,9 @@ try {
   };
   await checkSafeArticle();
   if (type === chromium) {
+    // Only an article saved for offline opens without a connection.
+    await page.getByRole('button', { name: 'Save for offline', exact: true }).click();
+    await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await context.setOffline(true);
     await page.getByRole('button', { name: 'Edit article tags' }).click();

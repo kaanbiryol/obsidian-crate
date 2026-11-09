@@ -113,12 +113,15 @@ it('falls back to the file listing without an index, and flags an index too old 
 	expect(list.issues[0]?.message).toContain('Open Obsidian');
 });
 
-it('refuses a manifest the server changed', async () => {
+it('ignores a manifest the server changed and lists the files instead', async () => {
 	const { manifest } = await published([await card(1)], 1);
 	const forged = { ...manifest, shards: Array.from({ length: READING_INDEX_SHARDS }, () => '') };
 	const h = harness(path => {
 		if (path === '/reading/index') return Response.json({ manifest: forged, etag: 'e1' });
+		if (path.startsWith('/reading/encrypted-files')) return Response.json({ files: [], nextCursor: null, sequence: 1, generation: 1 });
 		throw new Error(`Unexpected ${path}`);
 	});
-	await expect(h.api.request('/reading/list')).rejects.toThrow('verification');
+	expect((await h.api.request('/reading/list') as { items: unknown[] }).items).toEqual([]);
+	expect(h.paths()).not.toContain('/reading/index/shard');
+	expect(h.paths()).toContain('/reading/encrypted-files');
 });

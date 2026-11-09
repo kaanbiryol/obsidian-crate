@@ -221,6 +221,8 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: invalid Reading
           if (path === '/.well-known/crate') return Response.json({ service: 'crate', serverVersion: 'test', serverRevision: 4, reminderOperationDay: 20_000, protocol: { current: 1, oldestCompatible: 1 }, capabilities: ['reading'] });
           if (path === '/reading/session') return Response.json({ day: 20_000, generation: session.generation });
           if (path === '/reading/update') { mutations++; return Response.json({ saved: true }); }
+          // No card index here, so a first load lists pages.
+          if (path.startsWith('/reading/index')) return Response.json({ error: 'Missing', code: 'reading_index_missing' }, { status: 404 });
           const response = scenario.pages[lists++];
           if (!response) throw new Error('Unexpected extra list request');
           return Response.json(response);
