@@ -1,7 +1,7 @@
 import { ReadingDuplicates } from './ReadingDuplicates';
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { TextField } from '../../ui/shared/TextField';
-import React, { useCallback, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ViewHeader } from '../../ui/shared/ViewHeader';
@@ -26,8 +26,6 @@ export interface ReadingLibraryProps {
 	renderNavigation?: (props: { items: readonly NavigationItem<ReadingSection>[]; activeTab: ReadingSection; onTabChange: (section: ReadingSection) => void; onAdd: () => void; inert: boolean; disabled: boolean }) => React.ReactNode;
 	/** Host-owned transitions can retain the previous library while changing sections. */
 	renderLibraryContent?: (section: ReadingSection, content: React.ReactNode) => React.ReactNode;
-	/** Called with the shown section, initially and whenever it changes. */
-	onSectionChange?: (section: ReadingSection) => void;
 	onAdd: () => void;
 	onOpen: (item: ReadingItem, highlight: ReadingHighlight | undefined, section: ReadingSection) => Promise<void>;
 	onRefresh: () => Promise<void>;
@@ -55,13 +53,11 @@ const PAGE_SIZE = 100;
 
 /** Shared workspace. Uses the same stacked app layout at every width. */
 export function ReadingLibraryPanel({
-	listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, onSectionChange, snapshot, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich,
+	listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich,
 	onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false,
 	notice, beforeListContent, listContent,
 }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
-	const sectionShown = useEffectEvent((shown: ReadingSection) => onSectionChange?.(shown));
-	useEffect(() => { sectionShown(section); }, [section]);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [articleFilter, setArticleFilter] = useState('');
 	const [visible, setVisible] = useState(PAGE_SIZE);

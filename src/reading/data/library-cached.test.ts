@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ReadingLibrary, type ReadingFile, type ReadingVault } from './library';
+import { ReadingMaintenance } from './maintenance';
 import { createReadingNote } from '../core/notes';
-import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontmatter';
+import { readReadingFrontmatter } from '../core/frontmatter';
 import { READING_DUPLICATE_ID_ISSUE } from '../core/inventory';
 
 const id = (index: number) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
@@ -31,7 +32,8 @@ function vault(initial: Record<string, string>, { index = true } = {}) {
 		setProperties: (path: string, value: Record<string, unknown> | undefined) => properties.set(path, value),
 	};
 }
-const library = (fake: ReadingVault, canAdopt: () => boolean = () => true) => new ReadingLibrary(fake, 'Reading', new AbortController().signal, canAdopt);
+const library = (fake: ReadingVault, background?: ReadingMaintenance) => new ReadingLibrary(fake, 'Reading', new AbortController().signal, background);
+const maintenance = (fake: ReadingVault, canAdopt: () => boolean = () => true) => new ReadingMaintenance(fake, 'Reading', new AbortController().signal, canAdopt);
 const titles = (target: ReadingLibrary) => target.getSnapshot().items.map(item => item.title);
 
 describe('Reading library from cached frontmatter', () => {
@@ -52,16 +54,6 @@ describe('Reading library from cached frontmatter', () => {
 		await target.refresh();
 		expect(h.reads.sort()).toEqual(['Reading/A.md', 'Reading/B.md']);
 		expect(titles(target)).toEqual(['Article 3', 'Article 2', 'Article 1']);
-	});
-
-	it('reads and imports only a clip that is not a Reading note yet', async () => {
-		const clip = '---\nsource: https://example.invalid/clip\n---\nClipped text.';
-		const h = vault({ 'Reading/A.md': note(1), 'Reading/Clip.md': clip });
-		const target = library(h.fake);
-		await target.refresh();
-		expect(h.reads).toEqual(['Reading/Clip.md']);
-		expect(h.writes).toEqual(['Reading/Clip.md']);
-		expect(target.getSnapshot().items.map(item => item.source_url)).toContain('https://example.invalid/clip');
 	});
 
 	it('updates one card per change and keeps every other item unchanged', async () => {
@@ -110,32 +102,6 @@ describe('Reading library from cached frontmatter', () => {
 		expect(titles(target)).toEqual(['Read from the note', 'Changed while closed']);
 	});
 
-	it('reads only notes whose cached properties list highlights when Highlights opens', async () => {
-		const highlighted = patchReadingFrontmatter(note(2), { highlights: [{ id: 'h1', start: 0, end: 4, text: 'Text' }] });
-		const h = vault({ 'Reading/A.md': note(1), 'Reading/B.md': highlighted });
-		const target = library(h.fake);
-		await target.refresh();
-		await target.checkHighlights();
-		await target.checkHighlights();
-		expect(h.reads).toEqual(['Reading/B.md']);
-	});
-
-	it('retries an import that waited for sync without reading other notes', async () => {
-		const clip = '---\nsource: https://example.invalid/clip\n---\nClipped text.';
-		const h = vault({ 'Reading/A.md': note(1), 'Reading/Clip.md': clip });
-		let syncing = true;
-		const target = library(h.fake, () => !syncing);
-		await target.refresh();
-		expect(target.getSnapshot().issues).toEqual([{ path: 'Reading/Clip.md', message: 'Note is waiting for import after sync.' }]);
-		expect(h.writes).toEqual([]);
-		syncing = false;
-		h.reads.length = 0;
-		await target.retryPending();
-		expect(h.reads).toEqual(['Reading/Clip.md']);
-		expect(h.writes).toEqual(['Reading/Clip.md']);
-		expect(target.getSnapshot().issues).toEqual([]);
-	});
-
 	it('edits a note after reading only that note', async () => {
 		const h = vault({ 'Reading/A.md': note(1), 'Reading/B.md': note(2) });
 		const target = library(h.fake);
@@ -159,5 +125,87 @@ describe('Reading library from cached frontmatter', () => {
 		await target.refreshPaths(['Reading/Old', 'Reading/New']);
 		expect(h.walks()).toBe(walks + 1);
 		expect(target.getSnapshot().items.map(item => item.path)).toEqual(['Reading/New/A.md']);
+	});
+
+	it('is not built until a view uses it, and is released some time after the last view closes', async () => {
+		vi.useFakeTimers();
+		try {
+			const h = vault({ 'Reading/A.md': note(1) });
+			const target = library(h.fake);
+			expect(target.active).toBe(false);
+			expect(h.walks()).toBe(0);
+			const release = target.retain();
+			await vi.waitFor(() => expect(titles(target)).toEqual(['Article 1']));
+			release();
+			await vi.advanceTimersByTimeAsync(29_000);
+			expect(target.active).toBe(true);
+			// Reopening within the delay keeps the list.
+			const again = target.retain();
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(target.active).toBe(true);
+			again();
+			await vi.advanceTimersByTimeAsync(30_000);
+			expect(target.active).toBe(false);
+			expect(target.getSnapshot()).toMatchObject({ items: [], loading: true });
+		} finally { vi.useRealTimers(); }
+	});
+});
+
+describe('Reading background work', () => {
+	const clip = '---\nsource: https://example.invalid/clip\n---\nClipped text.';
+
+	it('finds a clip from cached properties and reads and imports only that note', async () => {
+		const h = vault({ 'Reading/A.md': note(1), 'Reading/Clip.md': clip });
+		await maintenance(h.fake).start();
+		expect(h.reads).toEqual(['Reading/Clip.md']);
+		expect(h.writes).toEqual(['Reading/Clip.md']);
+	});
+
+	it('retries an import that waited for sync without reading other notes', async () => {
+		const h = vault({ 'Reading/A.md': note(1), 'Reading/Clip.md': clip });
+		let syncing = true;
+		const work = maintenance(h.fake, () => !syncing), target = library(h.fake, work);
+		await work.start();
+		await target.refresh();
+		expect(target.getSnapshot().issues).toEqual([{ path: 'Reading/Clip.md', message: 'Note is waiting for import after sync.' }]);
+		expect(h.writes).toEqual([]);
+		syncing = false;
+		h.reads.length = 0;
+		await work.retry();
+		expect(h.reads).toEqual(['Reading/Clip.md']);
+		expect(h.writes).toEqual(['Reading/Clip.md']);
+		expect(work.issues.size).toBe(0);
+	});
+
+	it('reports a changed note the strict parser rejects instead of listing its card', async () => {
+		const duplicateKey = note(2).replace('favorite: false', 'favorite: false\nfavorite: true');
+		const h = vault({ 'Reading/A.md': note(1), 'Reading/B.md': note(2) });
+		// Obsidian's parser accepts the duplicate key, so its cached properties stay usable.
+		h.write('Reading/B.md', duplicateKey);
+		const work = maintenance(h.fake), target = library(h.fake, work);
+		await target.refresh();
+		// Obsidian's lenient cache lists it until the note is checked.
+		expect(titles(target)).toEqual(['Article 2', 'Article 1']);
+		await work.changed(['Reading/B.md']);
+		expect(titles(target)).toEqual(['Article 1']);
+		expect(target.getSnapshot().issues).toEqual([{ path: 'Reading/B.md', message: expect.stringContaining('valid YAML') as string }]);
+		expect(h.writes).toEqual([]);
+	});
+
+	it('removes a deleted highlight marker from the properties, so cached cards match the note', async () => {
+		const marked = note(1).replace('<!-- crate:article:end -->', 'Read ==this passage==.\n<!-- crate:article:end -->');
+		const h = vault({ 'Reading/A.md': marked });
+		const work = maintenance(h.fake);
+		await work.changed(['Reading/A.md']);
+		const recorded = await h.fake.read(h.fake.file!('Reading/A.md')!);
+		expect(readReadingFrontmatter(recorded)!.value.highlights).toHaveLength(1);
+		h.write('Reading/A.md', recorded.replace('==this passage==', 'this passage'));
+		await work.changed(['Reading/A.md']);
+		const edited = await h.fake.read(h.fake.file!('Reading/A.md')!);
+		expect(readReadingFrontmatter(edited)!.value.highlights).toEqual([]);
+		// Checking an unchanged note again writes nothing.
+		const writes = h.writes.length;
+		await work.changed(['Reading/A.md']);
+		expect(h.writes).toHaveLength(writes);
 	});
 });

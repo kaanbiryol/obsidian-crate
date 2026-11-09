@@ -31,7 +31,7 @@ const notes = new Map([
 async function pluginInventory() {
 	const vault: ReadingVault = { files: () => [...notes].map(([path, content]) => ({ path, modifiedAt: 0, size: content.length })),
 		read: async file => notes.get(file.path)!, process: async () => { throw new Error('Read only'); }, create: async () => { throw new Error('Read only'); } };
-	const library = new ReadingLibrary(vault, 'Reading', new AbortController().signal, () => true);
+	const library = new ReadingLibrary(vault, 'Reading', new AbortController().signal);
 	await library.refresh();
 	return library.getSnapshot();
 }

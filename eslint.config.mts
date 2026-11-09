@@ -230,8 +230,8 @@ export default tseslint.config(
 		rules: { 'obsidianmd/prefer-file-manager-trash-file': 'off' },
 	},
 	{
-		// Sync timers also run in Node-based unit tests.
-		files: ['src/sync/**/*.{ts,tsx}'],
+		// Sync timers and the Reading list's release timer also run in Node-based unit tests.
+		files: ['src/sync/**/*.{ts,tsx}', 'src/reading/data/library.ts'],
 		rules: {
 			'obsidianmd/prefer-window-timers': 'off',
 		},

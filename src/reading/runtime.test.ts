@@ -54,6 +54,10 @@ describe('Reading runtime with Obsidian\'s frontmatter cache', () => {
 		h.metadataCache.getFileCache.mockImplementation(() => ({ frontmatter: properties }));
 		h.workspace.layoutReady = true; startReading(h.plugin);
 		await vi.advanceTimersByTimeAsync(500);
+		// Startup builds no list while Reading is closed.
+		expect(getReadingLibrary(h.plugin)!.active).toBe(false);
+		getReadingLibrary(h.plugin)!.retain();
+		await vi.advanceTimersByTimeAsync(500);
 		expect(getReadingLibrary(h.plugin)!.getSnapshot().items).toHaveLength(1);
 		// Before: startup read every note.
 		expect(h.vault.read).not.toHaveBeenCalled();
@@ -68,13 +72,15 @@ describe('Reading runtime with Obsidian\'s frontmatter cache', () => {
 		h.vault.read.mockClear();
 		h.metadataCache.getFileCache.mockImplementation(() => ({ frontmatter: properties.current }));
 		h.workspace.layoutReady = true; startReading(h.plugin);
+		getReadingLibrary(h.plugin)!.retain();
 		await vi.advanceTimersByTimeAsync(500);
 		const reindexed = h.metadataCache.on.mock.calls.find(([name]) => name === 'changed')?.[1];
 		properties.current = { ...properties.current, title: 'Changed while Obsidian was closed' };
 		reindexed?.(h.file);
 		await vi.advanceTimersByTimeAsync(500);
 		expect(getReadingLibrary(h.plugin)!.getSnapshot().items[0]?.title).toBe('Changed while Obsidian was closed');
-		expect(h.vault.read).not.toHaveBeenCalled();
+		// The card came from the cache; the background work read the note once to check it.
+		expect(h.vault.read).toHaveBeenCalledOnce();
 		stopReading(h.plugin);
 		expect(h.metadataCache.offref).toHaveBeenCalled();
 	});
@@ -255,8 +261,12 @@ describe('Reading runtime lifecycle', () => {
 	it('discovers a normal clip after the vault is ready without a template marker', async () => {
 		const h = harness();
 		h.edit(() => '---\nsource: https://example.com/article\nauthor:\n---\nClipped text.');
+		// Obsidian's cache shows a note without Reading properties, so the import needs no list.
+		h.metadataCache.getFileCache.mockImplementation(() => ({ frontmatter: { source: 'https://example.com/article', author: null } }));
 		h.workspace.layoutReady = true; startReading(h.plugin);
 		await vi.advanceTimersByTimeAsync(500);
+		await vi.waitFor(() => expect(h.vault.process).toHaveBeenCalledTimes(1));
+		expect(getReadingLibrary(h.plugin)!.active).toBe(false);
 		await getReadingLibrary(h.plugin)!.refresh();
 		expect(getReadingLibrary(h.plugin)!.getSnapshot().issues).toEqual([]);
 		expect(getReadingLibrary(h.plugin)!.getSnapshot().items[0]).toMatchObject({ title: 'article', source_url: 'https://example.com/article', reading_status: 'inbox', favorite: false });
@@ -266,6 +276,7 @@ describe('Reading runtime lifecycle', () => {
 	it('imports a clip only once sync stops changing vault files', async () => {
 		const h = harness();
 		h.edit(() => '---\nsource: https://example.com/article\nauthor:\n---\nClipped text.');
+		h.metadataCache.getFileCache.mockImplementation(() => ({ frontmatter: { source: 'https://example.com/article', author: null } }));
 		h.setStatus('syncing'); h.workspace.layoutReady = true; startReading(h.plugin);
 		await vi.advanceTimersByTimeAsync(500);
 		await getReadingLibrary(h.plugin)!.refresh();
@@ -273,13 +284,14 @@ describe('Reading runtime lifecycle', () => {
 		expect(h.vault.process).not.toHaveBeenCalled();
 		// A queue flush only uploads, so the import goes ahead without waiting for it.
 		h.setStatus('syncing', false); await vi.advanceTimersByTimeAsync(500);
+		await vi.waitFor(() => expect(h.vault.process).toHaveBeenCalledTimes(1));
 		await getReadingLibrary(h.plugin)!.refresh();
-		expect(h.vault.process).toHaveBeenCalledTimes(1);
 		expect(getReadingLibrary(h.plugin)!.getSnapshot().items[0]).toMatchObject({ source_url: 'https://example.com/article' });
 		stopReading(h.plugin);
 	});
 	it('refreshes during a long burst of vault events instead of waiting for it to end', async () => {
 		const h = harness(); h.workspace.layoutReady = true; startReading(h.plugin);
+		getReadingLibrary(h.plugin)!.retain();
 		await vi.advanceTimersByTimeAsync(500);
 		const reads = h.vault.read.mock.calls.length;
 		for (let event = 0; event < 10; event++) {
@@ -304,6 +316,7 @@ describe('Reading runtime lifecycle', () => {
 		const h = harness(); startReading(h.plugin);
 		await vi.advanceTimersByTimeAsync(500); expect(h.vault.read).not.toHaveBeenCalled();
 		h.setStatus('syncing'); h.workspace.layoutReady = true; h.callbacks[0]!();
+		getReadingLibrary(h.plugin)!.retain();
 		await vi.advanceTimersByTimeAsync(500);
 		// Before: the library stayed loading until the sync finished.
 		expect(getReadingLibrary(h.plugin)?.getSnapshot().items).toHaveLength(1);
@@ -317,6 +330,7 @@ describe('Reading runtime lifecycle', () => {
 	});
 	it('invalidates equal-timestamp edits and avoids duplicate watchers when restarted', async () => {
 		const h = harness(); h.workspace.layoutReady = true; startReading(h.plugin);
+		getReadingLibrary(h.plugin)!.retain();
 		await vi.advanceTimersByTimeAsync(500);
 		const item = getReadingLibrary(h.plugin)!.getSnapshot().items[0]!;
 		h.edit(source => updateReadingNote(source, item.crate_reading_id, { favorite: true }));
@@ -330,6 +344,7 @@ describe('Reading runtime lifecycle', () => {
 	});
 	it('lists a note at its new path after its folder is renamed', async () => {
 		const h = harness(); h.file.path = 'Reading/Old/article.md'; h.workspace.layoutReady = true; startReading(h.plugin);
+		getReadingLibrary(h.plugin)!.retain();
 		await vi.advanceTimersByTimeAsync(500);
 		expect(getReadingLibrary(h.plugin)!.getSnapshot().items.map(item => item.path)).toEqual(['Reading/Old/article.md']);
 		h.file.path = 'Reading/New/article.md';

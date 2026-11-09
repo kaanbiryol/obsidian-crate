@@ -6,7 +6,7 @@ import { isEmptyReadingCapture, readingUpdateIssue } from '../core/mutation-poli
 import type { CapturedArticle } from '../extraction/types';
 import { readingCapturePath, retitledCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
-import { adoptReadingClip, createReadingNote, parseReadingNote, recordMarkdownHighlights, updateReadingNote } from '../core/notes';
+import { createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
 import { MAX_READING_BYTES, readingUrlIdentity, validateReadingMetadata, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontmatter';
 
@@ -38,11 +38,11 @@ interface ReadingEntry {
 	issue?: string;
 	/** Properties came from the host's frontmatter cache; the note itself was not read. */
 	cached: boolean;
-	/** An import or highlight record waits until sync stops changing vault files. */
-	pending: boolean;
-	/** An import or highlight record waits until no editor has the note open. */
-	deferred: boolean;
 }
+/** Background work's issues by path (imports waiting, failed strict checks), shown with the cards. */
+export interface ReadingIssueSource { readonly issues: ReadonlyMap<string, string>; subscribe(listener: () => void): () => void }
+// After the last view lets go, the list stays this long so reopening Reading is instant.
+const RELEASE_DELAY_MS = 30_000;
 const SIZE_ISSUE = 'File exceeds the 1 MB reading limit.';
 const newestFirst = (a: ReadingItem, b: ReadingItem) => b.saved_at.localeCompare(a.saved_at) || a.crate_reading_id.localeCompare(b.crate_reading_id);
 export interface ReadingSnapshot { items: ReadingItem[]; issues: ReadingIssue[]; loading: boolean; error: string | null }
@@ -66,16 +66,48 @@ export class ReadingLibrary {
 	private stale = new Set<string>();
 	// A full scan has listed the folder, so single notes can be updated on their own.
 	private listed = false;
-	private highlightsChecked = false;
+	// Views using the list; at zero the list is released after a delay.
+	private holders = 0;
+	private releaseTimer: ReturnType<typeof setTimeout> | undefined;
+	private stopIssues: (() => void) | undefined;
 	// URL identities by item; an unchanged note keeps its item, so each is normalized once.
 	private urlIdentities = new WeakMap<ReadingItem, string>();
 	// The last parsed note: an update's rescan and reread see the same bytes.
 	private parsed: { content: string; metadata: ReadingMetadata | null } | undefined;
-	// Notes whose import or highlight records wait until no editor has them open.
-	private deferred = new Set<string>();
 	constructor(private vault: ReadingVault, readonly folder: string, private signal: AbortSignal,
-		private canAdopt: () => boolean = () => true, startAfter: Promise<void> = Promise.resolve()) {
+		private background?: ReadingIssueSource, startAfter: Promise<void> = Promise.resolve()) {
 		this.queue = startAfter;
+	}
+	/** True once the list is built; until then vault changes need no work here. */
+	get active(): boolean { return this.listed; }
+	/** A view uses the list: it is built now, and kept current until the last holder lets go. */
+	retain(): () => void {
+		this.holders++;
+		clearTimeout(this.releaseTimer); this.releaseTimer = undefined;
+		this.stopIssues ??= this.background?.subscribe(() => { if (this.listed) this.publishLibrary(); });
+		if (!this.listed) void this.refresh().catch(() => { /* The library publishes its error. */ });
+		let held = true;
+		return () => {
+			if (!held) return;
+			held = false;
+			this.holders--;
+			this.scheduleRelease();
+		};
+	}
+	private scheduleRelease(): void {
+		if (this.holders > 0 || this.closed) return;
+		clearTimeout(this.releaseTimer);
+		this.releaseTimer = setTimeout(() => {
+			this.releaseTimer = undefined;
+			if (this.holders > 0 || this.closed) return;
+			// Queued so a running scan or action finishes with the list it started with.
+			void this.enqueue(async () => {
+				if (this.holders > 0) return;
+				this.entries.clear(); this.sorted = []; this.idPaths.clear(); this.stale.clear(); this.listed = false;
+				this.stopIssues?.(); this.stopIssues = undefined;
+				this.publish({ items: [], issues: [], loading: true, error: null });
+			}).catch(() => { /* Stopped. */ });
+		}, RELEASE_DELAY_MS);
 	}
 	getSnapshot = (): ReadingSnapshot => this.snapshot;
 	subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
@@ -98,6 +130,7 @@ export class ReadingLibrary {
 	/** Accepted host writes cannot be cancelled; drain both queues before replacing their owner. */
 	close(): Promise<void> {
 		this.closed = true;
+		clearTimeout(this.releaseTimer); this.stopIssues?.();
 		return this.closing ??= Promise.allSettled([this.queue, this.captureQueue]).then(() => {});
 	}
 	/** Lists the whole folder. Startup uses it; later changes use `refreshPaths`. */
@@ -116,31 +149,14 @@ export class ReadingLibrary {
 			return !entry || entry.cached;
 		})));
 	}
-	/** Retries imports and highlight records that waited for sync or an open editor. */
-	retryPending(): Promise<void> {
-		return this.enqueue(() => this.scanPaths([...this.entries].filter(([, entry]) => entry.pending || entry.deferred).map(([path]) => path)));
-	}
-	/** Highlights listed from cached frontmatter can predate edits made while Obsidian was
-	 * closed; the Highlights tab reads those notes once per session. */
-	checkHighlights(): Promise<void> {
-		if (this.highlightsChecked) return Promise.resolve();
-		this.highlightsChecked = true;
-		return this.enqueue(async () => {
-			if (!this.listed) await this.scan();
-			const paths = [...this.entries].filter(([, entry]) => entry.cached && entry.item?.highlights?.length).map(([path]) => path);
-			for (const path of paths) this.stale.add(path);
-			await this.scanPaths(paths);
-		});
-	}
 	private parse(content: string): ReadingMetadata | null {
 		if (this.parsed?.content === content) return this.parsed.metadata;
 		const metadata = parseReadingNote(content);
 		this.parsed = { content, metadata };
 		return metadata;
 	}
-	invalidate(path: string): void { this.stale.add(path); }
-	/** True while the last scan left a note for when its editor closes. */
-	get waitingForEditor(): boolean { return this.deferred.size > 0; }
+	// Before the list is built, the next scan takes every note from the cache anyway.
+	invalidate(path: string): void { if (this.listed) this.stale.add(path); }
 	private isNotePath(path: string): boolean { return path.startsWith(`${this.folder}/`) && /\.md$/i.test(path); }
 	private findFile(path: string): ReadingFile | undefined {
 		return (this.vault.file ? this.vault.file(path) ?? undefined : this.vault.files().find(file => file.path === path));
@@ -157,10 +173,12 @@ export class ReadingLibrary {
 	}
 	private reusable(entry: ReadingEntry, file: ReadingFile): boolean {
 		return entry.revision !== undefined && entry.revision === file.revision && !this.stale.has(file.path)
-			&& !entry.pending && !entry.deferred && (entry.item !== undefined || entry.issue === SIZE_ISSUE);
+			&& (entry.item !== undefined || entry.issue === SIZE_ISSUE);
 	}
+	/** One note's card. Imports and highlight records are background work; a note it has not
+	 * imported yet shows as an issue until its change arrives. */
 	private async loadEntry(file: ReadingFile): Promise<ReadingEntry> {
-		const base = { revision: file.revision, cached: false, pending: false, deferred: false };
+		const base = { revision: file.revision, cached: false };
 		if (file.size > MAX_READING_BYTES) return { ...base, issue: SIZE_ISSUE };
 		if (!this.stale.has(file.path)) {
 			const metadata = this.cachedMetadata(file);
@@ -168,52 +186,13 @@ export class ReadingLibrary {
 		}
 		this.stale.delete(file.path);
 		try {
-			let original = await this.vault.read(file);
-			// Versioned notes need no adoption, so parse them only once.
-			let metadata = this.parse(original);
-			let deferred = false, pending = false, written = false;
-			if (!metadata && !this.canAdopt()) pending = true;
-			if (!metadata && this.canAdopt()) {
-				const adopted = await adoptReadingClip(original, file.path, new Date(file.modifiedAt).toISOString());
-				this.assertActive();
-				// Like highlight records below, an import waits until nobody is editing the note.
-				if (adopted !== original && this.vault.editing?.(file.path)) deferred = true;
-				else {
-					const content = adopted === original ? original : await this.vault.process(file, current => {
-						this.assertActive();
-						if (!this.canAdopt() || current !== original) throw new Error('File changed during import. It will be checked again.');
-						return adopted;
-					});
-					written = content !== original;
-					metadata = this.parse(content);
-					original = content;
-				}
-			}
-			// Markers typed in Obsidian get stable IDs once nobody is editing the note.
-			const typedHighlights = metadata?.highlights?.some(highlight => highlight.id?.startsWith('markdown-'));
-			if (typedHighlights && !this.canAdopt()) pending = true;
-			if (metadata && typedHighlights && this.canAdopt()) {
-				const recorded = await recordMarkdownHighlights(original, metadata);
-				this.assertActive();
-				if (recorded !== original && this.vault.editing?.(file.path)) deferred = true;
-				else if (recorded !== original) {
-					const content = await this.vault.process(file, current => {
-						this.assertActive();
-						return current === original ? recorded : current;
-					});
-					written = true;
-					metadata = this.parse(content);
-					// A concurrent edit wins; its own change event schedules another scan.
-					deferred = content !== recorded;
-				}
-			}
-			// A write changed the revision; the note's change event reads it again.
-			const entry = { ...base, ...(written ? { revision: undefined } : {}), pending, deferred };
-			if (metadata) return { ...entry, item: { ...metadata, path: file.path } };
-			return { ...entry, issue: deferred ? 'Close this note to add it to Reading.' : 'Note is waiting for import after sync.' };
+			const metadata = this.parse(await this.vault.read(file));
+			if (metadata) return { ...base, item: { ...metadata, path: file.path } };
+			// Not imported yet: read again once the import's change event arrives.
+			return { cached: false, issue: 'Note is waiting for import after sync.' };
 		} catch (error) {
 			this.assertActive();
-			return { cached: false, pending: false, deferred: false, issue: error instanceof Error ? error.message : 'Could not read this note.' };
+			return { cached: false, issue: error instanceof Error ? error.message : 'Could not read this note.' };
 		}
 	}
 	/** Replaces one note's entry, keeping the sorted list and duplicate IDs current. */
@@ -227,11 +206,10 @@ export class ReadingLibrary {
 			if (paths?.size === 0) this.idPaths.delete(previous.crate_reading_id);
 		}
 		if (!entry) {
-			this.entries.delete(path); this.deferred.delete(path); this.captureErrors.delete(path);
+			this.entries.delete(path); this.captureErrors.delete(path);
 			return;
 		}
 		this.entries.set(path, entry);
-		if (entry.deferred) this.deferred.add(path); else this.deferred.delete(path);
 		if (!entry.item) return;
 		const item = entry.item;
 		let low = 0, high = this.sorted.length;
@@ -246,9 +224,8 @@ export class ReadingLibrary {
 	}
 	/** Rebuilds the sorted list and duplicate IDs from every entry in one pass. */
 	private rebuild(): void {
-		this.sorted = []; this.idPaths.clear(); this.deferred.clear();
+		this.sorted = []; this.idPaths.clear();
 		for (const [path, entry] of this.entries) {
-			if (entry.deferred) this.deferred.add(path);
 			if (!entry.item) continue;
 			this.sorted.push(entry.item);
 			const paths = this.idPaths.get(entry.item.crate_reading_id) ?? new Set<string>();
@@ -258,9 +235,14 @@ export class ReadingLibrary {
 		this.sorted.sort(newestFirst);
 	}
 	private publishLibrary(): void {
-		const unique = this.sorted.filter(item => this.idPaths.get(item.crate_reading_id)?.size === 1);
+		const background = this.background?.issues ?? new Map<string, string>();
+		// A note the background work could not check or import shows its reason instead of a card.
+		const unique = this.sorted.filter(item => this.idPaths.get(item.crate_reading_id)?.size === 1 && !background.has(item.path));
 		const issues: ReadingIssue[] = [...this.captureErrors].map(([path, message]) => ({ path, message }));
-		for (const [path, entry] of this.entries) if (entry.issue) issues.push({ path, message: entry.issue });
+		for (const [path, entry] of this.entries) {
+			const message = background.get(path) ?? entry.issue;
+			if (message) issues.push({ path, message });
+		}
 		for (const [path, entry] of this.entries) if (entry.item && (this.idPaths.get(entry.item.crate_reading_id)?.size ?? 0) > 1) issues.push({ path, message: READING_DUPLICATE_ID_ISSUE });
 		// Rescans after unrelated changes find the same notes; keep listeners quiet.
 		const previous = this.snapshot;
@@ -291,7 +273,10 @@ export class ReadingLibrary {
 			}
 			this.rebuild();
 			this.listed = true;
+			this.stopIssues ??= this.background?.subscribe(() => { if (this.listed) this.publishLibrary(); });
 			this.publishLibrary();
+			// An action without a view, such as Add link, keeps the list only briefly.
+			this.scheduleRelease();
 		} catch (error) { this.failed(error); }
 	}
 	/** Loads only `paths`. Before the first full scan, or for a path that is not a note (such

@@ -19,6 +19,8 @@ export function LocalReadingLibrary({ plugin, library, renderNavigation }: { plu
 	const listStyle = useRemindersSettingsStore(state => state.listStyle);
 	const reduceMotion = useReducedMotion();
 	const snapshot = useSyncExternalStore(library.subscribe, library.getSnapshot);
+	// The card list is built while this view is shown and released some time after it closes.
+	useEffect(() => library.retain(), [library]);
 	const { article, item, focusHighlight, open, close, update } = useLocalReadingArticle(library, snapshot.items);
 	const requested = useSyncExternalStore(useCallback(listener => subscribeReadingRuntime(plugin, listener), [plugin]), () => requestedReadingItem(plugin));
 	useEffect(() => {
@@ -32,7 +34,6 @@ export function LocalReadingLibrary({ plugin, library, renderNavigation }: { plu
 		renderNavigation={renderNavigation}
 		readerMotion={reduceMotion ? 'none' : 'slide'}
 		renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
-		onSectionChange={section => { if (section === 'highlights') void library.checkHighlights().catch(() => { /* The library publishes its error. */ }); }}
 		onAdd={() => new AddReadingLinkModal(plugin, open).open()}
 		onOpen={open}
 		onEnrich={async (target, source) => { await library.enrich(target, source); await open(target); }}

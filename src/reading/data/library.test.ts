@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ReadingLibrary, type ReadingFile, type ReadingVault } from './library';
+import { ReadingMaintenance } from './maintenance';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
 import { readReadingFrontmatter } from '../core/frontmatter';
 import { readingDocument } from '../core/markdown';
@@ -20,8 +21,11 @@ function harness() {
 	});
 	const vault: ReadingVault = { files: () => [...files].map(([path, content]) => ({ path, modifiedAt: Date.parse('2026-09-21T12:00:00Z'), size: new TextEncoder().encode(content).length })),
 		read: async file => files.get(file.path)!, process, create: async (path, content) => { if (files.has(path)) throw new Error('Already exists'); files.set(path, content); } };
-	const library = new ReadingLibrary(vault, 'Reading', controller.signal, () => canAdopt);
-	return { library, vault, files, process, controller, defer: () => { canAdopt = false; }, resume: () => { canAdopt = true; } };
+	const maintenance = new ReadingMaintenance(vault, 'Reading', controller.signal, () => canAdopt);
+	const library = new ReadingLibrary(vault, 'Reading', controller.signal, maintenance);
+	// The background work checks every note, as the runtime does after vault events, then the list refreshes.
+	const settle = async () => { await maintenance.changed([...files.keys()]); await library.refresh(); };
+	return { library, maintenance, settle, vault, files, process, controller, defer: () => { canAdopt = false; }, resume: () => { canAdopt = true; } };
 }
 const clip = '---\ncrate_reading_import: web-clipper-v1\ntitle: A clip\nsource_url: https://example.com\nsaved_at: 2026-09-21T12:00:00Z\n---\n\nExact clipped text.\n';
 
@@ -39,7 +43,7 @@ describe('local Reading library', () => {
 		h.files.set('Reading/Nested/Article.md', ordinaryClip);
 		h.files.set('Reading/Second.md', ordinaryClip);
 		h.files.set('Reading/Notes.md', 'Personal thoughts.');
-		await h.library.refresh(); expect(h.library.getSnapshot().items).toHaveLength(3);
+		await h.settle(); expect(h.library.getSnapshot().items).toHaveLength(3);
 		const item = h.library.getSnapshot().items.find(item => item.title === 'Notes')!;
 		await h.library.update(item, { reading_status: 'archived', favorite: true });
 		expect((await h.library.read(item)).markdown).toBe('Personal thoughts.');
@@ -62,41 +66,42 @@ describe('local Reading library', () => {
 		const manual = h.files.get(item.path)!.replace('<!-- crate:article:end -->', 'Read ==this passage==.\n<!-- crate:article:end -->');
 		h.files.set(item.path, manual);
 		let open = true; h.vault.editing = path => open && path === item.path;
-		h.library.invalidate(item.path); await h.library.refresh();
+		h.library.invalidate(item.path); await h.settle();
 		expect(h.files.get(item.path)).toBe(manual);
 		expect(h.library.getSnapshot().items[0]?.highlights?.[0]?.id).toMatch(/^markdown-/);
-		open = false; h.defer(); await h.library.refresh();
+		expect(h.maintenance.waitingForEditor).toBe(true);
+		open = false; h.defer(); await h.maintenance.retry();
 		expect(h.files.get(item.path)).toBe(manual);
-		h.resume(); await h.library.refresh();
+		h.resume(); await h.maintenance.retry(); h.library.invalidate(item.path); await h.library.refresh();
 		const recorded = readReadingFrontmatter(h.files.get(item.path)!)!;
 		expect(recorded.body).toBe(readReadingFrontmatter(manual)!.body);
 		expect(recorded.value.highlights).toEqual([expect.objectContaining({ text: 'this passage', id: h.library.getSnapshot().items[0]?.highlights?.[0]?.id })]);
 		expect(h.library.getSnapshot().items[0]?.highlights?.[0]?.id).not.toMatch(/^markdown-/);
-		const writes = h.process.mock.calls.length; await h.library.refresh();
+		const writes = h.process.mock.calls.length; await h.settle();
 		expect(h.process).toHaveBeenCalledTimes(writes);
 	});
 	it('imports a clip once the note is no longer open in an editor', async () => {
 		const h = harness(); h.files.set('Reading/Clip.md', clip);
 		let open = true; h.vault.editing = path => open && path === 'Reading/Clip.md';
-		await h.library.refresh();
+		await h.settle();
 		expect(h.process).not.toHaveBeenCalled();
 		expect(h.library.getSnapshot().issues).toEqual([{ path: 'Reading/Clip.md', message: 'Close this note to add it to Reading.' }]);
-		// Only a library waiting for an editor rescans on layout changes.
-		expect(h.library.waitingForEditor).toBe(true);
-		open = false; await h.library.refresh();
-		expect(h.library.waitingForEditor).toBe(false);
+		// Only background work waiting for an editor retries on layout changes.
+		expect(h.maintenance.waitingForEditor).toBe(true);
+		open = false; await h.maintenance.retry(); await h.library.refresh();
+		expect(h.maintenance.waitingForEditor).toBe(false);
 		expect(h.process).toHaveBeenCalledTimes(1);
 		expect(h.library.getSnapshot().items.map(item => item.title)).toEqual(['A clip']);
 	});
 	it('defers adoption during sync and imports every Markdown note only within the reading folder', async () => {
 		const h = harness(); h.files.set('Reading/Clip.md', clip); h.files.set('Reading/Personal.md', '# Personal notes'); h.files.set('Outside/Private.md', '# Private'); h.files.set('Reading/image.png', 'image'); h.files.set('ReadingElsewhere/Private.md', '# Private');
-		h.defer(); await h.library.refresh(); expect(h.process).not.toHaveBeenCalled();
+		h.defer(); await h.settle(); expect(h.process).not.toHaveBeenCalled();
 		expect(h.library.getSnapshot().issues).toHaveLength(2);
-		h.resume(); await h.library.refresh();
+		h.resume(); await h.maintenance.retry(); await h.library.refresh();
 		expect(h.process).toHaveBeenCalledTimes(2); expect(h.library.getSnapshot().items).toHaveLength(2);
 		expect(h.files.get('Outside/Private.md')).toBe('# Private'); expect(h.files.get('Reading/image.png')).toBe('image'); expect(h.files.get('ReadingElsewhere/Private.md')).toBe('# Private');
 		expect(h.files.get('Reading/Personal.md')).toMatch(/---\n# Personal notes$/);
-		await h.library.refresh(); expect(h.process).toHaveBeenCalledTimes(2);
+		await h.settle(); expect(h.process).toHaveBeenCalledTimes(2);
 	});
 	it('does not overwrite an edit arriving during adoption', async () => {
 		const h = harness(); h.files.set('Reading/Clip.md', clip);
@@ -104,10 +109,11 @@ describe('local Reading library', () => {
 			h.files.set(file.path, clip + 'My new notes.');
 			return update(h.files.get(file.path)!);
 		});
-		await h.library.refresh();
+		await h.settle();
 		expect(h.files.get('Reading/Clip.md')).toBe(clip + 'My new notes.');
 		expect(h.library.getSnapshot().issues[0]?.message).toContain('changed');
-		await h.library.refresh(); expect(h.library.getSnapshot().items).toHaveLength(1);
+		// The edit's own change event checks the note again.
+		await h.settle(); expect(h.library.getSnapshot().items).toHaveLength(1);
 	});
 	it('serializes repeated local captures and keeps archive and date on duplicate saves', async () => {
 		const h = harness();
@@ -281,13 +287,15 @@ function deferred<T>() {
 it('reuses a clipped video for equivalent URL saves and safely enriches a bookmark clipped later', async () => {
 	const h = harness();
 	h.files.set('Reading/Clipped video.md', '---\ntitle: Clipped video\nsource: https://www.youtube.com/watch?v=jNQXAC9IVRw\n---\n**0:42** · A useful passage.\n');
+	// The background work imports the clip once it arrives.
+	await h.settle();
 	const first = await h.library.add('https://youtu.be/jNQXAC9IVRw?t=99', undefined, false);
 	expect(first.duplicate).toBe(true);
 	expect(h.files.size).toBe(1);
 	const other = harness();
 	const bookmark = (await other.library.add('https://youtu.be/jNQXAC9IVRw', undefined, false)).item;
 	other.files.set('Reading/Clipped video.md', h.files.get('Reading/Clipped video.md')!);
-	await other.library.refresh();
+	await other.settle();
 	const clip = other.library.getSnapshot().items.find(item => item.capture_method === 'web-clipper')!;
 	await other.library.enrich(bookmark, clip);
 	expect(other.files.size).toBe(2);
@@ -301,7 +309,7 @@ it('does not republish an unchanged library after a rescan', async () => {
 	const read = vi.fn(async () => note);
 	const vault: ReadingVault = { files: () => [{ path: 'Reading/Article.md', size: note.length, modifiedAt: 1, revision }],
 		read, process: vi.fn(), create: vi.fn() };
-	const library = new ReadingLibrary(vault, 'Reading', new AbortController().signal, () => false);
+	const library = new ReadingLibrary(vault, 'Reading', new AbortController().signal);
 	const published = vi.fn();
 	library.subscribe(published);
 	await library.refresh();

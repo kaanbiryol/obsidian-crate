@@ -72,11 +72,15 @@ export function readingImportId(path: string, original: string): Promise<string>
  * `metadata` is the note's `parseReadingNote` result, which callers already have.
  */
 export async function recordMarkdownHighlights(markdown: string, metadata: ReadingMetadata): Promise<string> {
-	if (!metadata.highlights) return markdown;
+	const current = metadata.highlights ?? [];
 	const stored = new Set((validateReadingMetadata(readReadingFrontmatter(markdown)!.value).highlights ?? []).map(highlight => highlight.id));
-	const unrecorded = metadata.highlights.filter(highlight => highlight.id?.startsWith('markdown-') && !stored.has(highlight.id));
-	if (!unrecorded.length) return markdown;
-	const highlights = await Promise.all(metadata.highlights.map(async highlight => !unrecorded.includes(highlight) ? highlight : {
+	const unrecorded = current.filter(highlight => highlight.id?.startsWith('markdown-') && !stored.has(highlight.id));
+	// A marker deleted in the body also leaves the properties, so cached properties list the
+	// highlights the note shows. Moved markers alone write nothing.
+	const kept = new Set(current.map(highlight => highlight.id));
+	const removed = [...stored].some(id => !kept.has(id));
+	if (!unrecorded.length && !removed) return markdown;
+	const highlights = await Promise.all(current.map(async highlight => !unrecorded.includes(highlight) ? highlight : {
 		...highlight, id: await contentUuid(JSON.stringify(['crate:reading:markdown-highlight:v1', metadata.crate_reading_id, highlight.start, highlight.text, highlight.prefix ?? '', highlight.suffix ?? ''])),
 	}));
 	return patchReadingFrontmatter(markdown, { highlights, highlight_format: 'markdown-v1',
