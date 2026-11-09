@@ -73,8 +73,22 @@ const SECTION_FILTERS: Record<ReadingSection | 'all', string> = {
 	inbox: "status = 'inbox'", archived: "status = 'archived'", favorites: 'favorite = 1', highlights: 'highlighted = 1', all: 'status IS NOT NULL',
 };
 const ITEM_COLUMNS = `${ROW_COLUMNS}, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted`;
-/** Above every code point, so `term < prefix + TERM_END` keeps every word that starts with `prefix`. */
-const TERM_END = '\u{10FFFF}';
+// A search starts from its rarest term, found by counting each term's notes up to these caps:
+// a small one first, and a larger one only when every term reaches it.
+const TERM_PROBES = [50, 500];
+
+/** The term with the fewest notes, by capped counts. Each count reads at most its cap; a single
+ * term needs none. When every term is common at both caps, the first term is kept. */
+async function rarestTerm(env: Env, terms: string[]): Promise<string> {
+	if (terms.length === 1) return terms[0]!;
+	for (const cap of TERM_PROBES) {
+		const results = await env.DB.batch<Rows<{ n: number }>>(terms.map(term => env.DB.prepare(`SELECT count(*) AS n FROM (SELECT 1 FROM note_terms
+      WHERE scope = '${READING_TERM_SCOPE}' AND term = ? LIMIT ${cap})`).bind(term)));
+		const counts = results.map(result => result.results[0]?.n ?? 0), least = Math.min(...counts);
+		if (least < cap) return terms[counts.indexOf(least)]!;
+	}
+	return terms[0]!;
+}
 
 export interface ReadingItemsQuery {
 	section: ReadingSection | 'all'; cursor: string;
@@ -107,23 +121,26 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	const after = parseListCursor(query.cursor);
 	const visible = encrypted ? 'card IS NOT NULL' : 'metadata_json IS NOT NULL AND duplicate = 0';
 	// A query word matches by its term (its first three letters); an unencrypted title then
-	// confirms the whole word. An encrypted device sends its terms in the same order: link, tag,
-	// longest word first.
-	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS).sort((a, b) => [...b].length - [...a].length);
+	// confirms the whole word.
+	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS);
 	let identity: string | undefined;
 	if (!encrypted && query.url) { try { identity = readingUrlIdentity(query.url); } catch { throw new ReadingError('Enter a valid web link.'); } }
-	const terms = encrypted ? query.terms ?? [] : [...identity ? [`u:${identity}`] : [], ...query.tag ? [`t:${normalizedTag(query.tag)}`] : [], ...words.map(wordTerm)];
+	const terms = [...new Set(encrypted ? query.terms ?? [] : [...identity ? [`u:${identity}`] : [], ...query.tag ? [`t:${normalizedTag(query.tag)}`] : [], ...words.map(wordTerm)])];
 	let page: D1PreparedStatement;
 	if (terms.length) {
-		// Each term lists its notes newest first, so the search walks the first term and stops
-		// after a page; the other terms and words are checked on the row it reaches.
+		// Each term lists its notes newest first, so the search walks one term and stops after a
+		// page; the other terms and words are checked on the row it reaches.
+		const driver = await rarestTerm(env, terms);
 		const where = [`t.scope = '${READING_TERM_SCOPE}'`, 't.term = ?', ...[SECTION_FILTERS[query.section], visible].map(clause => clause.replace(/\b(status|favorite|highlighted|card|metadata_json|duplicate)\b/g, 'i.$1'))];
-		const args: unknown[] = [terms[0]];
+		const args: unknown[] = [driver];
 		if (after) { where.push('(t.saved_at, t.portable_path) < (?, ?)'); args.push(...after); }
 		if (query.id) { where.push('i.item_id = ?'); args.push(query.id); }
-		for (const term of new Set(terms.slice(1))) { where.push('EXISTS (SELECT 1 FROM json_each(i.terms) WHERE value = ?)'); args.push(term); }
-		for (const word of words) { where.push('EXISTS (SELECT 1 FROM json_each(i.words) WHERE value >= ? AND value < ?)'); args.push(word, `${word}${TERM_END}`); }
-		page = env.DB.prepare(`SELECT ${ITEM_COLUMNS.split(', ').map(column => `i.${column}`).join(', ')} FROM note_terms t JOIN reading_items i ON i.portable_path = t.portable_path
+		// CROSS JOIN keeps the term walk outermost, so SQLite never scans the library instead.
+		// The row's term and word lists are JSON text: finding a quoted term, or a quote followed
+		// by a word's start, reads no rows, where unpacking the lists would count each entry.
+		for (const term of terms) if (term !== driver) { where.push('instr(i.terms, ?) > 0'); args.push(JSON.stringify(term)); }
+		for (const word of words) { where.push('instr(i.words, ?) > 0'); args.push(JSON.stringify(word).slice(0, -1)); }
+		page = env.DB.prepare(`SELECT ${ITEM_COLUMNS.split(', ').map(column => `i.${column}`).join(', ')} FROM note_terms t CROSS JOIN reading_items i ON i.portable_path = t.portable_path
       WHERE ${where.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args);
 	} else {
 		const where = [SECTION_FILTERS[query.section], visible], args: unknown[] = [];

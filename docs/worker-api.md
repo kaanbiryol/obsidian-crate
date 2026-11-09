@@ -124,9 +124,9 @@ matches the start of a title word, a shorter one a whole word), `tag` and `url`,
 issues. An encrypted vault takes up to 10 hashed `term` values, every one of which must match,
 and answers `{ cards, cursor }`: each card's server path, revision, hash, size, sealed `card`,
 `stale` and the plaintext list `fields`. Terms live in `note_terms` (scope `reading`), one per
-title word, tag and link, keyed by saved date: a search walks its first term newest first and
-stops after a page, checking the other terms and, unencrypted, the title words on each row it
-reaches. See [Reading search](reading-search.md).
+title word, tag and link, keyed by saved date: a search walks its rarest term (by counts capped
+at 50, then 500) newest first and stops after a page, checking the other terms and, unencrypted,
+the title words on each row it reaches. See [Reading search](reading-search.md).
 
 In an encrypted vault, each Reading note's upload carries its card as the file's public data
 (`{ kind: 'reading-card', version: 1, card, terms, fields }`), from Obsidian's sync and the web

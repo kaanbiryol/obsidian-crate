@@ -28,9 +28,8 @@ export async function hashedReadingTerms(key: CryptoKey, item: Parameters<typeof
 }
 
 /** The hashed terms a query sends: a word of 3 or more letters matches by its first 3, a
- * shorter one exactly, so the device rechecks the titles it decrypts. The server walks the
- * first term in date order, so the most selective comes first: the link, a tag, then the
- * longest word. */
+ * shorter one exactly, so the device rechecks the titles it decrypts. The server starts from
+ * whichever term has the fewest notes. */
 export async function hashedQueryTerms(key: CryptoKey, query: { q?: string; tag?: string; url?: string }): Promise<string[]> {
 	const words = searchWords(query.q ?? '', MAX_QUERY_WORDS).sort((a, b) => [...b].length - [...a].length);
 	const terms = [...query.url ? [`u:${readingUrlIdentity(query.url)}`] : [], ...query.tag ? [`t:${normalizedTag(query.tag)}`] : [], ...words.map(wordTerm)];

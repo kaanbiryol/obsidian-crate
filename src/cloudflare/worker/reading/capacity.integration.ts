@@ -58,11 +58,16 @@ it.for([10_000, 50_000])('pages and searches a %i-note Reading library for the w
 	// One note matches.
 	const rare = await request(`items?section=inbox&q=${notes - 1}`);
 	expect((JSON.parse(rare.body) as { items: Array<{ title: string }> }).items.map(item => item.title)).toEqual([`Article ${notes - 1}`]);
-	// A search walks the notes sharing its first three letters: few here, and never the library.
+	// A rare word beside a word every note has: the search starts from the rare one.
+	const mixed = await request(`items?section=inbox&q=article%20${notes - 1}`);
+	expect((JSON.parse(mixed.body) as { items: unknown[] }).items).toHaveLength(1);
+	// A search walks the notes sharing its rarest term's first three letters, never the library.
+	// Finding that term among common ones costs a capped count of each.
 	for (const page of [first, common]) expect(page.rowsRead).toBeLessThan(200);
-	expect(rare.rowsRead).toBeLessThan(1000);
+	expect(rare.rowsRead).toBeLessThan(400);
+	expect(mixed.rowsRead).toBeLessThan(3000);
 	await context.annotate(JSON.stringify({
 		scenario: 'web-app-reading-pages', localOnly: true, notes,
-		...Object.fromEntries(Object.entries({ first, common, rare }).map(([name, page]) => [name, { ms: Math.round(page.ms), bytes: page.bytes, rowsRead: page.rowsRead }])),
+		...Object.fromEntries(Object.entries({ first, common, rare, mixed }).map(([name, page]) => [name, { ms: Math.round(page.ms), bytes: page.bytes, rowsRead: page.rowsRead }])),
 	}), 'capacity');
 });
