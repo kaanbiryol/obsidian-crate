@@ -9,7 +9,7 @@ import type { ReadingSection } from '@/reading/core/reading-presentation';
 import { MAX_QUERY_WORDS, normalizedTag, searchWords } from '@/reading/core/search-terms';
 import { isHashedReadingTerm } from '@/encryption/reading-search';
 import { sha256Hex } from '@/platform/sha256';
-import { ARTICLE_EDITED_ERROR, readingIndexScope, readingIndexStatement, type ReadingIndexRow, type ReadingIndexState } from './library-index';
+import { ARTICLE_EDITED_ERROR, READING_TERM_SCOPE, readingIndexScope, readingIndexStatement, type ReadingIndexRow, type ReadingIndexState } from './library-index';
 
 /** A queued capture with this ID and the index rows that name it, read together. */
 export const readingItemStatements = (db: D1Database, id: string) => [
@@ -146,7 +146,7 @@ export function parseReadingItemsQuery(params: URLSearchParams, encrypted: boole
 
 interface ItemsRow extends ReadingRow { card: string | null; storage_key: string; stale: number; hash: string; size: number; item_id: string; status: string; favorite: number; highlighted: number }
 
-/** Newest first. Each term narrows the page through `reading_terms`, so a search reads the
+/** Newest first. Each term narrows the page through `note_terms`, so a search reads the
  * notes it matches, not the library. The first unfiltered inbox page carries the capture queue
  * and the issues; an encrypted page carries each card for the device to open. */
 export async function readingItems(env: Env, current: ReadingPolicy, encrypted: boolean, query: ReadingItemsQuery) {
@@ -155,9 +155,9 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
 	if (query.id) { where.push('item_id = ?'); args.push(query.id); }
 	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS);
-	for (const word of words) { where.push('portable_path IN (SELECT portable_path FROM reading_terms WHERE term >= ? AND term < ?)'); args.push(`w:${word}`, `w:${word}${TERM_END}`); }
+	for (const word of words) { where.push(`portable_path IN (SELECT portable_path FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND term >= ? AND term < ?)`); args.push(`w:${word}`, `w:${word}${TERM_END}`); }
 	const exact = encrypted ? query.terms ?? [] : query.tag ? [`t:${normalizedTag(query.tag)}`] : [];
-	for (const term of exact) { where.push('portable_path IN (SELECT portable_path FROM reading_terms WHERE term = ?)'); args.push(term); }
+	for (const term of exact) { where.push(`portable_path IN (SELECT portable_path FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND term = ?)`); args.push(term); }
 	if (!encrypted && query.url) {
 		let identity: string; try { identity = readingUrlIdentity(query.url); } catch { throw new ReadingError('Enter a valid web link.'); }
 		where.push('url_identity = ?'); args.push(identity);

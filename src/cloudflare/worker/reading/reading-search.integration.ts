@@ -26,7 +26,7 @@ async function seed(title: string, path = `Reading/${title}.md`) {
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, note, null);
 	return { path, note };
 }
-const termCount = async () => (await env.DB.prepare('SELECT count(*) AS n FROM reading_terms').first<{ n: number }>())!.n;
+const termCount = async () => (await env.DB.prepare('SELECT count(*) AS n FROM note_terms').first<{ n: number }>())!.n;
 
 beforeEach(async () => {
 	day = 1;
@@ -74,7 +74,7 @@ it('pages by cursor and removes a deleted note from search', async () => {
 	const file = (await getStoredFileRow(env.DB, 'Reading/Note 0.md'))!;
 	await commitFileDelete(env.DB, { path: 'Reading/Note 0.md', expectedHash: file.hash, expectedRevision: file.storageKey, previousFile: file });
 	expect((await items('q=note&cursor=' + encodeURIComponent(first.cursor!))).items).toHaveLength(4);
-	expect(await env.DB.prepare("SELECT count(*) AS n FROM reading_terms WHERE portable_path = 'reading/note 0.md'").first()).toMatchObject({ n: 0 });
+	expect(await env.DB.prepare("SELECT count(*) AS n FROM note_terms WHERE portable_path = 'reading/note 0.md'").first()).toMatchObject({ n: 0 });
 });
 
 it('lists an encrypted note only once a device posts its card for the current revision', async () => {

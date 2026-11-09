@@ -6,7 +6,7 @@ import { isReceiptEnvelope } from '@/encryption/receipt-format';
 import { readingTimestamp } from '@/reading/core/model';
 import { portablePathKey } from '@/protocol/portable-path';
 import { isSyncRevision } from '@/protocol/sync-validation';
-import { isReadingNotePath } from './library-index';
+import { isReadingNotePath, READING_TERM_SCOPE } from './library-index';
 import { changedRows } from '../d1/db';
 
 /** Notes one stale listing or one card post covers. */
@@ -63,9 +63,9 @@ export async function postReadingCards(env: Env, current: ReadingPolicy, body: R
 		const match = 'EXISTS (SELECT 1 FROM reading_items WHERE portable_path = ?1 AND path = ?2 AND storage_key = ?3)';
 		const args = [portable, card.path, card.revision];
 		statements.push(
-			db.prepare(`DELETE FROM reading_terms WHERE portable_path = ?1 AND ${match}
+			db.prepare(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND portable_path = ?1 AND ${match}
         AND (SELECT terms FROM reading_items WHERE portable_path = ?1) IS NOT ?4`).bind(...args, terms),
-			db.prepare(`INSERT OR IGNORE INTO reading_terms(term, portable_path) SELECT value, ?1 FROM json_each(?4) WHERE ${match}`).bind(...args, terms),
+			db.prepare(`INSERT OR IGNORE INTO note_terms(scope, term, portable_path) SELECT '${READING_TERM_SCOPE}', value, ?1 FROM json_each(?4) WHERE ${match}`).bind(...args, terms),
 			db.prepare(`UPDATE reading_items SET card = ?4, terms = ?5, item_id = ?6, saved_at = ?7, status = ?8, favorite = ?9, highlighted = ?10, stale = 0,
         change_seq = COALESCE((SELECT seq FROM reading_index WHERE id = 1), 0) WHERE portable_path = ?1 AND path = ?2 AND storage_key = ?3`)
 				.bind(...args, card.card, terms, card.item_id, card.saved_at, card.status, card.favorite ? 1 : 0, card.highlighted ? 1 : 0),

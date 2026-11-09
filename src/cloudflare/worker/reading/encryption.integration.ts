@@ -71,7 +71,7 @@ it('keeps Reading captures, content, edits and replay receipts encrypted across 
 	expect(opened.metadata.path.startsWith('Reading/')).toBe(true);
 	expect(h.requests.join()).not.toContain('Reading/');
 	// The server lists the note by its sealed card and hashed terms.
-	const rows = JSON.stringify((await env.DB.prepare('SELECT * FROM reading_items').all()).results) + JSON.stringify((await env.DB.prepare('SELECT * FROM reading_terms').all()).results);
+	const rows = JSON.stringify((await env.DB.prepare('SELECT * FROM reading_items').all()).results) + JSON.stringify((await env.DB.prepare('SELECT * FROM note_terms').all()).results);
 	for (const secret of ['confidential', 'Private', 'private.example', 'Reading/']) expect(rows).not.toContain(secret);
 	expect(await env.DB.prepare('SELECT stale, card IS NOT NULL AS carded FROM reading_items').first()).toEqual({ stale: 0, carded: 1 });
 	expect((await env.DB.prepare('SELECT * FROM reading_jobs').all()).results).toHaveLength(0);
@@ -225,7 +225,7 @@ it('finds encrypted notes by title words, tags and links without sending them', 
 	expect(await titles('section=favorites&tag=languages')).toEqual(['Learning JavaScript deeply']);
 	// Saving the same link again finds it on the server.
 	expect(await save('https://private.example/java#later', 'Again')).toMatchObject({ alreadySaved: true, id: java.id });
-	for (const secret of ['javas', 'learn', 'Languages', 'languages', 'private.example']) expect(h.requests.join() + JSON.stringify((await env.DB.prepare('SELECT * FROM reading_terms').all()).results)).not.toContain(secret);
+	for (const secret of ['javas', 'learn', 'Languages', 'languages', 'private.example']) expect(h.requests.join() + JSON.stringify((await env.DB.prepare('SELECT * FROM note_terms').all()).results)).not.toContain(secret);
 });
 
 it('lists a note Obsidian synced once another client posts its card', async () => {

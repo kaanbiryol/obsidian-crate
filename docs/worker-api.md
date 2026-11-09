@@ -135,7 +135,7 @@ title word), `tag` and `url`, and answers `{ items, issues, cursor }`; the first
 page carries the capture queue and issues. An encrypted vault takes up to 10 hashed `term`
 values, every one of which must match, and answers `{ cards, cursor }`: each card's server path,
 revision, hash, size, sealed `card`, `stale` and the plaintext list `fields`. Terms live in
-`reading_terms`, written in the batch of each note commit; see [Reading search](reading-search.md).
+`note_terms` (scope `reading`), written in the batch of each note commit; see [Reading search](reading-search.md).
 
 In an encrypted vault, each commit in the Reading folder marks its row stale. Devices list stale
 rows with `GET /reading/cards/stale?after=` (50 at a time, with the previous card when there is

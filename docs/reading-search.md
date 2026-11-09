@@ -13,17 +13,19 @@ stay.
 - Reading notes stay ordinary synced notes and the only source of truth.
 - `reading_items` holds one row per note: what the web app lists. Rows are derived and can be
   rebuilt.
-- `reading_search`, an SQLite FTS5 table, holds one document per row: the title terms, tag
-  terms and, in an encrypted vault, the link term. Its `rowid` is the row's `doc`.
+- `note_terms` holds each listed note's search terms under scope `reading`: `w:` for a title
+  word, `p:` for its first three letters, `t:` for a tag and `u:` for the link identity
+  (`src/reading/core/search-terms.ts`). The scope lets other note indexes, such as a future
+  vault-wide one, share the table.
 - The web app never holds the library. It asks the server for one page at a time:
   `GET /reading/items?section=&q=&tag=&cursor=`, newest first.
 
 ## Unencrypted vaults
 
-The Worker writes the row and its search document in the same D1 batch as the file commit, as it
-already did for `reading_items`. A search matches each word of the query as a prefix of a title
-word (`"word"*`), using FTS5's `unicode61` tokenizer with diacritics removed. A tag filter matches
-the tag column and is rechecked against the row's tags.
+The Worker writes the row and its terms in the same D1 batch as the file commit, as it already
+did for `reading_items`. Words are lowercased with diacritics removed. A search matches each query
+word as the start of a title word, with a range over the `w:` terms; a tag or link filter matches
+its term exactly.
 
 ## Encrypted vaults
 
@@ -42,10 +44,9 @@ The server cannot read notes, so devices write the rows:
   its Reading ID. The server sorts and filters by them; the device checks them against the card it
   decrypts and drops rows that disagree.
 - **Terms** are HMAC-SHA256 under a search key derived from the vault key
-  (`crate-e2ee-v1/reading-search`), truncated to 60 bits: every prefix of 2 to 16 characters of
-  each normalized title word, each tag, and the link identity. A query sends the same hashes for
-  its words (the last as a prefix), so the server matches tokens it cannot read. Words longer
-  than 16 characters match on their first 16; the device rechecks titles it decrypts.
+  (`crate-e2ee-v1/reading-search`), truncated to 60 bits, of the same terms. A query sends, for
+  each word, the hash of its first three letters (or of the whole word when it is shorter), so the
+  server matches tokens it cannot read; the device rechecks the titles it decrypts.
 - The web app fills stale rows when it opens Reading, a few at a time, before it lists. Shortcut
   captures arrive this way, as do notes Obsidian synced.
 
@@ -75,6 +76,6 @@ independent security review listed in [Reading and encryption](reading-e2ee-asse
 
 - A page or a search reads about one page of rows plus the matched search entries; nothing grows
   with the library.
-- A note write adds the FTS5 document change, about 3 to 6 rows; status and favorite edits keep
-  the same terms and leave it untouched.
+- A new or retitled note writes about two terms per title word; status and favorite edits keep
+  the same terms and leave them untouched, but move the note between section indexes (two rows).
 - An encrypted library is indexed once: each note is opened by one device and its card posted.

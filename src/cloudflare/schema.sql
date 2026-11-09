@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS reading_policy (
 -- `change_seq` to the index's new `seq`, so a delta reads only the rows that changed.
 -- `status`, `favorite` and `highlighted` select a section. In an encrypted vault a commit
 -- leaves the row `stale` with no card, and a device then posts `card` (sealed with the vault key)
--- and the list fields. `terms` is the JSON array stored in `reading_terms`.
+-- and the list fields. `terms` is the JSON array stored in `note_terms` under scope `reading`.
 CREATE TABLE IF NOT EXISTS reading_items (
  portable_path TEXT PRIMARY KEY, path TEXT NOT NULL, storage_key TEXT NOT NULL,
  hash TEXT NOT NULL, size INTEGER NOT NULL, item_id TEXT, url_identity TEXT,
@@ -289,11 +289,12 @@ CREATE INDEX IF NOT EXISTS reading_items_favorite_idx ON reading_items(saved_at,
 CREATE INDEX IF NOT EXISTS reading_items_highlighted_idx ON reading_items(saved_at, portable_path) WHERE highlighted = 1;
 CREATE INDEX IF NOT EXISTS reading_items_stale_idx ON reading_items(portable_path) WHERE stale = 1;
 CREATE INDEX IF NOT EXISTS reading_items_issue_idx ON reading_items(portable_path) WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1;
--- Title, tag and link terms of each listed note, plain or, in an encrypted vault, hashed.
-CREATE TABLE IF NOT EXISTS reading_terms (
- term TEXT NOT NULL, portable_path TEXT NOT NULL, PRIMARY KEY (term, portable_path)
+-- Search terms of indexed notes, plain or, in an encrypted vault, hashed. `scope` names the
+-- index a note belongs to (only `reading` today), so other note indexes can share the table.
+CREATE TABLE IF NOT EXISTS note_terms (
+ scope TEXT NOT NULL, term TEXT NOT NULL, portable_path TEXT NOT NULL, PRIMARY KEY (scope, term, portable_path)
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS reading_terms_path_idx ON reading_terms(portable_path);
+CREATE INDEX IF NOT EXISTS note_terms_path_idx ON note_terms(scope, portable_path);
 CREATE INDEX IF NOT EXISTS reading_items_change_idx ON reading_items(change_seq);
 CREATE INDEX IF NOT EXISTS reading_items_id_idx ON reading_items(item_id);
 CREATE INDEX IF NOT EXISTS reading_items_url_idx ON reading_items(url_identity);

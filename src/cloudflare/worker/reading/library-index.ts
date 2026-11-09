@@ -14,6 +14,8 @@ import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-p
  * same D1 batch as the file commit, so reads never re-check `files`. Only a new scope
  * (folder, generation or format), a restore or an initial import rebuilds it from R2. */
 const INDEX_FORMAT = 2;
+/** The `note_terms` scope of Reading notes. */
+export const READING_TERM_SCOPE = 'reading';
 const REBUILD_PAGE = 25;
 // An encrypted rebuild reads no note, only `files` rows.
 const ENCRYPTED_REBUILD_PAGE = 200;
@@ -118,11 +120,11 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 		// revision changes in the same statement, one written row instead of two.
 		db.prepare('UPDATE reading_index SET seq = seq + 1, revision = coalesce(?, lower(hex(randomblob(16)))) WHERE id = 1').bind(options.revision ?? null),
 		// Terms change only when a note leaves or its terms differ; a status edit keeps them.
-		...(removes ? [statement(`DELETE FROM reading_terms WHERE portable_path IN (SELECT portable_path FROM reading_items WHERE ${removed})`)] : []),
-		...(plain.length ? [statement(`DELETE FROM reading_terms WHERE portable_path IN (SELECT c.portable FROM committed c JOIN reading_items i ON i.portable_path = c.portable
+		...(removes ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND portable_path IN (SELECT portable_path FROM reading_items WHERE ${removed})`)] : []),
+		...(plain.length ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND portable_path IN (SELECT c.portable FROM committed c JOIN reading_items i ON i.portable_path = c.portable
         WHERE c.keep = 1 AND c.stale = 0 AND i.terms IS NOT c.terms)`)] : []),
-		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO reading_terms(term, portable_path)
-        SELECT t.value, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable, json_each(c.terms) t
+		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(scope, term, portable_path)
+        SELECT '${READING_TERM_SCOPE}', t.value, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable, json_each(c.terms) t
         WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND i.terms IS NOT c.terms`)] : []),
 		...(removes ? [
 			statement(`INSERT INTO reading_removals(path, change_seq, removed_at) SELECT path, ${CHANGE_SEQ}, ?3 FROM reading_items WHERE ${removed}
@@ -232,7 +234,7 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 		index = { scope, revision: crypto.randomUUID(), cursor: '', epoch: crypto.randomUUID(), seq: 0, removedSeq: 0 };
 		await db.batch([
 			db.prepare('DELETE FROM reading_items'),
-			db.prepare('DELETE FROM reading_terms'),
+			db.prepare(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}'`),
 			db.prepare('DELETE FROM reading_removals'),
 			db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
 			db.prepare(`INSERT INTO reading_index(id, scope, revision, cursor, epoch, seq, removed_seq) VALUES (1, ?, ?, '', ?, 0, 0)
