@@ -230,16 +230,21 @@ it('finds encrypted notes by title words, tags and links without sending them', 
 	for (const secret of ['javas', 'learn', 'Languages', 'languages', 'private.example']) expect(h.requests.join() + JSON.stringify((await env.DB.prepare('SELECT * FROM note_terms').all()).results)).not.toContain(secret);
 });
 
-it('lists a Shortcut note by the card the server sealed, and makes it searchable once a device saves it', async () => {
+it('lists a Shortcut note by the card the server sealed and finds it by search at once', async () => {
 	const h = await setup(), id = crypto.randomUUID();
 	const note = createReadingNote({ id, url: 'https://private.example/shared', title: 'Shared from phone', savedAt: new Date().toISOString() });
 	expect(await commitSealedReadingNote(env, { id, content: note, folder: h.folder.wire, generation: 'policy' })).toBe(true);
 	const titles = async (query: string) => (await h.api().request(`/reading/items?${query}`) as { items: ReadingItem[] }).items.map(item => item.title);
 	expect(await titles('section=inbox')).toEqual(['Shared from phone']);
-	// The server cannot hash terms, so search finds it once a device saves the note.
-	expect(await titles('section=inbox&q=shared')).toEqual([]);
+	// The server cannot hash terms, so the device matches the note itself, at once.
+	expect(await titles('section=inbox&q=shared')).toEqual(['Shared from phone']);
+	expect(await titles('section=inbox&q=other')).toEqual([]);
+	// Sharing the link again finds the saved note.
+	expect(await h.api().request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/shared#again', fetchArticle: false }))).toMatchObject({ alreadySaved: true, id });
+	// Once a device saves it, the note has terms like any other.
 	await h.api().request('/reading/update', JSON.stringify({ operationId: operation(), id, changes: { favorite: true }, before: { favorite: false } }));
 	expect(await titles('section=inbox&q=shared')).toEqual(['Shared from phone']);
+	expect(await env.DB.prepare("SELECT terms != '[]' AS indexed FROM reading_items").first()).toEqual({ indexed: 1 });
 	expect(JSON.stringify((await env.DB.prepare('SELECT * FROM reading_items').all()).results)).not.toContain('Shared');
 });
 

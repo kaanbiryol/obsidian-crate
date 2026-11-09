@@ -41,8 +41,12 @@ way a reminder note carries its notification schedules:
   vault key and bound to the note's server path.
 - **Shortcut saves** are created by the server, which cannot use the vault key. It seals the card
   to the vault seal key, like the note itself, so the note is listed at once. The server cannot
-  hash terms, so the note is found by search once a device saves it again. Opening or editing a
-  sealed note checks that it does not replace a note or take another note's name.
+  hash terms, so such a note is stored with none, and every search page also carries the notes
+  without terms in that page's saved-date range (`unindexed`); the device opens their cards and
+  matches them itself. A Shortcut save is found by search, and by the duplicate-link check, as
+  soon as it is saved, however old. Once a device saves the note again it has terms like any
+  other. Opening or editing a sealed note checks that it does not replace a note or take another
+  note's name.
 - **List fields in plaintext**: saved date, status, favorite, whether the note has highlights and
   its Reading ID. The server sorts and filters by them; the device checks them against the card it
   decrypts and drops rows that disagree.

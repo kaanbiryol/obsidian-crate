@@ -142,7 +142,8 @@ In an encrypted vault, each Reading note's upload carries its card as the file's
 app's encrypted commits alike; the server validates it and lists the note from it in the commit's
 batch. An upload without a card keeps the row's last card, marked `stale`. A note the server
 sealed (a Shortcut save) carries a card sealed to the vault seal key (`seal: { keyId, epk }`) and
-no terms. `GET /reading/taken?path=…` (up to 20 server paths) tells a device which names are
+no terms; a search page (one with `term` values) also returns `unindexed`, every such note in
+that page's saved-date range, for the device to match. `GET /reading/taken?path=…` (up to 20 server paths) tells a device which names are
 stored, for naming notes and checking sealed ones.
 
 `GET /reading/list` pages hold up to 1,000 notes, newest `saved_at` first, so the first

@@ -288,6 +288,7 @@ CREATE INDEX IF NOT EXISTS reading_items_status_idx ON reading_items(status, sav
 CREATE INDEX IF NOT EXISTS reading_items_favorite_idx ON reading_items(saved_at, portable_path) WHERE favorite = 1;
 CREATE INDEX IF NOT EXISTS reading_items_highlighted_idx ON reading_items(saved_at, portable_path) WHERE highlighted = 1;
 CREATE INDEX IF NOT EXISTS reading_items_stale_idx ON reading_items(portable_path) WHERE stale = 1;
+CREATE INDEX IF NOT EXISTS reading_items_unindexed_idx ON reading_items(saved_at, portable_path) WHERE terms = '[]';
 CREATE INDEX IF NOT EXISTS reading_items_issue_idx ON reading_items(portable_path) WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1;
 -- Search terms of indexed notes, plain or, in an encrypted vault, hashed. `scope` names the
 -- index a note belongs to (only `reading` today), so other note indexes can share the table.

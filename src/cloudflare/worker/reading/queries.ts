@@ -170,8 +170,27 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	const last = results.at(-1);
 	const cursor = results.length === READING_ITEMS_PAGE && last ? JSON.stringify([last.saved_at, last.portable_path]) : null;
 	// The device checks the fields the page was sorted and filtered by against each card.
-	if (encrypted) return { cards: results.map(row => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, ...JSON.parse(row.card!) as { card: string; seal?: unknown }, stale: row.stale === 1,
-		fields: { item_id: row.item_id, saved_at: row.saved_at, status: row.status, favorite: row.favorite === 1, highlighted: row.highlighted === 1 } })), cursor };
+	const card = (row: ItemsRow) => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, ...JSON.parse(row.card!) as { card: string; seal?: unknown }, stale: row.stale === 1,
+		fields: { item_id: row.item_id, saved_at: row.saved_at, status: row.status, favorite: row.favorite === 1, highlighted: row.highlighted === 1 } });
+	if (encrypted) {
+		// Notes the server sealed have no terms, so a search cannot match them here. Every one in
+		// this page's date range goes with it, for the device to match itself.
+		const unindexed = exact.length ? await unindexedCards(env, query.section, after, cursor && last ? [last.saved_at, last.portable_path] : null) : [];
+		return { cards: results.map(card), ...exact.length ? { unindexed: unindexed.map(card) } : {}, cursor };
+	}
 	const listed = listedPage(current, results, queuedRows?.results ?? []);
 	return { items: listed.items, issues: issueRows ? listedPage(current, issueRows.results, []).issues : [], cursor };
+}
+
+// Sealed notes no device has saved again; a page's range rarely holds more.
+const MAX_UNINDEXED = 1000;
+/** Encrypted notes listed without search terms, newest first, from below `after` down to
+ * `until` (inclusive), or to the oldest note on the last page. */
+async function unindexedCards(env: Env, section: ReadingSection | 'all', after: [string, string] | null, until: [string, string] | null) {
+	const where = [SECTION_FILTERS[section], "card IS NOT NULL AND terms = '[]'"], args: unknown[] = [];
+	if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
+	if (until) { where.push('(saved_at, portable_path) >= (?, ?)'); args.push(...until); }
+	const { results } = await env.DB.prepare(`SELECT ${ROW_COLUMNS}, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted FROM reading_items
+    WHERE ${where.join(' AND ')} ORDER BY saved_at DESC, portable_path DESC LIMIT ${MAX_UNINDEXED}`).bind(...args).all<ItemsRow>();
+	return results;
 }

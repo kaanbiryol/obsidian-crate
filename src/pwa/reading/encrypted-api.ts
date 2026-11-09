@@ -110,11 +110,16 @@ export class EncryptedReadingApi {
 		const q = params.get('q') ?? '', tag = params.get('tag') ?? '', url = params.get('url') ?? '', cursor = params.get('cursor') ?? '', id = params.get('id');
 		const query = new URLSearchParams({ section: params.get('section') ?? 'inbox', ...cursor ? { cursor } : {}, ...id ? { id } : {} });
 		for (const term of await hashedQueryTerms(this.options.searchKey, { q, tag, url })) query.append('term', term);
-		const page: { cards: Array<WireFile & { card: string; seal?: ReadingCardData['seal']; stale: boolean; fields: Partial<ReadingCardFields> }>; cursor: string | null } = await this.json(`/reading/items?${query}`);
+		type ListedCard = WireFile & { card: string; seal?: ReadingCardData['seal']; stale: boolean; fields: Partial<ReadingCardFields> };
+		// A search also brings the notes the server sealed in this page's date range: they have no
+		// terms, so this device matches them itself.
+		const page: { cards: ListedCard[]; unindexed?: ListedCard[]; cursor: string | null } = await this.json(`/reading/items?${query}`);
 		const items: ReadingItem[] = [], issues: ItemsPage['issues'] = [];
-		const ids = new Map<string, number>();
-		for (const listed of page.cards) {
+		const ids = new Map<string, number>(), seen = new Set<string>();
+		for (const listed of [...page.cards, ...page.unindexed ?? []]) {
 			const { card, seal, stale, fields, ...file } = listed;
+			if (seen.has(file.path)) continue;
+			seen.add(file.path);
 			let item: ReadingItem;
 			try {
 				item = (await openReadingCard(card, file.path, this.cardKeys, seal)).item;
@@ -129,6 +134,8 @@ export class EncryptedReadingApi {
 			this.listed.set(item.crate_reading_id, { file, item, stale });
 			items.push(item);
 		}
+		// Newest first, as the server lists pages.
+		items.sort((a, b) => b.saved_at.localeCompare(a.saved_at));
 		const unique = items.filter(item => {
 			if (ids.get(item.crate_reading_id)! === 1) return true;
 			issues.push({ path: item.path, message: READING_DUPLICATE_ID_ISSUE });
