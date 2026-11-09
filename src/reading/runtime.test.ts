@@ -37,7 +37,7 @@ function harness() {
 	const metadataCache = { getFileCache: vi.fn((): { frontmatter?: Record<string, unknown> } | null => null), on: vi.fn((_name: string, _callback: (file: TFile) => void) => ({})), offref: vi.fn() };
 	const plugin = { secretStorage: { get: () => null }, settings: normalizeCrateSettings({ reading: { enabled: true, folderPath: 'Reading', confirmed: true } }, '.obsidian'),
 		remindersSettings: { remindersFolderPath: 'Reminders' }, app: { vault, workspace, metadataCache }, registerEvent: vi.fn(),
-		syncRuntime: { getState: () => ({ status }), isWritingVault: () => status === 'syncing' && writesVault, addStateChangeListener: (listener: () => void) => { syncListeners.add(listener); }, removeStateChangeListener: (listener: () => void) => { syncListeners.delete(listener); } },
+		syncRuntime: { getState: () => ({ status }), isWritingVault: () => status === 'syncing' && writesVault, addStateChangeListener: (listener: () => void) => { syncListeners.add(listener); }, removeStateChangeListener: (listener: () => void) => { syncListeners.delete(listener); }, addSyncResultListener: () => {}, removeSyncResultListener: () => {} },
 	} as unknown as CratePlugin;
 	return { plugin, file, vault, workspace, callbacks, events, syncListeners, metadataCache,
 		setStatus: (next: string, writes = true) => { status = next; writesVault = writes; for (const listener of syncListeners) listener(); },

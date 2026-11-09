@@ -237,8 +237,6 @@ export class EncryptedReadingApi {
 			const committed = JSON.parse(attempt.body) as { files: Array<{ path: string }>; remove?: Array<{ path: string }> };
 			for (const file of [...committed.files, ...committed.remove ?? []]) this.sources.delete(file.path);
 			for (const [itemId, listed] of this.listed) if (committed.files.concat(committed.remove ?? []).some(file => file.path === listed.file.path)) this.listed.delete(itemId);
-			// The commit left the note's card stale; post its new card now.
-			await this.fill().catch(() => { /* The next refresh posts it. */ });
 			return receipt.response;
 		}
 	}
@@ -287,7 +285,10 @@ export class EncryptedReadingApi {
 		}
 		const sealed = await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: null }, this.options.authority);
 		const file = { path: wire, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) };
-		return { attempt: await this.persistAttempt(id, requestHash, { saved: true, id: itemId }, [file], removed ? [removed] : []) };
+		// The note's card rides along, so the server lists the new revision in the same transaction.
+		const item = { ...parseReadingNote(content)!, path };
+		const card = { path: wire, card: await sealReadingCard(item, wire, sealed.metadata.hash, this.cardKeys), terms: await hashedReadingTerms(this.options.searchKey, item), ...readingCardFields(item) };
+		return { attempt: await this.persistAttempt(id, requestHash, { saved: true, id: itemId }, [file], removed ? [removed] : [], [card]) };
 	}
 	/** A new note for a captured link, or the answer when a note already saves it. */
 	private async planCapture(body: Record<string, unknown>, id: string, rawBody: string): Promise<PreparedPlan> {
@@ -330,10 +331,10 @@ export class EncryptedReadingApi {
 		return this.options.error(message, 503, 'reading_unavailable');
 	}
 	/** Stores the exact commit body, with the encrypted receipt `response` answers with. */
-	private async persistAttempt(id: string, requestHash: string, response: unknown, files: unknown[], remove: WireFile[]): Promise<Attempt> {
+	private async persistAttempt(id: string, requestHash: string, response: unknown, files: unknown[], remove: WireFile[], cards: unknown[] = []): Promise<Attempt> {
 		const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
 		const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id, files,
-			...(remove.length ? { remove: remove.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) } : {}), acknowledgment }) };
+			...(remove.length ? { remove: remove.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) } : {}), ...(cards.length ? { cards } : {}), acknowledgment }) };
 		await this.options.writeAttempt(id, attempt);
 		return attempt;
 	}

@@ -124,6 +124,12 @@ export class SyncWorkerApi {
 		return this.encryption ? this.encryption.paths.wireFor(path) : path;
 	}
 
+	/** Where the server stores `path` in an encrypted vault: its tag, or the random name of a
+	 * note the server sealed. Undefined in unencrypted vaults. */
+	async encryptedServerPath(path: string): Promise<string | undefined> {
+		return this.encryption ? this.encryption.paths.wireFor(path) : undefined;
+	}
+
 	async health(): Promise<HealthResponse> {
 		return this.http.requestJson<HealthResponse>('/health');
 	}

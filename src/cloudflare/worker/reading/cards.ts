@@ -37,12 +37,17 @@ export async function existingReadingPaths(env: Env, current: ReadingPolicy, par
 	return readingResponse({ paths: results.map(row => row.path) });
 }
 
-interface PostedCard { path: string; revision: string; card: string; terms: string[]; item_id: string; saved_at: string; status: 'inbox' | 'archived'; favorite: boolean; highlighted: boolean }
+export interface PostedCard { path: string; revision: string; card: string; terms: string[]; item_id: string; saved_at: string; status: 'inbox' | 'archived'; favorite: boolean; highlighted: boolean }
+const CARD_FIELDS = ['path', 'revision', 'card', 'terms', 'item_id', 'saved_at', 'status', 'favorite', 'highlighted'];
 
-function postedCard(value: unknown, folder: string): PostedCard {
+/** A card a device sent. A card sent with an encrypted commit names no revision: it is for the
+ * revision that commit writes. */
+export function parseReadingCard(value: unknown, folder: string, withRevision: false): Omit<PostedCard, 'revision'>;
+export function parseReadingCard(value: unknown, folder: string, withRevision?: true): PostedCard;
+export function parseReadingCard(value: unknown, folder: string, withRevision = true): Omit<PostedCard, 'revision'> {
 	const card = value as Partial<PostedCard> | null;
-	if (!card || typeof card !== 'object' || Object.keys(card).some(key => !['path', 'revision', 'card', 'terms', 'item_id', 'saved_at', 'status', 'favorite', 'highlighted'].includes(key))
-		|| typeof card.path !== 'string' || !isReadingNotePath(card.path, folder) || !isSyncRevision(card.revision)
+	if (!card || typeof card !== 'object' || Object.keys(card).some(key => !CARD_FIELDS.includes(key) || (key === 'revision' && !withRevision))
+		|| typeof card.path !== 'string' || !isReadingNotePath(card.path, folder) || (withRevision && !isSyncRevision(card.revision))
 		|| !isReceiptEnvelope(card.card) || card.card.length > MAX_CARD_BYTES
 		|| !Array.isArray(card.terms) || card.terms.length > MAX_CARD_TERMS || !card.terms.every(isHashedReadingTerm)
 		|| typeof card.item_id !== 'string' || !UUID.test(card.item_id) || (card.status !== 'inbox' && card.status !== 'archived')
@@ -51,27 +56,29 @@ function postedCard(value: unknown, folder: string): PostedCard {
 	return card as PostedCard;
 }
 
+/** Stores one card, its list fields and terms. Every statement applies only while the row
+ * names the card's path and revision; the last one reports whether it did. */
+export function readingCardStatements(db: D1Database, card: PostedCard): D1PreparedStatement[] {
+	const portable = portablePathKey(card.path), terms = JSON.stringify([...new Set(card.terms)]);
+	const match = 'EXISTS (SELECT 1 FROM reading_items WHERE portable_path = ?1 AND path = ?2 AND storage_key = ?3)';
+	const args = [portable, card.path, card.revision];
+	return [
+		db.prepare(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND portable_path = ?1 AND ${match}
+      AND (SELECT terms FROM reading_items WHERE portable_path = ?1) IS NOT ?4`).bind(...args, terms),
+		db.prepare(`INSERT OR IGNORE INTO note_terms(scope, term, portable_path) SELECT '${READING_TERM_SCOPE}', value, ?1 FROM json_each(?4) WHERE ${match}`).bind(...args, terms),
+		db.prepare(`UPDATE reading_items SET card = ?4, terms = ?5, item_id = ?6, saved_at = ?7, status = ?8, favorite = ?9, highlighted = ?10, stale = 0,
+      change_seq = COALESCE((SELECT seq FROM reading_index WHERE id = 1), 0) WHERE portable_path = ?1 AND path = ?2 AND storage_key = ?3`)
+			.bind(...args, card.card, terms, card.item_id, card.saved_at, card.status, card.favorite ? 1 : 0, card.highlighted ? 1 : 0),
+	];
+}
+
 /** Stores the cards devices posted. Each applies only while its row still names that path
  * and revision, so a card never lists another version of the note; others are skipped. */
 export async function postReadingCards(env: Env, current: ReadingPolicy, body: Record<string, unknown>): Promise<Response> {
 	if (!Array.isArray(body.cards) || !body.cards.length || body.cards.length > READING_CARD_BATCH || Object.keys(body).some(key => key !== 'cards')) throw new ReadingError('Invalid Reading cards.');
-	const cards = body.cards.map(card => postedCard(card, current.folder_path));
+	const cards = body.cards.map(card => parseReadingCard(card, current.folder_path));
 	if (new Set(cards.map(card => portablePathKey(card.path))).size !== cards.length) throw new ReadingError('Invalid Reading cards.');
-	const db = env.DB, statements: D1PreparedStatement[] = [];
-	for (const card of cards) {
-		const portable = portablePathKey(card.path), terms = JSON.stringify([...new Set(card.terms)]);
-		const match = 'EXISTS (SELECT 1 FROM reading_items WHERE portable_path = ?1 AND path = ?2 AND storage_key = ?3)';
-		const args = [portable, card.path, card.revision];
-		statements.push(
-			db.prepare(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND portable_path = ?1 AND ${match}
-        AND (SELECT terms FROM reading_items WHERE portable_path = ?1) IS NOT ?4`).bind(...args, terms),
-			db.prepare(`INSERT OR IGNORE INTO note_terms(scope, term, portable_path) SELECT '${READING_TERM_SCOPE}', value, ?1 FROM json_each(?4) WHERE ${match}`).bind(...args, terms),
-			db.prepare(`UPDATE reading_items SET card = ?4, terms = ?5, item_id = ?6, saved_at = ?7, status = ?8, favorite = ?9, highlighted = ?10, stale = 0,
-        change_seq = COALESCE((SELECT seq FROM reading_index WHERE id = 1), 0) WHERE portable_path = ?1 AND path = ?2 AND storage_key = ?3`)
-				.bind(...args, card.card, terms, card.item_id, card.saved_at, card.status, card.favorite ? 1 : 0, card.highlighted ? 1 : 0),
-		);
-	}
-	const results = await db.batch(statements);
+	const results = await env.DB.batch(cards.flatMap(card => readingCardStatements(env.DB, card)));
 	const accepted = cards.filter((_card, index) => changedRows(results[index * 3 + 2]) > 0).map(card => card.path);
 	return readingResponse({ accepted });
 }

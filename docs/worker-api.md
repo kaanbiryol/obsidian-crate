@@ -142,7 +142,9 @@ rows with `GET /reading/cards/stale?after=` (50 at a time, with the previous car
 one), check names with `GET /reading/cards/exists?path=…` (up to 20 server paths), and post
 `POST /reading/cards` `{ cards: [{ path, revision, card, terms, item_id, saved_at, status,
 favorite, highlighted }] }` (up to 50, 600 a minute). A card applies only while its row names
-that path and revision; the answer lists the `accepted` paths.
+that path and revision; the answer lists the `accepted` paths. `POST /reading/encrypted-commit`
+also takes `cards` (the same fields without `revision`, one per note it writes, refused for any
+other path); each is stored for the revision the commit writes, in its transaction.
 
 `GET /reading/list` pages hold up to 1,000 notes, newest `saved_at` first, so the first
 page of a first load is the top of the library. Every index write gives the rows it adds,

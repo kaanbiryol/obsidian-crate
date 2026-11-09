@@ -237,3 +237,15 @@ it('lists a note Obsidian synced once another client posts its card', async () =
 	expect((await reader.request('/reading/items?section=inbox') as { items: ReadingItem[] }).items.map(item => item.crate_reading_id)).toEqual([saved.id]);
 	expect(await env.DB.prepare('SELECT stale FROM reading_items').first()).toEqual({ stale: 0 });
 });
+
+it('stores a web app save with its card in the same commit, without a separate card post', async () => {
+	const h = await setup();
+	await h.api().request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/at-once', title: 'Listed at once', fetchArticle: false }));
+	expect(await env.DB.prepare('SELECT stale, card IS NOT NULL AS carded FROM reading_items').first()).toEqual({ stale: 0, carded: 1 });
+	expect(h.requests.some(body => body.startsWith('{"cards"'))).toBe(false);
+	// A card for a note the commit does not write is refused.
+	const commit = JSON.parse(h.requests.find(body => body.startsWith('{"folderPath"'))!) as { cards: Array<{ path: string }> };
+	expect(commit.cards).toHaveLength(1);
+	const forged = await h.request('/reading/encrypted-commit', JSON.stringify({ ...commit, operationId: operation(), cards: [{ ...commit.cards[0], path: `${h.folder.wire}/other.md` }] }));
+	expect(forged.status).toBe(400);
+});

@@ -19,6 +19,8 @@ import { FILE_HASH_HEADER, REVISION_HEADER } from '../../../protocol/http-header
 import type { Env } from '../types';
 import { isSha256Hex } from '../../../platform/validation';
 import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
+import { parseReadingCard, readingCardStatements, type PostedCard } from '../reading/cards';
+import type { CommitEffects } from '../sync/commit-effects';
 
 interface EncryptedWebFile { path: string; content: string; expectedHash: string | null; expectedRevision?: string }
 
@@ -40,7 +42,7 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 	if (![`${prefix}/encrypted-files`, `${prefix}/encrypted-file`, `${prefix}/encrypted-commit`].includes(path)) return null;
 	const state = authenticated !== undefined ? authenticated : await readEncryptionState(env.DB);
 	if (!state || state.mode !== 'active') throw new EncryptionStateError(`Finish setting up encryption before using encrypted ${label}`);
-	if (path === `${prefix}/encrypted-commit` && request.method === 'POST') return commitEncryptedFiles(request, env, state, expectedFolder);
+	if (path === `${prefix}/encrypted-commit` && request.method === 'POST') return commitEncryptedFiles(request, env, state, expectedFolder, feature === 'reading');
 	if (request.method !== 'GET') return null;
 	const params = new URL(request.url).searchParams;
 	const folder = params.get('folderPath');
@@ -76,11 +78,12 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 		'Content-Length': String(file.size), 'Cache-Control': 'private, no-store', [FILE_HASH_HEADER]: file.hash, [REVISION_HEADER]: file.storageKey } });
 }
 
-async function commitEncryptedFiles(request: Request, env: Env, state: EncryptionServerState, expectedFolder?: string): Promise<Response> {
+/** A Reading commit may carry the card of each note it writes, stored in the same transaction. */
+async function commitEncryptedFiles(request: Request, env: Env, state: EncryptionServerState, expectedFolder?: string, reading = false): Promise<Response> {
 	const parsed = await parseJsonObject(request, MAX_ENCRYPTED_REMINDER_REQUEST_BYTES);
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
-	if (Object.keys(body).some(key => !['folderPath', 'operationId', 'files', 'remove', 'acknowledgment', 'createdId'].includes(key))) return corsResponse({ error: 'Unexpected encrypted mutation field' }, 400);
+	if (Object.keys(body).some(key => !['folderPath', 'operationId', 'files', 'remove', 'acknowledgment', 'createdId', ...reading ? ['cards'] : []].includes(key))) return corsResponse({ error: 'Unexpected encrypted mutation field' }, 400);
 	if ((expectedFolder && body.folderPath !== expectedFolder) || !isFolder(body.folderPath)
 		|| !Array.isArray(body.files) || body.files.length > 2 || (body.files.length < 1 && body.remove === undefined)
 		|| !isReceiptEnvelope(body.acknowledgment)) return corsResponse({ error: 'Invalid encrypted mutation' }, 400);
@@ -112,8 +115,21 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 			|| files.length > 1 || files.length === 1 && (files[0]!.expectedHash !== null || sourcePath === files[0]!.path)) return corsResponse({ error: 'Invalid encrypted rename' }, 400);
 		removed = { path: sourcePath, expectedHash: source.expectedHash, expectedRevision: source.expectedRevision };
 	}
+	let cards: Array<Omit<PostedCard, 'revision'>> = [];
+	if (body.cards !== undefined) {
+		try {
+			if (!Array.isArray(body.cards) || body.cards.length > files.length) throw new Error();
+			cards = body.cards.map(card => parseReadingCard(card, body.folderPath as string, false));
+		} catch { return corsResponse({ error: 'Invalid Reading card' }, 400); }
+		if (!cards.every(card => files.some(file => file.path === card.path))) return corsResponse({ error: 'Invalid Reading card' }, 400);
+	}
 	const response = { encrypted: body.acknowledgment };
-	const effects = reminderOperationEffects(env.DB, operation, response, typeof body.createdId === 'string' ? body.createdId : undefined);
+	const receipt = reminderOperationEffects(env.DB, operation, response, typeof body.createdId === 'string' ? body.createdId : undefined);
+	// Each card applies to the revision this commit writes for its note.
+	const effects: CommitEffects = written => [...receipt(written), ...cards.flatMap(card => {
+		const revision = written.find(file => file.path === card.path)?.storageKey;
+		return revision ? readingCardStatements(env.DB, { ...card, revision }) : [];
+	})];
 	try {
 		if (removed && !files.length) {
 			const result = await commitFileDelete(env.DB, { ...removed, previousFile: await getStoredFileRow(env.DB, removed.path), effects });

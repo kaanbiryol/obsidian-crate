@@ -321,9 +321,7 @@ library and search moved to the server ([Reading search](reading-search.md)).
 
 1. Try the web app and the plugin with a large library on a phone, against a test server.
 2. Measure D1 rows per page, search and card post on a hosted server, with 50,000 notes.
-3. Let Obsidian post encrypted cards from its own notes, so a new encrypted library does not
-   wait for the web app to open each note once.
-4. Remove `/reading/list` and its delta tables once nothing reads them.
+3. Remove `/reading/list` and its delta tables once nothing reads them.
 
 ## User-facing notes
 
