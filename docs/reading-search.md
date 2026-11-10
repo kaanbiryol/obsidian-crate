@@ -24,11 +24,12 @@ stay.
 
 The Worker writes the row and its terms in the same D1 batch as the file commit, as it already
 did for `reading_items`. Words are lowercased with diacritics removed. A search walks its
-rarest term newest first, and confirms the other terms and the whole title words (`words`) on
-each row, so a query word of 3 or more letters matches the start of a title word and a shorter
-one a whole word. To find the rarest term it counts each term's notes, up to 50 and, when every
-term has that many, up to 500. Row checks search the row's JSON text (`instr`), which reads no
-extra rows.
+rarest term newest first. Each other term is an exact key lookup in `note_terms` on the walked
+entry, where a miss reads no row, so only notes with every term are read. Their whole title
+words (`words`) then confirm the match by searching the row's JSON text (`instr`), which reads no
+extra rows: a query word of 3 or more letters matches the start of a title word and a shorter one
+a whole word. To find the rarest term it counts each term's notes, up to 50 and, when every term
+has that many, up to 500.
 
 ## Encrypted vaults
 
@@ -90,7 +91,7 @@ integration tests keep the bounds):
 | Delete, written | about 25 |
 | First page, read | about 56, at any library size |
 | One-word search, read | about 104 for a full page; a rare word about 2 per match |
-| Two-word search, read | about 1,300 when both words are common; about 60–90 when one is rare |
+| Two-word search, read | at most about 1,600 when both words are common and never share a note; about 80 when one is rare |
 
 - Each title word is one term, and terms are keyed by saved date with no second index, so a
   search never scans the library and a term costs one written row.

@@ -129,19 +129,26 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	let page: D1PreparedStatement;
 	if (terms.length) {
 		// Each term lists its notes newest first, so the search walks one term and stops after a
-		// page; the other terms and words are checked on the row it reaches.
+		// page. The walk checks every other term with an exact key lookup in note_terms, where a
+		// miss reads no row, so only entries with every term go on to read their note. It is a
+		// subquery that LIMIT -1 keeps SQLite from merging: merged, SQLite reads the note first.
 		const driver = await rarestTerm(env, terms);
-		const where = [`t.scope = '${READING_TERM_SCOPE}'`, 't.term = ?', ...[SECTION_FILTERS[query.section], visible].map(clause => clause.replace(/\b(status|favorite|highlighted|card|metadata_json|duplicate)\b/g, 'i.$1'))];
-		const args: unknown[] = [driver];
-		if (after) { where.push('(t.saved_at, t.portable_path) < (?, ?)'); args.push(...after); }
+		const walk = [`t.scope = '${READING_TERM_SCOPE}'`, 't.term = ?'], walkArgs: unknown[] = [driver];
+		if (after) { walk.push('(t.saved_at, t.portable_path) < (?, ?)'); walkArgs.push(...after); }
+		for (const term of terms) if (term !== driver) {
+			walk.push(`EXISTS (SELECT 1 FROM note_terms o WHERE o.scope = '${READING_TERM_SCOPE}' AND o.term = ? AND o.saved_at = t.saved_at AND o.portable_path = t.portable_path)`);
+			walkArgs.push(term);
+		}
+		const where = [SECTION_FILTERS[query.section], visible].map(clause => clause.replace(/\b(status|favorite|highlighted|card|metadata_json|duplicate)\b/g, 'i.$1')), args: unknown[] = [];
 		if (query.id) { where.push('i.item_id = ?'); args.push(query.id); }
-		// CROSS JOIN keeps the term walk outermost, so SQLite never scans the library instead.
-		// The row's term and word lists are JSON text: finding a quoted term, or a quote followed
-		// by a word's start, reads no rows, where unpacking the lists would count each entry.
-		for (const term of terms) if (term !== driver) { where.push('instr(i.terms, ?) > 0'); args.push(JSON.stringify(term)); }
+		// The row's word list is JSON text: a quote followed by a word's start confirms the title
+		// without reading rows.
 		for (const word of words) { where.push('instr(i.words, ?) > 0'); args.push(JSON.stringify(word).slice(0, -1)); }
-		page = env.DB.prepare(`SELECT ${ITEM_COLUMNS.split(', ').map(column => `i.${column}`).join(', ')} FROM note_terms t CROSS JOIN reading_items i ON i.portable_path = t.portable_path
-      WHERE ${where.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args);
+		// CROSS JOIN keeps the walk outermost, so SQLite never scans the library instead.
+		page = env.DB.prepare(`SELECT ${ITEM_COLUMNS.split(', ').map(column => `i.${column}`).join(', ')}
+      FROM (SELECT t.saved_at, t.portable_path FROM note_terms t WHERE ${walk.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT -1) t
+      CROSS JOIN reading_items i ON i.portable_path = t.portable_path
+      WHERE ${where.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...walkArgs, ...args);
 	} else {
 		const where = [SECTION_FILTERS[query.section], visible], args: unknown[] = [];
 		if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
