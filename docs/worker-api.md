@@ -131,11 +131,11 @@ the title words on each row it reaches. See [Reading search](reading-search.md).
 In an encrypted vault, each Reading note's upload carries its card as the file's public data
 (`{ kind: 'reading-card', version: 1, card, terms, fields }`), from Obsidian's sync and the web
 app's encrypted commits alike; the server validates it and lists the note from it in the commit's
-batch. An upload without a card keeps the row's last card, marked `stale`. A note the server
-sealed (a Shortcut save) carries a card sealed to the vault seal key (`seal: { keyId, epk }`) and
-no terms; a search page (one with `term` values) also returns `unindexed`, every such note in
-that page's saved-date range, for the device to match. `GET /reading/taken?path=…` (up to 20 server paths) tells a device which names are
-stored, for naming notes and checking sealed ones.
+batch. An upload without a card keeps the row's last card, marked `stale`. `GET /reading/taken?path=…`
+(up to 20 server paths) tells a device which names are stored, for naming new notes.
+
+Encrypted vaults do not offer Save to Crate: the Shortcut's pairing, exchange and prepare routes
+answer `409` with code `shortcut_encrypted_vault`.
 
 `POST /reading/delete` accepts `{ id, before, markdownHash, operationId }` from a library credential.
 `before` holds the `reading_status`, `favorite`, `tags` and `highlights` values the client

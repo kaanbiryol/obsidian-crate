@@ -18,8 +18,8 @@ headers merely because one of those numbers changes.
 
 The published download sends the shared URL to the versioned preparation flow
 below and shows the server's save page in a Shortcuts sheet. Unencrypted vaults
-finish through a one-use handoff; encrypted vaults save a note sealed to the
-vault during the preparation request, so the page only confirms it.
+finish through a one-use handoff. Encrypted vaults refuse pairing and preparation
+with `409 shortcut_encrypted_vault`, since the server cannot encrypt the note.
 
 - `POST /reading/shortcut/v1/exchange` accepts only `{ token }`, redeems a
   short-lived pairing grant once, and returns capture access. Pairing codes use

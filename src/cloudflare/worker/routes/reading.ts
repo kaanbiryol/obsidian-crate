@@ -47,7 +47,9 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		}
 		return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
 	}
-	if (encryption && (shortcut?.kind === 'prepare' || PLAINTEXT_ONLY_PATHS.includes(path))) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
+	// Save to Crate cannot hash search terms or encrypt, so encrypted vaults do not offer it.
+	if (encryption && (shortcut || path === '/reading/shortcut-pairing')) throw new ReadingError('Save to Crate is not available in encrypted vaults. Save links in the Crate app or Obsidian.', 409, 'shortcut_encrypted_vault');
+	if (encryption && PLAINTEXT_ONLY_PATHS.includes(path)) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
 	if (path === '/reading/encryption' && request.method === 'GET' && principal) {
 		const current = await authority(env.DB, principal, featurePolicyValue); // Reading access only.
 		// The web app recovers the plaintext folder name from this label with the vault key.

@@ -137,8 +137,8 @@ export class EncryptedReminderApi {
 		if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
 		const response = await this.fetch(encryptedFilePath('/reminders', this.keys.wireFolder, file));
 		if (!response.ok) await json(response);
-		const { opened } = await openEncryptedNote(response, file, { authority: this.authority(file.path),
-			integrityError: 'Encrypted reminder transfer failed integrity validation', paths: this.keys.paths, sealedFolder: null });
+		const opened = await openEncryptedNote(response, file, { authority: this.authority(file.path),
+			integrityError: 'Encrypted reminder transfer failed integrity validation', paths: this.keys.paths });
 		this.names.set(file.path, opened.metadata.path);
 		if (opened.content.byteLength > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
 		const content = decodeMarkdownBytes(opened.content);

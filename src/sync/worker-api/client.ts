@@ -47,15 +47,15 @@ export class SyncApiClient {
 	getEncryptionState() { return readServerEncryption(this.http); }
 	refusePlaintext(refused: boolean): void { this.http.refusePlaintext(refused); }
 	observeEncryption(callback: (() => void) | undefined): void { this.http.observeEncryption(callback); }
-	/** Notes inside `reminderFolders()` carry encrypted notification schedules; notes the
-	 * server sealed to the vault are accepted only inside `readingFolder()`. */
+	/** Notes inside `reminderFolders()` carry encrypted notification schedules, and notes
+	 * inside `readingFolder()` their Reading card. */
 	async configureEncryption(bundle: VaultKeyBundle, reminderFolders: () => readonly string[], readingFolder?: () => string | null): Promise<void> {
 		const notifications = await importNotificationKeys(bundle.vaultId, bundle.notifications);
 		let cardKeys: Parameters<typeof readingUploadCard>[4] | undefined;
 		// A reminder note carries its schedules and a Reading note its card, so the server can
 		// schedule and list them without reading the note.
 		const encryption = await EncryptedFiles.create(this.http, bundle, async (path, bytes, wire) =>
-			(cardKeys ? await readingUploadCard(readingFolder?.(), path, wire, bytes, cardKeys) : null) ?? createReminderProjection(notifications, reminderFolders(), path, bytes), readingFolder);
+			(cardKeys ? await readingUploadCard(readingFolder?.(), path, wire, bytes, cardKeys) : null) ?? createReminderProjection(notifications, reminderFolders(), path, bytes));
 		const folderKey = await importEncryptionSecret(bundle.vault);
 		cardKeys = { vaultId: bundle.vaultId, key: folderKey, keyGeneration: bundle.generation, searchKey: await deriveReadingSearchKey(bundle.vaultId, bundle.vault) };
 		// Assign only after every key imports, so a failure leaves no request encrypted.

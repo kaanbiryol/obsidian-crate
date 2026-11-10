@@ -9,7 +9,7 @@ import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } f
 import { readingCapturePath, retitledCapturePath } from '../../reading/core/filename';
 import { READING_DUPLICATE_ID_ISSUE } from '../../reading/core/inventory';
 import { normalizedTag, titleMatches } from '../../reading/core/search-terms';
-import { openReadingCard, sameReadingCardFields, type ReadingCardData, type ReadingCardFields } from '../../reading/core/reading-card';
+import { openReadingCard, sameReadingCardFields, type ReadingCardFields } from '../../reading/core/reading-card';
 import { readingUploadCard } from '../../reading/core/reading-card-upload';
 import { hashedQueryTerms } from '@/encryption/reading-search';
 import { type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '@/encryption/file-inventory';
@@ -19,10 +19,8 @@ import { responseError } from '@/pwa/connection/response-error';
 import type { PathTags } from '@/encryption/path-tags';
 import { encryptedFilePath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 
-const SEALED_ISSUE = 'The server created a note that would replace or take the name of another note. It was not opened.';
-
-/** `hash` is the authenticated plaintext hash; `sealed` marks a note the server sealed. */
-interface Source { file: WireFile; content: string; item: ReadingItem; hash: string; sealed: boolean }
+/** `hash` is the authenticated plaintext hash. */
+interface Source { file: WireFile; content: string; item: ReadingItem; hash: string }
 /** A listed note: its current server file and the item its card lists. */
 interface Listed { file: WireFile; item: ReadingItem; stale: boolean }
 /** `rejected` marks an attempt the Worker refused with `version_conflict`; it is rebuilt, never resent. */
@@ -62,7 +60,7 @@ export class EncryptedReadingApi {
 	// Notes this client listed, by Reading ID, so an open or an edit finds its file.
 	private listed = new Map<string, Listed>();
 	constructor(private options: EncryptedReadingOptions) {}
-	private get cardKeys() { return { vaultId: this.options.authority.vaultId, key: this.options.authority.key, keyGeneration: this.options.generation, seal: this.options.authority.seal, searchKey: this.options.searchKey }; }
+	private get cardKeys() { return { vaultId: this.options.authority.vaultId, key: this.options.authority.key, keyGeneration: this.options.generation, searchKey: this.options.searchKey }; }
 	private async json<T>(path: string, body?: string): Promise<T> {
 		const response = await this.options.request(path, body);
 		if (!response.ok) {
@@ -78,27 +76,19 @@ export class EncryptedReadingApi {
 			if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new Error('This Reading note is too large.');
 			const response = await this.options.request(encryptedFilePath('/reading', this.options.wireFolder, file)).catch(() => undefined);
 			if (!response?.ok) throw new NoteUnavailableError('Article changed or is unavailable. Refresh to retry.');
-			const { opened, sealed } = await openEncryptedNote(response, file, { authority: this.options.authority, integrityError: 'Encrypted article failed integrity verification.',
-				paths: this.options.paths, sealedFolder: { plain: this.options.folderPath, wire: this.options.wireFolder } });
+			const opened = await openEncryptedNote(response, file, { authority: this.options.authority, integrityError: 'Encrypted article failed integrity verification.',
+				paths: this.options.paths });
 			if (opened.content.byteLength > MAX_READING_BYTES) throw new Error('Reading notes must be smaller than 1 MB.');
 			const content = new TextDecoder('utf-8', { fatal: true }).decode(opened.content);
 			const metadata = parseReadingNote(content);
 			if (!metadata) throw new Error('Open Obsidian to import this note into Reading.');
-			source = { file, content, item: { ...metadata, path: opened.metadata.path }, hash: opened.metadata.hash, sealed };
+			source = { file, content, item: { ...metadata, path: opened.metadata.path }, hash: opened.metadata.hash };
 		}
 		this.sources.set(file.path, source);
 		trimContentCache(this.sources, 100);
 		return source;
 	}
 
-	/** The server may only create sealed notes. One is opened only under a random server name,
-	 * never at the tag of a name (which would replace a note), nor under the name of a note
-	 * stored at another server path. */
-	private async checkSealed(source: Source): Promise<void> {
-		if (!source.sealed) return;
-		const named = await this.options.paths.wire(source.item.path);
-		if (named === source.file.path || (await this.existing([named])).has(named)) throw new Error(SEALED_ISSUE);
-	}
 	private async existing(wires: string[]): Promise<Set<string>> {
 		const params = new URLSearchParams(); for (const wire of wires) params.append('path', wire);
 		return new Set((await this.json<{ paths: string[] }>(`/reading/taken?${params}`)).paths);
@@ -110,19 +100,15 @@ export class EncryptedReadingApi {
 		const q = params.get('q') ?? '', tag = params.get('tag') ?? '', url = params.get('url') ?? '', cursor = params.get('cursor') ?? '', id = params.get('id');
 		const query = new URLSearchParams({ section: params.get('section') ?? 'inbox', ...cursor ? { cursor } : {}, ...id ? { id } : {} });
 		for (const term of await hashedQueryTerms(this.options.searchKey, { q, tag, url })) query.append('term', term);
-		type ListedCard = WireFile & { card: string; seal?: ReadingCardData['seal']; stale: boolean; fields: Partial<ReadingCardFields> };
-		// A search also brings the notes the server sealed in this page's date range: they have no
-		// terms, so this device matches them itself.
-		const page: { cards: ListedCard[]; unindexed?: ListedCard[]; cursor: string | null } = await this.json(`/reading/items?${query}`);
+		type ListedCard = WireFile & { card: string; stale: boolean; fields: Partial<ReadingCardFields> };
+		const page: { cards: ListedCard[]; cursor: string | null } = await this.json(`/reading/items?${query}`);
 		const items: ReadingItem[] = [], issues: ItemsPage['issues'] = [];
-		const ids = new Map<string, number>(), seen = new Set<string>();
-		for (const listed of [...page.cards, ...page.unindexed ?? []]) {
-			const { card, seal, stale, fields, ...file } = listed;
-			if (seen.has(file.path)) continue;
-			seen.add(file.path);
+		const ids = new Map<string, number>();
+		for (const listed of page.cards) {
+			const { card, stale, fields, ...file } = listed;
 			let item: ReadingItem;
 			try {
-				item = (await openReadingCard(card, file.path, this.cardKeys, seal)).item;
+				item = (await openReadingCard(card, file.path, this.cardKeys)).item;
 				// The server sorts by the listed fields; one that disagrees with its card is not trusted.
 				if (!sameReadingCardFields(item, fields ?? {})) throw new Error();
 			} catch { issues.push({ path: file.path, message: 'This Reading card is unreadable. Open the note in Obsidian.' }); continue; }
@@ -134,8 +120,6 @@ export class EncryptedReadingApi {
 			this.listed.set(item.crate_reading_id, { file, item, stale });
 			items.push(item);
 		}
-		// Newest first, as the server lists pages.
-		items.sort((a, b) => b.saved_at.localeCompare(a.saved_at));
 		const unique = items.filter(item => {
 			if (ids.get(item.crate_reading_id)! === 1) return true;
 			issues.push({ path: item.path, message: READING_DUPLICATE_ID_ISSUE });
@@ -202,7 +186,6 @@ export class EncryptedReadingApi {
 		const etag = `"e2ee-file-${this.options.generation}-${(await sha256Hex(`${file.path}\n${file.revision}\n${file.hash}`)).slice(0, 32)}"`;
 		if (etag === savedEtag) return null;
 		const source = await this.source(file);
-		await this.checkSealed(source);
 		if (source.item.crate_reading_id !== id) throw this.options.error('Article is unavailable or has an identity conflict.', 409, 'reading_conflict');
 		return { article: { item: source.item, markdown: readReadingFrontmatter(source.content)!.body }, etag };
 	}
@@ -262,7 +245,6 @@ export class EncryptedReadingApi {
 		const listed = await this.find(body.id);
 		if (!listed) throw this.options.error('This article moved or was deleted.', 409, 'reading_conflict');
 		const source = await this.source(listed.file);
-		await this.checkSealed(source);
 		// The card may describe an earlier revision; the edit applies to the note as it is now.
 		const item = source.item;
 		if (item.crate_reading_id !== body.id) throw this.unavailable(READING_DUPLICATE_ID_ISSUE);

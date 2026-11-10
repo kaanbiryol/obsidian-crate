@@ -1,7 +1,7 @@
 import type { EncryptionContext } from '@/encryption/envelope';
 import type { FileEncryptionAuthority } from '@/encryption/file-codec';
 import { openVerifiedInventoryFile, type EncryptedInventoryFile } from '@/encryption/file-inventory';
-import { resolveEncryptedPath, type ReadingFolderForms } from '@/encryption/path-binding';
+import { resolveEncryptedPath } from '@/encryption/path-binding';
 import type { PathTags } from '@/encryption/path-tags';
 
 /** Reminders and Reading serve the same encrypted folder routes under their own prefix. */
@@ -28,15 +28,12 @@ export function encryptedOperationContext(vaultId: string, scopeId: string, oper
 }
 
 /** Opens a downloaded note listed as `file`. Its metadata must bind its plaintext path to
- * that server path; a note the server sealed is accepted only in `sealedFolder`, which only
- * Reading names. Size limits and failed downloads stay with each feature. */
+ * that server path. Size limits and failed downloads stay with each feature. */
 export async function openEncryptedNote(response: Response, file: EncryptedInventoryFile, options: {
-	authority: FileEncryptionAuthority; integrityError: string; paths: PathTags; sealedFolder: ReadingFolderForms | null;
+	authority: FileEncryptionAuthority; integrityError: string; paths: PathTags;
 }) {
-	let sealed = false;
-	const opened = await openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, options.authority, options.integrityError,
-		(metadataPath, isSealed) => { sealed = isSealed; return resolveEncryptedPath(options.paths, file.path, metadataPath, sealed, options.sealedFolder); });
-	return { opened, sealed };
+	return openVerifiedInventoryFile(new Uint8Array(await response.arrayBuffer()), file, options.authority, options.integrityError,
+		metadataPath => resolveEncryptedPath(options.paths, file.path, metadataPath));
 }
 
 interface CommitAnswer { encrypted?: unknown; error?: string; code?: string }

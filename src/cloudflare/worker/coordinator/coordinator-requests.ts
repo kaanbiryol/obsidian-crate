@@ -4,7 +4,6 @@ import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import type { Env } from '../types';
 
 import { armReadingCoordinator, publishExtraction, type Publication } from '../reading/extraction/jobs';
-import { commitSealedReadingNote, type SealedReadingNote } from '../reading/sealed-note';
 import { getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
 import { drainNotificationJobs } from '../notifications/outbox';
 import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, REMINDERS_ENABLED_HEADER, TRANSFER_PATHS } from './coordinator';
@@ -59,9 +58,6 @@ export async function handleCoordinatorRequest(
 		if (path === COORDINATOR_PATHS.readingPublish && request.method === 'POST') {
 			await publishExtraction(env, await request.json() as Publication);
 			return new Response(null, { status: 204 });
-		}
-		if (path === COORDINATOR_PATHS.readingSealed && request.method === 'POST') {
-			return new Response(null, { status: await commitSealedReadingNote(env, await request.json() as SealedReadingNote) ? 204 : 409 });
 		}
 		if (path === COORDINATOR_PATHS.dispatchJobs && request.method === 'POST') {
 			await drainNotificationJobs(env, undefined, request.headers.get(REMINDERS_ENABLED_HEADER) === '1' || undefined);

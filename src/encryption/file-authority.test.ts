@@ -12,9 +12,7 @@ it('opens every vault note with the vault key and refuses unsafe paths or anothe
 	const content = new TextEncoder().encode('A whole note, including non-reminder text');
 	const sealed = await sealFile({ path, content, contentType: 'text/markdown' }, vault.forPath(path));
 	expect((await openFile(sealed.bytes, path, pwa.forPath(path))).content).toEqual(content);
-	// Markdown may open a sealed note; the path binding decides where one is accepted.
-	expect(vault.forPath('Private/image.png')).toBe(vault.forVaultMetadata());
-	expect(vault.forPath('Private/Secret.md').seal).toBeDefined();
+	expect(vault.forPath('Private/Secret.md')).toBe(vault.forVaultMetadata());
 	for (const denied of ['', 'Reminders/../Private/Secret.md', '/Reminders/Inbox.md', 'Reminders\\Inbox.md', 'Reminders//Inbox.md', './Inbox.md']) {
 		expect(() => pwa.forPath(denied)).toThrow();
 	}

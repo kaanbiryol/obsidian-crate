@@ -16,7 +16,6 @@ import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { sha256Hex } from '../../../platform/sha256';
 import type { PathTags } from '../../../encryption/path-tags';
-import { createOpaqueWireName } from '../../../protocol/encrypted-path';
 
 let state: EncryptionServerState;
 let keys: FileKeyAuthority;
@@ -151,11 +150,12 @@ it.each(['single', 'batch'] as const)('commits an encrypted %s Markdown upload w
 	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).not.toBeNull();
 });
 
-it('rejects a client upload sealed to the vault seal key, even inside the Reading folder', async () => {
-	const { sealFileForVault } = await import('../../../encryption/sealed-file');
-	const path = `${await paths.wire('Reading')}/${createOpaqueWireName()}`;
-	const sealed = await sealFileForVault({ path, content: new TextEncoder().encode('forged article'), contentType: 'text/markdown' },
-		{ vaultId: state.vaultId, keyId: state.seal.keyId, publicKey: state.seal.publicKey });
+it('rejects a file descriptor sealed to the vault seal key', async () => {
+	const path = await paths.wire('Reading/Article.md');
+	const plain = await sealFile({ path: 'Reading/Article.md', content: new TextEncoder().encode('forged article'), contentType: 'text/markdown' }, keys.forPath('Reading/Article.md'));
+	// The former server-sealed format: the descriptor names the seal key and an ephemeral key.
+	const text = new TextDecoder().decode(plain.bytes).replace(`"keyId":"${plain.descriptor.keyId}"`, `"keyId":"${state.seal.keyId}","seal":{"epk":"${state.seal.publicKey}"}`);
+	const bytes = new TextEncoder().encode(text), sealed = { bytes, hash: await sha256Hex(bytes) };
 	const response = await worker.fetch(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, {
 		method: 'PUT', body: sealed.bytes,
 		headers: { ...headers(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE,

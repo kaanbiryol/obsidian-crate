@@ -121,7 +121,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 						{homeScreen.platform && <Button className="settings-navigation-row" onClick={() => navigate('install')}>
 							<span>Add to home screen</span><ChevronRight size={16} aria-hidden="true" />
 						</Button>}
-						<ReadingSettings ready={Boolean(reading?.ready)} connected={Boolean(reading?.connected)} unavailable={reading?.unavailable} onShortcut={() => navigate('shortcut')} />
+						<ReadingSettings ready={Boolean(reading?.ready)} connected={Boolean(reading?.connected)} encrypted={!!reading?.encryption && reading.encryption.status !== 'unencrypted'} unavailable={reading?.unavailable} onShortcut={() => navigate('shortcut')} />
 					</SettingsSection>
 					<div data-settings-sync=""><SettingsSection title="Sync">
 						<SettingsRow title="Status"><span className="settings-value">{syncStatus.label}</span></SettingsRow>

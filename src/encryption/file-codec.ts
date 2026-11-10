@@ -1,7 +1,6 @@
 import { decryptBytes, decryptJson, encryptBytes, encryptJson, type EncryptionContext, type EncryptionKey } from './envelope';
 import { encodeEncryptedFile, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
 import { sha256Hex } from '../platform/sha256';
-import { openSealedFileKey, type SealOpenKey } from './sealed-file-key';
 import { isSha256Hex } from '../platform/validation';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
@@ -18,8 +17,6 @@ export interface FileEncryptionAuthority {
 	vaultId: string;
 	scopeId: string;
 	key: EncryptionKey;
-	/** Present only where this client accepts files the server sealed to the vault. */
-	seal?: SealOpenKey;
 }
 
 async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
@@ -30,23 +27,17 @@ function context(descriptor: EncryptedFileDescriptor, purpose: EncryptionContext
 	return { vaultId: descriptor.vaultId, scopeId: descriptor.scopeId, objectId: descriptor.objectId, purpose };
 }
 
-/** The key that opens this file: the vault key, or for a sealed file one derived
- * from the seal key. Sealing never reuses the vault key, and vice versa. */
-async function fileKey(descriptor: EncryptedFileDescriptor, authority: FileEncryptionAuthority): Promise<EncryptionKey> {
+function fileKey(descriptor: EncryptedFileDescriptor, authority: FileEncryptionAuthority): EncryptionKey {
 	validateFileDescriptor(descriptor);
-	if (descriptor.vaultId !== authority.vaultId || descriptor.scopeId !== authority.scopeId) throw new Error('File encryption keys belong to another vault or scope');
-	if (!descriptor.seal) {
-		if (descriptor.keyId !== authority.key.id) throw new Error('File encryption keys belong to another vault or scope');
-		return authority.key;
+	if (descriptor.vaultId !== authority.vaultId || descriptor.scopeId !== authority.scopeId || descriptor.keyId !== authority.key.id) {
+		throw new Error('File encryption keys belong to another vault or scope');
 	}
-	if (!authority.seal || descriptor.keyId !== authority.seal.keyId) throw new Error('This file was created by the server and is not accepted here');
-	return openSealedFileKey({ ...descriptor, seal: descriptor.seal }, authority.seal);
+	return authority.key;
 }
 
 /** How a reader checks the path a file claims: an exact path, or a check that compares
- * it with where the file is stored and returns the plaintext path. `hash` is the
- * authenticated plaintext hash. */
-export type PathBinding = string | ((metadataPath: string, sealed: boolean, hash: string) => Promise<string>);
+ * it with where the file is stored and returns the plaintext path. */
+export type PathBinding = string | ((metadataPath: string) => Promise<string>);
 
 function validateMetadata(value: unknown): asserts value is PrivateFileMetadata {
 	if (!value || typeof value !== 'object') throw new Error('Invalid encrypted file metadata');
@@ -64,18 +55,12 @@ type SealedFile = { bytes: Uint8Array<ArrayBuffer>; descriptor: EncryptedFileDes
 
 /** Persist these exact returned bytes before dispatching a mutating request. */
 export async function sealFile(input: FileInput, authority: FileEncryptionAuthority): Promise<SealedFile> {
-	return sealFileWithHeader(input, { version: 1, vaultId: authority.vaultId, scopeId: authority.scopeId,
-		objectId: crypto.randomUUID(), keyId: authority.key.id }, authority.key);
-}
-
-/** Shared by vault-key files and files the server seals to the vault. */
-export async function sealFileWithHeader(input: FileInput, header: Omit<EncryptedFileDescriptor, 'metadata'>, key: EncryptionKey): Promise<SealedFile> {
-	const publicData = input.publicData ?? null;
+	const key = authority.key, publicData = input.publicData ?? null;
 	const metadata: PrivateFileMetadata = { version: 1, path: input.path, hash: await digest(input.content),
 		size: input.content.byteLength, contentType: input.contentType,
 		publicDataHash: await digest(new TextEncoder().encode(JSON.stringify(publicData))) };
 	validateMetadata(metadata);
-	const descriptor: EncryptedFileDescriptor = { ...header, metadata: '' };
+	const descriptor: EncryptedFileDescriptor = { version: 1, vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: crypto.randomUUID(), keyId: key.id, metadata: '' };
 	descriptor.metadata = await encryptJson(metadata, key, context(descriptor, 'file-metadata'));
 	const ciphertext = await encryptBytes(input.content, key, context(descriptor, 'file'));
 	const bytes = encodeEncryptedFile({ descriptor, ciphertext, publicData });
@@ -88,10 +73,10 @@ export async function openFileMetadata(descriptor: EncryptedFileDescriptor, bind
 }
 
 async function openMetadataWithKey(descriptor: EncryptedFileDescriptor, binding: PathBinding, authority: FileEncryptionAuthority) {
-	const key = await fileKey(descriptor, authority);
+	const key = fileKey(descriptor, authority);
 	const metadata = await decryptJson(descriptor.metadata, key, context(descriptor, 'file-metadata'));
 	validateMetadata(metadata);
-	const path = typeof binding === 'string' ? metadata.path === binding ? binding : null : await binding(metadata.path, !!descriptor.seal, metadata.hash);
+	const path = typeof binding === 'string' ? metadata.path === binding ? binding : null : await binding(metadata.path);
 	if (path === null) throw new Error('Encrypted file metadata does not match the requested file');
 	return { metadata: { ...metadata, path }, key };
 }

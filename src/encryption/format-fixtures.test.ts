@@ -12,7 +12,6 @@ import { pairingCommitment, type PairingContext } from './pairing/protocol';
 import { PathTags } from './path-tags';
 import { importNotificationKeys, openNotification } from './notification-keys';
 import { createReminderProjection } from '../reminders/core/encrypted-schedule-projection';
-import { sealFileForVault } from './sealed-file';
 import type { EncryptedSchedules } from './notification-format';
 import { openReadingCard, sealReadingCard } from '../reading/core/reading-card';
 import { deriveReadingSearchKey, hashedReadingTerms } from './reading-search';
@@ -60,7 +59,6 @@ const fixture = <T>(value: Fixture<T>) => value as Fixture<unknown>;
 const envelopeContext = { vaultId: bundle.vaultId, scopeId: 'vault', objectId: 'shared-settings', purpose: 'settings' as const };
 const envelopeValue = { theme: 'dark', folders: ['Reminders', 'Reading'], note: 'Ünïcødé ✓' };
 const vaultFileInput = { path: 'Reminders/Personal.md', contentType: 'text/markdown', content: '- [ ] Dentist 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->\n', publicData: { version: 1, reminders: [] } };
-const sealedFileInput = { path: 'Reading/Saved article.md', contentType: 'text/markdown', content: '# Saved article\n\nSynthetic reading note.\n' };
 const tagPaths = ['Note.md', 'folder/Note.md', 'Folder/NOTE.md', 'Reminders/Personal.md', 'a/b/c/attachment.png', 'Café/Ünïcødé.md'];
 const localState = { vaultId: bundle.vaultId, scopeId: 'vault', storageKey: 'crate-outbox', value: '{"pending":[{"id":"op-1"}]}' };
 const pairingContext: PairingContext = { version: 1, id: 'fixture-pairing', origin: 'https://crate.example.test', vaultId: bundle.vaultId, generation: 1 };
@@ -85,19 +83,6 @@ const fixtures: Record<string, Fixture<unknown>> = {
 			expect(new TextDecoder().decode(opened.content)).toBe(vaultFileInput.content);
 			expect(opened.publicData).toEqual(vaultFileInput.publicData);
 			expect(opened.metadata).toMatchObject({ version: 1, path: vaultFileInput.path, contentType: vaultFileInput.contentType });
-		},
-	}),
-	'file-v1-sealed-to-vault': fixture<{ bytes: string }>({
-		generate: async () => {
-			const sealed = await sealFileForVault({ ...sealedFileInput, content: text(sealedFileInput.content) },
-				{ vaultId: bundle.vaultId, keyId: bundle.seal.id, publicKey: bundle.seal.publicKey });
-			return { bytes: new TextDecoder().decode(sealed.bytes) };
-		},
-		verify: async ({ bytes }) => {
-			const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath(sealedFileInput.path);
-			const opened = await openFile(text(bytes), sealedFileInput.path, authority);
-			expect(new TextDecoder().decode(opened.content)).toBe(sealedFileInput.content);
-			expect(opened.publicData).toBeNull();
 		},
 	}),
 	'recovery-v1': fixture<{ code: string; envelope: RecoveryEnvelope }>({

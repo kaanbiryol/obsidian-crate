@@ -1,4 +1,4 @@
-import { oversizedRemoteFileIssue, rejectedSealedNoteIssue, withSyncFileContext } from '../issues';
+import { oversizedRemoteFileIssue, withSyncFileContext } from '../issues';
 import { partitionSkippedUploads } from '../local/local-file-changes';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "../local/file-discovery";
@@ -99,8 +99,8 @@ export async function createFullSyncPlan(
 			diffMap.delete(path);
 			continue;
 		}
-		if (remoteEntry?.rejected || (remoteEntry && remoteEntry.size > MAX_FILE_SIZE_BYTES)) {
-			issues.push(remoteEntry.rejected ? rejectedSealedNoteIssue(path) : oversizedRemoteFileIssue(path));
+		if (remoteEntry && remoteEntry.size > MAX_FILE_SIZE_BYTES) {
+			issues.push(oversizedRemoteFileIssue(path));
 			diffMap.delete(path);
 			// The local copy was never reconciled with the server, so it must not become the baseline.
 			delete localFiles[path];

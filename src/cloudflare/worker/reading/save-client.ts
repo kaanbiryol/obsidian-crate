@@ -21,7 +21,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
 	const number = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : null;
 	const codes = new Set(['reading_error', 'reading_not_configured', 'feature_paused', 'protocol_incompatible',
 		'shortcut_update_required', 'shortcut_access_required', 'invalid_shortcut_request', 'invalid_response', 'request_failed',
-		'network_error', 'save_link_expired', 'missing_save_link', 'encryption_required', 'reading_save_failed']);
+		'network_error', 'save_link_expired', 'missing_save_link', 'encryption_required', 'reading_save_failed', 'shortcut_encrypted_vault']);
 	const normalize = (value: unknown): Record<string, unknown> => {
 		const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
 		return { stage: typeof input.stage === 'string' && ['pair', 'prepare', 'handoff'].includes(input.stage) ? input.stage : 'handoff',
@@ -112,6 +112,8 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
 			message.textContent = 'In the Crate app, open Reading settings → Set up iPhone shortcut to create a new pairing code.';
 		} else if (clean.stage !== 'pair' && (status === 410 || code === 'save_link_expired' || code === 'missing_save_link')) {
 			title.textContent = 'Share this link again'; message.textContent = 'This link has expired or is missing. Share the article to Crate again.';
+		} else if (code === 'shortcut_encrypted_vault') {
+			title.textContent = 'Not available with encryption'; message.textContent = 'Save to Crate doesn’t work with encrypted vaults. Save links in the Crate app or Obsidian.';
 		} else if (status === 423) {
 			title.textContent = 'Reading is paused'; message.textContent = 'Enable Reading in Crate settings, then share the article again.';
 		} else if (code === 'shortcut_update_required') {

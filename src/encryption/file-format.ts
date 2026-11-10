@@ -1,6 +1,5 @@
 import { isEncryptionId } from './encoding';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
-import { validateP256PublicKey } from './p256';
 
 export const ENCRYPTED_FILE_CONTENT_TYPE = 'application/vnd.crate.encrypted-file';
 const ENCRYPTED_FILE_PREFIX = 'CRATE-E2EE/1\n';
@@ -15,9 +14,6 @@ export interface EncryptedFileDescriptor {
 	objectId: string;
 	keyId: string;
 	metadata: string;
-	/** Present when the server sealed the file to the vault seal key: `epk` is the
-	 * ephemeral public key, and `keyId` names the seal key instead of the vault key. */
-	seal?: { epk: string };
 }
 
 export interface EncryptedFilePacket {
@@ -29,14 +25,10 @@ export interface EncryptedFilePacket {
 export function validateFileDescriptor(value: unknown): asserts value is EncryptedFileDescriptor {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid encrypted file descriptor');
 	const item = value as Partial<EncryptedFileDescriptor>;
-	if (Object.keys(item).some(key => !['version', 'vaultId', 'scopeId', 'objectId', 'keyId', 'metadata', 'seal'].includes(key))) throw new Error('Unexpected encrypted file descriptor field');
+	if (Object.keys(item).some(key => !['version', 'vaultId', 'scopeId', 'objectId', 'keyId', 'metadata'].includes(key))) throw new Error('Unexpected encrypted file descriptor field');
 	if (item.version !== 1 || ![item.vaultId, item.scopeId, item.objectId, item.keyId].every(isEncryptionId)
 		|| typeof item.metadata !== 'string' || item.metadata.length > 8192 || item.metadata.split('.').length !== 5) {
 		throw new Error('Unsupported or damaged encrypted file descriptor');
-	}
-	if (item.seal !== undefined) {
-		if (!item.seal || typeof item.seal !== 'object' || Object.keys(item.seal).join() !== 'epk') throw new Error('Unsupported or damaged encrypted file descriptor');
-		try { validateP256PublicKey(item.seal.epk); } catch { throw new Error('Unsupported or damaged encrypted file descriptor'); }
 	}
 }
 

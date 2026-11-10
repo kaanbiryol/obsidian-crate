@@ -112,8 +112,6 @@ export class SyncWorkerApi {
 		for (const { index, path } of assignPlainPaths(entries, tagged)) {
 			const { wire, entry } = entries[index]!;
 			const renamed = path !== entries[index]!.path;
-			// A rejected sealed note is reported, never mapped to a local file.
-			if (entry.rejected) { plain[path] = entry; continue; }
 			if (renamed) await encryption.paths.learn(path, wire);
 			plain[path] = tagged[index] && !renamed ? entry : { ...entry, wire };
 		}
@@ -371,12 +369,10 @@ export class SyncWorkerApi {
 		}
 		const encryption = this.encryption;
 		if (!encryption) return response;
-		// Each sealed note is checked against the Reading folder's synced files; read them once.
-		const synced = encryption.syncedSnapshot();
 		const files = await runConcurrentTasks(response.files.map(({ content, ...file }) => async (): Promise<DownloadedBatchFile> => {
 			const path = plainByWire.get(file.path) ?? file.path;
 			if (file.error) return { ...file, path, content };
-			const opened = await encryption.download(file.path, base64ToArrayBuffer(content), { check: file, expected: path, synced });
+			const opened = await encryption.download(file.path, base64ToArrayBuffer(content), { check: file, expected: path });
 			return { ...file, ...opened.metadata, path, verifiedContent: opened.content };
 		}), DECRYPT_CONCURRENCY, () => false);
 		return { files };

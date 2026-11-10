@@ -286,7 +286,6 @@ CREATE TABLE IF NOT EXISTS reading_items (
 CREATE INDEX IF NOT EXISTS reading_items_status_idx ON reading_items(status, saved_at, portable_path);
 CREATE INDEX IF NOT EXISTS reading_items_favorite_idx ON reading_items(saved_at, portable_path) WHERE favorite = 1;
 CREATE INDEX IF NOT EXISTS reading_items_highlighted_idx ON reading_items(saved_at, portable_path) WHERE highlighted = 1;
-CREATE INDEX IF NOT EXISTS reading_items_unindexed_idx ON reading_items(saved_at, portable_path) WHERE terms = '[]';
 CREATE INDEX IF NOT EXISTS reading_items_issue_idx ON reading_items(portable_path) WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1;
 CREATE INDEX IF NOT EXISTS reading_items_id_idx ON reading_items(item_id);
 CREATE INDEX IF NOT EXISTS reading_items_url_idx ON reading_items(url_identity);

@@ -3,7 +3,7 @@ import { fitsEncryptedPathLimit, PathTags } from './path-tags';
 import { resolveEncryptedPath } from './path-binding';
 import { openFolderLabel, sealFolderLabel } from './folder-label';
 import { importEncryptionSecret } from './envelope';
-import { createOpaqueWireName, encodeBase32, isWirePath, isWireSegment } from '../protocol/encrypted-path';
+import { encodeBase32, isWirePath } from '../protocol/encrypted-path';
 
 const vaultId = '0b8e2f9c-4c7a-4d3e-9a51-2f6c1d8e7b40';
 const secret = { id: 'b4d0c0de-0000-4000-8000-000000000001', secret: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8' };
@@ -52,26 +52,14 @@ it('predicts the encrypted depth limit without keys, at the boundary wire() enfo
 	}
 });
 
-it('binds metadata paths to their server path and accepts random names only for notes created without the key', async () => {
+it('binds metadata paths to their server path', async () => {
 	const t = await tags();
-	const readingWire = await t.wire('Reading'), reading = { plain: 'Reading', wire: readingWire };
-	const opaque = `${readingWire}/${createOpaqueWireName()}`;
-	expect(isWireSegment(opaque.split('/')[1]!)).toBe(true);
-	expect(await resolveEncryptedPath(t, await t.wire('Reading/Note.md'), 'Reading/Note.md', false, reading)).toBe('Reading/Note.md');
-	expect(await resolveEncryptedPath(t, opaque, `${readingWire}/Title - site - a1b2c3d4.md`, true, reading)).toBe('Reading/Title - site - a1b2c3d4.md');
-	// After an edit the note is re-saved with the vault key and keeps its server name.
-	expect(await resolveEncryptedPath(t, opaque, 'Reading/Title - site - a1b2c3d4.md', false, reading)).toBe('Reading/Title - site - a1b2c3d4.md');
-	for (const [wire, path, sealed] of [
-		[await t.wire('Reading/Note.md'), 'Archive/Note.md', false],
-		[await t.wire('Reading/Note.png'), 'Reading/Other.png', false],
-		[opaque, `${readingWire}/Title.md`, false],
-		[opaque, `${readingWire}/../Escape.md`, true],
-		[opaque, `${readingWire}/Image.png`, true],
-		[opaque, 'Archive/Title.md', false],
-		[await t.wire('Reading/Note.md'), 'Reading/Note.md', true],
-		[opaque, 'Reading/Title.md', true],
-		[`${await t.wire('Archive')}/${createOpaqueWireName()}`, `${readingWire}/Title.md`, true],
-	] as const) await expect(resolveEncryptedPath(t, wire, path, sealed, reading)).rejects.toThrow('does not match');
+	expect(await resolveEncryptedPath(t, await t.wire('Reading/Note.md'), 'Reading/Note.md')).toBe('Reading/Note.md');
+	for (const [wire, path] of [
+		[await t.wire('Reading/Note.md'), 'Archive/Note.md'],
+		[await t.wire('Reading/Note.png'), 'Reading/Other.png'],
+		[`${await t.wire('Reading')}/${'a'.repeat(26)}.md`, 'Reading/Title.md'],
+	] as const) await expect(resolveEncryptedPath(t, wire, path)).rejects.toThrow('does not match');
 });
 
 it('recovers plaintext folder names only from a label for the same folder', async () => {

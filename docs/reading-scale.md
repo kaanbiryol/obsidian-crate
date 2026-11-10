@@ -123,8 +123,7 @@ Tradeoffs:
 - "Most recent" is by last change, not saved date: storage keys carry no time, and the server
   cannot read saved dates in an encrypted note. An older note that was just edited counts as
   recent.
-- Saving a link detects a duplicate only among opened notes. The check that a server-sealed note
-  does not take another note's name also covers only those. Obsidian still checks every note.
+- Saving a link detects a duplicate only among opened notes. Obsidian still checks every note.
 - A refresh after any vault change lists the whole inventory: about one D1 row per Reading file.
 - Ordering on the server instead would need an index on `files`, which writes one row per vault
   file when it is created and one more on every later file write. On a large vault, building it

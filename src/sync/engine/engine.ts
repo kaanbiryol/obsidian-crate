@@ -373,7 +373,7 @@ export class SyncEngine {
 		return Object.entries(remote.files).flatMap(([path, entry]) => {
 			if (this.ignore.shouldIgnore(path)) return [];
 			const local = this.localManifest.getEntry(path);
-			const held = local && !entry.rejected && (entry.revision && local.revision ? local.revision === entry.revision : local.hash === entry.hash);
+			const held = local && (entry.revision && local.revision ? local.revision === entry.revision : local.hash === entry.hash);
 			return held ? [] : [path];
 		});
 	}

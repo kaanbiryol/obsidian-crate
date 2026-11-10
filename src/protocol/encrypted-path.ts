@@ -16,13 +16,8 @@ export function encodeBase32(bytes: Uint8Array): string {
 	return bits ? result + ALPHABET[(buffer << (5 - bits)) & 31] : result;
 }
 
-export function isWireSegment(segment: string): boolean { return WIRE_SEGMENT.test(segment); }
+function isWireSegment(segment: string): boolean { return WIRE_SEGMENT.test(segment); }
 
 export function isWirePath(path: string): boolean {
 	return !getSyncPathIssue(path) && path.split('/').every(isWireSegment);
-}
-
-/** A random note name for a party without the path key: the iPhone shortcut's server. */
-export function createOpaqueWireName(): string {
-	return `${encodeBase32(crypto.getRandomValues(new Uint8Array(16)))}.md`;
 }

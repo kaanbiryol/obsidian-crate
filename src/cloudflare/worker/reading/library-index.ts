@@ -45,7 +45,7 @@ interface IndexRow {
 	status?: string | null; favorite?: 0 | 1; highlighted?: 0 | 1; terms?: string | null;
 	/** An unencrypted note's title words, which confirm a search's candidates. */
 	words?: string | null;
-	/** An encrypted note's card from its public data, as JSON `{ card, seal? }`. */
+	/** An encrypted note's card from its public data, as JSON `{ card }`. */
 	card?: string | null;
 	/** An encrypted note whose upload carried no card: the row keeps its last one. */
 	stale?: 0 | 1;
@@ -83,7 +83,7 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 		if (!data) return { ...row, stale: 1 };
 		const { fields } = data;
 		return { ...row, item_id: fields.item_id, saved_at: fields.saved_at, status: fields.status, favorite: fields.favorite ? 1 : 0, highlighted: fields.highlighted ? 1 : 0,
-			terms: JSON.stringify(data.terms), card: JSON.stringify({ card: data.card, ...data.seal ? { seal: data.seal } : {} }) };
+			terms: JSON.stringify(data.terms), card: JSON.stringify({ card: data.card }) };
 	}
 	if (size > MAX_READING_BYTES) return { ...row, error: READING_SIZE_ERROR };
 	if (content == null || typeof content !== 'string' && content.byteLength !== size) return 'unknown';

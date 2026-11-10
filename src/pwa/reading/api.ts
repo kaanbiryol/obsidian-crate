@@ -45,7 +45,7 @@ function encryptedReadingApi(session: ReadingSession, keys: FeatureKeys): Encryp
 	const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath, keys.vaultId, keys.generation]);
 	if (encryptedClient?.identity !== identity) encryptedClient = { identity, api: new EncryptedReadingApi({
 		captureArticle: url => captureServerArticle(url, body => rawReadingRequest('/reading/encrypted-extract', session, body)),
-		folderPath: keys.folderPath, wireFolder: keys.wireFolder, paths: keys.paths, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault, seal: keys.seal },
+		folderPath: keys.folderPath, wireFolder: keys.wireFolder, paths: keys.paths, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault },
 		searchKey: keys.readingSearch,
 		request: (route, wire, headers) => rawReadingRequest(route, session, wire, headers),
 		readAttempt: id => readReadingAttempt(session, id),

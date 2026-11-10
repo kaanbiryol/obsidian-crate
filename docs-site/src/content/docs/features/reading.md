@@ -107,7 +107,7 @@ With iOS 27 or later, open **Reading settings → Set up iPhone shortcut** and f
 
 Pairing codes work once and expire after ten minutes. You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to Reading settings to create a pairing code. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is. Logging out of the web app you paired from, or removing that session from connected devices in Obsidian, also disconnects the shortcut.
 
-The shortcut works with encryption too: your server downloads the article and saves it locked to your vault, and your devices open it. Sharing the same link twice saves it twice.
+The shortcut doesn't work with [encryption](/docs/features/encryption/). It can't encrypt a note or make it searchable, so encrypted vaults don't offer it. Save links in the web app or in Obsidian instead.
 
 ### Save from the share sheet on Android
 

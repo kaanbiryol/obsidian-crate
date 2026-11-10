@@ -3,7 +3,7 @@ import { openFile, openFileMetadata, sealFile, type PathBinding, type PrivateFil
 import { ENCRYPTED_FILE_CONTENT_TYPE, validateFileDescriptor } from '../../encryption/file-format';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { PathTags } from '../../encryption/path-tags';
-import { resolveEncryptedPath, type ReadingFolderForms } from '../../encryption/path-binding';
+import { resolveEncryptedPath } from '../../encryption/path-binding';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
 import type { EncryptedUploadWire, JournalUpload } from '../durability/upload-intent';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
@@ -14,8 +14,7 @@ import type { RestoreIntent } from '../durability/restore-intent';
 import { requestFileVersions } from '../worker-api/version-contract';
 import { BATCH_DOWNLOAD_MAX_FILES, ENCRYPTION_METADATA_BATCH } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
-import { distinctLocalName, PathIndex, type SyncedFile } from './path-index';
-import { sealedNoteRefusal } from '../../encryption/sealed-note';
+import { PathIndex } from './path-index';
 
 interface WireMetadata { hash: string; size: number; revision?: string }
 const METADATA_CONCURRENCY = 4;
@@ -31,9 +30,8 @@ export type UploadPreconditions = Map<string, { expected: string | null; result:
 /** A verified file listed at server path `wire`: its plaintext path, and the entry with plaintext hash and size. */
 export interface PlainEntry<T> { path: string; wire: string; entry: T }
 /** How a server file is opened. A `historical` one, such as a retained version or a
- * checkpoint copy, neither teaches the path index nor is accepted as a sealed note.
- * `synced` shares one read of the Reading folder's synced files across a listing or batch. */
-interface OpenOptions { historical?: boolean; synced?: (folder: string) => Promise<SyncedFile[]> }
+ * checkpoint copy, does not teach the path index. */
+interface OpenOptions { historical?: boolean }
 /** `check` is the transferred ciphertext's size and hash. With `expected`, the file
  * must be the one this device knows by that plaintext path. */
 interface DownloadOptions extends OpenOptions { check?: Pick<WireMetadata, 'hash' | 'size'>; expected?: string }
@@ -46,14 +44,6 @@ function namespaceConflict(path: string, existing: string): HttpError {
 	return new HttpError(`${path} conflicts with ${existing}, which differs only in letter case or Unicode form`, 409, null, 'namespace_conflict');
 }
 
-/** A note the server sealed that would replace or take the name of a file this device
- * holds. `path` is where sync lists it: the file it would replace, or a distinct name. */
-class SealedReplacementError extends Error {
-	constructor(readonly path: string, readonly hash: string) {
-		super('The server created a note that would replace one already synced here. It was not applied, and the local copy is unchanged.');
-	}
-}
-
 /** Boundary between ciphertext transport identities and local sync identities.
  * The server stores files under tagged paths; callers use plaintext paths.
  * Never substitute a decrypted hash into an R2 or conditional-write request. */
@@ -63,45 +53,21 @@ export class EncryptedFiles {
 	// Journal entries loaded from disk are new objects and get full verification.
 	private readonly sealed = new WeakSet<EncryptedUploadWire>();
 	private constructor(private readonly http: WorkerApiHttpClient, readonly keys: FileKeyAuthority,
-		readonly generation: number, private readonly publicData: PublicDataBuilder, readonly paths: PathIndex,
-		private readonly readingFolder: () => string | null) {}
+		readonly generation: number, private readonly publicData: PublicDataBuilder, readonly paths: PathIndex) {}
 
-	/** `readingFolder` is where notes the server sealed to the vault are accepted. */
-	static async create(http: WorkerApiHttpClient, bundle: VaultKeyBundle, publicData: PublicDataBuilder, readingFolder: () => string | null = () => null): Promise<EncryptedFiles> {
+	static async create(http: WorkerApiHttpClient, bundle: VaultKeyBundle, publicData: PublicDataBuilder): Promise<EncryptedFiles> {
 		return new EncryptedFiles(http, await FileKeyAuthority.fromBundle(bundle), bundle.generation, publicData,
-			new PathIndex(await PathTags.fromSecret(bundle.vaultId, bundle.vault)), readingFolder);
-	}
-
-	private async reading(): Promise<ReadingFolderForms | null> {
-		const plain = this.readingFolder();
-		return plain ? { plain, wire: await this.paths.tags.wire(plain) } : null;
+			new PathIndex(await PathTags.fromSecret(bundle.vaultId, bundle.vault)));
 	}
 
 	/** Checks a file's claimed path against its server path. Live files also teach the
 	 * index where they are stored; historical ones must not. */
-	private binding(wire: string, { historical = false, synced }: OpenOptions): PathBinding {
-		return async (metadataPath, sealed, hash) => {
-			const reading = await this.reading();
-			const path = await resolveEncryptedPath(this.paths.tags, wire, metadataPath, sealed, reading);
-			if (sealed && !historical && reading) {
-				await this.acceptSealed(path, wire, hash, await (synced ? synced(reading.plain) : this.paths.syncedIn(reading.plain)));
-			}
+	private binding(wire: string, { historical = false }: OpenOptions): PathBinding {
+		return async metadataPath => {
+			const path = await resolveEncryptedPath(this.paths.tags, wire, metadataPath);
 			if (!historical) await this.paths.learn(path, wire);
 			return path;
 		};
-	}
-
-	/** Applies `sealedNoteRefusal` to the files synced in the note's folder. */
-	private async acceptSealed(path: string, wire: string, hash: string, synced: SyncedFile[]): Promise<void> {
-		const refusal = sealedNoteRefusal({ wire, path, hash }, synced);
-		if (refusal?.kind === 'replaces') throw new SealedReplacementError(refusal.held.path, hash);
-		if (refusal?.kind === 'name-taken') throw new SealedReplacementError(distinctLocalName(path, wire), hash);
-	}
-
-	/** One read of the files synced in a folder, shared by the files of one listing or batch. */
-	syncedSnapshot(): (folder: string) => Promise<SyncedFile[]> {
-		let synced: Promise<SyncedFile[]> | undefined;
-		return folder => synced ??= this.paths.syncedIn(folder);
 	}
 
 	/** Open the metadata of files listed by server path, returning their plaintext paths. */
@@ -111,9 +77,8 @@ export class EncryptedFiles {
 		const chunks: Array<Array<{ path: string; entry: T }>> = [];
 		for (let offset = 0; offset < entries.length; offset += ENCRYPTION_METADATA_BATCH) chunks.push(entries.slice(offset, offset + ENCRYPTION_METADATA_BATCH));
 		const results: Array<Array<PlainEntry<T>>> = [];
-		const syncedOnce = this.syncedSnapshot();
 		for (let start = 0; start < chunks.length; start += METADATA_CONCURRENCY) {
-			const group = await Promise.all(chunks.slice(start, start + METADATA_CONCURRENCY).map(chunk => this.metadataChunk(chunk, { historical, synced: syncedOnce })));
+			const group = await Promise.all(chunks.slice(start, start + METADATA_CONCURRENCY).map(chunk => this.metadataChunk(chunk, { historical })));
 			results.push(...group);
 		}
 		return results.flat();
@@ -137,14 +102,7 @@ export class EncryptedFiles {
 			if (!verified) {
 				const descriptor = response?.descriptors?.[entry.revision!];
 				validateFileDescriptor(descriptor);
-				let metadata: PrivateFileMetadata;
-				try { metadata = await openFileMetadata(descriptor, this.binding(path, options), this.keys.forPath(path)); }
-				catch (error) {
-					// Listed but never cached or learned, so sync reports it without applying it.
-					if (!(error instanceof SealedReplacementError)) throw error;
-					result.push({ path: error.path, wire: path, entry: { ...entry, hash: error.hash, rejected: true } });
-					continue;
-				}
+				const metadata = await openFileMetadata(descriptor, this.binding(path, options), this.keys.forPath(path));
 				verified = { metadata, wireHash: entry.hash, wire: path };
 				cached.set(entry.revision!, verified);
 				this.verifiedMetadata.set(entry.revision!, verified);
@@ -242,7 +200,7 @@ export class EncryptedFiles {
 		if (plain.metadata.hash !== file.hash || plain.metadata.size !== file.size) throw new Error('Encrypted upload does not match its saved local content');
 	}
 
-	/** Open a file downloaded from server path `wire`. A batch passes one `syncedSnapshot`. */
+	/** Open a file downloaded from server path `wire`. */
 	async download(wire: string, bytes: ArrayBuffer, options: DownloadOptions = {}): Promise<{ content: ArrayBuffer; metadata: PrivateFileMetadata }> {
 		const { check, expected } = options;
 		if (check && (bytes.byteLength !== check.size || await sha256Hex(bytes) !== check.hash)) throw new Error('Encrypted transfer failed integrity validation');

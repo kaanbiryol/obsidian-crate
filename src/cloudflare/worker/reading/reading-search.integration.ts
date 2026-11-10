@@ -18,6 +18,7 @@ import { sealFile } from '@/encryption/file-codec';
 import { readingUploadCard } from '@/reading/core/reading-card-upload';
 import { openReadingCard } from '@/reading/core/reading-card';
 import { readStoredNote } from './common';
+import { READING_SHORTCUT_CONTRACT } from '@/reading/shortcut';
 
 const principal = { tokenId: 'vault', scope: 'vault' as const };
 const items = async (query = '') => {
@@ -119,25 +120,15 @@ it('rebuilds an index of encrypted notes as rows waiting for cards', async () =>
 	expect((await env.DB.prepare('SELECT count(*) AS n FROM reading_items WHERE stale = 1').first())).toEqual({ n: 2 });
 });
 
-it('sends each search page the notes without terms in its date range, so an old one is reached', async () => {
+it('turns Save to Crate off in encrypted vaults', async () => {
 	const encrypted = { encryption: { mode: 'active' } as unknown as EncryptionServerState };
-	const route = async (query: string) => (await (await handleReadingRoute(new Request(`https://test/reading/items?${query}`), env, principal, encrypted)).json()) as
-		{ cards: Array<{ path: string }>; unindexed: Array<{ path: string }>; cursor: string | null };
-	const row = (n: number, terms: string[]) => env.DB.batch([
-		env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, saved_at, status, card, terms)
-      VALUES (?, ?, 'r', 'h', 1, ?, ?, 'inbox', '{"card":"a.b.c.d.e"}', ?)`).bind(`reading/${n}.md`, `Reading/${n}.md`, crypto.randomUUID(),
-			new Date(Date.UTC(2026, 0, 1) + n * 86400_000).toISOString(), JSON.stringify(terms)),
-		...terms.map(term => env.DB.prepare("INSERT INTO note_terms(scope, term, saved_at, portable_path) VALUES ('reading', ?, ?, ?)").bind(term, new Date(Date.UTC(2026, 0, 1) + n * 86400_000).toISOString(), `reading/${n}.md`)),
-	]);
-	for (let n = 10; n < 62; n++) await row(n, ['aaaaaaaaaaaa']);
-	// Shortcut saves: one newer than every indexed note, one older than every indexed note.
-	await row(65, []); await row(1, []);
-	const first = await route('section=inbox&term=aaaaaaaaaaaa');
-	expect(first.cards).toHaveLength(50);
-	expect(first.unindexed.map(card => card.path)).toEqual(['Reading/65.md']);
-	const second = await route(`section=inbox&term=aaaaaaaaaaaa&cursor=${encodeURIComponent(first.cursor!)}`);
-	expect(second.cards.map(card => card.path)).toEqual(['Reading/11.md', 'Reading/10.md']);
-	expect(second.unindexed.map(card => card.path)).toEqual(['Reading/1.md']);
-	// Browsing without a search needs no extra cards.
-	expect(await route('section=inbox')).not.toHaveProperty('unindexed');
+	const post = (path: string, body: object, headers: Record<string, string> = {}) => handleReadingRoute(new Request(`https://test${path}`,
+		{ method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', ...headers } }), env, principal, encrypted);
+	for (const [path, body] of [['/reading/shortcut-pairing', {}], [READING_SHORTCUT_CONTRACT.preparePath, { url: 'https://example.invalid/a' }],
+		[READING_SHORTCUT_CONTRACT.exchangePath, { token: 'a'.repeat(64) }]] as const) {
+		const response = await post(path, body, { [READING_SHORTCUT_CONTRACT.revisionHeader]: String(READING_SHORTCUT_CONTRACT.revision) });
+		expect(response.status).toBe(409);
+		expect(await response.json()).toMatchObject({ code: 'shortcut_encrypted_vault' });
+	}
+	expect(await env.DB.prepare('SELECT count(*) AS n FROM reading_enrollments').first()).toEqual({ n: 0 });
 });

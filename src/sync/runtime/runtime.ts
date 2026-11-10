@@ -78,7 +78,7 @@ export class SyncRuntime {
 		private prepareReminderScope?: () => Promise<void>,
 		/** Notes inside these folders carry encrypted notification schedules. */
 		private reminderFolders: () => readonly string[] = () => [],
-		/** Where notes the server sealed to the vault (Save to Crate captures) are accepted. */
+		/** The Reading folder, whose notes carry their card in an encrypted vault. */
 		private readingFolder: () => string | null = () => null,
 		/** Runs when a first upload starts, before it lists vault files. */
 		private prepareInitialUpload?: () => Promise<void>,
