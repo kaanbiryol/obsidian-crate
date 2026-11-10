@@ -34,6 +34,12 @@ export function readingTerms(item: Pick<ReadingMetadata, 'title' | 'tags' | 'sou
 	return [...terms];
 }
 
+/** The shortest query the web app searches its server library with: one prefix term. */
+const MIN_SEARCH_LENGTH = SEARCH_PREFIX;
+
+/** The query itself, or nothing while it is shorter than `MIN_SEARCH_LENGTH`. */
+export const searchableQuery = (query: string) => [...query.trim()].length >= MIN_SEARCH_LENGTH ? query : '';
+
 /** Whether a title matches a query: every query word is a prefix of a title word. */
 export function titleMatches(title: string, query: string): boolean {
 	const words = searchWords(title), wanted = searchWords(query, MAX_QUERY_WORDS);

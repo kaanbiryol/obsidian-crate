@@ -414,7 +414,16 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await expect(page.locator('.toast.has-sync-indicator')).toHaveText(await readingSync.getAttribute('title'));
   await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
   assert.equal(await page.locator('.crate-feature-nav').count(), 0);
-  await page.getByRole('searchbox',{name:'Search reading'}).fill('kept while switching');
+  // A search waits for three characters and for typing to pause before it asks the server.
+  const searches = [];
+  const recordSearch = request => { const url = new URL(request.url()); if (url.pathname.endsWith('/reading/items') && url.searchParams.has('q')) searches.push(url.searchParams.get('q')); };
+  page.on('request', recordSearch);
+  await page.getByRole('searchbox',{name:'Search reading'}).fill('ke');
+  await page.waitForTimeout(500);
+  assert.deepEqual(searches, [], 'Two characters send no search');
+  await page.getByRole('searchbox',{name:'Search reading'}).pressSequentially('pt while switching');
+  await expect.poll(() => searches).toEqual(['kept while switching']);
+  page.off('request', recordSearch);
   await switchFeature(page, 'Reminders');
   await expect(page.locator('.crate-feature-panel[data-active="true"]')).toHaveAttribute('data-crate-section', 'reminders');
   await expect(page.getByRole('dialog')).toHaveCount(0);

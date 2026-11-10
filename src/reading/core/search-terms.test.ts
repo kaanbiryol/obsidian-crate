@@ -1,5 +1,13 @@
 import { expect, it } from 'vitest';
-import { readingTerms, searchWords, titleMatches, wordTerm } from './search-terms';
+import { readingTerms, searchableQuery, searchWords, titleMatches, wordTerm } from './search-terms';
+
+it('searches only from three characters, counting letters rather than code units or edge spaces', () => {
+	expect(searchableQuery('ja')).toBe('');
+	expect(searchableQuery('  ja  ')).toBe('');
+	expect(searchableQuery('😀😀')).toBe('');
+	expect(searchableQuery('jav')).toBe('jav');
+	expect(searchableQuery('go at')).toBe('go at');
+});
 
 it('splits titles into lowercase words without accents or punctuation', () => {
 	expect(searchWords('Café — Crème brûlée, 2nd édition! Café')).toEqual(['cafe', 'creme', 'brulee', '2nd', 'edition']);

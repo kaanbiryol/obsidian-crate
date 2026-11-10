@@ -19,7 +19,7 @@ import { HighlightArticleFilter } from './HighlightArticleFilter';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
 import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
-import { titleMatches, normalizedTag } from '../core/search-terms';
+import { titleMatches, normalizedTag, searchableQuery } from '../core/search-terms';
 
 export interface ReadingLibraryProps {
 	listStyle?: ListStyle;
@@ -98,7 +98,9 @@ export function ReadingLibraryPanel({
 		return () => window.clearTimeout(timer);
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
 	// Filter on a deferred query so typing never waits for the list to re-render.
-	const listQuery = useDeferredValue(query);
+	const deferredQuery = useDeferredValue(query);
+	// A server library searches from three characters, so the first letters send no request.
+	const listQuery = source ? searchableQuery(deferredQuery) : deferredQuery;
 	// A server library lists pages the server matched; local changes then move or hide items.
 	const pages = useLibraryPages(source, section, listQuery, tag);
 	const present = source?.present;
