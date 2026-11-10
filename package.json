@@ -154,7 +154,7 @@
 		"highlight.js": "^11.12.0",
 		"htmlparser2": "12.0.0",
 		"idb": "^8.0.4",
-		"jose": "6.2.13",
+		"jose": "6.2.15",
 		"lexical": "0.52.0",
 		"linkedom": "0.18.13",
 		"lucide-react": "^1.61.0",
