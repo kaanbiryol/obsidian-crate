@@ -15,8 +15,6 @@ CREATE TABLE IF NOT EXISTS changelog (
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS changelog_created_at_idx ON changelog(created_at);
-
 CREATE TABLE IF NOT EXISTS files (
 	path TEXT NOT NULL,
 	portable_path TEXT PRIMARY KEY,
@@ -45,14 +43,11 @@ CREATE INDEX IF NOT EXISTS auth_tokens_expires_at_idx ON auth_tokens(expires_at)
 
 CREATE TABLE IF NOT EXISTS scheduled_reminders (
 	delivery_failed_at TEXT,
-	delivery_error TEXT,
-	delivery_attempts INTEGER,
 	reminder_id TEXT PRIMARY KEY,
 	schedule_token TEXT NOT NULL,
 	content TEXT NOT NULL,
 	project TEXT,
-	due_datetime TEXT NOT NULL,
-	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	due_datetime TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS notification_jobs (
@@ -62,8 +57,7 @@ CREATE TABLE IF NOT EXISTS notification_jobs (
 	payload_json TEXT,
 	attempts INTEGER NOT NULL DEFAULT 0,
 	available_at INTEGER NOT NULL,
-	last_error TEXT,
-	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	last_error TEXT
 );
 
 CREATE INDEX IF NOT EXISTS notification_jobs_available_at_idx
@@ -72,8 +66,7 @@ CREATE INDEX IF NOT EXISTS notification_jobs_available_at_idx
 CREATE TABLE IF NOT EXISTS vapid_keys (
 	id INTEGER PRIMARY KEY CHECK (id = 1),
 	public_key TEXT NOT NULL,
-	private_key TEXT NOT NULL,
-	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	private_key TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -92,16 +85,14 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 CREATE TABLE IF NOT EXISTS web_enrollment_tokens (
 	folder_path TEXT,
 	token_hash TEXT PRIMARY KEY,
-	expires_at INTEGER NOT NULL,
-	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	expires_at INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS web_enrollment_tokens_expires_at_idx ON web_enrollment_tokens(expires_at);
 
 CREATE TABLE IF NOT EXISTS object_cleanup_queue (
 	storage_key TEXT PRIMARY KEY,
-  file_path TEXT NOT NULL,
-	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  file_path TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS file_versions (
@@ -112,7 +103,7 @@ CREATE TABLE IF NOT EXISTS file_versions (
 	reason TEXT NOT NULL CHECK (reason IN ('replaced', 'deleted')),
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	expires_at INTEGER NOT NULL
-);
+) WITHOUT ROWID;
 
 CREATE INDEX IF NOT EXISTS file_versions_expires_at_idx ON file_versions(expires_at);
 CREATE INDEX IF NOT EXISTS file_versions_created_key_idx ON file_versions(created_at DESC, storage_key DESC);
@@ -138,21 +129,19 @@ CREATE TABLE IF NOT EXISTS reminder_file_cache (
 	file_hash TEXT NOT NULL,
 	parser_version INTEGER NOT NULL,
 	reminders_json TEXT NOT NULL,
-	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
 	PRIMARY KEY (folder_path, file_path)
 );
 
+-- Operation IDs sort by creation day, so receipts are pruned by key range.
 CREATE TABLE IF NOT EXISTS reminder_operations (
     operation_id TEXT PRIMARY KEY,
     request_hash TEXT NOT NULL,
-    response_json TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    response_json TEXT NOT NULL
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS reminder_identities (
     reminder_id TEXT PRIMARY KEY,
     created_operation_id TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS reminder_operations_created_at_idx ON reminder_operations(created_at);
 
 CREATE TABLE IF NOT EXISTS notification_policy (
   enabled INTEGER NOT NULL DEFAULT 1,
@@ -166,8 +155,8 @@ CREATE TABLE IF NOT EXISTS notification_projection_jobs (
 CREATE INDEX IF NOT EXISTS notification_projection_ready_idx
  ON notification_projection_jobs(updated_at, path) WHERE last_error IS NULL;
 CREATE TABLE IF NOT EXISTS reminder_projections (
- notification_token TEXT, policy_revision TEXT,
- reminder_id TEXT PRIMARY KEY, file_path TEXT NOT NULL, file_revision TEXT NOT NULL
+ notification_token TEXT,
+ reminder_id TEXT PRIMARY KEY, file_path TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS reminder_projections_path_idx ON reminder_projections(file_path);
 
@@ -180,7 +169,9 @@ CREATE INDEX IF NOT EXISTS reminder_sources_id_idx ON reminder_sources(reminder_
 CREATE TABLE IF NOT EXISTS reminder_source_state (
  file_path TEXT PRIMARY KEY, file_revision TEXT NOT NULL,
  parser_version INTEGER NOT NULL, verified INTEGER NOT NULL CHECK (verified IN (0, 1)),
- updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+ updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+ -- SHA-256 of the verified reminder_sources summary of this file, NULL when not verified.
+ sources_digest TEXT
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS reminder_source_state_version_idx ON reminder_source_state(parser_version, file_path);
 CREATE INDEX IF NOT EXISTS reminder_source_state_retry_idx ON reminder_source_state(updated_at, file_path) WHERE verified = 0;
@@ -195,8 +186,8 @@ CREATE TABLE IF NOT EXISTS request_rate_limits (key TEXT PRIMARY KEY, count INTE
 
 CREATE TABLE IF NOT EXISTS file_deletion_receipts (
  consumed_revision TEXT PRIMARY KEY,
- revision TEXT NOT NULL UNIQUE,
- changelog_seq INTEGER NOT NULL UNIQUE,
+ revision TEXT NOT NULL,
+ changelog_seq INTEGER NOT NULL,
  path TEXT NOT NULL,
  consumed_hash TEXT NOT NULL,
  request_id TEXT NOT NULL,
@@ -204,7 +195,7 @@ CREATE TABLE IF NOT EXISTS file_deletion_receipts (
  client_session TEXT,
  operation_id TEXT,
  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS file_deletion_receipts_created_at_idx ON file_deletion_receipts(created_at);
 
 
@@ -212,8 +203,7 @@ CREATE INDEX IF NOT EXISTS file_deletion_receipts_created_at_idx ON file_deletio
 CREATE TABLE IF NOT EXISTS upload_operations (
  operation_id TEXT PRIMARY KEY,
  request_hash TEXT NOT NULL,
- response_json TEXT NOT NULL,
- created_at TEXT NOT NULL DEFAULT (datetime('now'))
+ response_json TEXT NOT NULL
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS notification_file_retries (
@@ -230,8 +220,6 @@ CREATE TABLE IF NOT EXISTS staged_uploads (
  attempts INTEGER NOT NULL DEFAULT 0,
  last_error TEXT
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS staged_uploads_expiry_idx ON staged_uploads(expires_at, storage_key)
- WHERE expires_at IS NOT NULL;
 CREATE TABLE IF NOT EXISTS staged_upload_batches (
  id TEXT PRIMARY KEY,
  storage_keys TEXT NOT NULL CHECK (json_valid(storage_keys) AND json_type(storage_keys) = 'array'),
@@ -273,10 +261,11 @@ CREATE TABLE IF NOT EXISTS reading_policy (
 -- Lists page by `saved_at` (empty for notes with an issue). `status`, `favorite` and
 -- `highlighted` select a section. In an encrypted vault `card` comes from the note's upload,
 -- sealed by the device that encrypted it, and `stale` marks an upload that carried none. `terms` is the JSON array stored in `note_terms` under scope `reading`, and
--- `words` an unencrypted note's title words, which confirm a search's candidates.
+-- `words` an unencrypted note's title words, which confirm a search's candidates. The link of a note
+-- is its `u:` term in `note_terms`.
 CREATE TABLE IF NOT EXISTS reading_items (
  portable_path TEXT PRIMARY KEY, path TEXT NOT NULL, storage_key TEXT NOT NULL,
- hash TEXT NOT NULL, size INTEGER NOT NULL, item_id TEXT, url_identity TEXT,
+ hash TEXT NOT NULL, size INTEGER NOT NULL, item_id TEXT,
  metadata_json TEXT, error TEXT, article_hash TEXT, article_edited INTEGER NOT NULL DEFAULT 0,
  duplicate INTEGER NOT NULL DEFAULT 0, saved_at TEXT NOT NULL DEFAULT '',
  status TEXT, favorite INTEGER NOT NULL DEFAULT 0, highlighted INTEGER NOT NULL DEFAULT 0,
@@ -287,7 +276,6 @@ CREATE INDEX IF NOT EXISTS reading_items_favorite_idx ON reading_items(saved_at,
 CREATE INDEX IF NOT EXISTS reading_items_highlighted_idx ON reading_items(saved_at, portable_path) WHERE highlighted = 1;
 CREATE INDEX IF NOT EXISTS reading_items_issue_idx ON reading_items(portable_path) WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1;
 CREATE INDEX IF NOT EXISTS reading_items_id_idx ON reading_items(item_id);
-CREATE INDEX IF NOT EXISTS reading_items_url_idx ON reading_items(url_identity);
 CREATE INDEX IF NOT EXISTS reading_items_article_idx ON reading_items(article_hash) WHERE article_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS reading_items_duplicate_idx ON reading_items(item_id) WHERE duplicate = 1;
 -- Search terms of indexed notes, plain or, in an encrypted vault, hashed. `scope` names the
@@ -305,25 +293,25 @@ CREATE TABLE IF NOT EXISTS reading_jobs (
  path TEXT PRIMARY KEY, item_id TEXT NOT NULL, generation TEXT NOT NULL,
  source_revision TEXT NOT NULL, block_hash TEXT NOT NULL, url TEXT NOT NULL,
  attempts INTEGER NOT NULL DEFAULT 0, available_at INTEGER NOT NULL
-);
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS reading_jobs_due_idx ON reading_jobs(available_at);
+-- Operation IDs sort by creation day, so receipts are pruned by key range.
 CREATE TABLE IF NOT EXISTS reading_operations (
  operation_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, generation TEXT NOT NULL,
- request_hash TEXT NOT NULL, response_json TEXT NOT NULL, day INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS reading_operations_day_idx ON reading_operations(day);
+ request_hash TEXT NOT NULL, response_json TEXT NOT NULL
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS reading_enrollments (
  token_hash TEXT PRIMARY KEY, generation TEXT NOT NULL, scope TEXT NOT NULL,
  expires_at INTEGER NOT NULL
-);
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS reading_handoffs (
  token_hash TEXT PRIMARY KEY, principal_id TEXT NOT NULL, generation TEXT NOT NULL,
  body TEXT NOT NULL, expires_at INTEGER NOT NULL
-);
+) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS reading_captures (
  id TEXT PRIMARY KEY, generation TEXT NOT NULL, url_identity TEXT NOT NULL,
  note TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, available_at INTEGER NOT NULL,
  UNIQUE(generation, url_identity)
-);
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS reading_captures_due_idx ON reading_captures(available_at);

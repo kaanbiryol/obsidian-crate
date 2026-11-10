@@ -34,8 +34,8 @@ async function seedLibrary(notes: number) {
 	const template = parseReadingNote(createReadingNote({ id: crypto.randomUUID(), url: 'https://example.invalid/template', title: 'Template', savedAt: new Date().toISOString() }))!;
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
     INSERT INTO files(path, portable_path, storage_key, hash, size) SELECT 'Reading/' || x || '.md', 'reading/' || x || '.md', 'reading-key-' || x, '', 0 FROM n`).bind(notes).run();
-	await env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, saved_at, status, terms, words)
-    SELECT portable_path, path, storage_key, hash, size, id, 'https://example.invalid/' || n,
+	await env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, terms, words)
+    SELECT portable_path, path, storage_key, hash, size, id,
       json_set(?, '$.crate_reading_id', id, '$.source_url', 'https://example.invalid/' || n, '$.title', 'Article ' || n, '$.saved_at', saved), saved, 'inbox',
       json_array('p:art', CASE WHEN length(n) >= 3 THEN 'p:' || substr(n, 1, 3) ELSE 'w:' || n END), json_array('article', CAST(n AS TEXT))
     FROM (SELECT *, printf('00000000-0000-4000-8000-%012d', n) AS id, strftime('%Y-%m-%dT%H:%M:%fZ', '2020-01-01', '+' || n || ' minutes') AS saved

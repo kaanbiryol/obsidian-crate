@@ -24,6 +24,7 @@ export const COORDINATOR_PATHS = {
 	readingPublish: '/reading-publish',
 	dispatchJobs: '/dispatch-jobs',
 	commitUpload: '/commit-upload',
+	commitUploads: '/commit-uploads',
 	commitNewFiles: '/commit-new-files',
 	revokeCredential: '/revoke-credential',
 } as const;
@@ -107,6 +108,11 @@ export async function dispatchNotifications(env: AlarmBinding, remindersEnabled?
 /** Commits a staged upload under the coordinator lock. */
 export function commitCoordinatorUpload(env: AlarmBinding, init: Omit<RequestInit, 'method'>): Promise<Response> {
 	return post(coordinatorStub(env), COORDINATOR_PATHS.commitUpload, init);
+}
+
+/** Commits several staged uploads in one transaction under the coordinator lock. */
+export function commitCoordinatorUploads(env: AlarmBinding, init: Omit<RequestInit, 'method'>): Promise<Response> {
+	return post(coordinatorStub(env), COORDINATOR_PATHS.commitUploads, init);
 }
 
 /** Revokes a credential under the coordinator lock, which coordinator routes authenticate

@@ -12,7 +12,7 @@ import type { AuthPrincipal } from '../auth/authenticate';
 import { beginOperation, operationEffects, operationStatement } from './operations';
 import { ReadingError, readingResponse, readStoredNote, sourceById } from './common';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
-import { ensureReadingIndex } from './library-index';
+import { ensureReadingIndex, READING_TERM_SCOPE } from './library-index';
 import { readingItemEtag } from './queries';
 
 export async function mutateReading(env: Env, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string): Promise<Response> {
@@ -30,8 +30,17 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 			current = { ...current, enabled: 1 };
 		}
 
-		const { results } = await env.DB.prepare('SELECT item_id FROM reading_items WHERE url_identity=? LIMIT 2')
-			.bind(readingUrlIdentity(url)).all<{ item_id: string }>();
+		const identity = readingUrlIdentity(url);
+		const id = typeof body.captureId === 'string' ? body.captureId : crypto.randomUUID();
+		// One round trip answers every check below. A note's link is its `u:` term.
+		const [saved, waiting, full, taken] = await env.DB.batch<{ results: Array<{ item_id?: string; id?: string }> }>([
+			env.DB.prepare(`SELECT item_id FROM reading_items WHERE portable_path IN (
+        SELECT portable_path FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND term = ? LIMIT 2)`).bind(`u:${identity}`),
+			env.DB.prepare('SELECT id FROM reading_captures WHERE generation=? AND url_identity=?').bind(current.generation, identity),
+			env.DB.prepare('SELECT 1 WHERE (SELECT count(*) FROM reading_jobs)+(SELECT count(*) FROM reading_captures)>=1000'),
+			env.DB.prepare('SELECT 1 FROM reading_captures WHERE id=? UNION ALL SELECT 1 FROM reading_items WHERE item_id=? LIMIT 1').bind(id, id),
+		]);
+		const results = saved!.results as Array<{ item_id: string }>;
 		if (results.length > 1) throw new ReadingError('Several notes use this link. Review them in Obsidian before saving again.', 409);
 		if (results[0]) {
 			await sourceById(env, results[0].item_id);
@@ -39,26 +48,23 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 			await env.DB.batch([operationStatement(env.DB, op, response)]);
 			return readingResponse(response);
 		}
-		const identity = readingUrlIdentity(url);
-		const queued = await env.DB.prepare('SELECT id FROM reading_captures WHERE generation=? AND url_identity=?')
-			.bind(current.generation, identity).first<{ id: string }>();
+		const queued = waiting!.results[0] as { id: string } | undefined;
 		if (queued) {
 			const response = { saved: true, alreadySaved: true, id: queued.id };
 			await env.DB.batch([operationStatement(env.DB, op, response)]);
 			return readingResponse(response);
 		}
-		if (await env.DB.prepare('SELECT 1 WHERE (SELECT count(*) FROM reading_jobs)+(SELECT count(*) FROM reading_captures)>=1000').first()) throw new ReadingError('Reading has many articles waiting. Retry after some finish.', 429);
-		const id = typeof body.captureId === 'string' ? body.captureId : crypto.randomUUID();
+		if (full!.results.length) throw new ReadingError('Reading has many articles waiting. Retry after some finish.', 429);
 		let note: string;
 		try { note = createReadingNote({ id, url, title: body.title, savedAt: new Date().toISOString() }); }
 		catch { throw new ReadingError('Invalid Reading capture.'); }
 		if (parseReadingNote(note)!.crate_reading_id !== id) throw new ReadingError('Use a lowercase Reading ID.');
-		if (await env.DB.prepare('SELECT 1 FROM reading_captures WHERE id=? UNION ALL SELECT 1 FROM reading_items WHERE item_id=? LIMIT 1').bind(id, id).first()) throw new ReadingError('This Reading ID already exists.', 409);
+		if (taken!.results.length) throw new ReadingError('This Reading ID already exists.', 409);
 		const response = { saved: true, alreadySaved: false, id };
 		if (current.enabled && body.fetchArticle !== false) {
 			await env.DB.batch([
 				env.DB.prepare('INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES (?,?,?,?,?)')
-					.bind(id, current.generation, readingUrlIdentity(url), note, Date.now()),
+					.bind(id, current.generation, identity, note, Date.now()),
 				operationStatement(env.DB, op, response),
 			]);
 			return readingResponse(response);

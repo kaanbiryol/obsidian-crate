@@ -45,8 +45,9 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true, rese
 		['expire file versions', bounded(() => enqueueExpiredFileVersions(db, Date.now(),
 			encrypted ? expired => releaseExpiredVersionDescriptors(db, expired) : undefined))],
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, db); }],
-		['prune obsolete reminder occurrences', () => pruneReminderOccurrences(db)],
-		['prune expired operation receipts', bounded(() => pruneOperationReceipts(db))],
+		// Unbounded scans of retained history: once per episode, not on every follow-up pass.
+		['prune obsolete reminder occurrences', async () => { if (firstPass) await pruneReminderOccurrences(db); }],
+		['prune expired operation receipts', bounded(() => pruneOperationReceipts(db, firstPass))],
 		['prune request limits', () => db.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(db)],
 		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, db); }],

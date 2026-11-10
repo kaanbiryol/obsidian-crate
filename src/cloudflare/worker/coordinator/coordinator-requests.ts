@@ -10,7 +10,7 @@ import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, REMINDERS_ENABLED_HEADER, 
 import { uploadInitialFiles } from '../sync/import/initial-import-upload';
 import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/staging/bulk-upload-dispatch';
-import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../sync/staging/staged-upload-dispatch';
+import { prepareCoordinatedUpload, commitCoordinatedUpload, prepareCoordinatedUploads, commitCoordinatedUploads } from '../sync/staging/staged-upload-dispatch';
 import { scheduleMaintenance } from '../maintenance/schedule';
 import { armMaintenanceCoordinator, MAINTENANCE_COORDINATOR_KEY } from '../maintenance/lifecycle';
 import { isCrateMutation } from '../../../protocol/server-info';
@@ -38,6 +38,11 @@ export async function handleCoordinatorRequest(
 		const prepared = await prepareCoordinatedUpload(request, env);
 		if (prepared instanceof Response) return prepared;
 		return withStateLock(() => commitCoordinatedUpload(prepared, state, env));
+	}
+	if (path === COORDINATOR_PATHS.commitUploads && request.method === 'POST') {
+		const prepared = await prepareCoordinatedUploads(request);
+		if (prepared instanceof Response) return prepared;
+		return withStateLock(() => commitCoordinatedUploads(prepared, state, env));
 	}
 	// Every poll ensures the projection coordinator. Once armed for this parser
 	// version, answer without queuing behind mutations or notification passes.

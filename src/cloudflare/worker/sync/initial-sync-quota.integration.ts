@@ -41,7 +41,7 @@ it.each([false, true])('bounds initial-upload writes and preserves retries with 
 	const result = await (await handleBatchUpload(request(files), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
 	expect(result.success).toBe(true);
 	await drainNotificationProjections({ ...env, DB: meter.db }, 8);
-	expect(meter.writes()).toBe(legacy ? 76 : 52);
+	expect(meter.writes()).toBe(legacy ? 68 : 44);
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toBeNull();
 	const beforeRetry = meter.writes();
 	const retry = await (await handleBatchUpload(request(files), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
@@ -49,17 +49,20 @@ it.each([false, true])('bounds initial-upload writes and preserves retries with 
 	expect(meter.writes() - beforeRetry).toBe(0);
 });
 
-it('keeps cleanup work when a new upload replaces stale reminder state', async () => {
+it.each([false, true])('keeps cleanup work when a new upload replaces stale reminder state (scheduled: %s)', async scheduled => {
 	await initialize();
-	await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, file_revision, notification_token, policy_revision)
-    VALUES ('old-reminder', 'Notes/recreated.md', 'old-revision', 'old-token', 'policy')`).run();
+	await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, notification_token)
+    VALUES ('old-reminder', 'Notes/recreated.md', 'old-token')`).run();
+	// A departed reminder needs a cancel only when it still has a schedule or a job.
+	if (scheduled) await env.DB.prepare(`INSERT INTO scheduled_reminders(reminder_id, schedule_token, content, due_datetime)
+    VALUES ('old-reminder', 'old-token', 'Old', '2099-01-01T00:00:00.000Z')`).run();
 	const result = await (await handleBatchUpload(request([file('Notes/recreated.md')]), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
 	expect(result.success).toBe(true);
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path: 'Notes/recreated.md' });
 	await drainNotificationProjections(env, 8);
 	expect(await env.DB.prepare('SELECT reminder_id FROM reminder_projections').first()).toBeNull();
 	expect(await env.DB.prepare('SELECT reminder_id, operation FROM notification_jobs').first())
-		.toEqual({ reminder_id: 'old-reminder', operation: 'cancel' });
+		.toEqual(scheduled ? { reminder_id: 'old-reminder', operation: 'cancel' } : null);
 });
 
 it('passes batch leases through the real reminder coordinator and schedules actual reminders', async () => {

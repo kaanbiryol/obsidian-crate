@@ -16,6 +16,7 @@ import type { extractDocument } from '@/reading/extraction/document';
 import { publishReading, wakeReading } from '@/cloudflare/worker/coordinator/coordinator';
 import { sha256Hex } from '@/platform/sha256';
 import { deploymentFenceHeld } from '../../d1/db';
+import { getStoredFileRow } from '../../sync/storage';
 
 /** Fetch and publication attempts per article job, like the other durable queues. */
 export const MAX_JOB_ATTEMPTS = 8;
@@ -90,8 +91,10 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 		await state.storage.setAlarm(Date.now() + 60_000);
 		let result: Awaited<ReturnType<typeof extractDocument>> | null = null, resolvedUrl: string | undefined;
 		try {
-			const source = await readSource(env, job.path);
-			if (source.file.storageKey !== job.source_revision) {
+			// The revision check needs only the file row; publication reads the note itself.
+			const file = await getStoredFileRow(env.DB, job.path);
+			if (!file) throw new Error('Reading note unavailable');
+			if (file.storageKey !== job.source_revision) {
 				await env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision).run();
 			} else {
 				// Three attempts fetch the page. Later ones publish the bookmark without an

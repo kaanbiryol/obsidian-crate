@@ -1,5 +1,5 @@
 import { corsResponse } from '../../http/cors';
-import { COMMIT_CONTEXT_COLUMNS, commitFileDelete, parseCommitContext, type CommitContextRow } from '../mutations';
+import { COMMIT_CONTEXT_COLUMNS, commitFileDeletes, parseCommitContext, type CommitContextRow, type CommitResult, type FileDeleteInput } from '../mutations';
 import { parseJsonObject, parseOptionalString, sanitizePath } from '../../http/request-validation';
 import {
 	formatMetadataCommitFailure,
@@ -83,39 +83,48 @@ export async function handleBatchDelete(
 		}
 	}
 
+	// Like an absent file, a stale precondition is answered from the batch's snapshot,
+	// so a batch of stale deletes needs no write or second read per file.
+	const current = validFiles.filter(file => {
+		const previousFile = previousFiles.get(file.path);
+		return !previousFile || previousFile.hash === file.expectedHash && previousFile.storageKey === file.expectedRevision;
+	});
+	const deletion = (file: typeof validFiles[number]): FileDeleteInput => ({
+		path: file.path,
+		expectedHash: file.expectedHash,
+		expectedRevision: file.expectedRevision,
+		previousFile: previousFiles.get(file.path) ?? null,
+		audit,
+		reminderFolder: context.reminderFolder,
+		readingPolicy: context.readingPolicy,
+	});
+	const commits = new Map<string, CommitResult | { failure: unknown }>();
+	try {
+		// One transaction and one round trip for the whole batch. An uncertain outcome is
+		// reported for every member, and a retry answers from the receipts it left.
+		(await commitFileDeletes(db, current.map(deletion))).forEach((commit, index) => commits.set(current[index]!.path, commit));
+	} catch (failure: unknown) {
+		for (const file of current) commits.set(file.path, { failure });
+	}
+
 	let metadataFailure = false;
 	for (const file of validFiles) {
-		const previousFile = previousFiles.get(file.path) ?? null;
-		// Like an absent file, a stale precondition is answered from the batch's snapshot,
-		// so a batch of stale deletes needs no write or second read per file.
-		if (previousFile && (previousFile.hash !== file.expectedHash || previousFile.storageKey !== file.expectedRevision)) {
-			errors.push(versionConflict(file.path, previousFile.hash));
-			continue;
-		}
-		try {
-			const commit = await commitFileDelete(db, {
-				path: file.path,
-				expectedHash: file.expectedHash,
-				expectedRevision: file.expectedRevision,
-				previousFile,
-				audit,
-				reminderFolder: context.reminderFolder,
-				readingPolicy: context.readingPolicy,
-			});
-			if (!commit.committed) {
-				errors.push(versionConflict(file.path, commit.currentHash));
-				continue;
-			}
-			deleted.push(file.path);
-			results.push({ path: file.path, ...commit.deletion });
-		} catch (error: unknown) {
+		const commit = commits.get(file.path);
+		if (!commit) {
+			errors.push(versionConflict(file.path, previousFiles.get(file.path)!.hash));
+		} else if ('failure' in commit) {
 			metadataFailure = true;
 			errors.push({
 				path: file.path,
-				error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
+				error: formatMetadataCommitFailure('Delete', formatMutationError(commit.failure)),
 				code: 'storage',
 				status: 503,
 			});
+		} else if (!commit.committed) {
+			errors.push(versionConflict(file.path, commit.currentHash));
+		} else {
+			deleted.push(file.path);
+			results.push({ path: file.path, ...commit.deletion });
 		}
 	}
 

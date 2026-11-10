@@ -28,12 +28,12 @@ export async function beginOperation(db: D1Database, principal: AuthPrincipal, c
 	return { id: body.operationId, principal: principal.tokenId, generation: current.generation, hash, day, reminderFolder: saved.reminder_folder };
 }
 export function operationStatement(db: D1Database, op: ReadingOperation, response: unknown, predicate = '1', args: string[] = []) {
-	return db.prepare(`INSERT INTO reading_operations(operation_id, principal_id, generation, request_hash, response_json, day)
+	return db.prepare(`INSERT INTO reading_operations(operation_id, principal_id, generation, request_hash, response_json)
     SELECT ?, ?, ?, ?, CASE WHEN ${OPERATION_VALID}
       AND EXISTS (SELECT 1 FROM reading_policy WHERE generation=?)
       AND EXISTS (SELECT 1 FROM auth_tokens WHERE id=? AND (expires_at IS NULL OR expires_at > ?))
-      THEN ? ELSE NULL END, ? WHERE ${predicate}`)
-		.bind(op.id, op.principal, op.generation, op.hash, op.day, op.day, op.generation, op.principal, Date.now(), JSON.stringify(response), op.day, ...args);
+      THEN ? ELSE NULL END WHERE ${predicate}`)
+		.bind(op.id, op.principal, op.generation, op.hash, op.day, op.day, op.generation, op.principal, Date.now(), JSON.stringify(response), ...args);
 }
 export function operationEffects(db: D1Database, op: ReadingOperation, response: unknown): CommitEffects {
 	return files => {

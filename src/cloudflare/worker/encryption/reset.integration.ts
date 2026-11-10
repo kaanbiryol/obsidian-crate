@@ -62,7 +62,7 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 		env.DB.prepare("INSERT INTO reading_items(portable_path,path,storage_key,hash,size,metadata_json) VALUES ('reading/private.md','Reading/private.md','r','hash',1,'private metadata')"),
 		env.DB.prepare("INSERT INTO reading_index(id,scope) VALUES (1,'scope')"),
 		env.DB.prepare("INSERT INTO reading_jobs(path,item_id,generation,source_revision,block_hash,url,available_at) VALUES ('Reading/private.md','article','reading-generation','r','hash','https://private.example',0)"),
-		env.DB.prepare("INSERT INTO reading_operations VALUES ('operation','original','reading-generation','hash','{}',1)"),
+		env.DB.prepare("INSERT INTO reading_operations VALUES ('operation','original','reading-generation','hash','{}')"),
 		env.DB.prepare("INSERT INTO reading_enrollments VALUES (?,'reading-generation','reading',9999999999999)").bind(await sha256Hex('old-reading-grant')),
 		env.DB.prepare("INSERT INTO reading_handoffs VALUES ('handoff','original','reading-generation','private url',9999999999999)"),
 		env.DB.prepare("INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES ('capture','reading-generation','private url','private note',0)"),

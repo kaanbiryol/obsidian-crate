@@ -40,7 +40,7 @@ async function seedSourceStates(db: D1Database, folder: string): Promise<boolean
 		db.prepare(`INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified)
       SELECT path, storage_key, 0, 0 FROM files WHERE portable_path IN (SELECT value FROM json_each(?))
       ON CONFLICT(file_path) DO UPDATE SET file_revision = excluded.file_revision,
-        parser_version = 0, verified = 0, updated_at = datetime('now')
+        parser_version = 0, verified = 0, sources_digest = NULL, updated_at = datetime('now')
       WHERE reminder_source_state.file_revision != excluded.file_revision`).bind(JSON.stringify(files.map(file => portablePathKey(file.path)))),
 		db.prepare(`INSERT INTO maintenance_state (key, value) VALUES (?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`).bind(scanKey, next),
@@ -111,7 +111,7 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 			const revision = fileRevisionGuard(file.path, file.storageKey);
 			await env.DB.batch([
 				...resetRetries,
-				recordReminderSourceState(env.DB, file.path, file.storageKey, false),
+				...recordReminderSourceState(env.DB, file.path, file.storageKey, false),
 				recordFileFailure(env.DB, file.path, issue, revision.sql, revision.args, isPermanentSourceError(error)),
 				env.DB.prepare(`INSERT INTO notification_projection_jobs (path, job_token, last_error)
           SELECT ?, ?, ? WHERE ${revision.sql}

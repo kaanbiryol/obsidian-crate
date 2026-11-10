@@ -229,7 +229,12 @@ export class SyncApiClient {
 		return this.sharedSettingsApi.createSharedSettings(settings);
 	}
 
+	/** Creates the policy only when the server has none. An existing one is read, which
+	 * costs the server a read instead of a coordinated write; one that lacks this vault's
+	 * sealed folder name is ensured again so the server stores it. */
 	async ensureNotificationPolicy(policy: Omit<NotificationPolicy, 'revision'>): Promise<{ policy: NotificationPolicy }> {
+		const { policy: existing } = await this.notificationsApi.getNotificationPolicy();
+		if (existing && (!this.isEncrypted() || existing.folderLabel)) return { policy: await this.localPolicy(existing) };
 		const result = await this.notificationsApi.ensureNotificationPolicy({ ...policy, ...await this.serverFolder(policy.folderPath) });
 		return { policy: await this.localPolicy(result.policy) };
 	}

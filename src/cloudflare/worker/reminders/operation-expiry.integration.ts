@@ -32,8 +32,7 @@ it('accepts the last valid day and refuses expired, future and missing legacy co
 	const validDay = day - REMINDER_RETRY_DAYS + 1;
 	const id = createReminderOperationId(validDay);
 	await payload(await handleCreateReminder(request({ id, operationId: id, content: 'Boundary task' }), env));
-	// Retention follows the encoded retry window, not a misleading receipt date.
-	await db.prepare("UPDATE reminder_operations SET created_at = '2000-01-01 00:00:00'").run();
+	// Retention follows the retry window encoded in the ID.
 	await pruneOperationReceipts(db);
 	expect(await db.prepare('SELECT operation_id FROM reminder_operations').first()).toEqual({ operation_id: id });
 	const put = vi.spyOn(bucket, 'put');

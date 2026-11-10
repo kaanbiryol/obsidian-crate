@@ -34,17 +34,16 @@ function createCacheUpsertStatement(
 ): D1PreparedStatement {
 	const { entry, remindersJson } = serialized;
 	return db.prepare(`INSERT INTO reminder_file_cache (
-			folder_path, file_path, file_hash, parser_version, reminders_json, updated_at
+			folder_path, file_path, file_hash, parser_version, reminders_json
 		)
-		SELECT ?, ?, ?, ?, ?, datetime('now')
+		SELECT ?, ?, ?, ?, ?
 		WHERE EXISTS (
 			SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?
 		)
 		ON CONFLICT(folder_path, file_path) DO UPDATE SET
 			file_hash = excluded.file_hash,
 			parser_version = excluded.parser_version,
-			reminders_json = excluded.reminders_json,
-			updated_at = datetime('now')${onlyIfChanged ? `
+			reminders_json = excluded.reminders_json${onlyIfChanged ? `
 		WHERE reminder_file_cache.file_hash IS NOT excluded.file_hash
 			OR reminder_file_cache.parser_version IS NOT excluded.parser_version` : ''}`)
 		.bind(

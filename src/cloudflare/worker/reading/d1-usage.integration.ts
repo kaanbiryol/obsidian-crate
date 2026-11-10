@@ -60,8 +60,8 @@ beforeEach(async () => {
 	const template = parseReadingNote(createReadingNote({ id: crypto.randomUUID(), url: 'https://example.invalid/template', savedAt: new Date().toISOString() }))!;
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
     INSERT INTO files(path, portable_path, storage_key, hash, size) SELECT 'Reading/' || x || '.md', 'reading/' || x || '.md', 'reading-key-' || x, '', 0 FROM n`).bind(NOTES).run();
-	await env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, saved_at, status, terms, words)
-    SELECT portable_path, path, storage_key, hash, size, printf('00000000-0000-4000-8000-%012d', n), 'https://example.invalid/' || n,
+	await env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, terms, words)
+    SELECT portable_path, path, storage_key, hash, size, printf('00000000-0000-4000-8000-%012d', n),
       json_set(?, '$.crate_reading_id', printf('00000000-0000-4000-8000-%012d', n), '$.source_url', 'https://example.invalid/' || n),
       ?, 'inbox', '["p:exa"]', '["example"]'
     FROM (SELECT *, CAST(substr(path, 9, length(path) - 11) AS INTEGER) AS n FROM files WHERE path >= 'Reading/' AND path < 'Reading0')`)

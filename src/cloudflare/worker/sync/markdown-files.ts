@@ -2,6 +2,7 @@ import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
 import { queryRows } from '../d1/db';
+import { compareCodePoints } from '../../../protocol/portable-path';
 import { stageMarkdownFile } from './markdown-file-staging';
 import { commitStagedFile, type CommitContext } from './mutations';
 import {
@@ -42,9 +43,11 @@ export async function listStoredMarkdownFileMetadataByPrefix(
 	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key: string }>(
 		db.prepare(
 			`SELECT path, hash, size, storage_key FROM files
-			WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md' ORDER BY path ASC`,
+			WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'`,
 		).bind(...fileFolderArgs(pathPrefix)),
 	);
+	// Sorted here, in the binary collation's order: ORDER BY in SQL read every row twice.
+	rows.sort((a, b) => compareCodePoints(a.path, b.path));
 	return rows.map((row) => ({
 		path: row.path,
 		hash: row.hash,

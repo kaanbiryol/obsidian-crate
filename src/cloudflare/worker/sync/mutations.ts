@@ -14,7 +14,7 @@ import type { CommitEffects } from './commit-effects';
 import { allGuards, changedRows, type SqlGuard } from '../d1/db';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { assertFileNamespaceAvailable, FileNamespaceConflictError, fileNamespaceGuard } from './file-namespace';
-import { findFileDeletionReceipt, recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
+import { fileDeletionReceiptStatement, findFileDeletionReceipt, recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
 import type { MutationAuditContext } from '../http/request-diagnostics';
 import {
 	FILE_VERSION_EXPIRES_AT_SQL,
@@ -148,11 +148,10 @@ export function parseCommitContext(row: CommitContextRow | null): CommitContext 
 		readingPolicy: row?.readingFolder ? { folder_path: row.readingFolder } : null };
 }
 
-export async function commitStagedFile(
-	bucket: R2Bucket,
-	db: D1Database,
-	params: StagedFileCommitInput,
-): Promise<CommitResult> {
+/** One upload's statements, in the order they keep within a batch. `mutationIndex` is
+ * the `files` write and a receipt, when the upload has an operation, is last. A caller
+ * that commits several uploads together adds the Reading index for all of them itself. */
+async function stagedFileStatements(db: D1Database, params: StagedFileCommitInput, readingIndex: boolean): Promise<{ statements: D1PreparedStatement[]; mutationIndex: number; encrypted: boolean }> {
 	const encryption = await prepareEncryptedFileCommit(db, params.path, params.content, params.encryptionState);
 	const upload: UploadMutationInput = {
 		path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey,
@@ -160,19 +159,54 @@ export async function commitStagedFile(
 		operation: params.operation, encryptionState: encryption.state, resetGeneration: params.resetGeneration,
 	};
 	const retained = retainReplacedUpload(db, upload, params.keepReplacedVersion === true);
-	const results: unknown[] = await db.batch([
+	return { mutationIndex: retained.length, encrypted: Boolean(encryption.state), statements: [
 		...retained,
 		uploadMutation(db, upload),
 		...recordEncryptedFile(db, params.path, params.objectKey, encryption.descriptor),
 		publishedChangelogStatement(db, params),
 		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, { encrypted: Boolean(encryption.state), reminderFolder: params.reminderFolder, size: params.size }),
-		...await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
-			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state) }),
+		...(readingIndex ? await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
+			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state) }) : []),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 		finishStagedUpload(db, params.objectKey, params.path),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),
-	]);
+	] };
+}
 
+export async function commitStagedFile(
+	bucket: R2Bucket,
+	db: D1Database,
+	params: StagedFileCommitInput,
+): Promise<CommitResult> {
+	const plan = await stagedFileStatements(db, params, true);
+	return settleStagedFile(bucket, db, params, await db.batch(plan.statements), plan.mutationIndex);
+}
+
+/** `commitStagedFile` for several uploads in one transaction and one round trip. Each
+ * upload has an operation, so its outcome is its durable receipt: a retry of the same
+ * operations, together or one at a time, answers from those receipts. The files share
+ * one server state, so the first one's Reading policy serves all. Results keep the
+ * order of `files`. */
+export async function commitStagedFiles(bucket: R2Bucket, db: D1Database, files: Array<StagedFileCommitInput & { operation: UploadOperation }>): Promise<CommitResult[]> {
+	if (!files.length) return [];
+	const plans = await Promise.all(files.map(file => stagedFileStatements(db, file, false)));
+	const statements: D1PreparedStatement[] = [];
+	const ranges = plans.map(plan => {
+		const start = statements.length;
+		statements.push(...plan.statements);
+		return [start, statements.length] as const;
+	});
+	// Index rows apply only to revisions this batch committed, so they follow every file.
+	statements.push(...await readingIndexStatements(db, files.map(file => ({ path: file.path, storageKey: file.objectKey, hash: file.hash, size: file.size, content: file.content })),
+		{ policy: files[0]!.readingPolicy, encrypted: plans[0]!.encrypted }));
+	const results: unknown[] = await db.batch(statements);
+	const commits: CommitResult[] = [];
+	for (const [index, file] of files.entries()) commits.push(await settleStagedFile(bucket, db, file, results.slice(...ranges[index]!), plans[index]!.mutationIndex));
+	return commits;
+}
+
+/** Reads one upload's outcome from its statements' `results`. */
+async function settleStagedFile(bucket: R2Bucket, db: D1Database, params: StagedFileCommitInput, results: unknown[], mutationIndex: number): Promise<CommitResult> {
 	if (params.operation) {
 		// RETURNING belongs to the atomic commit. Only a concurrent replay needs a read.
 		const recorded = (results[results.length - 1] as { results?: Array<{ response_json: string }> } | undefined)?.results?.[0];
@@ -182,7 +216,7 @@ export async function commitStagedFile(
 		return { committed: receipt.success, currentHash: receipt.success ? params.hash : receipt.currentHash ?? null, revision: receipt.revision, ...(!receipt.success ? { failure: receipt } : {}) };
 	}
 
-	if (changedRows(results[retained.length]) !== 1) {
+	if (changedRows(results[mutationIndex]) !== 1) {
 		try {
 			await assertFileNamespaceAvailable(db, params.path);
 		} catch (error) {
@@ -204,28 +238,22 @@ export async function commitStagedFile(
 	return { committed: true, currentHash: params.hash, revision: params.objectKey };
 }
 
-export async function commitFileDelete(
-	db: D1Database,
-	params: {
-		path: string;
-		expectedHash: ExpectedFileHash;
-		expectedRevision?: string;
-		previousFile: FileStorageRow | null;
-		audit?: MutationAuditContext;
-		/** Statements that commit only with this deletion. */
-		effects?: CommitEffects;
-		/** The current reminder folder when the caller already read it under the coordinator lock. */
-		reminderFolder?: string | null;
-		readingPolicy?: ReadingIndexPolicy;
-	},
-): Promise<CommitResult> {
-	// The caller's verified absent snapshot is a valid linearization point for
-	// an idempotent retry. Avoid a no-op mutation batch, and never touch a newer
-	// recreation which can arrive after that snapshot.
-	if (!params.previousFile) {
-		const deletion = await findFileDeletionReceipt(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '');
-		return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
-	}
+export interface FileDeleteInput {
+	path: string;
+	expectedHash: ExpectedFileHash;
+	expectedRevision?: string;
+	previousFile: FileStorageRow | null;
+	audit?: MutationAuditContext;
+	/** Statements that commit only with this deletion. */
+	effects?: CommitEffects;
+	/** The current reminder folder when the caller already read it under the coordinator lock. */
+	reminderFolder?: string | null;
+	readingPolicy?: ReadingIndexPolicy;
+}
+
+/** One deletion's statements, in the order they must keep within a batch: the receipt
+ * reads the changelog row written just before it. `deleteIndex` is the `files` DELETE. */
+async function fileDeleteStatements(db: D1Database, params: FileDeleteInput): Promise<{ statements: D1PreparedStatement[]; deleteIndex: number; deletion: FileDeletionReceipt }> {
 	const audit = params.audit ?? { requestId: crypto.randomUUID(), deviceId: null, clientSession: null, operationId: null };
 	const revision = `__crate__/deletions/${crypto.randomUUID()}`;
 	const expectedPredicate = params.expectedHash === null
@@ -235,23 +263,58 @@ export async function commitFileDelete(
 		? filePathArgs(params.path)
 		: [...filePathArgs(params.path), params.expectedHash, params.expectedRevision ?? ''];
 	const recorded = deletedFileStatements(db, expectedPredicate, predicateArgs, revision);
-	const results: unknown[] = await db.batch([
+	return { deleteIndex: recorded.length, deletion: { revision, consumedRevision: params.expectedRevision ?? '', deleteRequestId: audit.requestId }, statements: [
 		...recorded,
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
 		...await enqueueFileProjection(db, params.path, null, null, { reminderFolder: params.reminderFolder }),
 		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }], { policy: params.readingPolicy }),
 		...(params.effects?.([{ path: params.path, storageKey: null }]) ?? []),
-	]);
+	] };
+}
 
-	if (changedRows(results[recorded.length]) !== 1) {
-		const current = await getStoredFileRow(db, params.path);
-		if (!current) {
-			const deletion = await findFileDeletionReceipt(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '');
+/** A deletion that matched no row: an earlier delete's retry, or a changed file. */
+async function unmatchedFileDelete(db: D1Database, params: FileDeleteInput): Promise<CommitResult> {
+	const current = await getStoredFileRow(db, params.path);
+	if (current) return { committed: false, currentHash: current.hash };
+	const deletion = await findFileDeletionReceipt(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '');
+	return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
+}
+
+export async function commitFileDelete(db: D1Database, params: FileDeleteInput): Promise<CommitResult> {
+	// The caller's verified absent snapshot is a valid linearization point for
+	// an idempotent retry. Avoid a no-op mutation batch, and never touch a newer
+	// recreation which can arrive after that snapshot.
+	if (!params.previousFile) {
+		const deletion = await findFileDeletionReceipt(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '');
+		return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
+	}
+	const plan = await fileDeleteStatements(db, params);
+	const results: unknown[] = await db.batch(plan.statements);
+	if (changedRows(results[plan.deleteIndex]) !== 1) return unmatchedFileDelete(db, params);
+	return { committed: true, currentHash: null, deletion: plan.deletion };
+}
+
+/** `commitFileDelete` for several files in one transaction and one round trip. A file
+ * the caller's snapshot found absent only reads its earlier receipt. Results keep the
+ * order of `deletions`. */
+export async function commitFileDeletes(db: D1Database, deletions: FileDeleteInput[]): Promise<CommitResult[]> {
+	if (!deletions.length) return [];
+	const plans = await Promise.all(deletions.map(async params => params.previousFile ? fileDeleteStatements(db, params) : null));
+	const statements: D1PreparedStatement[] = [];
+	const starts = plans.map((plan, index) => {
+		const start = statements.length, params = deletions[index]!;
+		statements.push(...(plan ? plan.statements : [fileDeletionReceiptStatement(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '')]));
+		return start;
+	});
+	const results: unknown[] = await db.batch(statements);
+	return Promise.all(deletions.map(async (params, index): Promise<CommitResult> => {
+		const plan = plans[index], start = starts[index]!;
+		if (!plan) {
+			const deletion = (results[start] as { results?: FileDeletionReceipt[] } | undefined)?.results?.[0];
 			return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
 		}
-		return { committed: false, currentHash: current.hash };
-	}
-
-	return { committed: true, currentHash: null, deletion: { revision, consumedRevision: params.expectedRevision ?? '', deleteRequestId: audit.requestId } };
+		if (changedRows(results[start + plan.deleteIndex]) !== 1) return unmatchedFileDelete(db, params);
+		return { committed: true, currentHash: null, deletion: plan.deletion };
+	}));
 }

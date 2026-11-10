@@ -58,15 +58,15 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
 	const results = await db.batch([...follow, mutation,
 		...(encryption ? [saveFolderLabel(db, folder, parsed.value.folderLabel as string)] : []),
 		db.prepare('DELETE FROM notification_file_retries WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)').bind(revision),
+		// Every note in the folder and every projected file, each written once. Projection
+		// rows carry no policy revision: this job is what withholds their authority.
 		db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
-      SELECT path, ? FROM files WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'
-        AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
+      SELECT path, ? FROM (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'
+        UNION SELECT file_path FROM reminder_projections)
+      WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
       ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, ...fileFolderArgs(folder), revision),
 		db.prepare(`DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'
       AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)`).bind(revision),
-		db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
-      SELECT DISTINCT file_path, ? FROM reminder_projections WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
-      ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, revision),
 	]);
 	if (request.method === 'PUT' && changedRows(results[follow.length]) !== 1) return corsResponse({ error: 'Notification settings changed on another device. Refresh before saving.' }, 409);
 	return corsResponse({ policy: await labelledNotificationPolicy(db) });

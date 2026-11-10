@@ -23,10 +23,15 @@ export function recordFileDeletion(
 		.bind(consumedRevision, consumedHash, context.requestId, context.deviceId, context.clientSession, context.operationId, revision, path);
 }
 
-export async function findFileDeletionReceipt(db: D1Database, path: string, hash: string, consumedRevision: string): Promise<FileDeletionReceipt | null> {
+/** Selects at most one `FileDeletionReceipt`. */
+export function fileDeletionReceiptStatement(db: D1Database, path: string, hash: string, consumedRevision: string): D1PreparedStatement {
 	return db.prepare(`SELECT revision, consumed_revision AS consumedRevision, request_id AS deleteRequestId
 		FROM file_deletion_receipts WHERE consumed_revision = ? AND path = ? AND consumed_hash = ?`)
-		.bind(consumedRevision, path, hash).first<FileDeletionReceipt>();
+		.bind(consumedRevision, path, hash);
+}
+
+export async function findFileDeletionReceipt(db: D1Database, path: string, hash: string, consumedRevision: string): Promise<FileDeletionReceipt | null> {
+	return fileDeletionReceiptStatement(db, path, hash, consumedRevision).first<FileDeletionReceipt>();
 }
 
 export async function pruneFileDeletionReceipts(db: D1Database): Promise<boolean> {

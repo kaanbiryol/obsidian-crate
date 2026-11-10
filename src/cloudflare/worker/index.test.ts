@@ -42,6 +42,11 @@ function createDb(
 			}
 			return { meta: { changes } };
 		}
+		// The subscribe batch confirms its row after the insert, in the same transaction.
+		if (sql.startsWith('SELECT id, folder_path FROM push_subscriptions WHERE endpoint = ?')) {
+			const row = [...state.subscriptions.values()].find(subscription => subscription.endpoint === args[0]);
+			return { results: row ? [row] : [], meta: { changes: 0 } };
+		}
 
 		return { meta: { changes: 0 } };
 	};

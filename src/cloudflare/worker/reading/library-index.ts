@@ -1,6 +1,6 @@
 import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
-import { MAX_READING_BYTES, readingUrlIdentity } from '@/reading/core/model';
+import { MAX_READING_BYTES } from '@/reading/core/model';
 import { readingTerms, searchWords } from '@/reading/core/search-terms';
 import { isReadingCardKind, validateReadingCardData, type ReadingCardData } from '@/reading/core/reading-card';
 import { parseEncryptedFile } from '@/encryption/file-format';
@@ -18,6 +18,9 @@ import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-p
 const INDEX_FORMAT = 2;
 /** The `note_terms` scope of Reading notes. */
 export const READING_TERM_SCOPE = 'reading';
+/** The upsert's unindexed columns for a note with a current card or metadata, from `committed c`. */
+const UNINDEXED = `storage_key = c.storage_key, hash = c.hash, size = c.size, metadata_json = c.metadata_json,
+        error = c.error, words = c.words, terms = c.terms, card = c.card`;
 const REBUILD_PAGE = 25;
 const MAX_READING_JOBS = 1000;
 export const readingIndexScope = (current: Pick<ReadingPolicy, 'folder_path' | 'generation'>) => `${current.folder_path}\n${current.generation}\n${INDEX_FORMAT}`;
@@ -40,7 +43,7 @@ export function decodeReadingNote(bytes: ArrayBuffer | Uint8Array): string | nul
 
 interface IndexRow {
 	path: string; portable: string; storage_key: string | null; keep: 0 | 1;
-	hash?: string; size?: number; item_id?: string | null; url_identity?: string | null; url?: string | null;
+	hash?: string; size?: number; item_id?: string | null; url?: string | null;
 	metadata_json?: string | null; error?: string | null; article_hash?: string | null; article_edited?: 0 | 1; saved_at?: string;
 	status?: string | null; favorite?: 0 | 1; highlighted?: 0 | 1; terms?: string | null;
 	/** An unencrypted note's title words, which confirm a search's candidates. */
@@ -98,7 +101,7 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 		if (!block || block.text.trim()) article_edited = 1;
 		else article_hash = await sha256Hex(block.text);
 	}
-	return { ...row, item_id: metadata.crate_reading_id, url_identity: metadata.source_url ? readingUrlIdentity(metadata.source_url) : null, url: metadata.source_url || null,
+	return { ...row, item_id: metadata.crate_reading_id, url: metadata.source_url || null,
 		metadata_json: JSON.stringify(metadata), article_hash, article_edited, saved_at: metadata.saved_at,
 		status: metadata.reading_status, favorite: metadata.favorite ? 1 : 0, highlighted: metadata.highlights?.length ? 1 : 0,
 		terms: JSON.stringify(readingTerms(metadata)), words: JSON.stringify(searchWords(metadata.title)) };
@@ -124,7 +127,7 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 	const json = JSON.stringify(rows);
 	const committed = `WITH input AS (SELECT json_extract(value, '$.path') AS path, json_extract(value, '$.portable') AS portable,
       json_extract(value, '$.storage_key') AS storage_key, json_extract(value, '$.keep') AS keep, json_extract(value, '$.hash') AS hash,
-      json_extract(value, '$.size') AS size, json_extract(value, '$.item_id') AS item_id, json_extract(value, '$.url_identity') AS url_identity,
+      json_extract(value, '$.size') AS size, json_extract(value, '$.item_id') AS item_id,
       json_extract(value, '$.url') AS url, json_extract(value, '$.metadata_json') AS metadata_json, json_extract(value, '$.error') AS error,
       json_extract(value, '$.article_hash') AS article_hash, COALESCE(json_extract(value, '$.article_edited'), 0) AS article_edited,
       COALESCE(json_extract(value, '$.saved_at'), '') AS saved_at, json_extract(value, '$.status') AS status,
@@ -144,8 +147,12 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 	const termKeys = (rows: string) => `(term, saved_at, portable_path) IN (SELECT t.value, r.saved_at, r.portable_path FROM (${rows}) r, json_each(r.terms) t)`;
 	return [
 		...(removes ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND ${termKeys(`SELECT terms, saved_at, portable_path FROM reading_items WHERE ${removed}`)}`)] : []),
-		...(plain.length ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND ${termKeys(`SELECT i.terms, i.saved_at, i.portable_path FROM committed c
-        JOIN reading_items i ON i.portable_path = c.portable WHERE c.keep = 1 AND c.stale = 0 AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)`)}`)] : []),
+		// A changed saved date moves every key; otherwise only the terms the note lost leave,
+		// and the insert below adds only the new ones.
+		...(plain.length ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND (term, saved_at, portable_path) IN (
+        SELECT t.value, i.saved_at, i.portable_path FROM committed c JOIN reading_items i ON i.portable_path = c.portable, json_each(i.terms) t
+        WHERE c.keep = 1 AND c.stale = 0 AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)
+          AND (i.saved_at IS NOT c.saved_at OR c.terms IS NULL OR t.value NOT IN (SELECT value FROM json_each(c.terms))))`)] : []),
 		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(scope, term, saved_at, portable_path)
         SELECT '${READING_TERM_SCOPE}', t.value, r.saved_at, r.portable FROM (SELECT c.terms, c.saved_at, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable
           WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)) r, json_each(r.terms) t`)] : []),
@@ -163,28 +170,30 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 		// Setting an indexed column rewrites its index entry even when the value is the same. So
 		// indexed columns change first, and only on rows where they differ; the upsert then sets
 		// only unindexed columns and the change number. A favorite rewrites the row and its change
-		// number, not every index.
-		...(plain.length ? [statement(`UPDATE reading_items SET path = c.path, item_id = c.item_id, url_identity = c.url_identity, saved_at = c.saved_at,
-        article_hash = c.article_hash, article_edited = c.article_edited, stale = 0
+		// number, not every index. Each update also sets the unindexed columns, so the upsert
+		// skips a row an update already brought to its new revision.
+		...(plain.length ? [statement(`UPDATE reading_items SET path = c.path, item_id = c.item_id, saved_at = c.saved_at,
+        article_hash = c.article_hash, article_edited = c.article_edited, stale = 0, ${UNINDEXED}
         FROM committed c WHERE c.keep = 1 AND c.stale = 0 AND reading_items.portable_path = c.portable
-        AND (reading_items.path, reading_items.item_id, reading_items.url_identity, reading_items.saved_at, reading_items.article_hash, reading_items.article_edited, reading_items.stale)
-          IS NOT (c.path, c.item_id, c.url_identity, c.saved_at, c.article_hash, c.article_edited, 0)`),
+        AND (reading_items.path, reading_items.item_id, reading_items.saved_at, reading_items.article_hash, reading_items.article_edited, reading_items.stale)
+          IS NOT (c.path, c.item_id, c.saved_at, c.article_hash, c.article_edited, 0)`),
 			// Each section column has its own index, so each changes only where it differs.
-			...(['status', 'favorite', 'highlighted'] as const).map(column => statement(`UPDATE reading_items SET ${column} = c.${column}
+			...(['status', 'favorite', 'highlighted'] as const).map(column => statement(`UPDATE reading_items SET ${column} = c.${column}, ${UNINDEXED}
         FROM committed c WHERE c.keep = 1 AND c.stale = 0 AND reading_items.portable_path = c.portable AND reading_items.${column} IS NOT c.${column}`)),
 		] : []),
 		// An encrypted note keeps its last card, list fields and terms until a device posts new ones.
 		...(keeps.length > plain.length ? [statement(`UPDATE reading_items SET path = c.path, stale = 1
         FROM committed c WHERE c.keep = 1 AND c.stale = 1 AND reading_items.portable_path = c.portable AND (reading_items.path, reading_items.stale) IS NOT (c.path, 1)`)] : []),
 		...(keeps.length ? [
-			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at,
+			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, error, article_hash, article_edited, saved_at,
           status, favorite, highlighted, stale, terms, words, card)
-        SELECT portable, path, storage_key, hash, size, item_id, url_identity, metadata_json, error, article_hash, article_edited, saved_at,
+        SELECT portable, path, storage_key, hash, size, item_id, metadata_json, error, article_hash, article_edited, saved_at,
           status, favorite, highlighted, stale, terms, words, card FROM committed WHERE keep = 1
         ON CONFLICT(portable_path) DO UPDATE SET storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
           metadata_json = excluded.metadata_json, error = excluded.error, words = excluded.words,
           terms = CASE WHEN excluded.stale = 1 THEN reading_items.terms ELSE excluded.terms END,
-          card = CASE WHEN excluded.stale = 1 THEN reading_items.card ELSE excluded.card END`),
+          card = CASE WHEN excluded.stale = 1 THEN reading_items.card ELSE excluded.card END
+        WHERE reading_items.storage_key IS NOT excluded.storage_key OR excluded.stale = 1`),
 		] : []),
 
 		// Recount the IDs this batch wrote and every flagged row: a row that changed or left

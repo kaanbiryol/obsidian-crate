@@ -58,8 +58,7 @@ async function runNotificationJob(env: Env, job: NotificationJobRow): Promise<D1
 		return env.DB.prepare(`UPDATE notification_jobs SET
 			attempts = attempts + 1,
 			available_at = ?,
-			last_error = ?,
-			updated_at = datetime('now')
+			last_error = ?
 			WHERE reminder_id = ? AND job_token = ?`)
 			.bind(job.attempts + 1 >= 8 ? -1 : Date.now() + notificationRetryDelayMs(job.attempts), message.slice(0, 1024), job.reminder_id, job.job_token);
 	}

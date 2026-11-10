@@ -20,8 +20,9 @@ const held = (revision: string) => `(EXISTS (SELECT 1 FROM file_deletion_receipt
 		FROM staged_upload_batches b, json_each(b.storage_keys) k) WHERE staged IS NOT NULL))`;
 /** A revision's changelog entry is written in the same transaction as its descriptor,
  * and pruning keeps the changelog contiguous from its oldest entry. Once that entry is
- * newer than the descriptor, the revision has no changelog entry left. */
-const CHANGELOG_PRUNED = `NOT EXISTS (SELECT 1 FROM changelog WHERE created_at <= datetime(maintenance_state.updated_at, '+1 minute'))`;
+ * newer than the descriptor, the revision has no changelog entry left. Reads one row. */
+const CHANGELOG_PRUNED = `NOT EXISTS (SELECT 1 FROM (SELECT created_at FROM changelog ORDER BY seq LIMIT 1) oldest
+	WHERE oldest.created_at <= datetime(maintenance_state.updated_at, '+1 minute'))`;
 
 /** Runs in the changelog pruning transaction: drops descriptors whose last
  * reference is one of the `expired` changelog entries (sequence numbers). */

@@ -87,10 +87,10 @@ it('projects folder imports without extraction and syncs their reading metadata'
 		await writeCommittedMarkdownFile(env.BUCKET, env.DB, path!, content, null);
 	}
 	await buildIndex();
-	const { results } = await env.DB.prepare('SELECT item_id, url_identity, metadata_json FROM reading_items ORDER BY portable_path').all<{ item_id: string; url_identity: string | null; metadata_json: string }>();
+	const { results } = await env.DB.prepare('SELECT item_id, terms, metadata_json FROM reading_items ORDER BY portable_path').all<{ item_id: string; terms: string; metadata_json: string }>();
 	expect(results).toHaveLength(2);
-	expect(results[0]!.url_identity).toBe('https://example.com/article');
-	expect(results[1]!.url_identity).toBeNull();
+	expect(JSON.parse(results[0]!.terms)).toContain('u:https://example.com/article');
+	expect((JSON.parse(results[1]!.terms) as string[]).some(term => term.startsWith('u:'))).toBe(false);
 	expect(JSON.parse(results[1]!.metadata_json)).toMatchObject({ source_url: '', title: 'Note', favorite: false });
 	const response = await command('update', { id: results[1]!.item_id, before: { favorite: false, reading_status: 'inbox', tags: [] }, changes: { favorite: true, reading_status: 'archived', tags: ['design', 'later'] }, operationId: id() });
 	expect(response.status, await response.clone().text()).toBe(200);

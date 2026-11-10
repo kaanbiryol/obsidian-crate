@@ -1,4 +1,5 @@
 import type { UploadCommitters } from '../staging/upload-committers';
+import type { CommitResult } from '../mutations';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../../encryption/file-format';
 import { trackStagedUploads } from '../staging/staged-uploads';
@@ -91,53 +92,69 @@ export async function handleBatchUpload(
 		return corsResponse({ success: results.every(result => result.success), results }, failed ? 503 : 200);
 	}
 
+	type Upload = typeof uploads[number];
 	let metadataFailure = false;
-	await Promise.all(uploads.map(async (file) => {
+	const commitInput = (file: Upload) => ({
+		encryptionState,
+		resetGeneration,
+		operation: file.operation,
+		path: file.safePath,
+		hash: file.hash,
+		size: file.size,
+		objectKey: file.objectKey,
+		content: file.bytes,
+		expectedHash: file.expectedHash,
+	});
+	const record = (file: Upload, commit: CommitResult) => {
+		if (commit.committed) results.push({ path: file.safePath, success: true, hash: file.hash, revision: commit.revision });
+		else if (commit.failure) results.push(commit.failure);
+		else results.push({
+			path: file.safePath,
+			success: false,
+			error: `Remote file changed since it was read${commit.currentHash ? ` (current hash: ${commit.currentHash})` : ''}`,
+			code: 'version_conflict',
+			status: 409,
+			currentHash: commit.currentHash,
+		});
+	};
+	const fail = (file: Upload, error: unknown) => {
+		if (error instanceof FileNamespaceConflictError) {
+			results.push({ path: file.safePath, success: false, error: error.message, code: error.code, status: 409 });
+			return;
+		}
+		metadataFailure = true;
+		// An uncertain commit does not establish that this object is unused.
+		results.push({
+			path: file.safePath,
+			success: false,
+			error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+			code: 'storage',
+			status: 503,
+		});
+	};
+	const stored = await Promise.all(uploads.map(async file => {
 		try {
 			await bucket.put(file.objectKey, file.bytes, {
 				httpMetadata: { contentType: file.contentType },
 				customMetadata: { hash: file.hash },
 			});
-			const commit = await committers.commitUpload(bucket, db, {
-				encryptionState,
-				resetGeneration,
-				operation: file.operation,
-				path: file.safePath,
-				hash: file.hash,
-				size: file.size,
-				objectKey: file.objectKey,
-				content: file.bytes,
-				expectedHash: file.expectedHash,
-			});
-			if (!commit.committed) {
-				if (commit.failure) { results.push(commit.failure); return; }
-				results.push({
-					path: file.safePath,
-					success: false,
-					error: `Remote file changed since it was read${commit.currentHash ? ` (current hash: ${commit.currentHash})` : ''}`,
-					code: 'version_conflict',
-					status: 409,
-					currentHash: commit.currentHash,
-				});
-				return;
-			}
-
-			results.push({ path: file.safePath, success: true, hash: file.hash, revision: commit.revision });
+			return true;
 		} catch (error: unknown) {
-			if (error instanceof FileNamespaceConflictError) {
-				results.push({ path: file.safePath, success: false, error: error.message, code: error.code, status: 409 });
-				return;
-			}
-			metadataFailure = true;
-			// An uncertain commit does not establish that this object is unused.
-			results.push({
-				path: file.safePath,
-				success: false,
-				error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
-				code: 'storage',
-				status: 503,
-			});
+			fail(file, error);
+			return false;
 		}
+	}));
+	const staged = uploads.filter((_, index) => stored[index]);
+	// Several files commit in one transaction. If that fails or its outcome is unknown,
+	// each file commits alone by the same operation, which answers from any receipt the
+	// batch left behind.
+	let commits: CommitResult[] | null = null;
+	if (committers.commitUploads && staged.length > 1) {
+		try { commits = await committers.commitUploads(bucket, db, staged.map(commitInput)); } catch { commits = null; }
+	}
+	await Promise.all(staged.map(async (file, index) => {
+		try { record(file, commits ? commits[index]! : await committers.commitUpload(bucket, db, commitInput(file))); }
+		catch (error: unknown) { fail(file, error); }
 	}));
 
 	return corsResponse({ success: results.every((result) => result.success), results }, metadataFailure ? 503 : 200);

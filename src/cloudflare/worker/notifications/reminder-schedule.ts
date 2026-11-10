@@ -140,9 +140,9 @@ async function scheduleReminder(request: Request, context: ReminderScheduleConte
 		const failure = sameOccurrence ? snapshot.deliveryFailure : undefined;
 		const saved = await env.DB.prepare(
 			`INSERT OR REPLACE INTO scheduled_reminders
-				(reminder_id, schedule_token, content, project, due_datetime, delivery_failed_at, delivery_error, delivery_attempts)
-				SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'schedule')`,
-		).bind(reminderId, body.scheduleToken, content, project ?? null, dueDatetime, failure?.failedAt ?? null, failure?.error ?? null, failure?.attempts ?? null, reminderId, jobToken).run();
+				(reminder_id, schedule_token, content, project, due_datetime, delivery_failed_at)
+				SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'schedule')`,
+		).bind(reminderId, body.scheduleToken, content, project ?? null, dueDatetime, failure?.failedAt ?? null, reminderId, jobToken).run();
 		if (changedRows(saved) !== 1) {
 			await restoreSnapshot(state, snapshot);
 			return internalJson({ success: true, superseded: true });
@@ -282,8 +282,8 @@ async function scheduleRetry({ state, env }: ReminderScheduleContext, reminder: 
 			failedAt: new Date().toISOString(),
 			error: errorMessage.slice(0, 1024),
 		};
-		await env.DB.prepare(`UPDATE scheduled_reminders SET delivery_failed_at = ?, delivery_error = ?, delivery_attempts = ?
-			WHERE reminder_id = ? AND schedule_token = ?`).bind(failure.failedAt, failure.error, failure.attempts, reminder.reminderId, reminder.scheduleToken).run();
+		await env.DB.prepare(`UPDATE scheduled_reminders SET delivery_failed_at = ?
+			WHERE reminder_id = ? AND schedule_token = ?`).bind(failure.failedAt, reminder.reminderId, reminder.scheduleToken).run();
 		await state.storage.put(DELIVERY_FAILURE_KEY, failure);
 		await state.storage.deleteAlarm();
 		console.error(`Reminder alarm ${reminder.reminderId} exhausted delivery retries:`, errorMessage);

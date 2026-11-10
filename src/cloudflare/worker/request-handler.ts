@@ -10,7 +10,7 @@ import { ReminderIdentityConflictError } from './reminders/source-identity';
 import { logMutation } from './http/request-diagnostics';
 import { admitApiRequest } from './admission/rate-limit';
 import { authenticatedAdmissionKey, rememberAuthenticatedRequest } from './admission/admission-state';
-import { coordinatedUpload } from './sync/staging/staged-upload-dispatch';
+import { coordinatedUpload, coordinatedUploads } from './sync/staging/staged-upload-dispatch';
 import { apiRoutePolicy } from './routes/policy';
 import { requestPlacement } from './routes/placement';
 import { armNotificationCoordinator } from './notifications/lifecycle';
@@ -27,7 +27,7 @@ import { ENCRYPTION_STATE_HEADER } from '../../encryption/server-state';
 import { assertRequestEncryption, checkRequestProtocol } from './request-guards';
 import { forwardTransferRequest } from './sync/transfer-dispatch';
 import { scheduleMaintenance } from './maintenance/schedule';
-import { commitStagedFile } from './sync/mutations';
+import { commitStagedFile, commitStagedFiles } from './sync/mutations';
 import { commitNewFiles } from './sync/staging/bulk-new-file-commit';
 import type { UploadCommitters } from './sync/staging/upload-committers';
 import { ensureProjection, forwardToCoordinator } from '@/cloudflare/worker/coordinator/coordinator';
@@ -156,8 +156,8 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 		await scheduleMaintenance(env, projectionBinding);
 	}
 	const uploadCommitters: UploadCommitters = execution.kind === 'coordinator'
-		? { commitUpload: commitStagedFile, commitNewFiles }
-		: { commitUpload: coordinatedUpload(env), commitNewFiles: coordinatedNewFiles(env) };
+		? { commitUpload: commitStagedFile, commitUploads: commitStagedFiles, commitNewFiles }
+		: { commitUpload: coordinatedUpload(env), commitUploads: coordinatedUploads(env), commitNewFiles: coordinatedNewFiles(env) };
 	const response = await handleAuthenticatedRoute(request, env, {
 		uploadCommitters, path, method, principal: authResult.principal, resetGeneration: authResult.resetGeneration,
 		requestId: context.requestId, encryption, featurePolicyValue: authResult.featurePolicyValue,

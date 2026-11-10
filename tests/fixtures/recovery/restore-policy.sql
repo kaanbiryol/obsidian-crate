@@ -6,7 +6,7 @@ INSERT INTO "maintenance_state" ("key","value","updated_at") VALUES ('reminder_s
 INSERT INTO "maintenance_state" ("key","value","updated_at") VALUES ('reminder_operation_floor','20524','2026-09-29 00:00:00');
 INSERT INTO "server_state" ("id","features") VALUES (1,'{"reading":false}');
 INSERT INTO "reading_captures" ("id","generation","url_identity","note","attempts","available_at") VALUES ('fixture-capture','generation','https://example.com/queued','queued note',2,123456789);
-INSERT INTO "reading_operations" ("operation_id","principal_id","generation","request_hash","response_json","day") VALUES ('fixture-reading-receipt','device','generation','request','{}',20524);
+INSERT INTO "reading_operations" ("operation_id","principal_id","generation","request_hash","response_json") VALUES ('fixture-reading-receipt','device','generation','request','{}');
 INSERT INTO "upload_operations" ("operation_id","request_hash","response_json") VALUES ('fixture-upload-receipt','request','{}');
 INSERT INTO "auth_tokens" ("id","token_hash") VALUES ('fixture-device','fixture-token');
 INSERT INTO "reading_jobs" ("path","item_id","generation","source_revision","block_hash","url","available_at") VALUES ('Reading/fixture.md','fixture-item','generation','source','block','https://example.com/article',123);

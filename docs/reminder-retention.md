@@ -10,7 +10,7 @@ The issued date and the following 179 UTC dates are valid. This is at least 179 
 
 Without a receipt, an unversioned ID, future date, or expired date receives HTTP 410 `operation_expired` before staging vault data. The D1 publication batch checks expiry again: a request that expires while R2 is being staged cannot commit either side of a project move, file pointers, source metadata or a receipt. Private staged objects remain subject to existing orphan cleanup. An uncertain commit response still requires the same request on retry.
 
-Maintenance atomically advances `maintenance_state.reminder_operation_floor` and then prunes at most 500 expired versioned receipts and 500 expired unreferenced versioned identities per run. The floor never decreases; clock rollback cannot reopen an already-pruned window. Cleanup failure rolls back its floor and deletions together. Delayed maintenance may retain receipts longer, but cannot extend the ability of a missing-receipt request to mutate. Monitor maintenance failures and receipt counts through diagnostics.
+Maintenance atomically advances `maintenance_state.reminder_operation_floor` and then prunes at most 5,000 expired versioned receipts per run, and 500 expired unreferenced versioned identities once per maintenance episode. The floor never decreases; clock rollback cannot reopen an already-pruned window. Cleanup failure rolls back its floor and deletions together. Delayed maintenance may retain receipts longer, but cannot extend the ability of a missing-receipt request to mutate. Monitor maintenance failures and receipt counts through diagnostics.
 
 Active and quarantined source references preserve identity reservations. New creates cannot add unversioned identities or reuse a pruned old identity with a fresh command. The generic Markdown path continues to preserve user-chosen stable IDs; this is separate from authorizing a new web create.
 
@@ -26,7 +26,7 @@ Independently saved drafts with no dispatched attempt can receive a new operatio
 
 ## Notification occurrences
 
-Each maintenance run removes at most 500 unreferenced occurrence rows, only when both the first observation and the due time are over 180 days old. Current and quarantined sources, future and recent due times, and unknown date formats remain protected. The source check and deletion occur in one SQL statement.
+Each maintenance episode removes at most 500 unreferenced occurrence rows, on its first pass, only when both the first observation and the due time are over 180 days old. Current and quarantined sources, future and recent due times, and unknown date formats remain protected. The source check and deletion occur in one SQL statement.
 
 A restored obsolete reminder is observed after its old deadline and cannot be rearmed by projection. The normal notification delivery window is 24 hours. Each Durable Object also retains its last completed occurrence so cancellation or a repeated accepted job cannot immediately duplicate delivery; this constant per-identity record is separate from the D1 occurrence history.
 

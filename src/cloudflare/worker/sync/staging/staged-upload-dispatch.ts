@@ -1,4 +1,4 @@
-import { commitStagedFile } from '../mutations';
+import { commitStagedFile, commitStagedFiles, type CommitResult } from '../mutations';
 import { armNotificationCoordinator } from '../../notifications/lifecycle';
 import { FileNamespaceConflictError } from '../file-namespace';
 import type { Env } from '../../types';
@@ -7,7 +7,8 @@ import { isReadingNotePath } from '../../reading/library-index';
 import { getNotificationPolicy } from '../../notifications/policy';
 import { readEncryptionState } from '../../encryption/state';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
-import { commitCoordinatorUpload } from '../../coordinator/coordinator';
+import { commitCoordinatorUpload, commitCoordinatorUploads } from '../../coordinator/coordinator';
+import type { UploadOperation } from '../upload-operations';
 import { isMarkdownPath } from '../../../../protocol/note-paths';
 import { MAX_REMINDER_NOTE_BYTES } from '../../../../reminders/core/constants';
 
@@ -74,6 +75,59 @@ export function coordinatedUpload(env: Env): CommitUpload {
 		}
 		return response.json() as Promise<Awaited<ReturnType<CommitUpload>>>;
 	};
+}
+
+type UploadsParams = Array<UploadParams & { operation: UploadOperation }>;
+
+/** Markdown commits whose bytes travel with the request share one coordinator call and
+ * one transaction. Other files commit here, and a note too large to frame keeps its own
+ * call, which reads its bytes under the policy fence. Any failure throws. */
+export function coordinatedUploads(env: Env): NonNullable<UploadCommitters['commitUploads']> {
+	const commitOne = coordinatedUpload(env);
+	return async (bucket, db, files) => {
+		const framed = files.filter(file => isMarkdownPath(file.path) && (file.encryptionState || hasFramedMarkdown(file)));
+		const direct = files.filter(file => !isMarkdownPath(file.path));
+		const commitFramed = async (): Promise<CommitResult[]> => {
+			if (!framed.length) return [];
+			const metadata = framed.map((file): UploadMetadata => ({
+				path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,
+				expectedHash: file.expectedHash, expectedRevision: file.expectedRevision,
+				encryptionState: file.encryptionState, resetGeneration: file.resetGeneration, operation: file.operation,
+			}));
+			const response = await commitCoordinatorUploads(env, { body: frameUpload(metadata, framed.map(file => file.content)) });
+			if (!response.ok) throw new Error('Staged uploads could not be committed; retry the same operations');
+			return response.json() as Promise<CommitResult[]>;
+		};
+		const [framedResults, directResults] = await Promise.all([commitFramed(), commitStagedFiles(bucket, db, direct)]);
+		const committed = new Map<UploadsParams[number], CommitResult>();
+		framed.forEach((file, index) => committed.set(file, framedResults[index]!));
+		direct.forEach((file, index) => committed.set(file, directResults[index]!));
+		return Promise.all(files.map(async file => committed.get(file) ?? commitOne(bucket, db, file)));
+	};
+}
+
+/** Each file's bytes follow the metadata in order. */
+export async function prepareCoordinatedUploads(request: Request): Promise<UploadsParams | Response> {
+	// Only the authenticated Worker calls this internal DO endpoint. No public route exposes it.
+	const { metadata, content } = readFrame<Array<UploadMetadata & { operation: UploadOperation }>>(await request.arrayBuffer());
+	let position = 0;
+	const files = metadata.map(file => {
+		const bytes = content.slice(position, position + file.size);
+		position += file.size;
+		return { ...file, content: bytes };
+	});
+	if (position !== content.byteLength) return Response.json({ error: 'Staged upload size mismatch' }, { status: 400 });
+	return files;
+}
+
+/** Framed bytes need no policy fence: the commit projects whatever folder is current. */
+export async function commitCoordinatedUploads(files: UploadsParams, state: DurableObjectState, env: Env): Promise<Response> {
+	const current = await env.DB.prepare(`SELECT p.folder_path, r.folder_path AS reading_folder
+    FROM (SELECT 1) LEFT JOIN notification_policy p ON p.id = 1 LEFT JOIN reading_policy r ON r.id = 1`)
+		.first<{ folder_path: string | null; reading_folder: string | null }>();
+	if (createsNotificationWork(files.map(file => file.path), current?.folder_path ?? null, current?.reading_folder ?? null)) await armNotificationCoordinator(state);
+	return Response.json(await commitStagedFiles(env.BUCKET, env.DB, files.map(file => ({ ...file, reminderFolder: current?.folder_path ?? null,
+		readingPolicy: current?.reading_folder ? { folder_path: current.reading_folder } : null }))));
 }
 
 export async function prepareCoordinatedUpload(request: Request, env: Env): Promise<UploadParams | Response> {

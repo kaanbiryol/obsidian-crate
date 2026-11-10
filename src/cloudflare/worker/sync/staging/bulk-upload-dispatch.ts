@@ -52,11 +52,15 @@ export async function prepareCoordinatedNewFiles(request: Request, env: Env): Pr
 }
 
 export async function commitCoordinatedNewFiles(files: NewFileUpload[], state: DurableObjectState, env: Env): Promise<Response> {
-	const policy = await getNotificationPolicy(env.DB);
-	if (files.some(file => file.reminderPolicyRevision !== undefined && file.reminderPolicyRevision !== (policy?.revision ?? null))) {
+	// One read under the lock covers the policy fence and the folders used by the
+	// reminder projection and the Reading index.
+	const current = await env.DB.prepare(`SELECT p.revision, p.folder_path, r.folder_path AS reading_folder
+    FROM (SELECT 1) LEFT JOIN notification_policy p ON p.id = 1 LEFT JOIN reading_policy r ON r.id = 1`)
+		.first<{ revision: string | null; folder_path: string | null; reading_folder: string | null }>();
+	if (files.some(file => file.reminderPolicyRevision !== undefined && file.reminderPolicyRevision !== (current?.revision ?? null))) {
 		return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
 	}
-	const reading = await env.DB.prepare('SELECT folder_path FROM reading_policy WHERE id = 1').first<{ folder_path: string }>();
-	if (createsNotificationWork(files.map(file => file.path), policy?.folderPath ?? null, reading?.folder_path ?? null)) await armNotificationCoordinator(state);
-	return Response.json(await commitNewFiles(env.BUCKET, env.DB, files, policy?.folderPath ?? null));
+	if (createsNotificationWork(files.map(file => file.path), current?.folder_path ?? null, current?.reading_folder ?? null)) await armNotificationCoordinator(state);
+	return Response.json(await commitNewFiles(env.BUCKET, env.DB, files, current?.folder_path ?? null,
+		current?.reading_folder ? { folder_path: current.reading_folder } : null));
 }
