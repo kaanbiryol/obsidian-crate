@@ -91,7 +91,7 @@ Web Clipper can save a transcript into your Reading folder too. Check its previe
 
 Select text while reading to highlight it. Tap or select a highlight to copy, share, delete, or resize it. Each article's **Highlights** view shows your notes alongside a **View in article** action.
 
-The library's **Highlights** view collects highlights from your inbox, favorites, and archive in one place. Search them, or filter by article or tag.
+The library's **Highlights** view collects highlights from your inbox, favorites, and archive in one place. Search them, or filter by tag.
 
 ![The Highlights view in the web app on iPhone, grouping highlights by article](../../../assets/screenshots/phone-reading-highlights.png)
 

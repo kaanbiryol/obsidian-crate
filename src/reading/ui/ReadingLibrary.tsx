@@ -15,7 +15,6 @@ import type { ReadingSnapshot } from '../data/library';
 import { filterReadingHighlights, filterReadingItems, groupReadingItems, groupReadingHighlights, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { HighlightGroups } from './HighlightGroups';
-import { HighlightArticleFilter } from './HighlightArticleFilter';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
 import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
@@ -63,7 +62,6 @@ export function ReadingLibraryPanel({
 }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
-	const [articleFilter, setArticleFilter] = useState('');
 	const [visible, setVisible] = useState(PAGE_SIZE);
 	const [busy, setBusy] = useState<ReadonlySet<string>>(new Set()), [error, setError] = useState<string | null>(null);
 	const [exitingReader, setExitingReader] = useState<React.ReactNode>(null);
@@ -108,7 +106,7 @@ export function ReadingLibraryPanel({
 	const items = useMemo(() => present
 		? filterReadingItems(loaded, section, '', null).filter(item => (!listQuery.trim() || titleMatches(item.title, listQuery)) && (!tag || item.tags.some(value => normalizedTag(value) === normalizedTag(tag))))
 		: filterReadingItems(snapshot.items, section, listQuery, tag), [present, loaded, snapshot.items, section, listQuery, tag]);
-	const excerpts = useMemo(() => filterReadingHighlights(items, listQuery, articleFilter), [items, articleFilter, listQuery]);
+	const excerpts = useMemo(() => filterReadingHighlights(items, listQuery), [items, listQuery]);
 	const excerptGroups = useMemo(() => groupReadingHighlights(excerpts), [excerpts]);
 	const count = section === 'highlights' ? excerpts.length : items.length;
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
@@ -116,9 +114,6 @@ export function ReadingLibraryPanel({
 	const tags = useMemo(() => [...new Set([...snapshot.items, ...loaded].flatMap(item => item.tags).concat(tag ? [tag] : []))].sort((a, b) => a.localeCompare(b)), [snapshot.items, loaded, tag]);
 	const loading = source ? pages.loading && !pages.items.length : snapshot.loading;
 	const more = source ? !!pages.cursor : false;
-	useEffect(() => {
-		if (articleFilter && !loading && !loaded.some(item => item.crate_reading_id === articleFilter && item.highlights?.length)) { setArticleFilter(''); setVisible(PAGE_SIZE); }
-	}, [articleFilter, loaded, loading]);
 	useEffect(() => {
 		if (tag && !tags.includes(tag)) { setTag(null); setVisible(PAGE_SIZE); }
 	}, [tag, tags]);
@@ -130,12 +125,12 @@ export function ReadingLibraryPanel({
 	};
 	const resetList = () => { setVisible(PAGE_SIZE); lists.current.get(section)?.scrollTo({ top: 0 }); };
 	const selectSection = (next: ReadingSection) => {
-		setSection(next); setTag(null); setArticleFilter('');
+		setSection(next); setTag(null);
 		if (renderLibraryContent && next !== section) setVisible(PAGE_SIZE);
 		else resetList();
 	};
 	const renderLibrary = (content: React.ReactNode) => renderLibraryContent ? renderLibraryContent(section, content) : content;
-	const highlightsCopy = emptyHighlightsCopy(Boolean(listQuery || articleFilter || tag)), linksCopy = emptyLinksCopy(section, Boolean(listQuery || tag));
+	const highlightsCopy = emptyHighlightsCopy(Boolean(listQuery || tag)), linksCopy = emptyLinksCopy(section, Boolean(listQuery || tag));
 	return <section className="crate-reading crate-reading-workspace" aria-label="Reading" data-list-style={listStyle} data-reader-open={!!reader} data-reader-motion={readerMotion}>
 		<div className="crate-reading__layout">
 			<aside className="crate-reading__sidebar" inert={readerMotion !== undefined && (!!reader || readerClosing)}>
@@ -163,7 +158,6 @@ export function ReadingLibraryPanel({
 					<option value="">All tags</option>
 					{tags.map(value => <option key={value} value={value}>{value}</option>)}
 				</select><ThemeIcon id="chevron-down" size="s" aria-hidden="true" /></label>}
-				{section === 'highlights' && <HighlightArticleFilter items={loaded} value={articleFilter} onChange={value => { setArticleFilter(value); resetList(); }} />}
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1}>
 					{notice}
@@ -177,7 +171,7 @@ export function ReadingLibraryPanel({
 					</Button>}
 					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" /> : <>
 						{section === 'highlights' && (count > 0
-							? <HighlightGroups key={`${listQuery}:${articleFilter}:${tag ?? ''}`} disabled={busy.has('open')}
+							? <HighlightGroups key={`${listQuery}:${tag ?? ''}`} disabled={busy.has('open')}
 								entries={excerptGroups.slice(0, visible).flatMap(group => group.entries)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />
 							: <EmptyState className="crate-reading__empty" icon="highlighter" title={highlightsCopy.title} description={highlightsCopy.description} />)}
 						{section !== 'highlights' && items.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open" title={linksCopy.title} description={linksCopy.description}>

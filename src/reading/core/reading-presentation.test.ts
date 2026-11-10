@@ -41,12 +41,11 @@ describe('highlight article groups', () => {
 			{ start: 4, end: 7, text: 'New', createdAt: '2026-09-23', note: 'Keep' },
 		] });
 		const second = item('second', '2026-09-02', { highlights: [{ start: 0, end: 6, text: 'Middle', createdAt: '2026-09-22' }] });
-		const entries = filterReadingHighlights([first, second], '', '');
+		const entries = filterReadingHighlights([first, second], '');
 		const groups = groupReadingHighlights(entries);
 		expect(groups.map(group => group.item.crate_reading_id)).toEqual(['first', 'second']);
 		expect(groups[0]?.entries.map(entry => entry.highlight.text)).toEqual(['New', 'Old']);
-		expect(groupReadingHighlights(filterReadingHighlights([first, second], 'keep', ''))).toHaveLength(1);
-		expect(groupReadingHighlights(filterReadingHighlights([first, second], '', 'second'))[0]?.item).toBe(second);
+		expect(groupReadingHighlights(filterReadingHighlights([first, second], 'keep'))).toHaveLength(1);
 		expect(groupReadingHighlights([])).toEqual([]);
 		expect(entries.map(entry => entry.highlight.text)).toEqual(['New', 'Middle', 'Old']);
 	});

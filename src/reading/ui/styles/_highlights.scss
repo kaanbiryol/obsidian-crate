@@ -145,26 +145,4 @@
 		@media (hover: hover) and (pointer: fine) { &:hover { background: color-mix(in srgb, var(--crate-control-hover-bg) 60%, var(--background-primary)); } }
 		&[data-press-active] { background: color-mix(in srgb, var(--crate-control-active-bg) 75%, var(--background-primary)); }
 	}
-	.crate-highlight-filter { display: flex; align-items: center; gap: 6px; margin: 0 18px 8px; min-width: 0; }
-	.crate-highlight-filter button.crate-highlight-filter__trigger {
-		min-width: 0; min-height: 44px; height: auto; max-width: 100%; flex-shrink: 1;
-		--crate-action-border: var(--crate-divider);
-		padding: 8px 8px; border-radius: 12px; gap: 4px;
-		background: var(--crate-control-bg); box-shadow: none;
-		font-size: var(--crate-font-xxs); font-weight: var(--crate-font-weight-medium); line-height: 1.4; color: var(--text-normal);
-		&[data-filtered] { --crate-action-border: var(--crate-accent); background: var(--crate-selection-bg); color: var(--crate-accent-text); }
-		@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: var(--crate-control-hover-bg); } }
-		&[data-press-active]:not(:disabled) { background: var(--crate-control-active-bg); }
-	}
-	.crate-highlight-filter > .crate-icon-button { flex-shrink: 0; }
-	.crate-highlight-filter__trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-	.crate-highlight-filter__trigger svg { flex-shrink: 0; width: 14px; height: 14px; color: var(--text-muted); }
-	.crate-highlight-filter__trigger[data-filtered] svg { color: currentColor; }
-	.crate-highlight-picker { display: grid; gap: var(--crate-space-8); }
-	.crate-highlight-picker__option { @include list-item.primary-spacing; display: flex; align-items: center; justify-content: space-between; border: 0; border-radius: 8px; background: transparent; color: var(--text-normal); text-align: left; }
-	.crate-highlight-picker__option small { display: block; color: var(--text-muted); margin-top: var(--crate-list-copy-gap); }
-	.crate-highlight-picker__option svg { flex-shrink: 0; }
-	.crate-highlight-picker__option[aria-pressed="true"] { background: var(--crate-selection-bg); }
-	@media (hover: hover) and (pointer: fine) { .crate-highlight-picker__option:hover { background: var(--crate-control-hover-bg); } }
-	.crate-highlight-picker__option[data-press-active] { background: var(--crate-control-active-bg); }
 }

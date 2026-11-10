@@ -37,10 +37,9 @@ export function groupReadingItems(items: ReadingItem[], now = new Date()): { lab
 	return Array.from(groups, ([label, items]) => ({ label, items }));
 }
 
-export function filterReadingHighlights(items: ReadingItem[], query: string, articleId: string) {
+export function filterReadingHighlights(items: ReadingItem[], query: string) {
 	const search = query.trim().toLocaleLowerCase();
-	return items.filter(item => !articleId || item.crate_reading_id === articleId)
-		.flatMap(item => (item.highlights ?? [])
+	return items.flatMap(item => (item.highlights ?? [])
 			.filter(highlight => `${item.title} ${item.author ?? ''} ${item.source_url} ${item.tags.join(' ')} ${highlight.text} ${highlight.note ?? ''}`.toLocaleLowerCase().includes(search))
 			.map(highlight => ({ item, highlight })))
 		.sort((a, b) => (b.highlight.createdAt ?? b.item.saved_at).localeCompare(a.highlight.createdAt ?? a.item.saved_at)
