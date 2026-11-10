@@ -271,9 +271,8 @@ CREATE TABLE IF NOT EXISTS reading_policy (
 );
 -- Reading notes in the Reading folder, written in the same batch as each file commit.
 -- Lists page by `saved_at` (empty for notes with an issue). `status`, `favorite` and
--- `highlighted` select a section. In an encrypted vault `card` (sealed by a device, or by the
--- server for a Shortcut save) comes from the note's upload, and `stale` marks an upload that
--- carried none. `terms` is the JSON array stored in `note_terms` under scope `reading`, and
+-- `highlighted` select a section. In an encrypted vault `card` comes from the note's upload,
+-- sealed by the device that encrypted it, and `stale` marks an upload that carried none. `terms` is the JSON array stored in `note_terms` under scope `reading`, and
 -- `words` an unencrypted note's title words, which confirm a search's candidates.
 CREATE TABLE IF NOT EXISTS reading_items (
  portable_path TEXT PRIMARY KEY, path TEXT NOT NULL, storage_key TEXT NOT NULL,
