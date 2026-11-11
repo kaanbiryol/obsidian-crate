@@ -207,7 +207,7 @@ it('restarts a saved export after its write guards were removed', async () => {
 	await expect(h.run()).rejects.toThrow('Interrupted');
 	expect(h.progress()).toMatchObject({ phase: 'finishing' });
 	for (const row of h.db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger'").all()) h.db.exec(`DROP TRIGGER "${String(row.name)}"`);
-	h.db.exec("INSERT INTO reminder_identities(reminder_id,created_operation_id) VALUES ('written-later','operation')");
+	h.db.exec("INSERT INTO reminder_identities(reminder_id) VALUES ('written-later')");
 	await h.run();
 	expect(h.fence.mutate.mock.calls.map(([, step]) => step)).toEqual(['freeze-upgrade-data', 'freeze-upgrade-data', 'verify-upgrade-checkpoint']);
 	expect(database(h.exported()).prepare('SELECT reminder_id FROM reminder_identities').all()).toEqual([{ reminder_id: 'written-later' }]);
@@ -271,8 +271,8 @@ it('pages large tables by key so each row is read once', async () => {
 	const h = await harness();
 	const receipt = h.db.prepare('INSERT INTO upload_operations(operation_id,request_hash,response_json) VALUES (?,?,?)');
 	for (let index = 0; index < 1234; index++) receipt.run(`op-${String(index).padStart(5, '0')}`, `hash-${index}`, `{"index":${index}}`);
-	const identity = h.db.prepare('INSERT INTO reminder_identities(reminder_id,created_operation_id) VALUES (?,?)');
-	for (let index = 0; index < 1001; index++) identity.run(`reminder-${index}`, 'operation');
+	const identity = h.db.prepare('INSERT INTO reminder_identities(reminder_id) VALUES (?)');
+	for (let index = 0; index < 1001; index++) identity.run(`reminder-${index}`);
 	await h.run();
 	const pages = h.api.queryD1.mock.calls.map(([, , sql]) => sql).filter(sql => /FROM "(upload_operations|reminder_identities)"/.test(sql));
 	expect(h.api.queryD1.mock.calls.some(([, , sql]) => /\bOFFSET\b/i.test(sql))).toBe(false);

@@ -13,7 +13,7 @@ stay.
 - Reading notes stay ordinary synced notes and the only source of truth.
 - `reading_items` holds one row per note: what the web app lists. Rows are derived and can be
   rebuilt.
-- `note_terms` holds each listed note's search terms under scope `reading`, keyed by saved
+- `note_terms` holds each listed note's search terms, keyed by saved
   date: one per title word (`p:` and its first three letters, or `w:` and the whole word when
   shorter), `t:` for a tag and `u:` for the link identity (`src/reading/core/search-terms.ts`).
   The scope lets other note indexes, such as a future vault-wide one, share the table.

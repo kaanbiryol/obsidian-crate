@@ -203,7 +203,7 @@ it('names captures after their title and renames a link-named note once a retry 
 	// The retry creates the titled note and deletes the old one in one commit.
 	await h.api(async () => ({ markdown: 'Later text.', title: 'Later headline' })).request('/reading/retry', JSON.stringify({ operationId: operation(), id: bare.id }));
 	expect((await names()).sort()).toEqual([`Reading/Later headline - private.example - ${bare.id.slice(0, 8)}.md`, `Reading/Private headline - private.example - ${titled.id.slice(0, 8)}.md`]);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM file_deletion_receipts').first()).toEqual({ count: 1 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM file_versions WHERE deletion_revision IS NOT NULL').first()).toEqual({ count: 1 });
 	const library = await h.api().request('/reading/items?section=inbox') as { items: ReadingItem[] };
 	expect(library.items.find(item => item.crate_reading_id === bare.id)).toMatchObject({ title: 'Later headline', extraction_status: 'ready' });
 	expect(h.requests.join()).not.toContain('headline');

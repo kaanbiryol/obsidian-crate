@@ -1,3 +1,4 @@
+import { LAST_SEQ_SQL } from '../sync/storage';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../http/cors';
@@ -96,7 +97,10 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 	const complete = { ...receipt, complete: true };
 	const setup = await env.DB.prepare('SELECT 1 FROM maintenance_state WHERE key = ?').bind(PREFIX + receipt.id + SETUP_SUFFIX).first();
 	await env.DB.batch([
-		...['files', 'file_versions', 'changelog', 'file_deletion_receipts', 'upload_operations', 'reminder_operations',
+		// Sequence numbers keep rising after the changelog and import snapshot are emptied.
+		env.DB.prepare(`INSERT INTO changelog_floor(id, seq) VALUES (1, ${LAST_SEQ_SQL})
+			ON CONFLICT(id) DO UPDATE SET seq = excluded.seq`),
+		...['files', 'file_versions', 'changelog', 'upload_operations', 'reminder_operations',
 			'reminder_file_cache', 'reminder_identities', 'reminder_occurrences', 'reminder_sources', 'reminder_source_state',
 			'reminder_projections', 'notification_projection_jobs', 'notification_file_retries', 'notification_policy', 'initial_import',
 			'web_enrollment_tokens', 'push_subscriptions', ...READING_TABLES].map(table => env.DB.prepare(`DELETE FROM ${table}`)),

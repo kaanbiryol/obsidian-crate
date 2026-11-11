@@ -149,7 +149,15 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 			});
 			const token = crypto.randomUUID();
 			const current = existing ?? await readExistingNotifications(env.DB, operations.map(operation => operation.id));
-			const chunks = operationChunks(planNotificationOperations(current, operations, token));
+			const plan = planNotificationOperations(current, operations, token);
+			// Only changed alarms are enqueued, and a projection row already naming this file and
+			// token needs no upsert. When jobs of this pass share reminders, `projectedRows` may be
+			// stale, so every projection row is upserted.
+			const projected = new Set(existing ? projectedRows.filter(row => row.file_path === job.path).map(row => row.reminder_id) : []);
+			const enqueued = plan.filter(entry => entry.enqueue);
+			const reprojected = plan.filter(entry => !projected.has(entry.id) || current.get(entry.id)?.token !== entry.token);
+			const chunks = enqueued.length ? operationChunks(enqueued) : [];
+			const projections = reprojected.length ? operationChunks(reprojected) : [];
 			const fileGuard = file ? fileRevisionGuard(job.path, file.storageKey)
 				: { sql: `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`, args: filePathArgs(job.path) };
 			const guard = `EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = ? AND job_token = ?)
@@ -175,11 +183,11 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 					.bind(token, job.path, JSON.stringify([...ids]), ...args)] : []),
 				...chunks.map(json => env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
           SELECT json_extract(value, '$.id'), json_extract(value, '$.token'), json_extract(value, '$.operation'), json_extract(value, '$.payload'), 0, 0
-          FROM json_each(?) WHERE json_extract(value, '$.enqueue') = 1 AND ${guard}
+          FROM json_each(?) WHERE ${guard}
           ${upsertJob}`).bind(json, ...args)),
 				...(departed ? [env.DB.prepare(`DELETE FROM reminder_projections WHERE file_path = ?
           AND reminder_id NOT IN (SELECT value FROM json_each(?)) AND ${guard}`).bind(job.path, JSON.stringify([...ids]), ...args)] : []),
-				...chunks.map(json => env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, notification_token)
+				...projections.map(json => env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, notification_token)
           SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.token') FROM json_each(?) WHERE ${guard}
           ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path, notification_token = excluded.notification_token
           WHERE reminder_projections.file_path IS NOT excluded.file_path

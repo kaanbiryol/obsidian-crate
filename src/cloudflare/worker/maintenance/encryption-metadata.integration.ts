@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { DESCRIPTOR_CLEANUP_PAGE, pruneEncryptionMetadata, releaseExpiredVersionDescriptors, releasePrunedChangelogDescriptors } from './encryption-metadata';
-import { enqueueExpiredFileVersions } from './object-cleanup';
+import { expireFileVersions } from './object-cleanup';
 import { runMaintenanceEpisode } from './lifecycle';
 import { pruneChangelog } from '../d1/db';
 import { sealFile } from '../../../encryption/file-codec';
@@ -46,7 +46,7 @@ it('sweeps old unreferenced and receipt-only descriptors, preserving data, histo
 	await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('live.md', 'live.md', 'live')").run();
 	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('history', 'old.md', 'hash', 1, 'replaced', 0)").run();
 	await put('changelog', 'changed.md', '-3 days');
-	await env.DB.prepare("INSERT INTO file_deletion_receipts(consumed_revision, revision, changelog_seq, path, consumed_hash, request_id) VALUES ('deletion', 'deleted', 1, 'deleted.md', 'hash', 'request')").run();
+	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, deletion_revision, request_id, expires_at) VALUES ('deletion', 'deleted.md', 'hash', 1, 'deleted', 'deleted', 'request', 0)").run();
 	// A replayed upload receipt returns its stored response and never needs the descriptor.
 	await env.DB.prepare(`INSERT INTO upload_operations(operation_id, request_hash, response_json) VALUES ('operation', 'hash', '{"revision":"receipt"}')`).run();
 	await env.DB.prepare("INSERT INTO staged_uploads(storage_key, file_path) VALUES ('upload', 'upload.md')").run();
@@ -54,7 +54,7 @@ it('sweeps old unreferenced and receipt-only descriptors, preserving data, histo
 	expect(await pruneEncryptionMetadata(env.DB, true)).toBe(false);
 	expect(await retained()).toEqual([...references, 'new'].sort());
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM files').first()).toEqual({ n: 1 });
-	expect(await env.DB.prepare('SELECT count(*) AS n FROM file_versions').first()).toEqual({ n: 1 });
+	expect(await env.DB.prepare('SELECT count(*) AS n FROM file_versions').first()).toEqual({ n: 2 });
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM upload_operations').first()).toEqual({ n: 1 });
 });
 
@@ -97,7 +97,7 @@ it('releases a descriptor in the changelog pruning transaction when that entry w
 	await put('newest', 'newest.md', '-1 minute');
 	await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('live.md', 'live.md', 'live')").run();
 	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('history', 'history.md', 'hash', 1, 'replaced', ?)").bind(Date.now() + 60_000).run();
-	await env.DB.prepare("INSERT INTO file_deletion_receipts(consumed_revision, revision, changelog_seq, path, consumed_hash, request_id) VALUES ('deletion', 'deleted', 99, 'deletion.md', 'hash', 'request')").run();
+	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, deletion_revision, request_id, expires_at) VALUES ('deletion', 'deletion.md', 'hash', 1, 'deleted', 'deleted', 'request', ?)").bind(Date.now() + 60_000).run();
 	await env.DB.prepare("INSERT INTO staged_uploads(storage_key, file_path) VALUES ('upload', 'upload.md')").run();
 	expect(await pruneChangelog(env.DB, expired => releasePrunedChangelogDescriptors(env.DB, expired))).toBe(false);
 	expect(await retained()).toEqual(['deletion', 'history', 'live', 'upload']);
@@ -106,17 +106,17 @@ it('releases a descriptor in the changelog pruning transaction when that entry w
 
 it('releases a descriptor in the version expiry transaction only after its changelog entry is gone', async () => {
 	const now = Date.now();
+	// A deleted file's retained version is also its deletion receipt, so both expire together.
 	for (const [revision, age] of [['released', '-40 days'], ['logged', '-2 days'], ['deletion', '-40 days'], ['restored', '-40 days']] as const) {
 		await descriptor(revision, age);
 		await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES (?, ?, 'hash', 1, 'deleted', ?)").bind(revision, `${revision}.md`, now - 1).run();
 	}
 	await put('logged', 'logged.md', '-2 days');
-	await env.DB.prepare("INSERT INTO file_deletion_receipts(consumed_revision, revision, changelog_seq, path, consumed_hash, request_id) VALUES ('deletion', 'deleted', 99, 'deletion.md', 'hash', 'request')").run();
 	await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('restored.md', 'restored.md', 'restored')").run();
-	expect(await enqueueExpiredFileVersions(env.DB, now, expired => releaseExpiredVersionDescriptors(env.DB, expired))).toBe(false);
-	expect(await retained()).toEqual(['deletion', 'logged', 'restored']);
+	expect(await expireFileVersions(env.BUCKET, env.DB, now, expired => releaseExpiredVersionDescriptors(env.DB, expired))).toBe(false);
+	expect(await retained()).toEqual(['logged', 'restored']);
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM file_versions').first()).toEqual({ n: 0 });
-	expect(await env.DB.prepare('SELECT count(*) AS n FROM object_cleanup_queue').first()).toEqual({ n: 4 });
+	expect(await env.DB.prepare('SELECT count(*) AS n FROM object_cleanup_queue').first()).toEqual({ n: 0 });
 });
 
 it('keeps pace with a descriptor backlog across scheduled passes within the query budget', async () => {
@@ -153,7 +153,6 @@ it('keeps worst-case passes within the query budget when every maintenance task 
 		env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 600)
 			INSERT INTO object_cleanup_queue(storage_key, file_path) SELECT 'queued-'||x, 'queued.md' FROM n`),
 		env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('expired', 'expired.md', 'hash', 1, 'replaced', 0)"),
-		env.DB.prepare("INSERT INTO file_deletion_receipts(consumed_revision, revision, changelog_seq, path, consumed_hash, request_id, created_at) VALUES ('consumed', 'deleted', 99, 'deleted.md', 'hash', 'request', datetime('now', '-40 days'))"),
 		env.DB.prepare("INSERT INTO reminder_occurrences(reminder_id, due_key, first_seen_at) VALUES ('reminder', '2020-01-01', 0)"),
 		env.DB.prepare("INSERT INTO upload_operations(operation_id, request_hash, response_json) VALUES (?, 'hash', '{}')").bind(createReminderOperationId(1)),
 		env.DB.prepare("INSERT INTO request_rate_limits(key, count, expires_at) VALUES ('limit', 1, 0)"),
@@ -178,7 +177,7 @@ it('keeps worst-case passes within the query budget when every maintenance task 
 	expect(queries.filter(count => count > D1_QUERIES_PER_INVOCATION)).toEqual([]);
 	expect(queries).toHaveLength(3);
 	expect(await retained()).toEqual([]);
-	for (const table of ['object_cleanup_queue', 'staged_uploads', 'staged_upload_batches', 'file_versions', 'file_deletion_receipts', 'reminder_occurrences', 'upload_operations', 'request_rate_limits', 'auth_tokens']) {
+	for (const table of ['object_cleanup_queue', 'staged_uploads', 'staged_upload_batches', 'file_versions', 'reminder_occurrences', 'upload_operations', 'request_rate_limits', 'auth_tokens']) {
 		expect(await env.DB.prepare(`SELECT count(*) AS n FROM ${table}`).first(), table).toEqual({ n: 0 });
 	}
 	expect(await env.DB.prepare("SELECT key FROM maintenance_state WHERE key GLOB 'e2ee:receipt:*'").first()).toBeNull();

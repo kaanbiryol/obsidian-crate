@@ -70,8 +70,8 @@ it('drains thousands of expired versions within bounded passes and keeps referen
 		vi.restoreAllMocks();
 	} while (setAlarm.mock.calls.length && passes < 20);
 
-	// 6,001 queued objects at 500 per pass, beyond the ten-pass limit for other work.
-	expect(passes).toBe(13);
+	// 6,000 expired versions at 500 per pass, beyond the ten-pass limit for other work.
+	expect(passes).toBe(12);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM object_cleanup_queue').first()).toEqual({ n: 0 });
 	expect((await env.DB.prepare('SELECT storage_key FROM file_versions').all()).results).toEqual([{ storage_key: 'retained' }]);
 	expect((await env.BUCKET.list()).objects.map(object => object.key).sort())

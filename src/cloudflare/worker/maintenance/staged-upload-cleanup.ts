@@ -30,8 +30,7 @@ export async function cleanStagedUploads(bucket: R2Bucket, db: D1Database, now =
 			.bind(JSON.stringify(finished)),
 		// An absent object may still be uploading. Keep its record instead of losing a late write.
 		db.prepare(`UPDATE staged_uploads SET attempts = attempts + 1,
-      expires_at = CASE WHEN attempts + 1 >= 8 THEN NULL ELSE ? END,
-      last_error = 'Object cleanup could not be confirmed; the upload record is retained'
+      expires_at = CASE WHEN attempts + 1 >= 8 THEN NULL ELSE ? END
       WHERE storage_key IN (SELECT value FROM json_each(?))`)
 			.bind(now + STAGED_UPLOAD_TTL_MS, JSON.stringify(waiting)),
 	]);

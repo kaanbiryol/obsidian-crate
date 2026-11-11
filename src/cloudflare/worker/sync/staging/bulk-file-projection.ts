@@ -27,7 +27,7 @@ export async function bulkFileProjection(db: D1Database, files: Array<{ path: st
 		statement(`INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified)
       SELECT path, storage_key, ?, issue IS NULL FROM live WHERE 1
       ON CONFLICT(file_path) DO UPDATE SET file_revision = excluded.file_revision, parser_version = excluded.parser_version,
-        verified = excluded.verified, sources_digest = NULL, updated_at = datetime('now')`, REMINDER_CACHE_PARSER_VERSION),
+        verified = excluded.verified, sources_digest = NULL`, REMINDER_CACHE_PARSER_VERSION),
 		statement(`INSERT INTO notification_projection_jobs(path, job_token)
       SELECT DISTINCT file_path, ? FROM reminder_sources WHERE reminder_id IN (
         SELECT reminder_id FROM reminder_sources WHERE file_path IN (SELECT path FROM valid) UNION SELECT id FROM sources)

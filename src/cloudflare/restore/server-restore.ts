@@ -22,11 +22,6 @@ export async function listUpgradeBackups(api: CloudflareApiClient, source: Backu
 const MARKER = 'crate_restore_progress';
 export function rowSql(row: BackupRow, expected: string): string {
 	const guard = `EXISTS (SELECT 1 FROM maintenance_state WHERE key='${MARKER}' AND value=${literal(expected)})`;
-	if (row.table === 'sqlite_sequence') {
-		const name = row.values[row.columns.indexOf('name')];
-		if (typeof name !== 'string') throw new Error('Invalid backup sequence');
-		return `DELETE FROM sqlite_sequence WHERE name=${literal(name)} AND ${guard};\nINSERT INTO sqlite_sequence(${row.columns.map(quote).join(',')}) SELECT ${row.values.map(literal).join(',')} WHERE ${guard};`;
-	}
 	return `INSERT INTO ${quote(row.table)}(${row.columns.map(quote).join(',')}) SELECT ${row.values.map(literal).join(',')} WHERE ${guard};`;
 }
 function rowBatches(rows: BackupRow[], plan: string): string[] {

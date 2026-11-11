@@ -33,7 +33,7 @@ export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentS
 		refs.delete(item.key);
 	}
 	if (refs.size) throw new Error('Backup is missing file contents');
-	return rows.filter(row => !RESET.has(row.table) && !(row.table === 'maintenance_state' && discardMaintenanceKey(String(record(row).key)))).map(row => {
+	const prepared = rows.filter(row => !RESET.has(row.table) && !(row.table === 'maintenance_state' && discardMaintenanceKey(String(record(row).key)))).map(row => {
 		const copy = { ...row, values: [...row.values] };
 		if (row.table === 'file_versions') {
 			const index = row.columns.indexOf('expires_at');
@@ -46,4 +46,16 @@ export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentS
 		}
 		return copy;
 	});
+	return withChangelogFloor(prepared);
+}
+
+/** Archives made while the changelog used AUTOINCREMENT keep its cursor in `sqlite_sequence`;
+ * the current schema keeps it in `changelog_floor`. */
+function withChangelogFloor(rows: BackupRow[]): BackupRow[] {
+	const sequence = rows.find(row => row.table === 'sqlite_sequence');
+	const result = rows.filter(row => row.table !== 'sqlite_sequence' && row.table !== 'changelog_floor');
+	const floors = [...rows.filter(row => row.table === 'changelog_floor').map(row => record(row).seq), ...sequence ? [record(sequence).seq] : []];
+	if (!floors.length) return result;
+	if (floors.some(seq => typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0)) throw new Error('Invalid backup sequence');
+	return [...result, { table: 'changelog_floor', columns: ['id', 'seq'], values: [1, Math.max(...floors as number[])] }];
 }

@@ -128,7 +128,7 @@ it('renames a note still named after its link once extraction finds the title, a
 	expect(parseReadingNote((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, renamed))!.content)).toMatchObject({ title: 'An article', extraction_status: 'ready' });
 	expect((await env.DB.prepare('SELECT path, action FROM changelog ORDER BY seq DESC LIMIT 2').all()).results).toEqual([
 		{ path: job.path, action: 'delete' }, { path: renamed, action: 'put' }]);
-	expect(await env.DB.prepare('SELECT 1 FROM file_deletion_receipts WHERE path=?').bind(job.path).first()).not.toBeNull();
+	expect(await env.DB.prepare('SELECT 1 FROM file_versions WHERE path=? AND deletion_revision IS NOT NULL').bind(job.path).first()).not.toBeNull();
 	expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
 	// A name the user chose is never replaced.
 	const other = createReadingNote({ id: crypto.randomUUID(), url: 'https://example.com/kept', savedAt: new Date().toISOString() });

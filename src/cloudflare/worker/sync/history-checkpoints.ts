@@ -4,7 +4,7 @@ import type { FileEntry } from '../../../protocol/sync-types';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { corsHeaders, corsResponse } from '../http/cors';
 import { fileTransportLimit } from '../../../encryption/file-format';
-import { storedObjectMatchesMetadata } from './storage';
+import { LAST_SEQ_SQL, storedObjectMatchesMetadata } from './storage';
 import { sanitizePath } from '../http/request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
@@ -30,7 +30,7 @@ async function readIndex(bucket: R2Bucket) {
 }
 
 async function generation(db: D1Database) {
-	const row = await db.prepare(`SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'changelog'), 0) AS sequence,
+	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS sequence,
         COALESCE((SELECT state FROM initial_import WHERE id = 1), 'complete') AS state,
         CAST(strftime('%s', 'now') AS INTEGER) * 1000 AS now`).first<{ sequence: number; state: string; now: number }>();
 	if (!row) throw new Error('Could not read checkpoint generation');

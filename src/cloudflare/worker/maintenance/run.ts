@@ -3,10 +3,9 @@ import { readEncryptionState } from '../encryption/state';
 import { cleanStagedUploads } from './staged-upload-cleanup';
 import { cleanStagedBatches } from './staged-batch-cleanup';
 import { deploymentFenceHeld, pruneChangelog } from '../d1/db';
-import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './object-cleanup';
+import { drainObjectCleanupQueue, expireFileVersions } from './object-cleanup';
 import type { Env } from '../types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './database';
-import { pruneFileDeletionReceipts } from '../sync/file-delete-audit';
 import { pruneReminderOccurrences } from './reminder-history';
 import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
@@ -38,11 +37,10 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true, rese
 			}
 		}],
 				['prune shared checkpoints', bounded(() => pruneSharedCheckpoints(env.BUCKET, db))],
-		// Changelog entries and deletion receipts usually expire before the versions of
-		// their revisions, so each descriptor is released with its last reference.
+		// Changelog entries usually expire before the versions of their revisions, so each
+		// descriptor is released with its last reference.
 		['prune changelog', bounded(() => pruneChangelog(db, encrypted ? expired => releasePrunedChangelogDescriptors(db, expired) : undefined))],
-		['prune file deletion receipts', bounded(() => pruneFileDeletionReceipts(db))],
-		['expire file versions', bounded(() => enqueueExpiredFileVersions(db, Date.now(),
+		['expire file versions', bounded(() => expireFileVersions(env.BUCKET, db, Date.now(),
 			encrypted ? expired => releaseExpiredVersionDescriptors(db, expired) : undefined))],
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, db); }],
 		// Unbounded scans of retained history: once per episode, not on every follow-up pass.

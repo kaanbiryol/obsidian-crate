@@ -66,7 +66,7 @@ beforeEach(async () => {
       ?, 'inbox', '["p:exa"]', '["example"]'
     FROM (SELECT *, CAST(substr(path, 9, length(path) - 11) AS INTEGER) AS n FROM files WHERE path >= 'Reading/' AND path < 'Reading0')`)
 		.bind(JSON.stringify(template), template.saved_at).run();
-	await env.DB.prepare(`INSERT INTO note_terms(scope, term, saved_at, portable_path) SELECT 'reading', 'p:exa', saved_at, portable_path FROM reading_items`).run();
+	await env.DB.prepare(`INSERT INTO note_terms(term, saved_at, portable_path) SELECT 'p:exa', saved_at, portable_path FROM reading_items`).run();
 });
 afterEach(reset);
 

@@ -41,7 +41,7 @@ async function seedLibrary(notes: number) {
     FROM (SELECT *, printf('00000000-0000-4000-8000-%012d', n) AS id, strftime('%Y-%m-%dT%H:%M:%fZ', '2020-01-01', '+' || n || ' minutes') AS saved
       FROM (SELECT *, CAST(substr(path, 9, length(path) - 11) AS INTEGER) AS n FROM files WHERE path >= 'Reading/' AND path < 'Reading0'))`)
 		.bind(JSON.stringify(template)).run();
-	await env.DB.prepare(`INSERT INTO note_terms(scope, term, saved_at, portable_path) SELECT 'reading', t.value, i.saved_at, i.portable_path FROM reading_items i, json_each(i.terms) t`).run();
+	await env.DB.prepare(`INSERT INTO note_terms(term, saved_at, portable_path) SELECT t.value, i.saved_at, i.portable_path FROM reading_items i, json_each(i.terms) t`).run();
 }
 
 beforeEach(async () => { await applySchema(env.DB); });

@@ -16,8 +16,6 @@ import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-p
  * same D1 batch as the file commit, so reads never re-check `files`. Only a new scope
  * (folder, generation or format), a restore or an initial import rebuilds it from R2. */
 const INDEX_FORMAT = 2;
-/** The `note_terms` scope of Reading notes. */
-export const READING_TERM_SCOPE = 'reading';
 /** The upsert's unindexed columns for a note with a current card or metadata, from `committed c`. */
 const UNINDEXED = `storage_key = c.storage_key, hash = c.hash, size = c.size, metadata_json = c.metadata_json,
         error = c.error, words = c.words, terms = c.terms, card = c.card`;
@@ -146,15 +144,15 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 	// key to delete, so no second index on the terms is needed.
 	const termKeys = (rows: string) => `(term, saved_at, portable_path) IN (SELECT t.value, r.saved_at, r.portable_path FROM (${rows}) r, json_each(r.terms) t)`;
 	return [
-		...(removes ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND ${termKeys(`SELECT terms, saved_at, portable_path FROM reading_items WHERE ${removed}`)}`)] : []),
+		...(removes ? [statement(`DELETE FROM note_terms WHERE ${termKeys(`SELECT terms, saved_at, portable_path FROM reading_items WHERE ${removed}`)}`)] : []),
 		// A changed saved date moves every key; otherwise only the terms the note lost leave,
 		// and the insert below adds only the new ones.
-		...(plain.length ? [statement(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}' AND (term, saved_at, portable_path) IN (
+		...(plain.length ? [statement(`DELETE FROM note_terms WHERE (term, saved_at, portable_path) IN (
         SELECT t.value, i.saved_at, i.portable_path FROM committed c JOIN reading_items i ON i.portable_path = c.portable, json_each(i.terms) t
         WHERE c.keep = 1 AND c.stale = 0 AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)
           AND (i.saved_at IS NOT c.saved_at OR c.terms IS NULL OR t.value NOT IN (SELECT value FROM json_each(c.terms))))`)] : []),
-		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(scope, term, saved_at, portable_path)
-        SELECT '${READING_TERM_SCOPE}', t.value, r.saved_at, r.portable FROM (SELECT c.terms, c.saved_at, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable
+		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(term, saved_at, portable_path)
+        SELECT t.value, r.saved_at, r.portable FROM (SELECT c.terms, c.saved_at, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable
           WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)) r, json_each(r.terms) t`)] : []),
 		...(removes ? [
 			statement(`DELETE FROM reading_items WHERE ${removed}`),
@@ -243,7 +241,7 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 		index = { scope, cursor: '' };
 		await db.batch([
 			db.prepare('DELETE FROM reading_items'),
-			db.prepare(`DELETE FROM note_terms WHERE scope = '${READING_TERM_SCOPE}'`),
+			db.prepare('DELETE FROM note_terms'),
 			db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
 			db.prepare(`INSERT INTO reading_index(id, scope, cursor) VALUES (1, ?, '')
         ON CONFLICT(id) DO UPDATE SET scope = excluded.scope, cursor = excluded.cursor`).bind(scope),

@@ -1,3 +1,4 @@
+import { LAST_SEQ_SQL } from '../storage';
 import { INITIAL_IMPORT_VERIFY_PAGE, type ImportInventoryEntry, type InitialImport } from '@/protocol/initial-import';
 import { queryRows, readMaintenanceValue } from '../../d1/db';
 import { corsResponse } from '../../http/cors';
@@ -19,7 +20,7 @@ export async function beginInitialImport(db: D1Database, wakeReminders?: () => P
 		await db.prepare(`INSERT INTO initial_import(id, token, state)
       SELECT 1, ?, 'importing' WHERE NOT EXISTS (SELECT 1 FROM files)
         AND NOT EXISTS (SELECT 1 FROM changelog) AND NOT EXISTS (SELECT 1 FROM file_versions)
-        AND NOT EXISTS (SELECT 1 FROM file_deletion_receipts) AND NOT EXISTS (SELECT 1 FROM upload_operations)
+        AND NOT EXISTS (SELECT 1 FROM upload_operations)
         AND ${plaintext.sql}
       ON CONFLICT(id) DO NOTHING`).bind(crypto.randomUUID(), ...plaintext.args).run();
 		current = await readInitialImport(db);
@@ -70,12 +71,9 @@ export async function finishInitialImport(request: Request, db: D1Database): Pro
 		return corsResponse({ cursor });
 	}
 	await db.batch([
-		db.prepare(`UPDATE initial_import SET state = 'complete', snapshot_seq = MAX(snapshot_seq, 1, (SELECT COALESCE(MAX(seq), 0) + 1 FROM changelog))
+		// Later changelog entries number from the snapshot (see LAST_SEQ_SQL).
+		db.prepare(`UPDATE initial_import SET state = 'complete', snapshot_seq = MAX(1, ${LAST_SEQ_SQL} + 1)
       WHERE id = 1 AND token = ? AND state = 'importing' AND generation = ?`).bind(current.token, current.generation),
-		db.prepare(`INSERT INTO sqlite_sequence(name, seq) SELECT 'changelog', snapshot_seq FROM initial_import
-      WHERE state = 'complete' AND NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'changelog')`),
-		db.prepare(`UPDATE sqlite_sequence SET seq = MAX(seq, (SELECT snapshot_seq FROM initial_import))
-      WHERE name = 'changelog' AND EXISTS (SELECT 1 FROM initial_import WHERE state = 'complete')`),
 		// Folder setup can finish an empty reminder scan before the first upload starts.
 		db.prepare(`DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'
       AND EXISTS (SELECT 1 FROM initial_import WHERE state = 'complete')`),

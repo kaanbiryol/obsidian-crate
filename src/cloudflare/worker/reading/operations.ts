@@ -9,15 +9,25 @@ import { sha256Hex } from '@/platform/sha256';
 
 /** `reminderFolder` is read with the receipt, for the commit's reminder projection check. */
 export interface ReadingOperation { id: string; principal: string; generation: string; hash: string; day: number; reminderFolder: string | null }
-export async function beginOperation(db: D1Database, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string) {
-	if (typeof body.operationId !== 'string') throw new ReadingError('A saved operation ID is required.', 428);
+export interface ReadingReceiptRow { principal_id: string | null; generation: string | null; request_hash: string | null; response_json: string | null; retryable: number | null; reminder_folder: string | null }
+
+/** One read: a saved receipt is replayed even after its day leaves the retry window. Null
+ * when the body has no operation ID, which `beginOperation` refuses. */
+export function operationReceiptStatement(db: D1Database, body: Record<string, unknown>): D1PreparedStatement | null {
+	if (typeof body.operationId !== 'string') return null;
+	const day = reminderOperationDay(body.operationId);
+	return db.prepare(`SELECT r.principal_id, r.generation, r.request_hash, r.response_json,
+    (SELECT 1 WHERE ${OPERATION_VALID}) AS retryable, (SELECT folder_path FROM notification_policy WHERE id = 1) AS reminder_folder
+    FROM (SELECT 1) LEFT JOIN reading_operations r ON r.operation_id = ?`).bind(day, day, body.operationId);
+}
+
+/** `loaded` is the `operationReceiptStatement` row when the caller already read it in a batch. */
+export async function beginOperation(db: D1Database, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string, loaded?: ReadingReceiptRow | null) {
+	const statement = operationReceiptStatement(db, body);
+	if (typeof body.operationId !== 'string' || !statement) throw new ReadingError('A saved operation ID is required.', 428);
 	const day = reminderOperationDay(body.operationId);
 	const hash = await sha256Hex(JSON.stringify({ action, body }));
-	// One read: a saved receipt is replayed even after its day leaves the retry window.
-	const saved = await db.prepare(`SELECT r.principal_id, r.generation, r.request_hash, r.response_json,
-    (SELECT 1 WHERE ${OPERATION_VALID}) AS retryable, (SELECT folder_path FROM notification_policy WHERE id = 1) AS reminder_folder
-    FROM (SELECT 1) LEFT JOIN reading_operations r ON r.operation_id = ?`).bind(day, day, body.operationId)
-		.first<{ principal_id: string | null; generation: string | null; request_hash: string | null; response_json: string | null; retryable: number | null; reminder_folder: string | null }>();
+	const saved = loaded !== undefined ? loaded : await statement.first<ReadingReceiptRow>();
 	if (saved?.response_json != null) {
 		if (saved.principal_id !== principal.tokenId || saved.generation !== current.generation || saved.request_hash !== hash) throw new ReadingError('This operation ID belongs to a different save.', 409, 'operation_mismatch');
 		return readingResponse(JSON.parse(saved.response_json));

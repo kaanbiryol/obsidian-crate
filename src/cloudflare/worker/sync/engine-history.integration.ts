@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { pruneChangelog } from '../d1/db';
-import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from '../maintenance/object-cleanup';
+import { drainObjectCleanupQueue, expireFileVersions } from '../maintenance/object-cleanup';
 
 const clients: SyncTestDevice[] = [];
 beforeEach(async () => {
@@ -85,7 +85,7 @@ it.each([false, true])('merges a restarted offline edit after changelog and remo
 	// the wall clock through token expiry or waiting thirty actual days.
 	await env.DB.prepare("UPDATE changelog SET created_at = datetime('now', '-31 days')").run();
 	await pruneChangelog(env.DB);
-	await enqueueExpiredFileVersions(env.DB, Date.now() + 32 * 24 * 60 * 60_000);
+	await expireFileVersions(env.BUCKET, env.DB, Date.now() + 32 * 24 * 60 * 60_000);
 	await drainObjectCleanupQueue(env.BUCKET, env.DB);
 	expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM file_versions').first<{ n: number }>())!.n).toBe(0);
 	await offline.open();

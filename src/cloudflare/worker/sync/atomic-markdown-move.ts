@@ -12,7 +12,7 @@ import { portablePathKey } from '../../../protocol/portable-path';
 import { stageMarkdownFile } from './markdown-file-staging';
 import { FileVersionConflictError } from './markdown-files';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
-import { recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
+import type { FileDeletionReceipt } from './file-delete-audit';
 import type { MutationAuditContext } from '../http/request-diagnostics';
 import { getStoredFileRow } from './storage';
 
@@ -53,13 +53,11 @@ export async function writeCommittedMarkdownMove(
 		publishedChangelogStatement(db, destination),
 		...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, { encrypted: Boolean(encryption.state), reminderFolder: context?.reminderFolder }),
 		finishStagedUpload(db, destination.objectKey, destination.path),
-		...deletedFileStatements(db, `${sourceMatch} AND ${published.sql}`, [...sourceArgs, ...published.args], deletion),
+		...deletedFileStatements(db, `${sourceMatch} AND ${published.sql}`, [...sourceArgs, ...published.args], deletion, audit.requestId),
 	];
 	const results: unknown[] = await db.batch([
 		...beforeDelete,
 		sourceStatement('DELETE FROM files'),
-		// Must directly follow the delete's changelog row.
-		recordFileDeletion(db, source.path, source.expectedHash, source.expectedRevision, deletion, audit),
 		...await enqueueFileProjection(db, source.path, null, null, { reminderFolder: context?.reminderFolder }),
 		...await readingIndexStatements(db, [{ path: source.path, storageKey: null },
 			{ path: destination.path, storageKey: destination.objectKey, hash: destination.hash, size: destination.size, content: params.destination.content }],

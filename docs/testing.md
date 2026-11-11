@@ -543,7 +543,7 @@ web app merging deltas built from changed notes ends with the full list.
 post-commit cleanup from scheduled failure reporting. The corresponding
 `maintenance/object-cleanup.integration.ts` regression uses local D1/R2 bindings
 to retain failed cleanup and its diagnostic until a successful retry. It also
-drains 6,000 expired versions in 13 maintenance passes, each within the Free D1
+drains 6,000 expired versions in 12 maintenance passes, each within the Free D1
 query limit, without sorting the queue, while referenced objects survive.
 `sync/checkpoint-cleanup.integration.ts` checks that index rewrites delete evicted,
 expired and unpublished checkpoint inventories, including with a concurrent index

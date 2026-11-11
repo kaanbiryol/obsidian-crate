@@ -59,6 +59,8 @@ it('writes about the same rows for one reminder edit in a 20- and a 400-reminder
 	expect(small.cost.rowsWritten).toBeLessThan(30);
 	expect(large.cost.rowsWritten).toBeLessThan(30);
 	expect(Math.abs(large.cost.rowsWritten - small.cost.rowsWritten)).toBeLessThan(5);
+	// The pass skips the projection rows of unchanged reminders. Was 6,128 rows read.
+	expect(large.cost.rowsRead).toBeLessThan(5000);
 }, 60_000);
 
 it('keeps the request to a few D1 round trips and its replay to a cheap pass', async () => {

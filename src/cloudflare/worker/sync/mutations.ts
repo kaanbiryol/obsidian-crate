@@ -1,3 +1,4 @@
+import type { ObjectReference } from '../d1/storage-references';
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
 import { deletedFileStatements, keepReplacedVersionSql, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
@@ -14,7 +15,7 @@ import type { CommitEffects } from './commit-effects';
 import { allGuards, changedRows, type SqlGuard } from '../d1/db';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { assertFileNamespaceAvailable, FileNamespaceConflictError, fileNamespaceGuard } from './file-namespace';
-import { fileDeletionReceiptStatement, findFileDeletionReceipt, recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
+import { fileDeletionReceiptStatement, findFileDeletionReceipt, type FileDeletionReceipt } from './file-delete-audit';
 import type { MutationAuditContext } from '../http/request-diagnostics';
 import {
 	FILE_VERSION_EXPIRES_AT_SQL,
@@ -201,18 +202,27 @@ export async function commitStagedFiles(bucket: R2Bucket, db: D1Database, files:
 		{ policy: files[0]!.readingPolicy, encrypted: plans[0]!.encrypted }));
 	const results: unknown[] = await db.batch(statements);
 	const commits: CommitResult[] = [];
-	for (const [index, file] of files.entries()) commits.push(await settleStagedFile(bucket, db, file, results.slice(...ranges[index]!), plans[index]!.mutationIndex));
+	// Unpublished uploads are cleaned up together, so a batch of stale uploads stays
+	// within the invocation's query budget.
+	const unpublished: ObjectReference[] = [];
+	for (const [index, file] of files.entries()) commits.push(await settleStagedFile(bucket, db, file, results.slice(...ranges[index]!), plans[index]!.mutationIndex, unpublished));
+	await deleteBucketObjectsOrQueue(bucket, db, unpublished);
 	return commits;
 }
 
-/** Reads one upload's outcome from its statements' `results`. */
-async function settleStagedFile(bucket: R2Bucket, db: D1Database, params: StagedFileCommitInput, results: unknown[], mutationIndex: number): Promise<CommitResult> {
+/** Reads one upload's outcome from its statements' `results`. An upload with an operation
+ * whose object was not published is added to `unpublished` when the caller cleans up. */
+async function settleStagedFile(bucket: R2Bucket, db: D1Database, params: StagedFileCommitInput, results: unknown[], mutationIndex: number,
+	unpublished?: ObjectReference[]): Promise<CommitResult> {
 	if (params.operation) {
 		// RETURNING belongs to the atomic commit. Only a concurrent replay needs a read.
 		const recorded = (results[results.length - 1] as { results?: Array<{ response_json: string }> } | undefined)?.results?.[0];
 		const receipt = recorded ? decodeReceipt(recorded.response_json) : await readUploadReceipt(db, params.operation);
 		if (!receipt) throw new Error('Upload receipt is unavailable; retry the same operation');
-		if (receipt.revision !== params.objectKey) await deleteBucketObjectsOrQueue(bucket, db, [{ storageKey: params.objectKey, path: params.path }]);
+		if (receipt.revision !== params.objectKey) {
+			const object = { storageKey: params.objectKey, path: params.path };
+			if (unpublished) unpublished.push(object); else await deleteBucketObjectsOrQueue(bucket, db, [object]);
+		}
 		return { committed: receipt.success, currentHash: receipt.success ? params.hash : receipt.currentHash ?? null, revision: receipt.revision, ...(!receipt.success ? { failure: receipt } : {}) };
 	}
 
@@ -251,8 +261,9 @@ export interface FileDeleteInput {
 	readingPolicy?: ReadingIndexPolicy;
 }
 
-/** One deletion's statements, in the order they must keep within a batch: the receipt
- * reads the changelog row written just before it. `deleteIndex` is the `files` DELETE. */
+/** One deletion's statements, in the order they must keep within a batch. The retained
+ * copy, which is also the receipt, is written before the row it copies is deleted.
+ * `deleteIndex` is the `files` DELETE. */
 async function fileDeleteStatements(db: D1Database, params: FileDeleteInput): Promise<{ statements: D1PreparedStatement[]; deleteIndex: number; deletion: FileDeletionReceipt }> {
 	const audit = params.audit ?? { requestId: crypto.randomUUID(), deviceId: null, clientSession: null, operationId: null };
 	const revision = `__crate__/deletions/${crypto.randomUUID()}`;
@@ -262,11 +273,10 @@ async function fileDeleteStatements(db: D1Database, params: FileDeleteInput): Pr
 	const predicateArgs = params.expectedHash === null
 		? filePathArgs(params.path)
 		: [...filePathArgs(params.path), params.expectedHash, params.expectedRevision ?? ''];
-	const recorded = deletedFileStatements(db, expectedPredicate, predicateArgs, revision);
+	const recorded = deletedFileStatements(db, expectedPredicate, predicateArgs, revision, audit.requestId);
 	return { deleteIndex: recorded.length, deletion: { revision, consumedRevision: params.expectedRevision ?? '', deleteRequestId: audit.requestId }, statements: [
 		...recorded,
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
-		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
 		...await enqueueFileProjection(db, params.path, null, null, { reminderFolder: params.reminderFolder }),
 		...await readingIndexStatements(db, [{ path: params.path, storageKey: null }], { policy: params.readingPolicy }),
 		...(params.effects?.([{ path: params.path, storageKey: null }]) ?? []),

@@ -11,11 +11,11 @@ export const DESCRIPTOR_CLEANUP_PAGE = 5000;
 
 const ACTIVE = `json_extract(${ENCRYPTION_STATE_SQL}, '$.mode') = 'active'`;
 const descriptorKey = (revision: string) => `'${ENCRYPTION_FILE_PREFIX}' || ${revision}`;
-/** Deletion receipts and upload leases that still need a revision's descriptor.
- * Upload receipts are not references: a replayed receipt returns its stored
- * response, and clients never open the descriptor of a receipt's revision. */
-const held = (revision: string) => `(EXISTS (SELECT 1 FROM file_deletion_receipts WHERE consumed_revision = ${revision})
-	OR EXISTS (SELECT 1 FROM staged_uploads WHERE storage_key = ${revision})
+/** Upload leases that still need a revision's descriptor. A deletion receipt is a retained
+ * version, which every caller checks. Upload receipts are not references: a replayed
+ * receipt returns its stored response, and clients never open the descriptor of a
+ * receipt's revision. */
+const held = (revision: string) => `(EXISTS (SELECT 1 FROM staged_uploads WHERE storage_key = ${revision})
 	OR ${revision} IN (SELECT staged FROM (SELECT json_extract(k.value, '$.storageKey') AS staged
 		FROM staged_upload_batches b, json_each(b.storage_keys) k) WHERE staged IS NOT NULL))`;
 /** A revision's changelog entry is written in the same transaction as its descriptor,

@@ -7,7 +7,7 @@ import { corsHeaders, corsResponse } from '../http/cors';
 import { parseJsonObject, sanitizePath } from '../http/request-validation';
 import { readEncryptionState, prepareEncryptedFileCommit, EncryptionStateError } from './state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { getStoredFileRow, storedObjectMatchesMetadata } from '../sync/storage';
+import { getStoredFileRow, LAST_SEQ_SQL, storedObjectMatchesMetadata } from '../sync/storage';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import { writeCommittedMarkdownMove } from '../sync/atomic-markdown-move';
@@ -48,7 +48,7 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 	if (path === `${prefix}/encrypted-files`) {
 		const after = params.get('after') ?? '';
 		if (after.length > 1024) return corsResponse({ error: 'Invalid file cursor' }, 400);
-		const sequence = await env.DB.prepare("SELECT MAX(COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'changelog'), 0), COALESCE((SELECT snapshot_seq FROM initial_import), 0)) AS seq").first<{ seq: number }>();
+		const sequence = await env.DB.prepare(`SELECT ${LAST_SEQ_SQL} AS seq`).first<{ seq: number }>();
 		// Page in primary-key order from a single lower bound, so each page reads only
 		// its own rows. The cursor is opaque to clients.
 		const [keyStart = '', keyEnd, pathStart, pathEnd] = fileFolderArgs(folder);

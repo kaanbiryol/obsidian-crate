@@ -41,7 +41,7 @@ it.each([false, true])('bounds initial-upload writes and preserves retries with 
 	const result = await (await handleBatchUpload(request(files), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
 	expect(result.success).toBe(true);
 	await drainNotificationProjections({ ...env, DB: meter.db }, 8);
-	expect(meter.writes()).toBe(legacy ? 68 : 44);
+	expect(meter.writes()).toBe(legacy ? 66 : 42);
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toBeNull();
 	const beforeRetry = meter.writes();
 	const retry = await (await handleBatchUpload(request(files), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;

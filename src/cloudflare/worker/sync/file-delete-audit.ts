@@ -1,41 +1,16 @@
-import { changedRows, MAINTENANCE_DELETE_LIMIT } from '../d1/db';
-import type { MutationAuditContext } from '../http/request-diagnostics';
-
 export interface FileDeletionReceipt {
 	revision: string;
 	consumedRevision: string;
 	deleteRequestId: string;
 }
 
-/** The changelog row and receipt must be in the same batch as the deletion. */
-export function recordFileDeletion(
-	db: D1Database,
-	path: string,
-	consumedHash: string,
-	consumedRevision: string,
-	revision: string,
-	context: MutationAuditContext,
-): D1PreparedStatement {
-	return db.prepare(`INSERT INTO file_deletion_receipts
-		(consumed_revision, revision, changelog_seq, path, consumed_hash, request_id, device_id, client_session, operation_id)
-		SELECT ?, revision, seq, path, ?, ?, ?, ?, ? FROM changelog
-		WHERE seq = (SELECT MAX(seq) FROM changelog) AND revision = ? AND action = 'delete' AND path = ?`)
-		.bind(consumedRevision, consumedHash, context.requestId, context.deviceId, context.clientSession, context.operationId, revision, path);
-}
-
-/** Selects at most one `FileDeletionReceipt`. */
+/** Selects at most one `FileDeletionReceipt`: the retained copy of the deleted revision. */
 export function fileDeletionReceiptStatement(db: D1Database, path: string, hash: string, consumedRevision: string): D1PreparedStatement {
-	return db.prepare(`SELECT revision, consumed_revision AS consumedRevision, request_id AS deleteRequestId
-		FROM file_deletion_receipts WHERE consumed_revision = ? AND path = ? AND consumed_hash = ?`)
+	return db.prepare(`SELECT deletion_revision AS revision, storage_key AS consumedRevision, request_id AS deleteRequestId
+		FROM file_versions WHERE storage_key = ? AND path = ? AND hash = ? AND deletion_revision IS NOT NULL`)
 		.bind(consumedRevision, path, hash);
 }
 
 export async function findFileDeletionReceipt(db: D1Database, path: string, hash: string, consumedRevision: string): Promise<FileDeletionReceipt | null> {
 	return fileDeletionReceiptStatement(db, path, hash, consumedRevision).first<FileDeletionReceipt>();
-}
-
-export async function pruneFileDeletionReceipts(db: D1Database): Promise<boolean> {
-	const result = await db.prepare(`DELETE FROM file_deletion_receipts WHERE consumed_revision IN (SELECT consumed_revision FROM file_deletion_receipts
-		WHERE created_at < datetime('now', '-30 days') ORDER BY created_at LIMIT ?)`).bind(MAINTENANCE_DELETE_LIMIT).run();
-	return changedRows(result) === MAINTENANCE_DELETE_LIMIT;
 }

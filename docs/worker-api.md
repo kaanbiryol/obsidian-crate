@@ -123,7 +123,7 @@ matches the start of a title word, a shorter one a whole word), `tag` and `url`,
 `{ items, issues, cursor }`; the first unfiltered inbox page carries the capture queue and
 issues. An encrypted vault takes up to 10 hashed `term` values, every one of which must match,
 and answers `{ cards, cursor }`: each card's server path, revision, hash, size, sealed `card`,
-`stale` and the plaintext list `fields`. Terms live in `note_terms` (scope `reading`), one per
+`stale` and the plaintext list `fields`. Terms live in `note_terms`, one per
 title word, tag and link, keyed by saved date: a search walks its rarest term (by counts capped
 at 50, then 500) newest first and stops after a page. It checks the other terms by key lookups in
 `note_terms` and, unencrypted, the title words on the notes that have every term. See [Reading search](reading-search.md).
@@ -497,7 +497,7 @@ Reminder mutations replay a matching operation receipt before rereading a moved 
 
 ## Changelog Pruning
 
-Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Expired retained versions drain 500 objects per pass in queue order. While that queue advances, passes continue every five seconds beyond the ten-pass limit, up to 200 passes (100,000 objects) per episode. Failures are recorded for diagnostics.
+Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Expired retained versions are deleted 500 per pass, oldest first: the R2 objects, then their rows, so the expired row is the cleanup intent until both are gone. Copies that were never kept drain from the cleanup queue at the same rate. While either advances, passes continue every five seconds beyond the ten-pass limit, up to 200 passes (100,000 objects) per episode. Failures are recorded for diagnostics.
 
 When a client's `since` cursor points to pruned entries, the `cursorExpired` flag is returned so the plugin falls back to full sync.
 
@@ -646,7 +646,7 @@ redemption and capture must be serialized together.
 
 Every file and folder name in an encrypted vault is a 26-character lowercase base32 tag, with `.md` kept for Markdown, so every `path` and `folderPath` the server sees is a tagged server path. Uploads and commits of encrypted content at a readable path return 428. `POST /reading/policy`, `POST` and `PUT /reminders/notification-policy`, and `POST /notifications/reminders-enrollment-token` require a tagged `folderPath` plus a `folderLabel` (the folder's plaintext path and tag encrypted under the vault key, at most 8,192 characters) and return 428 without them; a plaintext vault rejects `folderLabel`. The server stores the label in `maintenance_state` under `e2ee:folder:<tag>`, and policy reads return it as `folder_label` (Reading) or `folderLabel` (notifications). There is no in-place conversion API: turning encryption on uses the [destructive reset](#destructive-encryption-reset).
 
-`POST /encryption/metadata` returns descriptors for up to 1,000 revisions. A descriptor is kept while a live file, retained version, changelog entry, deletion receipt or upload lease references its revision, not for an upload receipt alone; see [descriptor cleanup](e2ee-implementation.md). `/encryption/deletion-precondition?path=…&revision=…` resolves an accepted encrypted deletion. Shared `/settings` becomes a conditional encrypted envelope endpoint.
+`POST /encryption/metadata` returns descriptors for up to 1,000 revisions. A descriptor is kept while a live file, retained version (including a deletion receipt), changelog entry or upload lease references its revision, not for an upload receipt alone; see [descriptor cleanup](e2ee-implementation.md). `/encryption/deletion-precondition?path=…&revision=…` resolves an accepted encrypted deletion. Shared `/settings` becomes a conditional encrypted envelope endpoint.
 
 Encrypted settings support all preferences accepted by the plaintext API's 1 MiB request limit. The envelope allowance is `ceil(1 MiB × 4 / 3) + 4096` characters for base64url and JWE overhead; encrypted settings requests allow another 4096 bytes for the JSON wrapper.
 

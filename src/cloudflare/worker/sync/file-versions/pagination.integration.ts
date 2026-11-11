@@ -24,7 +24,7 @@ it('walks all equal-timestamp pages without duplicates and restores an entry bey
 	const first = await list();
 	expect(first.versions).toHaveLength(100);
 	// A newly retained row cannot shift the cursor and repeat older entries.
-	await env.DB.prepare(`INSERT INTO file_versions SELECT 'retained/zzz', 'new.md', hash, size, reason, created_at, expires_at FROM file_versions LIMIT 1`).run();
+	await env.DB.prepare(`INSERT INTO file_versions(storage_key, path, hash, size, reason, created_at, expires_at) SELECT 'retained/zzz', 'new.md', hash, size, reason, created_at, expires_at FROM file_versions LIMIT 1`).run();
 	const second = await list({ cursor: first.nextCursor! });
 	const third = await list({ cursor: second.nextCursor! });
 	expect(second.versions).toHaveLength(100);

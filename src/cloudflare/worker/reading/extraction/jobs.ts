@@ -79,9 +79,10 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 	const current = await policy(env.DB);
 	if (!current) return;
 	try { await runCapture(env, state, Boolean(current.enabled)); } catch { /* The durable lease retries an uncertain publication. */ }
-	// File removals delete their jobs in the commit batch; only another generation's remain.
-	await env.DB.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation).run();
+	// File removals delete their jobs in the commit batch, and a new generation deletes the old one's.
 	const job = await env.DB.prepare('SELECT * FROM reading_jobs WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
+	// A job that found its source changed leaves its capture for the queue below.
+	let requeue = !job;
 	if (job && current.enabled) {
 		// Lease before network access: a crash or restart repeats safely after one minute.
 		// Exhausted jobs keep their row, so the article queue cannot restart their fetches,
@@ -96,6 +97,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 			if (!file) throw new Error('Reading note unavailable');
 			if (file.storageKey !== job.source_revision) {
 				await env.DB.prepare('DELETE FROM reading_jobs WHERE path=? AND source_revision=?').bind(job.path, job.source_revision).run();
+				requeue = true;
 			} else {
 				// Three attempts fetch the page. Later ones publish the bookmark without an
 				// article, so a note that cannot take its article stops refetching it.
@@ -108,11 +110,14 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 		} catch { /* Keep the bounded lease and exact source for recovery. No article or URL logging. */ }
 	}
 	// Queue a capture still pending after a stale source or publication, or one a full queue held
-	// back. Waking the coordinator for this would reset notification processing's retry budget.
-	if (current.enabled && await env.DB.prepare('SELECT 1 FROM reading_index WHERE id=1 AND scope=? AND cursor IS NULL').bind(readingIndexScope(current)).first()) {
+	// back, unless this pass published a job. Waking the coordinator for this would reset
+	// notification processing's retry budget.
+	if (current.enabled && requeue && await env.DB.prepare('SELECT 1 FROM reading_index WHERE id=1 AND scope=? AND cursor IS NULL').bind(readingIndexScope(current)).first()) {
 		await queueReadingArticles(env.DB).run();
 	}
-	const next = await env.DB.prepare('SELECT MIN(available_at) AS at FROM (SELECT available_at FROM reading_captures UNION ALL SELECT available_at FROM reading_jobs WHERE ?=1)').bind(current.enabled).first<{ at: number | null }>();
+	// Each MIN reads one entry of its table's due index.
+	const next = await env.DB.prepare(`SELECT MIN(at) AS at FROM (SELECT (SELECT MIN(available_at) FROM reading_captures) AS at
+    UNION ALL SELECT (SELECT MIN(available_at) FROM reading_jobs) WHERE ?=1)`).bind(current.enabled).first<{ at: number | null }>();
 	if (next?.at != null) await state.storage.setAlarm(Math.max(Date.now() + 1000, next.at));
 }
 

@@ -112,7 +112,7 @@ it('adds no encryption descriptor statements to passes in a plaintext vault', as
 	const bucket = { delete: vi.fn(async () => {}), get: vi.fn(async () => null), list: vi.fn(async () => ({ objects: [], truncated: false })) };
 	// Before: every first pass scanned the referencing tables, encrypted or not.
 	for (const firstPass of [true, false]) await runScheduledMaintenance({ DB: db, BUCKET: bucket } as never, { firstPass });
-	// Descriptor releases and the sweep check deletion receipts as references.
-	expect(statements.filter(statement => statement.sql.includes('file_deletion_receipts') && !statement.sql.startsWith('DELETE FROM file_deletion_receipts'))).toEqual([]);
+	// Descriptor releases and the sweep check retained versions as references.
+	expect(statements.filter(statement => statement.sql.includes('maintenance_state') && statement.sql.includes('file_versions'))).toEqual([]);
 	expect(statements.filter(statement => statement.sql.startsWith('DELETE FROM request_rate_limits')).length).toBe(2);
 });

@@ -175,10 +175,8 @@ async function dumpDatabase(context: BackupContext, saved: { raw: string; progre
 		}
 		if (buffer.length >= PART_CHARACTERS) await checkpoint(index + 1, null);
 	}
+	// The changelog's sequence floor is a server_state column, exported with its row.
 	buffer += definitions.filter(row => row.type === 'index').map(row => `${String(row.sql)};`).join('\n');
-	// Preserve an AUTOINCREMENT cursor even when all older changelog rows were pruned.
-	const sequences = await query('SELECT name, seq FROM sqlite_sequence;');
-	buffer += '\nDELETE FROM sqlite_sequence;\n' + sequences.map(row => `INSERT INTO sqlite_sequence(name,seq) VALUES (${literal(row.name)},${literal(row.seq)});`).join('\n');
 	const finished: ExportedProgress = { format: 2, phase: 'finishing', prefix: progress.prefix, createdAt: progress.createdAt, parts: await savePart() };
 	return { raw: await saveProgress(query, raw, finished), progress: finished };
 }

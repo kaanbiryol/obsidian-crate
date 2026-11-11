@@ -43,20 +43,20 @@ the plugin require a fresh confirmation; failed requests remain eligible for ret
 
 ## Initial upload write budget
 
-The local workerd/D1 billing-metadata regression measures **11,262 row writes for
+The local workerd/D1 billing-metadata regression measures **10,947 row writes for
 10,000 ordinary notes**, including import setup and paged completion with 32-file batches.
 The same fixture used 31,256 writes before the pre-release inventory redesign: a
-20,000-write (64%) reduction. Eight-file batches now cost 15,010 writes, down from
+20,309-write (65%) reduction. Eight-file batches now cost 13,758 writes, down from
 45,004 before these optimizations. Replaying a committed batch writes zero rows
 and uploads no R2 objects.
 
 | Component, for 10,000 ordinary notes | Measured row writes | Purpose |
 | --- | ---: | --- |
 | Current file records | 10,000 | Remote identity, original spelling, content hash, size and object pointer |
-| Shared staging leases | 939 | 313 batches, each with an insert, expiry-index entry and lease removal |
+| Shared staging leases | 626 | 313 batches, each with an insert and lease removal |
 | Import generation checkpoints | 313 | Fence completion against batches still in flight |
-| Session and completion | 10 | Open the import (1) and publish its sync baseline (9) |
-| Total | 11,262 | No per-note history, upload receipts or reminder indexing |
+| Session and completion | 8 | Open the import (1) and publish its sync baseline (7) |
+| Total | 10,947 | No per-note history, upload receipts or reminder indexing |
 
 When a reminder policy is configured, tracking and acknowledging initial reminder
 readiness adds **two row writes per vault**, independent of note count, in addition
@@ -109,7 +109,7 @@ npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/i
 
 The normal 32-file upload path retains per-file receipts and changelog entries.
 Its separate 8,000-note benchmark, with notes inside the selected reminder folder,
-measures 49,000 row writes on a new database. This is a regression check for normal
+measures 40,500 row writes on a new database. This is a regression check for normal
 uploads, not the cost of an initial import.
 
 ## Normal upload benchmark

@@ -8,10 +8,13 @@ import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { parseJsonObject, READING_EDIT_JSON_BODY_BYTES, SMALL_JSON_BODY_BYTES } from '../http/request-validation';
-import { policy, authority, readingResponse, ReadingError } from '../reading/common';
+import { policy, policyStatement, authority, readingResponse, ReadingError } from '../reading/common';
 import { prepareHandoff, updatePolicy, handoffAuthority, labelledPolicy } from '../reading/access';
 import { readFolderLabel } from '../encryption/folder-labels';
-import { mutateReading } from '../reading/mutations';
+import { loadReadingMutation, mutateReading } from '../reading/mutations';
+
+/** The library mutations and the action each one performs. */
+const MUTATION_ACTIONS: Partial<Record<string, string>> = { '/reading/capture': 'capture', '/reading/update': 'update', '/reading/retry': 'retry', '/reading/delete': 'delete' };
 import { extractForEncryptedReading } from '../reading/encrypted-extract';
 import { isLibraryRead, loadLibraryRead, readLibrary } from '../reading/library-read';
 import { PLAINTEXT_ONLY_PATHS } from './policy';
@@ -74,15 +77,16 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 		if (request.method === 'POST') return await updatePolicy(env.DB, body);
 	}
 	const loaded = isLibraryRead(request, path) ? await loadLibraryRead(env.DB, url) : undefined;
-	const current = await authority(env.DB, principal, featurePolicyValue, loaded?.policy);
+	const action = request.method === 'POST' ? MUTATION_ACTIONS[path] : undefined;
+	// A mutation reads the policy, its receipt, the index row and its note in one round trip.
+	const mutation = action ? await loadReadingMutation(env.DB, policyStatement(env.DB), body, action) : undefined;
+	const current = await authority(env.DB, principal, featurePolicyValue, loaded ? loaded.policy : mutation?.policy);
 	if (path === '/reading/shortcut-pairing' && request.method === 'POST') return await issueShortcutPairing(env.DB, principal, current, url.origin);
 	if (shortcut?.kind === 'prepare' && request.method === 'POST') return await prepareHandoff(env.DB, principal, body, url.origin);
-	if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture');
+	if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture', mutation?.mutation);
 	if (principal.scope === 'reading_capture') throw new ReadingError('This credential can only save links.', 403);
 	if (path === '/reading/session' && request.method === 'GET') return readingResponse({ id: principal.tokenId, folderPath: current.folder_path, generation: current.generation, expiresAt: principal.expiresAt ?? null, day: Math.floor(Date.now() / 86400_000) });
-	if (path === '/reading/update' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'update');
-	if (path === '/reading/retry' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'retry');
-	if (path === '/reading/delete' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'delete');
+	if (action) return await mutateReading(env, principal, current, body, action, mutation?.mutation);
 	if (loaded) return await readLibrary(request, env, current, loaded, state, forward, !!encryption);
 	if (path === '/reading/taken' && request.method === 'GET') {
 		if (!encryption) throw new ReadingError('Name checks are only for encrypted vaults.', 409);

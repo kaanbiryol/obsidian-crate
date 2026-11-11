@@ -41,8 +41,8 @@ export function reminderOperationEffects(db: D1Database, operation: ReminderOper
 			db.prepare(`INSERT INTO reminder_operations (operation_id, request_hash, response_json)
 				SELECT ?, ?, CASE WHEN ${OPERATION_VALID} THEN ? ELSE NULL END WHERE ${predicate}`)
 				.bind(operation.id, operation.requestHash, operation.day, operation.day, receipt.json, ...bindings),
-			...(createdId ? [db.prepare(`INSERT INTO reminder_identities (reminder_id, created_operation_id) SELECT ?, ? WHERE ${predicate}`)
-				.bind(createdId, operation.id, ...bindings)] : []),
+			...(createdId ? [db.prepare(`INSERT INTO reminder_identities (reminder_id) SELECT ? WHERE ${predicate}`)
+				.bind(createdId, ...bindings)] : []),
 		];
 	};
 }

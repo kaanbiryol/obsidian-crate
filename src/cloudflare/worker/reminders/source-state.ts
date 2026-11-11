@@ -13,7 +13,7 @@ export function recordReminderSourceState(db: D1Database, path: string, storageK
 	return [db.prepare(`INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified, sources_digest)
     SELECT ?, ?, ?, ?, ? WHERE ${revision.sql}
     ON CONFLICT(file_path) DO UPDATE SET file_revision = excluded.file_revision,
-      verified = excluded.verified, sources_digest = excluded.sources_digest, updated_at = datetime('now')`)
+      verified = excluded.verified, sources_digest = excluded.sources_digest`)
 		.bind(path, storageKey, REMINDER_CACHE_PARSER_VERSION, verified ? 1 : 0, verified ? sourcesDigest : null, ...revision.args),
 	db.prepare(`UPDATE reminder_source_state SET parser_version = ? WHERE file_path = ? AND parser_version != ? AND ${revision.sql}`)
 		.bind(REMINDER_CACHE_PARSER_VERSION, path, REMINDER_CACHE_PARSER_VERSION, ...revision.args)];

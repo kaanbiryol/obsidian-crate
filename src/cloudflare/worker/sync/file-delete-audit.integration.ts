@@ -7,7 +7,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { SERVER_RELEASE } from '../../deployment/database-upgrades';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
-import { pruneFileDeletionReceipts } from './file-delete-audit';
+import { expireFileVersions } from '../maintenance/object-cleanup';
 import { BATCH_DELETE_MAX_FILES } from '../../../protocol/sync-limits';
 import { commitFileDelete } from './mutations';
 import { getStoredFileRow } from './storage';
@@ -20,7 +20,7 @@ const path = 'Private folder/Confidential note.md';
 const clientSession = '11111111-1111-4111-8111-111111111111';
 const operation = '22222222-2222-4222-8222-222222222222';
 interface File { path: string; hash: string; revision: string }
-interface Receipt { consumed_revision: string; revision: string; changelog_seq: number; path: string; consumed_hash: string; request_id: string; device_id: string; client_session: string | null; operation_id: string | null }
+interface Receipt { consumed_revision: string; revision: string; path: string; consumed_hash: string; request_id: string }
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -47,7 +47,11 @@ async function remove(file: File, device?: string, headers?: Record<string, stri
 	const body = await response.json() as { results?: object[]; errors?: Array<{ status: number }> };
 	return { status: body.errors?.[0]?.status ?? response.status, headers: response.headers, json: async () => body.results?.[0] ?? {} };
 }
-async function receipts() { return (await env.DB.prepare('SELECT * FROM file_deletion_receipts ORDER BY changelog_seq').all<Receipt>()).results; }
+/** Deletion receipts are the retained copies of deleted revisions. */
+async function receipts() {
+	return (await env.DB.prepare(`SELECT storage_key AS consumed_revision, deletion_revision AS revision, path, hash AS consumed_hash, request_id
+		FROM file_versions WHERE deletion_revision IS NOT NULL ORDER BY created_at, path`).all<Receipt>()).results;
+}
 async function tombstones() { return (await env.DB.prepare("SELECT * FROM changelog WHERE action = 'delete' ORDER BY seq").all()).results; }
 
 it('atomically correlates the consumed revision, tombstone, request and authenticated device without logging note data', async () => {
@@ -58,9 +62,9 @@ it('atomically correlates the consumed revision, tombstone, request and authenti
 	const body = await response.json() as { revision: string; consumedRevision: string; deleteRequestId: string };
 	expect(body).toMatchObject({ consumedRevision: file.revision, deleteRequestId: response.headers.get('X-Crate-Request-Id') });
 	expect(body.revision).toMatch(/^__crate__\/deletions\//);
-	expect(await receipts()).toMatchObject([{ consumed_revision: file.revision, revision: body.revision, path, consumed_hash: file.hash,
-		request_id: body.deleteRequestId, device_id: 'device-first', client_session: clientSession, operation_id: operation }]);
-	expect(await tombstones()).toMatchObject([{ seq: (await receipts())[0]!.changelog_seq, revision: body.revision, path }]);
+	expect(await receipts()).toEqual([{ consumed_revision: file.revision, revision: body.revision, path, consumed_hash: file.hash,
+		request_id: body.deleteRequestId }]);
+	expect(await tombstones()).toMatchObject([{ revision: body.revision, path }]);
 	expect(log).toHaveBeenCalledWith('crate.mutation', expect.objectContaining({ requestId: body.deleteRequestId, deviceId: 'device-first',
 		clientSession, operationId: operation, revisions: [body.revision], consumedRevisions: [file.revision], deleteRequestIds: [body.deleteRequestId] }));
 	const logged = JSON.stringify(log.mock.calls);
@@ -111,8 +115,8 @@ it('attributes simultaneous deletes to exactly the transaction that consumed the
 	expect(all).toHaveLength(2);
 	expect(await tombstones()).toHaveLength(2);
 	const owner = all.find(receipt => receipt.path === path)!;
-	expect(owner.device_id).toBe(owner.request_id === single.headers.get('X-Crate-Request-Id') ? 'device-first' : 'device-second');
-	expect(all.find(receipt => receipt.path === extra.path)).toMatchObject({ device_id: 'device-second', request_id: batch.headers.get('X-Crate-Request-Id') });
+	expect([single.headers.get('X-Crate-Request-Id'), batch.headers.get('X-Crate-Request-Id')]).toContain(owner.request_id);
+	expect(all.find(receipt => receipt.path === extra.path)).toMatchObject({ request_id: batch.headers.get('X-Crate-Request-Id') });
 });
 
 it('returns original per-file receipts when a whole batch response is lost', async () => {
@@ -170,7 +174,7 @@ it('does not record a deletion on a precondition conflict or failed receipt writ
 	const file = await upload();
 	expect((await remove({ ...file, revision: 'stale' })).status).toBe(409);
 	expect(await receipts()).toEqual([]);
-	await env.DB.prepare("CREATE TRIGGER reject_delete_audit BEFORE INSERT ON file_deletion_receipts BEGIN SELECT RAISE(ABORT, 'test audit failure'); END").run();
+	await env.DB.prepare("CREATE TRIGGER reject_delete_audit BEFORE INSERT ON file_versions BEGIN SELECT RAISE(ABORT, 'test audit failure'); END").run();
 	expect((await remove(file)).status).toBe(503);
 	expect(await receipts()).toEqual([]);
 	expect(await tombstones()).toEqual([]);
@@ -182,7 +186,8 @@ it('drops non-opaque client correlation values and never treats absence as a new
 	const file = await upload();
 	const log = vi.spyOn(console, 'info');
 	expect((await remove(file, 'first', { 'X-Crate-Client-Session': path, 'X-Crate-Operation-Id': secret })).status).toBe(200);
-	expect(await receipts()).toMatchObject([{ client_session: null, operation_id: null }]);
+	expect(await receipts()).toHaveLength(1);
+	expect(log).toHaveBeenCalledWith('crate.mutation', expect.objectContaining({ clientSession: undefined, operationId: undefined }));
 	const absent = await remove({ ...file, path: 'Never uploaded.md' });
 	expect(absent.status).toBe(200);
 	expect(await absent.json()).not.toHaveProperty('revision');
@@ -193,7 +198,6 @@ it('drops non-opaque client correlation values and never treats absence as a new
 
 it('reapplying the baseline schema preserves existing vault rows', async () => {
 	const file = await upload();
-	await env.DB.prepare('DROP TABLE file_deletion_receipts').run();
 	const before = await env.DB.prepare('SELECT * FROM files').all();
 	await applySchema(env.DB); await applySchema(env.DB);
 	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion });
@@ -202,11 +206,11 @@ it('reapplying the baseline schema preserves existing vault rows', async () => {
 	expect(await receipts()).toHaveLength(1);
 });
 
-it('retains recent correlation and expires receipts after their documented 30-day window', async () => {
+it('retains recent correlation and expires receipts with their retained version after 30 days', async () => {
 	const first = await upload(); await remove(first);
-	await env.DB.prepare("UPDATE file_deletion_receipts SET created_at = datetime('now', '-31 days')").run();
+	await env.DB.prepare('UPDATE file_versions SET expires_at = ?').bind(Date.now() - 1).run();
 	const second = await upload(); await remove(second);
-	await pruneFileDeletionReceipts(env.DB);
+	await expireFileVersions(env.BUCKET, env.DB);
 	expect(await receipts()).toMatchObject([{ consumed_revision: second.revision }]);
 	expect(await (await remove(first)).json()).not.toHaveProperty('revision');
 });

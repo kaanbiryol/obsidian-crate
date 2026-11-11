@@ -99,7 +99,7 @@ it.each(['completion', 'move'] as const)('rolls back the entire %s publication i
 
 it('preserves identity reservations still owned by a reminder source', async () => {
 	const active = createReminderOperationId(day - REMINDER_RETRY_DAYS);
-	await db.prepare('INSERT INTO reminder_identities VALUES (?, ?)').bind(active, active).run();
+	await db.prepare('INSERT INTO reminder_identities VALUES (?)').bind(active).run();
 	await db.prepare('INSERT INTO reminder_sources VALUES (?, ?, ?, 1)').bind('Reminders/Quarantined.md', active, '').run();
 	await pruneOperationReceipts(db);
 	expect((await db.prepare('SELECT reminder_id FROM reminder_identities').all()).results).toHaveLength(1);

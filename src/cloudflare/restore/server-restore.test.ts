@@ -35,11 +35,11 @@ async function fixture(extraRows = 0) {
 	const bytes = new TextEncoder().encode("Private 'note';\n日本語"), oldBytes = new Uint8Array([0, 255, 12, 99]);
 	original.prepare('INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES (?,?,?,?,?)').run("Reminders/a's.md", "reminders/a's.md", await sha256Hex(bytes), bytes.length, 'live-object');
 	original.prepare('INSERT INTO file_versions(storage_key,path,hash,size,reason,expires_at) VALUES (?,?,?,?,?,?)').run('old-object', "Reminders/a's.md", await sha256Hex(oldBytes), oldBytes.length, 'replaced', 1);
-	original.exec("INSERT INTO auth_tokens(id,token_hash) VALUES ('old-device','private-token'); INSERT INTO notification_policy(id,folder_path,timezone,revision) VALUES(1,'Reminders','Europe/Berlin','policy'); INSERT INTO changelog(seq,path,action) VALUES(90,'test.md','put'); DELETE FROM changelog;");
+	original.exec("INSERT INTO auth_tokens(id,token_hash) VALUES ('old-device','private-token'); INSERT INTO notification_policy(id,folder_path,timezone,revision) VALUES(1,'Reminders','Europe/Berlin','policy');");
 	original.prepare('INSERT INTO reminder_operations(operation_id,request_hash,response_json) VALUES (?,?,?)').run('op', 'request-hash', JSON.stringify({ text: "'hello'; 日本語\n\"world\"" }));
 	original.exec("INSERT INTO maintenance_state(key,value) VALUES ('retained','hello'),('reminder_source_scan_old','obsolete');");
 	original.exec("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','generation','revision');");
-	for (let index = 0; index < extraRows; index++) original.prepare('INSERT INTO reminder_identities(reminder_id,created_operation_id) VALUES (?,?)').run(`id-${index}`, 'operation');
+	for (let index = 0; index < extraRows; index++) original.prepare('INSERT INTO reminder_identities(reminder_id) VALUES (?)').run(`id-${index}`);
 	const buckets = new Map<string, Map<string, Uint8Array>>([[source.bucket, new Map([['live-object', bytes], ['old-object', oldBytes], ['__crate__/settings.json', new TextEncoder().encode('{"setting":true}')]])]]);
 	const databases = new Map([[source.database, original]]);
 	const names = new Map<string, string>();
@@ -102,6 +102,8 @@ async function fixture(extraRows = 0) {
 
 it('restores launch-baseline checkpoints, keeps history and receipts, and requires fresh enrollment', async () => {
 	const f = await fixture();
+	// Archives made while the changelog used AUTOINCREMENT carry its cursor in sqlite_sequence.
+	await f.rewriteSQL(sql => sql + "\nINSERT INTO sqlite_sequence(name,seq) VALUES ('changelog',90);");
 	const sourceBytes = [...f.buckets.get(source.bucket)!].map(([key, value]) => [key, [...value]]);
 	expect(await f.run()).toBe(`https://${f.state.target.workerName}.test.workers.dev`);
 	const restored = f.databases.get(destination)!;
@@ -110,7 +112,7 @@ it('restores launch-baseline checkpoints, keeps history and receipts, and requir
 	expect(restored.prepare('SELECT * FROM reminder_operations').all()).toEqual(f.original.prepare('SELECT * FROM reminder_operations').all());
 	expect(restored.prepare('SELECT expires_at FROM file_versions').get()).toEqual({ expires_at: f.state.restoredAt + 2592000000 });
 	expect(restored.prepare('SELECT * FROM auth_tokens').all()).toEqual([]);
-	expect(restored.prepare('SELECT * FROM sqlite_sequence').get()).toEqual({ name: 'changelog', seq: 90 });
+	expect(restored.prepare('SELECT seq FROM changelog_floor').get()).toEqual({ seq: 90 });
 	expect(restored.prepare('SELECT path,job_token FROM notification_projection_jobs').get()).toEqual({ path: "Reminders/a's.md", job_token: 'live-object' });
 	expect(restored.prepare('SELECT folder_path FROM reading_policy').get()).toEqual({ folder_path: 'Reading' });
 	expect([...f.buckets.get(source.bucket)!].map(([key, value]) => [key, [...value]])).toEqual(sourceBytes);
@@ -259,7 +261,7 @@ it('pins the completed manifest and rejects a backup for another source', async 
 
 it('guards every imported row against replay after a batch advances', () => {
 	const db = database(); db.exec(schema); db.exec("INSERT INTO maintenance_state(key,value) VALUES('crate_restore_progress','plan:0')");
-	const sql = rowSql({ table: 'reminder_identities', columns: ['reminder_id','created_operation_id'], values: ['id','op'] }, 'plan:0');
+	const sql = rowSql({ table: 'reminder_identities', columns: ['reminder_id'], values: ['id'] }, 'plan:0');
 	db.exec(sql); db.exec("UPDATE maintenance_state SET value='plan:1'"); db.exec(sql);
 	expect(db.prepare('SELECT COUNT(*) AS n FROM reminder_identities').get()).toEqual({ n: 1 });
 });
@@ -273,7 +275,7 @@ it('resumes multiple batches from a later checkpoint without missing or duplicat
 });
 it('rejects oversized rows before creating resources and does not round unsafe integers', async () => {
 	const f = await fixture();
-	await f.rewriteSQL(sql => sql + `INSERT INTO "reminder_identities" ("reminder_id","created_operation_id") VALUES ('id','${'x'.repeat(71000)}');`);
+	await f.rewriteSQL(sql => sql + `INSERT INTO "reminder_identities" ("reminder_id") VALUES ('${'x'.repeat(71000)}');`);
 	await expect(f.run()).rejects.toThrow('too large'); expect(f.api.createD1Database).not.toHaveBeenCalled();
 	expect(() => parseBackupRows('INSERT INTO "sqlite_sequence" ("name","seq") VALUES (\'changelog\',9007199254740993);')).toThrow();
 });

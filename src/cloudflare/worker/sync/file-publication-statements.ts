@@ -1,5 +1,5 @@
 import { fileRevisionGuard, fileRevisionsGuard } from './file-identity';
-import { FILE_VERSION_EXPIRES_AT_SQL, FILE_VERSION_RETENTION_MS, type FileStorageRow } from './storage';
+import { FILE_VERSION_EXPIRES_AT_SQL, FILE_VERSION_RETENTION_MS, LAST_SEQ_SQL, nextChangelogSeqSql, type FileStorageRow } from './storage';
 
 interface PublishedRevision {
 	path: string;
@@ -11,21 +11,24 @@ export function publishedChangelogStatement(
 	file: PublishedRevision & { hash: string; size: number },
 ): D1PreparedStatement {
 	const revision = fileRevisionGuard(file.path, file.objectKey);
-	return db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
-		SELECT ?, 'put', ?, ?, ?
+	return db.prepare(`INSERT INTO changelog (seq, path, action, hash, size, revision)
+		SELECT ${LAST_SEQ_SQL} + 1, ?, 'put', ?, ?, ?
 		WHERE ${revision.sql}`)
 		.bind(file.path, file.hash, file.size, file.objectKey, ...revision.args);
 }
 
 /** The delete's changelog row and its history copy for the `files` row `where`
- * selects with `args`. Both must run before that row is deleted. */
-export function deletedFileStatements(db: D1Database, where: string, args: readonly unknown[], revision: string): D1PreparedStatement[] {
+ * selects with `args`. Both must run before that row is deleted. The copy is also the
+ * deletion's receipt, naming its `revision` and the server `requestId`. */
+export function deletedFileStatements(db: D1Database, where: string, args: readonly unknown[], revision: string, requestId: string): D1PreparedStatement[] {
 	return [
-		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
-			SELECT path, 'delete', '', 0, ? FROM files WHERE ${where}`).bind(revision, ...args),
-		db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, expires_at)
-			SELECT storage_key, path, hash, size, 'deleted', ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${where}`)
-			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...args),
+		db.prepare(`INSERT INTO changelog (seq, path, action, hash, size, revision)
+			SELECT ${nextChangelogSeqSql('portable_path')}, path, 'delete', '', 0, ? FROM files WHERE ${where}`).bind(revision, ...args),
+		db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, deletion_revision, request_id, expires_at)
+			SELECT storage_key, path, hash, size, 'deleted', ?, ?, ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${where}
+			ON CONFLICT(storage_key) DO UPDATE SET reason = 'deleted', deletion_revision = excluded.deletion_revision,
+				request_id = excluded.request_id, expires_at = excluded.expires_at`)
+			.bind(revision, requestId, Date.now() + FILE_VERSION_RETENTION_MS, ...args),
 	];
 }
 

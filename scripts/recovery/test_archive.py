@@ -53,7 +53,6 @@ class ArchiveTests(unittest.TestCase):
         db.execute("INSERT INTO reminder_operations (operation_id, request_hash, response_json) VALUES ('retry-me', 'hash', '{}')")
         db.execute("INSERT INTO reminder_sources (file_path, reminder_id, due_key, occurrences) VALUES ('Reminders/Inbox.md', 'reminder', '2026-09-07', 1)")
         db.execute("INSERT INTO reminder_occurrences (reminder_id, due_key, first_seen_at) VALUES ('reminder', '2026-09-07', 123)")
-        db.execute("INSERT INTO file_deletion_receipts (consumed_revision, revision, changelog_seq, path, consumed_hash, request_id, device_id) VALUES ('consumed', 'deleted', 1, 'Deleted.md', 'hash', 'original-request', 'old-device')")
         db.execute("INSERT INTO maintenance_state (key, value) VALUES ('crate_deployment_fence', 'old deployment owner')")
         db.execute("INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified) VALUES ('Reminders/Inbox.md', ?, 6, 1)", (key,))
         db.commit()
@@ -96,7 +95,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(self.remote.objects, target.objects)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM auth_tokens').fetchone()[0], 0)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_operations').fetchone()[0], 1)
-        for table in ('reminder_sources', 'reminder_occurrences', 'file_deletion_receipts'):
+        for table in ('reminder_sources', 'reminder_occurrences'):
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM notification_projection_jobs').fetchone()[0], 1)
         self.assertEqual(restored.execute("SELECT COUNT(*) FROM maintenance_state WHERE key = 'crate_deployment_fence'").fetchone()[0], 0)
@@ -142,7 +141,6 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
         for table in ('files', 'file_versions', 'reminder_operations', 'reminder_identities', 'reminder_sources', 'reminder_occurrences'):
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
-        self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 1)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
         self.assertEqual(target.objects, self.remote.objects)
         self.assertEqual((self.directory / 'database.sql').read_bytes(), source_sql)

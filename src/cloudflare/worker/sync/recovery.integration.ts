@@ -6,7 +6,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { handleRestoreFileVersion } from './file-versions/handlers';
-import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from '../maintenance/object-cleanup';
+import { drainObjectCleanupQueue, expireFileVersions } from '../maintenance/object-cleanup';
 import type { Env } from '../types';
 import { sha256Hex } from '../../../platform/sha256';
 
@@ -43,7 +43,7 @@ describe('sync recovery', () => {
 			const { key, hash } = await retain(path, content);
 			const put = bucket.put.bind(bucket);
 			vi.spyOn(bucket, 'put').mockImplementationOnce(async (...args) => {
-				await enqueueExpiredFileVersions(db, Date.now() + 120_000);
+				await expireFileVersions(bucket, db, Date.now() + 120_000);
 				await drainObjectCleanupQueue(bucket, db);
 				return put(...args);
 			});

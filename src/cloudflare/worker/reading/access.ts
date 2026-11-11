@@ -29,6 +29,8 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
 	await db.batch([db.prepare(`INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled, folder_path=excluded.folder_path, generation=excluded.generation, revision=excluded.revision`)
 		.bind(current.enabled, folder, current.generation, current.revision),
+		// Jobs extract into the folder of their generation, so a new one drops the old one's.
+		db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
 		...(encryption ? [saveFolderLabel(db, folder, body.folderLabel as string)] : [])]);
 	return readingResponse({ policy: await labelledPolicy(db, current) });
 }

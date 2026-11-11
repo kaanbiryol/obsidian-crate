@@ -37,31 +37,37 @@ async function deleteQueuedBucketObjects(
 }
 
 /** Scheduled failures reach the maintenance error recorder; queued keys retry later.
- * Rowid order is insertion order and reads the table without a sort. */
+ * Key order reads the table without a sort; every drained key leaves the queue. */
 export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database): Promise<number> {
 	const rows = await queryRows<{ storage_key: string; file_path: string }>(
-		db.prepare('SELECT storage_key, file_path FROM object_cleanup_queue ORDER BY rowid LIMIT ?')
+		db.prepare('SELECT storage_key, file_path FROM object_cleanup_queue ORDER BY storage_key LIMIT ?')
 			.bind(CLEANUP_BATCH_LIMIT),
 	);
 	return deleteQueuedBucketObjects(bucket, db, rows.map(row => ({ storageKey: row.storage_key, path: row.file_path })));
 }
 
-// The queue drains 500 objects per pass; larger batches only grow its backlog.
-const EXPIRED_VERSION_BATCH = 1000;
+// Matches the cleanup queue's batch, which keeps the key list below D1's value limit.
+const EXPIRED_VERSION_BATCH = CLEANUP_BATCH_LIMIT;
 
-/** Moves the oldest expired versions in one transaction. `alongside` runs in it
- * before the versions are deleted, given their storage keys. Returns true when more
- * may remain. */
-export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now(),
+/** Deletes the objects of the oldest expired versions, then their rows. The expired row
+ * is the cleanup intent: every reader already hides it, and a pass interrupted after the
+ * R2 delete repeats it. Keys are never reused, so only a live file can still need one.
+ * `alongside` runs in the row deletion's transaction, given the storage keys. Returns
+ * true when more may remain. */
+export async function expireFileVersions(bucket: R2Bucket, db: D1Database, now = Date.now(),
 	alongside?: (expired: SqlGuard<unknown>) => D1PreparedStatement): Promise<boolean> {
-	const expired: SqlGuard<unknown> = { sql: `SELECT storage_key FROM file_versions WHERE expires_at <= ? ORDER BY expires_at LIMIT ${EXPIRED_VERSION_BATCH}`, args: [now] };
-	const results = await db.batch([
-		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)
-			SELECT storage_key, path FROM file_versions WHERE storage_key IN (${expired.sql})`).bind(...expired.args),
+	const rows = await queryRows<{ storage_key: string; path: string }>(db.prepare(`SELECT storage_key, path FROM file_versions
+    WHERE expires_at <= ? ORDER BY expires_at LIMIT ${EXPIRED_VERSION_BATCH}`).bind(now));
+	if (!rows.length) return false;
+	const live = await findReferencedStorageKeys(db, rows.map(row => ({ storageKey: row.storage_key, path: row.path })), { versions: false });
+	const unused = rows.map(row => row.storage_key).filter(key => !live.has(key));
+	if (unused.length) await bucket.delete(unused);
+	const expired: SqlGuard<unknown> = { sql: 'SELECT value FROM json_each(?)', args: [JSON.stringify(rows.map(row => row.storage_key))] };
+	await db.batch([
 		...(alongside ? [alongside(expired)] : []),
-		db.prepare(`DELETE FROM file_versions WHERE storage_key IN (${expired.sql})`).bind(...expired.args),
+		db.prepare(`DELETE FROM file_versions WHERE storage_key IN (${expired.sql}) AND expires_at <= ?`).bind(...expired.args, now),
 	]);
-	return changedRows(results.at(-1)) === EXPIRED_VERSION_BATCH;
+	return rows.length === EXPIRED_VERSION_BATCH;
 }
 
 /** Cleanup must never turn an already-committed file mutation into a failure. */

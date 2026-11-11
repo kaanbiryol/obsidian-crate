@@ -9,7 +9,7 @@ import type { ReadingSection } from '@/reading/core/reading-presentation';
 import { MAX_QUERY_WORDS, normalizedTag, searchWords, wordTerm } from '@/reading/core/search-terms';
 import { isHashedReadingTerm } from '@/encryption/reading-search';
 import { sha256Hex } from '@/platform/sha256';
-import { ARTICLE_EDITED_ERROR, READING_TERM_SCOPE, readingIndexScope } from './library-index';
+import { ARTICLE_EDITED_ERROR, readingIndexScope } from './library-index';
 
 /** A queued capture with this ID and the index rows that name it, read together. */
 export const readingItemStatements = (db: D1Database, id: string) => [
@@ -76,15 +76,27 @@ const ITEM_COLUMNS = `${ROW_COLUMNS}, card, storage_key, stale, hash, size, item
 // A search starts from its rarest term, found by counting each term's notes up to these caps:
 // a small one first, and a larger one only when every term reaches it.
 const TERM_PROBES = [50, 500];
+/** Usually small sections, each with its own index ordered newest first. When one holds fewer
+ * notes than the first cap and than every term, a search walks it instead of a term. */
+const WALKABLE_SECTIONS = new Set<ReadingSection | 'all'>(['favorites', 'highlights']);
 
-/** The term with the fewest notes, by capped counts. Each count reads at most its cap; a single
- * term needs none. When every term is common at both caps, the first term is kept. */
-async function rarestTerm(env: Env, terms: string[]): Promise<string> {
-	if (terms.length === 1) return terms[0]!;
-	for (const cap of TERM_PROBES) {
-		const results = await env.DB.batch<Rows<{ n: number }>>(terms.map(term => env.DB.prepare(`SELECT count(*) AS n FROM (SELECT 1 FROM note_terms
-      WHERE scope = '${READING_TERM_SCOPE}' AND term = ? LIMIT ${cap})`).bind(term)));
-		const counts = results.map(result => result.results[0]?.n ?? 0), least = Math.min(...counts);
+/** The term with the fewest notes, or null to walk the section, by capped counts. Each count
+ * reads at most its cap; a single term outside a walkable section needs none. When every term
+ * is common at both caps, the first term is kept. */
+async function searchDriver(env: Env, terms: string[], section: ReadingSection | 'all'): Promise<string | null> {
+	const walkable = WALKABLE_SECTIONS.has(section);
+	if (terms.length === 1 && !walkable) return terms[0]!;
+	for (const [stage, cap] of TERM_PROBES.entries()) {
+		const probeTerms = terms.length > 1, probeSection = walkable && stage === 0;
+		if (!probeTerms && !probeSection) break;
+		const results = await env.DB.batch<Rows<{ n: number }>>([
+			...probeTerms ? terms.map(term => env.DB.prepare(`SELECT count(*) AS n FROM (SELECT 1 FROM note_terms WHERE term = ? LIMIT ${cap})`).bind(term)) : [],
+			...probeSection ? [env.DB.prepare(`SELECT count(*) AS n FROM (SELECT 1 FROM reading_items WHERE ${SECTION_FILTERS[section]} LIMIT ${cap})`)] : [],
+		]);
+		const counts = results.map(result => result.results[0]?.n ?? 0);
+		const sectionCount = probeSection ? counts.pop()! : Infinity;
+		const least = probeTerms ? Math.min(...counts) : Infinity;
+		if (sectionCount < cap && sectionCount <= least) return null;
 		if (least < cap) return terms[counts.indexOf(least)]!;
 	}
 	return terms[0]!;
@@ -132,23 +144,32 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 		// page. The walk checks every other term with an exact key lookup in note_terms, where a
 		// miss reads no row, so only entries with every term go on to read their note. It is a
 		// subquery that LIMIT -1 keeps SQLite from merging: merged, SQLite reads the note first.
-		const driver = await rarestTerm(env, terms);
-		const walk = [`t.scope = '${READING_TERM_SCOPE}'`, 't.term = ?'], walkArgs: unknown[] = [driver];
-		if (after) { walk.push('(t.saved_at, t.portable_path) < (?, ?)'); walkArgs.push(...after); }
-		for (const term of terms) if (term !== driver) {
-			walk.push(`EXISTS (SELECT 1 FROM note_terms o WHERE o.scope = '${READING_TERM_SCOPE}' AND o.term = ? AND o.saved_at = t.saved_at AND o.portable_path = t.portable_path)`);
-			walkArgs.push(term);
-		}
+		const driver = await searchDriver(env, terms, query.section);
 		const where = [SECTION_FILTERS[query.section], visible].map(clause => clause.replace(/\b(status|favorite|highlighted|card|metadata_json|duplicate)\b/g, 'i.$1')), args: unknown[] = [];
 		if (query.id) { where.push('i.item_id = ?'); args.push(query.id); }
 		// The row's word list is JSON text: a quote followed by a word's start confirms the title
 		// without reading rows.
 		for (const word of words) { where.push('instr(i.words, ?) > 0'); args.push(JSON.stringify(word).slice(0, -1)); }
-		// CROSS JOIN keeps the walk outermost, so SQLite never scans the library instead.
-		page = env.DB.prepare(`SELECT ${ITEM_COLUMNS.split(', ').map(column => `i.${column}`).join(', ')}
+		const columns = ITEM_COLUMNS.split(', ').map(column => `i.${column}`).join(', ');
+		// Every other term is an exact key lookup in note_terms, where a miss reads no row.
+		const has = (alias: string) => `EXISTS (SELECT 1 FROM note_terms o WHERE o.term = ? AND o.saved_at = ${alias}.saved_at AND o.portable_path = ${alias}.portable_path)`;
+		if (driver === null) {
+			// The section has the fewest notes: walk its index newest first and check each term.
+			const walk = [...where], walkArgs: unknown[] = [];
+			if (after) { walk.push('(i.saved_at, i.portable_path) < (?, ?)'); walkArgs.push(...after); }
+			for (const term of terms) { walk.push(has('i')); walkArgs.push(term); }
+			page = env.DB.prepare(`SELECT ${columns} FROM reading_items i WHERE ${walk.join(' AND ')}
+      ORDER BY i.saved_at DESC, i.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args, ...walkArgs);
+		} else {
+			const walk = ['t.term = ?'], walkArgs: unknown[] = [driver];
+			if (after) { walk.push('(t.saved_at, t.portable_path) < (?, ?)'); walkArgs.push(...after); }
+			for (const term of terms) if (term !== driver) { walk.push(has('t')); walkArgs.push(term); }
+			// CROSS JOIN keeps the walk outermost, so SQLite never scans the library instead.
+			page = env.DB.prepare(`SELECT ${columns}
       FROM (SELECT t.saved_at, t.portable_path FROM note_terms t WHERE ${walk.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT -1) t
       CROSS JOIN reading_items i ON i.portable_path = t.portable_path
       WHERE ${where.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...walkArgs, ...args);
+		}
 	} else {
 		const where = [SECTION_FILTERS[query.section], visible], args: unknown[] = [];
 		if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }

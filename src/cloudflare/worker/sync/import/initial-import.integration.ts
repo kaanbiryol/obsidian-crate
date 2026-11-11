@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { LAST_SEQ_SQL } from '../storage';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -93,7 +94,7 @@ it('publishes one baseline, rejects incomplete completion, and fences closed imp
 	await env.DB.prepare("DELETE FROM files WHERE path = 'note.md'").run();
 	expect(await send(token, [await file('note.md')])).toMatchObject({ error: 'Initial import is closed or unavailable' });
 	expect(await (await beginInitialImport(env.DB)).json()).toEqual({ import: null });
-	await env.DB.prepare("INSERT INTO changelog(path, action) VALUES ('next.md', 'put')").run();
+	await env.DB.prepare(`INSERT INTO changelog(seq, path, action) SELECT ${LAST_SEQ_SQL} + 1, 'next.md', 'put'`).run();
 	expect(await env.DB.prepare('SELECT seq FROM changelog').first()).toEqual({ seq: 2 });
 });
 
@@ -191,7 +192,7 @@ it('preserves confirmed uploads when a resumed standard sync fails', async () =>
 	vi.spyOn(client.api.initialImport, 'finish').mockRejectedValueOnce(new Error('offline'));
 	const interrupted = await client.engine.sync();
 	expect(interrupted).toMatchObject({ success: false, uploaded: 1, uploadedPaths: ['note.md'], errors: ['offline'] });
-	expect(client.engine.getTimings().requests?.d1).toMatchObject({ rowsWritten: 7 });
+	expect(client.engine.getTimings().requests?.d1).toMatchObject({ rowsWritten: 6 });
 	client.close(); await client.open();
 	expect(await client.engine.sync()).toMatchObject({ success: true, uploaded: 0 });
 });
@@ -256,7 +257,7 @@ it.each([8, INITIAL_IMPORT_MAX_FILES])('measures 10,000-note import writes with 
 	expect((await finish(token, meter.db)).status).toBe(200);
 	await revalidateReminderSources({ ...env, DB: meter.db }, 4);
 	expect(meter.writes()).toBeLessThan(16000);
-	expect(meter.writes()).toBe(batchSize === 8 ? 15010 : 11262);
+	expect(meter.writes()).toBe(batchSize === 8 ? 13758 : 10947);
 	console.info('Initial import D1 writes:', meter.writes());
 }, 120000);
 

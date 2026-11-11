@@ -14,6 +14,9 @@ import { assertUniqueReminderSources, duplicateReminderSourcesSql, ReminderIdent
 import { ReminderFileSizeError } from './limits';
 import { reminderOperationEffects, type ReminderOperation } from './operations';
 import { saveReminderFileCache } from './cache/index';
+import { reminderFileCacheUpsert } from './cache/persist';
+import { sha256Hex } from '@/platform/sha256';
+import type { CommitEffects } from '../sync/commit-effects';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 
 type ReminderAction = 'create' | 'update' | 'set-completed' | 'delete' | 'reorder';
@@ -77,7 +80,12 @@ export async function commitReminderCommand(env: Env, operation: ReminderOperati
 	// Edit routes check their identity before reading; a reorder learns its
 	// identities from the note.
 	if (action === 'reorder') await assertUniqueReminderSources(env.DB, folderPath, files[0]!.reminders.map(reminder => reminder.id));
-	const effects = reminderOperationEffects(env.DB, operation, command.response, command.createdId);
+	// The parsed cache commits with the notes, so it needs no round trip of its own. A note too
+	// large to cache records its issue after the commit instead.
+	const contentHashes = await Promise.all(files.map(file => sha256Hex(new TextEncoder().encode(file.content).buffer)));
+	const caches = files.map((file, index) => reminderFileCacheUpsert(env.DB, folderPath, { filePath: file.path, fileHash: contentHashes[index]!, reminders: file.reminders }));
+	const receipt = reminderOperationEffects(env.DB, operation, command.response, command.createdId);
+	const effects: CommitEffects = written => [...receipt(written), ...caches.filter((cache): cache is D1PreparedStatement => cache !== null)];
 	const expectedHash = (path: string) => versions.get(path)?.hash ?? null;
 	const [source, destination] = files;
 	const hashes = destination
@@ -87,6 +95,6 @@ export async function commitReminderCommand(env: Env, operation: ReminderOperati
 			destination: { path: destination.path, content: destination.content, expectedHash: expectedHash(destination.path) },
 		}).then(writes => [writes.source.hash, writes.destination.hash])
 		: [(await writeCommittedMarkdownFile(env.BUCKET, env.DB, source!.path, source!.content, expectedHash(source!.path), effects, context)).hash];
-	await Promise.all(files.map((file, index) => saveReminderFileCache(env.DB, folderPath, file.path, hashes[index]!, file.reminders)));
+	await Promise.all(files.flatMap((file, index) => caches[index] ? [] : [saveReminderFileCache(env.DB, folderPath, file.path, hashes[index]!, file.reminders)]));
 	return corsResponse(command.response);
 }

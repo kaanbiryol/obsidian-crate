@@ -19,8 +19,7 @@ export async function cleanStagedBatches(bucket: R2Bucket, db: D1Database, now =
 			// An absent key can still arrive after a lost R2 response. Keep its lease
 			// fenced against publication, and eventually surface it for inspection.
 			await db.prepare(`UPDATE staged_upload_batches SET storage_keys = ?, attempts = attempts + 1,
-        expires_at = CASE WHEN attempts + 1 >= 8 THEN NULL ELSE ? END,
-        last_error = 'Object cleanup could not be confirmed; the upload record is retained'
+        expires_at = CASE WHEN attempts + 1 >= 8 THEN NULL ELSE ? END
         WHERE id = ? AND storage_keys = ?`)
 				.bind(JSON.stringify(objects.filter(object => waiting.includes(object.storageKey))), now + STAGED_UPLOAD_TTL_MS, row.id, row.storage_keys).run();
 		}

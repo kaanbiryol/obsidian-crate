@@ -2,6 +2,8 @@ import { corsResponse } from '../http/cors';
 import { PUSH_RECIPIENT_AUTHORITY } from '../notifications/recipient-authority';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 
+const STAGED_CLEANUP_PAUSED = 'Object cleanup could not be confirmed; the upload record is retained';
+
 function firstCount(result: unknown): number {
 	if (!result || typeof result !== 'object') return 0;
 	const rows = (result as { results?: Array<{ count?: number }> }).results;
@@ -37,8 +39,9 @@ export async function handleDiagnostics(db: D1Database): Promise<Response> {
 			WHERE last_error IS NOT NULL ORDER BY updated_at, path LIMIT 100`).all<{ path: string; reason: string }>(),
 	db.prepare('SELECT path, attempts, error FROM notification_file_retries WHERE (attempts >= 8 OR available_at < 0) ORDER BY path LIMIT 100').all(),
 	db.prepare('SELECT reminder_id AS reminderId, attempts, last_error AS error FROM notification_jobs WHERE available_at < 0 ORDER BY reminder_id LIMIT 100').all(),
-	db.prepare(`SELECT storage_key AS storageKey, last_error AS error FROM staged_uploads WHERE expires_at IS NULL
-      UNION ALL SELECT json_extract(k.value, '$.storageKey') AS storageKey, b.last_error AS error FROM staged_upload_batches b, json_each(b.storage_keys) k
+	// Cleanup stops retrying a record (clears its expiry) only after it could not confirm the object.
+	db.prepare(`SELECT storage_key AS storageKey, '${STAGED_CLEANUP_PAUSED}' AS error FROM staged_uploads WHERE expires_at IS NULL
+      UNION ALL SELECT json_extract(k.value, '$.storageKey') AS storageKey, '${STAGED_CLEANUP_PAUSED}' AS error FROM staged_upload_batches b, json_each(b.storage_keys) k
       WHERE b.expires_at IS NULL ORDER BY storageKey LIMIT 100`).all(),
 	]);
 	return corsResponse({
