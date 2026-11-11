@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS changelog (
 	revision TEXT,
 	hash TEXT NOT NULL DEFAULT '',
 	size INTEGER NOT NULL DEFAULT 0,
+	-- A `put` of an encrypted file: its descriptor JSON. NULL otherwise.
+	descriptor TEXT,
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -22,7 +24,9 @@ CREATE TABLE IF NOT EXISTS files (
 	hash TEXT NOT NULL DEFAULT '',
 	size INTEGER NOT NULL DEFAULT 0,
 	modified TEXT NOT NULL DEFAULT (datetime('now')),
-	storage_key TEXT NOT NULL
+	storage_key TEXT NOT NULL,
+	-- The descriptor JSON of an encrypted file, written with the row. NULL in a plaintext vault.
+	descriptor TEXT
 ) WITHOUT ROWID;
 
 
@@ -102,6 +106,8 @@ CREATE TABLE IF NOT EXISTS file_versions (
 	-- published and the server request that made it.
 	deletion_revision TEXT,
 	request_id TEXT,
+	-- The descriptor JSON of an encrypted copy, taken from its `files` row.
+	descriptor TEXT,
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	expires_at INTEGER NOT NULL
 ) WITHOUT ROWID;

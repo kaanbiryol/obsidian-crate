@@ -13,6 +13,9 @@ export interface FileEntry {
 	revision?: string;
 	size: number;
 	modified: string;
+	/** Server responses only: an encrypted file's descriptor, checked by the encryption
+	 * layer. Older servers omit it, and clients then ask `/encryption/metadata`. */
+	descriptor?: unknown;
 	/** Local only: an encrypted file's server path, kept where it cannot be recomputed
 	 * from `path`, as for notes with a random server name. */
 	wire?: string;
@@ -30,6 +33,9 @@ export interface ChangelogEntry {
 	revision?: string;
 	size: number;
 	created_at: string;
+	/** Server responses only: an encrypted file's descriptor, checked by the encryption
+	 * layer. Older servers omit it, and clients then ask `/encryption/metadata`. */
+	descriptor?: unknown;
 }
 
 export interface ChangesResponse {
@@ -174,6 +180,9 @@ export interface RemoteFileVersion {
 	reason: 'replaced' | 'deleted';
 	created_at: string;
 	expires_at: number;
+	/** Server responses only: an encrypted file's descriptor, checked by the encryption
+	 * layer. Older servers omit it, and clients then ask `/encryption/metadata`. */
+	descriptor?: unknown;
 }
 
 export interface RestoreFileRequest {

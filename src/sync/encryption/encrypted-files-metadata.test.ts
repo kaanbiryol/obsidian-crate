@@ -32,6 +32,24 @@ it('decrypts large inventories in bounded, overlapping batches and keeps their o
 	expect(result.map(({ entry }) => entry.hash)).toEqual(entries.map(({ entry }) => `plain-${entry.revision}`));
 });
 
+it('opens descriptors listed inline and asks the server only for revisions listed without one', async () => {
+	const requestJson = vi.fn(async (_path: string, init: { body: string }) => {
+		const { revisions } = JSON.parse(init.body) as { revisions: string[] };
+		return { descriptors: Object.fromEntries(revisions.map(revision => [revision, { path: `n/${revision}.md`, revision }])) };
+	});
+	const files = await EncryptedFiles.create({ requestJson } as unknown as WorkerApiHttpClient, {} as never, async () => null);
+	const inline = (revision: string) => ({ path: `n/${revision}.md`, entry: { hash: 'cipher', size: 9, revision, descriptor: { path: `n/${revision}.md`, revision } as unknown } });
+	const opened = await files.metadata([inline('0'), inline('1')]);
+	// Before: every listed page cost an /encryption/metadata request.
+	expect(requestJson).not.toHaveBeenCalled();
+	expect(opened.map(({ entry }) => entry)).toEqual([{ hash: 'plain-0', size: 1, revision: '0' }, { hash: 'plain-1', size: 1, revision: '1' }]);
+	// An older server or a shared checkpoint lists some revisions without descriptors.
+	const mixed = await files.metadata<{ hash: string; size: number; revision: string; descriptor?: unknown }>([inline('2'), { path: 'n/3.md', entry: { hash: 'cipher', size: 9, revision: '3' } }]);
+	expect(requestJson).toHaveBeenCalledTimes(1);
+	expect(JSON.parse(requestJson.mock.calls[0]![1].body)).toEqual({ revisions: ['3'] });
+	expect(mixed.map(({ entry }) => entry.hash)).toEqual(['plain-2', 'plain-3']);
+});
+
 function precondition() {
 	const cipher = (i: number) => `c${i.toString(16).padStart(63, '0')}`;
 	const requestJson = vi.fn(async (path: string, init: { body: string }) => {

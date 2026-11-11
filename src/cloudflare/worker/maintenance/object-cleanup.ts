@@ -1,4 +1,4 @@
-import { changedRows, queryRows, type SqlGuard } from '../d1/db';
+import { changedRows, queryRows } from '../d1/db';
 import { findReferencedStorageKeys, type ObjectReference } from '../d1/storage-references';
 
 // R2 deletes up to R2_KEYS_PER_CALL keys per call. 500 keeps the reference lookup's single
@@ -52,21 +52,16 @@ const EXPIRED_VERSION_BATCH = CLEANUP_BATCH_LIMIT;
 /** Deletes the objects of the oldest expired versions, then their rows. The expired row
  * is the cleanup intent: every reader already hides it, and a pass interrupted after the
  * R2 delete repeats it. Keys are never reused, so only a live file can still need one.
- * `alongside` runs in the row deletion's transaction, given the storage keys. Returns
- * true when more may remain. */
-export async function expireFileVersions(bucket: R2Bucket, db: D1Database, now = Date.now(),
-	alongside?: (expired: SqlGuard<unknown>) => D1PreparedStatement): Promise<boolean> {
+ * Returns true when more may remain. */
+export async function expireFileVersions(bucket: R2Bucket, db: D1Database, now = Date.now()): Promise<boolean> {
 	const rows = await queryRows<{ storage_key: string; path: string }>(db.prepare(`SELECT storage_key, path FROM file_versions
     WHERE expires_at <= ? ORDER BY expires_at LIMIT ${EXPIRED_VERSION_BATCH}`).bind(now));
 	if (!rows.length) return false;
 	const live = await findReferencedStorageKeys(db, rows.map(row => ({ storageKey: row.storage_key, path: row.path })), { versions: false });
 	const unused = rows.map(row => row.storage_key).filter(key => !live.has(key));
 	if (unused.length) await bucket.delete(unused);
-	const expired: SqlGuard<unknown> = { sql: 'SELECT value FROM json_each(?)', args: [JSON.stringify(rows.map(row => row.storage_key))] };
-	await db.batch([
-		...(alongside ? [alongside(expired)] : []),
-		db.prepare(`DELETE FROM file_versions WHERE storage_key IN (${expired.sql}) AND expires_at <= ?`).bind(...expired.args, now),
-	]);
+	await db.prepare('DELETE FROM file_versions WHERE storage_key IN (SELECT value FROM json_each(?)) AND expires_at <= ?')
+		.bind(JSON.stringify(rows.map(row => row.storage_key)), now).run();
 	return rows.length === EXPIRED_VERSION_BATCH;
 }
 

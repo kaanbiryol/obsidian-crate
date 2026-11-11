@@ -1,7 +1,7 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
 import { publishedChangelogStatement, retainReplacedVersionStatements } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
-import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
+import { descriptorColumn, encryptionWriteGuard, prepareEncryptedFileCommit } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
 import { enqueueFileProjection } from '../notifications/projection-queue';
@@ -19,8 +19,8 @@ import {
 } from './storage';
 
 /** The replaced row, including when it became live for version coalescing. */
-function getReplacedFileRow(db: D1Database, path: string): Promise<(FileStorageRow & { path: string; modified: string }) | null> {
-	return db.prepare(`SELECT path, hash, size, storage_key AS storageKey, modified FROM files WHERE ${FILE_PATH_MATCH}`)
+function getReplacedFileRow(db: D1Database, path: string): Promise<(FileStorageRow & { path: string; modified: string; descriptor: string | null }) | null> {
+	return db.prepare(`SELECT path, hash, size, storage_key AS storageKey, modified, descriptor FROM files WHERE ${FILE_PATH_MATCH}`)
 		.bind(...filePathArgs(path)).first();
 }
 
@@ -46,8 +46,8 @@ function destinationMutation(
 	}
 	if (destination.expectedHash === null) {
 		return db.prepare(`/* atomic-destination-insert */
-			INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
-			SELECT ?, ?, ?, ?, datetime('now'), ?
+			INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor)
+			SELECT ?, ?, ?, ?, datetime('now'), ?, ?
 			WHERE NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})
 			AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
 			AND ${namespaceGuard}
@@ -58,6 +58,7 @@ function destinationMutation(
 				destination.hash,
 				destination.size,
 				destination.objectKey,
+				destination.descriptor ?? null,
 				...filePathArgs(destination.path),
 				...filePathArgs(source.path),
 				source.expectedHash,
@@ -66,7 +67,7 @@ function destinationMutation(
 	}
 
 	return db.prepare(`/* atomic-destination-update */
-		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
 		WHERE ${FILE_PATH_MATCH} AND hash = ?
 		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
 		AND ${namespaceGuard}`)
@@ -75,6 +76,7 @@ function destinationMutation(
 			destination.hash,
 			destination.size,
 			destination.objectKey,
+			destination.descriptor ?? null,
 			...filePathArgs(destination.path),
 			destination.expectedHash,
 			...filePathArgs(source.path),
@@ -90,7 +92,7 @@ function sourceMutation(
 ): D1PreparedStatement {
 	const destinationRevision = fileRevisionGuard(destination.path, destination.objectKey);
 	return db.prepare(`/* atomic-source-update */
-		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
 		WHERE ${FILE_PATH_MATCH} AND hash = ?
 		AND ${destinationRevision.sql}`)
 		.bind(
@@ -98,6 +100,7 @@ function sourceMutation(
 			source.hash,
 			source.size,
 			source.objectKey,
+			source.descriptor ?? null,
 			...filePathArgs(source.path),
 			source.expectedHash,
 			...destinationRevision.args,
@@ -155,6 +158,8 @@ export async function writeCommittedMarkdownFilePair(
 	const [destination, source] = stagedFiles as [StagedMarkdownFile, StagedMarkdownFile];
 	source.expectedRevision = params.source.expectedRevision;
 	destination.expectedRevision = params.destination.expectedRevision;
+	source.descriptor = descriptorColumn(sourceEncryption.descriptor);
+	destination.descriptor = descriptorColumn(destinationEncryption.descriptor);
 	const previousVersions = [
 		...(previousSource && previousSource.storageKey !== source.objectKey ? [previousSource] : []),
 		...(previousDestination && previousDestination.storageKey !== destination.objectKey ? [previousDestination] : []),
@@ -165,8 +170,6 @@ export async function writeCommittedMarkdownFilePair(
 	const results: unknown[] = await db.batch([
 			destinationMutation(db, destination, source, sourceEncryption.state),
 			sourceMutation(db, source, destination),
-			...recordEncryptedFile(db, source.path, source.objectKey, sourceEncryption.descriptor),
-			...recordEncryptedFile(db, destination.path, destination.objectKey, destinationEncryption.descriptor),
 			publishedChangelogStatement(db, destination),
 			publishedChangelogStatement(db, source),
 			...previousVersions.flatMap(previous => retainReplacedVersionStatements(db, previous, [source, destination])),

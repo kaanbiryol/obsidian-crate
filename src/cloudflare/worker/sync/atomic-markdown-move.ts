@@ -1,7 +1,7 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
 import { deletedFileStatements, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
-import { encryptionWriteGuard, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
+import { descriptorColumn, encryptionWriteGuard, prepareEncryptedFileCommit } from '../encryption/state';
 import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements } from '../reading/library-index';
@@ -36,6 +36,7 @@ export async function writeCommittedMarkdownMove(
 	const destination = await stageMarkdownFile(bucket, db, params.destination.path, params.destination.content, null, Boolean(encryption.state));
 	const audit = params.audit ?? { requestId: crypto.randomUUID(), deviceId: null, clientSession: null, operationId: null };
 	const deletion = `__crate__/deletions/${crypto.randomUUID()}`;
+	const descriptor = descriptorColumn(encryption.descriptor);
 	const namespace = fileNamespaceGuard(destination.path), lease = stagedUploadGuard(destination.objectKey), guard = encryptionWriteGuard(encryption.state);
 	const sourceMatch = `${FILE_PATH_MATCH} AND hash = ? AND storage_key = ?`;
 	const sourceArgs = [...filePathArgs(source.path), source.expectedHash, source.expectedRevision];
@@ -43,14 +44,13 @@ export async function writeCommittedMarkdownMove(
 	// Every source statement requires the new revision, so it only runs after the insert.
 	const sourceStatement = (sql: string, ...args: unknown[]) => db.prepare(`${sql} WHERE ${sourceMatch} AND ${published.sql}`).bind(...args, ...sourceArgs, ...published.args);
 	const beforeDelete = [
-		db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
-			SELECT ?, ?, ?, ?, datetime('now'), ?
+		db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor)
+			SELECT ?, ?, ?, ?, datetime('now'), ?, ?
 			WHERE EXISTS (SELECT 1 FROM files WHERE ${sourceMatch}) AND ${namespace.sql} AND ${lease.sql} AND ${guard.sql}
 			ON CONFLICT(portable_path) DO NOTHING`)
-			.bind(destination.path, portablePathKey(destination.path), destination.hash, destination.size, destination.objectKey,
+			.bind(destination.path, portablePathKey(destination.path), destination.hash, destination.size, destination.objectKey, descriptor,
 				...sourceArgs, ...namespace.args, ...lease.args, ...guard.args),
-		...recordEncryptedFile(db, destination.path, destination.objectKey, encryption.descriptor),
-		publishedChangelogStatement(db, destination),
+		publishedChangelogStatement(db, { ...destination, descriptor }),
 		...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, { encrypted: Boolean(encryption.state), reminderFolder: context?.reminderFolder }),
 		finishStagedUpload(db, destination.objectKey, destination.path),
 		...deletedFileStatements(db, `${sourceMatch} AND ${published.sql}`, [...sourceArgs, ...published.args], deletion, audit.requestId),

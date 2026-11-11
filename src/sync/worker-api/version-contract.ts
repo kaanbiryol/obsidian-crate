@@ -1,5 +1,5 @@
 import { isRecord, isSha256Hex } from '../../platform/validation';
-import { isSyncDate, isSyncPath, isSyncRevision, isSyncSequence } from '../../protocol/sync-validation';
+import { isOptionalDescriptor, isSyncDate, isSyncPath, isSyncRevision, isSyncSequence } from '../../protocol/sync-validation';
 import type { FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import { isWirePath } from '../../protocol/encrypted-path';
 import type { WorkerApiHttpClient } from './http';
@@ -19,9 +19,11 @@ export function parseFileVersions(value: unknown): FileVersionsPage {
 		if (!isRecord(row) || !isSyncPath(row.path) || !isSyncRevision(row.storage_key) || !isSha256Hex(row.hash)
 			|| !isSyncSequence(row.size) || !isSyncSequence(row.expires_at) || !isSyncDate(row.created_at)
 			|| row.reason !== 'replaced' && row.reason !== 'deleted'
-			|| (row.wire !== undefined && (typeof row.wire !== 'string' || !isWirePath(row.wire)))) throw new Error('Invalid retained-file metadata');
+			|| (row.wire !== undefined && (typeof row.wire !== 'string' || !isWirePath(row.wire)))
+			|| !isOptionalDescriptor(row.descriptor)) throw new Error('Invalid retained-file metadata');
 		return { path: row.path, storage_key: row.storage_key, hash: row.hash, size: row.size, expires_at: row.expires_at,
-			created_at: row.created_at, reason: row.reason, ...(row.wire === undefined ? {} : { wire: row.wire }) };
+			created_at: row.created_at, reason: row.reason, ...(row.wire === undefined ? {} : { wire: row.wire }),
+			...(row.descriptor === undefined ? {} : { descriptor: row.descriptor }) };
 	});
 	return { versions, hasMore: value.hasMore, ...(value.hasMore ? { nextCursor: value.nextCursor as string } : {}) };
 }

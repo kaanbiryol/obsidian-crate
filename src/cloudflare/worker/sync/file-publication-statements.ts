@@ -8,13 +8,13 @@ interface PublishedRevision {
 
 export function publishedChangelogStatement(
 	db: D1Database,
-	file: PublishedRevision & { hash: string; size: number },
+	file: PublishedRevision & { hash: string; size: number; descriptor?: string | null },
 ): D1PreparedStatement {
 	const revision = fileRevisionGuard(file.path, file.objectKey);
-	return db.prepare(`INSERT INTO changelog (seq, path, action, hash, size, revision)
-		SELECT ${LAST_SEQ_SQL} + 1, ?, 'put', ?, ?, ?
+	return db.prepare(`INSERT INTO changelog (seq, path, action, hash, size, revision, descriptor)
+		SELECT ${LAST_SEQ_SQL} + 1, ?, 'put', ?, ?, ?, ?
 		WHERE ${revision.sql}`)
-		.bind(file.path, file.hash, file.size, file.objectKey, ...revision.args);
+		.bind(file.path, file.hash, file.size, file.objectKey, file.descriptor ?? null, ...revision.args);
 }
 
 /** The delete's changelog row and its history copy for the `files` row `where`
@@ -24,8 +24,8 @@ export function deletedFileStatements(db: D1Database, where: string, args: reado
 	return [
 		db.prepare(`INSERT INTO changelog (seq, path, action, hash, size, revision)
 			SELECT ${nextChangelogSeqSql('portable_path')}, path, 'delete', '', 0, ? FROM files WHERE ${where}`).bind(revision, ...args),
-		db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, deletion_revision, request_id, expires_at)
-			SELECT storage_key, path, hash, size, 'deleted', ?, ?, ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${where}
+		db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, deletion_revision, request_id, descriptor, expires_at)
+			SELECT storage_key, path, hash, size, 'deleted', ?, ?, descriptor, ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${where}
 			ON CONFLICT(storage_key) DO UPDATE SET reason = 'deleted', deletion_revision = excluded.deletion_revision,
 				request_id = excluded.request_id, expires_at = excluded.expires_at`)
 			.bind(revision, requestId, Date.now() + FILE_VERSION_RETENTION_MS, ...args),
@@ -56,18 +56,18 @@ export function keepReplacedVersionSql(previous: string): string {
  * A copy that is not kept is queued for reference-aware cleanup instead. */
 export function retainReplacedVersionStatements(
 	db: D1Database,
-	previous: FileStorageRow & { path: string; modified: string },
+	previous: FileStorageRow & { path: string; modified: string; descriptor?: string | null },
 	requiredRevisions: readonly [PublishedRevision, ...PublishedRevision[]],
 ): D1PreparedStatement[] {
 	const guard = fileRevisionsGuard(requiredRevisions.map(file => ({ path: file.path, storageKey: file.objectKey })));
 	return [
 		db.prepare(`INSERT OR IGNORE INTO file_versions
-			(storage_key, path, hash, size, reason, expires_at)
-			SELECT storage_key, path, hash, size, 'replaced', ${FILE_VERSION_EXPIRES_AT_SQL}
-			FROM (SELECT ? AS storage_key, ? AS path, ? AS hash, ? AS size, ? AS modified) AS previous
+			(storage_key, path, hash, size, reason, descriptor, expires_at)
+			SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_EXPIRES_AT_SQL}
+			FROM (SELECT ? AS storage_key, ? AS path, ? AS hash, ? AS size, ? AS modified, ? AS descriptor) AS previous
 			WHERE ${guard.sql} AND ${keepReplacedVersionSql('previous')}`)
 			.bind(Date.now() + FILE_VERSION_RETENTION_MS, previous.storageKey, previous.path, previous.hash, previous.size,
-				previous.modified, ...guard.args),
+				previous.modified, previous.descriptor ?? null, ...guard.args),
 		// Runs after the insert, so it sees whether the copy was kept.
 		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)
 			SELECT ?, ? WHERE ${guard.sql} AND NOT EXISTS (SELECT 1 FROM file_versions WHERE storage_key = ?)`)

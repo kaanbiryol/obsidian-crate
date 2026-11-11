@@ -147,7 +147,7 @@ it.each(['single', 'batch'] as const)('commits an encrypted %s Markdown upload w
 	} finally { env.BUCKET.get = get; }
 	expect(reads).toBe(0);
 	expect(await env.DB.prepare('SELECT path FROM files').first()).toEqual({ path: wire });
-	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).not.toBeNull();
+	expect(typeof (await env.DB.prepare('SELECT descriptor FROM files').first<{ descriptor: string | null }>())?.descriptor).toBe('string');
 });
 
 it('rejects a file descriptor sealed to the vault seal key', async () => {

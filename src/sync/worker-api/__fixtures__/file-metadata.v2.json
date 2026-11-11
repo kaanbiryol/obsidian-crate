@@ -1,0 +1,46 @@
+{
+	"stored": {
+		"requested": [
+			"b.md"
+		],
+		"response": {
+			"files": {
+				"b.md": {
+					"hash": "320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88",
+					"size": 5,
+					"modified": "2026-10-31 16:57:20",
+					"revision": "__crate__/files/320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88/b6ff103f-e739-4ff8-bbd4-e93fd2fbc11f",
+					"descriptor": {
+						"version": 1,
+						"vaultId": "7f1c2a9e-3b4d-4e5f-8a6b-9c0d1e2f3a4b",
+						"scopeId": "vault",
+						"objectId": "0b6e4c1d-2f3a-4b5c-8d9e-0f1a2b3c4d5e",
+						"keyId": "vault-key-1",
+						"metadata": "eyJ2ZXJzaW9uIjoxLCJpdiI6InN5bnRoZXRpYyIsImNpcGhlcnRleHQiOiJzeW50aGV0aWMifQ"
+					}
+				}
+			}
+		}
+	},
+	"decoded": {
+		"files": {
+			"b.md": {
+				"hash": "320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88",
+				"size": 5,
+				"modified": "2026-10-31 16:57:20",
+				"revision": "__crate__/files/320b5d80f8cfd184c57473d7081003135e0001480dac18583a0bdc748b361b88/b6ff103f-e739-4ff8-bbd4-e93fd2fbc11f",
+				"descriptor": {
+					"version": 1,
+					"vaultId": "7f1c2a9e-3b4d-4e5f-8a6b-9c0d1e2f3a4b",
+					"scopeId": "vault",
+					"objectId": "0b6e4c1d-2f3a-4b5c-8d9e-0f1a2b3c4d5e",
+					"keyId": "vault-key-1",
+					"metadata": "eyJ2ZXJzaW9uIjoxLCJpdiI6InN5bnRoZXRpYyIsImNpcGhlcnRleHQiOiJzeW50aGV0aWMifQ"
+				}
+			}
+		},
+		"paths": [
+			"b.md"
+		]
+	}
+}

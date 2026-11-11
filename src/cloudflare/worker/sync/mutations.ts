@@ -2,7 +2,7 @@ import type { ObjectReference } from '../d1/storage-references';
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
 import { deletedFileStatements, keepReplacedVersionSql, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
-import { ENCRYPTION_STATE_SQL, encryptionWriteGuard, parseEncryptionState, prepareEncryptedFileCommit, recordEncryptedFile } from '../encryption/state';
+import { descriptorColumn, ENCRYPTION_STATE_SQL, encryptionWriteGuard, parseEncryptionState, prepareEncryptedFileCommit } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { syncResetGenerationGuard } from './reset-generation';
 import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
@@ -37,6 +37,8 @@ interface UploadMutationInput {
 	stagingBatchId?: string;
 	importToken?: string;
 	encryptionState?: EncryptionServerState | null;
+	/** The `descriptor` column of an encrypted file. */
+	descriptor?: string | null;
 	resetGeneration?: string | null;
 }
 
@@ -65,18 +67,19 @@ function replacedRow(input: UploadMutationInput & { expectedHash: string }): Sql
 
 export function uploadMutation(db: D1Database, input: UploadMutationInput): D1PreparedStatement {
 	const { path, hash, size, objectKey, expectedHash } = input;
+	const descriptor = input.descriptor ?? null;
 	if (expectedHash === null) {
 		const namespace = uploadGuard(input);
-		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
-			SELECT ?, ?, ?, ?, datetime('now'), ? WHERE ${namespace.sql}
+		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor)
+			SELECT ?, ?, ?, ?, datetime('now'), ?, ? WHERE ${namespace.sql}
 			ON CONFLICT(portable_path) DO NOTHING`)
-			.bind(path, portablePathKey(path), hash, size, objectKey, ...namespace.args);
+			.bind(path, portablePathKey(path), hash, size, objectKey, descriptor, ...namespace.args);
 	}
 	const replaced = replacedRow({ ...input, expectedHash });
 	return db.prepare(`UPDATE files
-		SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
 		WHERE ${replaced.sql}`)
-		.bind(portablePathKey(path), hash, size, objectKey, ...replaced.args);
+		.bind(portablePathKey(path), hash, size, objectKey, descriptor, ...replaced.args);
 }
 
 /** Runs before the upload's UPDATE in the same batch and reads the live row, so a
@@ -86,8 +89,8 @@ export function uploadMutation(db: D1Database, input: UploadMutationInput): D1Pr
 function retainReplacedUpload(db: D1Database, input: UploadMutationInput, always: boolean): D1PreparedStatement[] {
 	if (input.expectedHash === null) return [];
 	const replaced = replacedRow({ ...input, expectedHash: input.expectedHash });
-	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, expires_at)
-		SELECT storage_key, path, hash, size, 'replaced', ${FILE_VERSION_EXPIRES_AT_SQL}
+	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, descriptor, expires_at)
+		SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_EXPIRES_AT_SQL}
 		FROM files WHERE ${replaced.sql} AND storage_key != ?${always ? '' : ` AND ${keepReplacedVersionSql('files')}`}`)
 		.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...replaced.args, input.objectKey),
 	...queueReplacedUploadCleanup(db, input)];
@@ -157,14 +160,14 @@ async function stagedFileStatements(db: D1Database, params: StagedFileCommitInpu
 	const upload: UploadMutationInput = {
 		path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey,
 		expectedHash: params.expectedHash, expectedRevision: params.expectedRevision,
-		operation: params.operation, encryptionState: encryption.state, resetGeneration: params.resetGeneration,
+		operation: params.operation, encryptionState: encryption.state, descriptor: descriptorColumn(encryption.descriptor),
+		resetGeneration: params.resetGeneration,
 	};
 	const retained = retainReplacedUpload(db, upload, params.keepReplacedVersion === true);
 	return { mutationIndex: retained.length, encrypted: Boolean(encryption.state), statements: [
 		...retained,
 		uploadMutation(db, upload),
-		...recordEncryptedFile(db, params.path, params.objectKey, encryption.descriptor),
-		publishedChangelogStatement(db, params),
+		publishedChangelogStatement(db, upload),
 		...await enqueueFileProjection(db, params.path, params.objectKey, params.content, { encrypted: Boolean(encryption.state), reminderFolder: params.reminderFolder, size: params.size }),
 		...(readingIndex ? await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
 			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state) }) : []),

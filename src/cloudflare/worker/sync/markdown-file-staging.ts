@@ -10,6 +10,8 @@ export interface StagedMarkdownFile {
 	objectKey: string;
 	expectedHash: string | null;
 	expectedRevision?: string;
+	/** Set by the committer: the `descriptor` column of an encrypted file. */
+	descriptor?: string | null;
 }
 
 export async function stageMarkdownFile(

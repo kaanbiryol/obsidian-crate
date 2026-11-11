@@ -1,6 +1,5 @@
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER, validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, parseEncryptedFile, type EncryptedFileDescriptor } from '../../../encryption/file-format';
-import { fileRevisionGuard } from '../sync/file-identity';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
 import { isWirePath } from '../../../protocol/encrypted-path';
 import { readServerState, saveServerState, serverStateValue } from '../d1/server-state';
@@ -11,7 +10,6 @@ import { isReadingCardKind, validateReadingCardData } from '@/reading/core/readi
 
 /** The stored state JSON, or NULL for a plaintext vault. */
 export const ENCRYPTION_STATE_SQL = serverStateValue('encryption');
-export const ENCRYPTION_FILE_PREFIX = 'e2ee:file:';
 
 export class EncryptionStateError extends Error {
 	constructor(message: string, readonly status = 409) { super(message); this.name = 'EncryptionStateError'; }
@@ -107,11 +105,10 @@ function validateEncryptedContent(state: EncryptionServerState, path: string, co
 	return descriptor;
 }
 
-/** An immutable descriptor is published only if its file publication succeeds. */
-export function recordEncryptedFile(db: D1Database, path: string, storageKey: string, descriptor?: EncryptedFileDescriptor): D1PreparedStatement[] {
-	if (!descriptor) return [];
-	const revision = fileRevisionGuard(path, storageKey);
-	return [db.prepare(`INSERT INTO maintenance_state (key, value, updated_at)
-		SELECT ?, ?, datetime('now') WHERE ${revision.sql}
-		ON CONFLICT(key) DO NOTHING`).bind(ENCRYPTION_FILE_PREFIX + storageKey, JSON.stringify(descriptor), ...revision.args)];
-}
+/** The `descriptor` column value: an encrypted file's descriptor JSON, or NULL. It is
+ * written with the file's own rows, so it lives and dies with them. */
+export const descriptorColumn = (descriptor?: EncryptedFileDescriptor): string | null => descriptor ? JSON.stringify(descriptor) : null;
+
+/** The response field for a stored `descriptor` column: absent in a plaintext vault. */
+export const descriptorField = (value: string | null | undefined): { descriptor?: EncryptedFileDescriptor } =>
+	value ? { descriptor: JSON.parse(value) as EncryptedFileDescriptor } : {};

@@ -29,10 +29,19 @@ function parseSyncFileEntry(value: unknown, local = false): FileEntry {
 		|| !(isSyncDate(value.modified) || local && value.modified === 'unverified')
 		|| (value.revision !== undefined && !isSyncRevision(value.revision))
 		|| (!local && !isSyncRevision(value.revision))
-		|| (value.wire !== undefined && !(local && typeof value.wire === 'string' && isWirePath(value.wire)))) throw new Error('Invalid sync file metadata; no changes were applied');
+		|| (value.wire !== undefined && !(local && typeof value.wire === 'string' && isWirePath(value.wire)))
+		|| !local && !isOptionalDescriptor(value.descriptor)) throw new Error('Invalid sync file metadata; no changes were applied');
 	return { hash: value.hash, size: value.size, modified: value.modified,
 		...(value.revision === undefined ? {} : { revision: value.revision }),
+		// Local records never keep a descriptor.
+		...(local || value.descriptor === undefined ? {} : { descriptor: value.descriptor }),
 		...(value.wire === undefined ? {} : { wire: value.wire }) };
+}
+
+/** An encrypted file's descriptor, as servers send it beside a revision. The encryption
+ * layer validates its fields. */
+export function isOptionalDescriptor(value: unknown): boolean {
+	return value === undefined || isRecord(value);
 }
 
 export function parseSyncFiles(value: unknown, local = false): Record<string, FileEntry> {

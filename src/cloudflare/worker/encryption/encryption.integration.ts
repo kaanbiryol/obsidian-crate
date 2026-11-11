@@ -10,7 +10,6 @@ import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import { createReminderProjection } from '../../../reminders/core/encrypted-schedule-projection';
 import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
-import { ENCRYPTION_FILE_PREFIX } from './state';
 import { handleUpload } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
 import { trackStagedUpload } from '../sync/staging/staged-uploads';
@@ -57,8 +56,11 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	const stored = await getStoredFileRow(env.DB, path);
 	expect(stored?.hash).toBe(file.hash);
 	expect(await (await env.BUCKET.get(stored!.storageKey))!.text()).not.toContain('Secret medical');
-	const descriptor = await env.DB.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(ENCRYPTION_FILE_PREFIX + stored!.storageKey).first<{ value: string }>();
-	expect(JSON.parse(descriptor!.value)).toEqual(file.descriptor);
+	// The descriptor is written with the file's row and its changelog put, nowhere else.
+	const descriptors = await env.DB.prepare(`SELECT descriptor FROM files WHERE storage_key = ?1
+		UNION ALL SELECT descriptor FROM changelog WHERE revision = ?1`).bind(stored!.storageKey).all<{ descriptor: string }>();
+	expect(descriptors.results.map(row => row.descriptor)).toEqual([JSON.stringify(file.descriptor), JSON.stringify(file.descriptor)]);
+	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).toBeNull();
 	await drainNotificationProjections(env);
 	await drainNotificationJobs(env);
 	const alarm = await env.DB.prepare('SELECT content FROM scheduled_reminders WHERE reminder_id = ?').bind('r1').first<{ content: string }>();

@@ -3,6 +3,7 @@ import { queryRows } from '../../d1/db';
 import { sanitizePath } from '../../http/request-validation';
 import { isSyncDate, isSyncRevision } from '../../../../protocol/sync-validation';
 import type { RemoteFileVersion } from '../../../../protocol/sync-types';
+import { descriptorField } from '../../encryption/state';
 
 const PAGE_SIZE = 100;
 
@@ -30,10 +31,10 @@ export async function handleListFileVersions(request: Request, db: D1Database): 
 			values.push(cursor[1], decodeURIComponent(cursor[2]));
 		} catch { return corsResponse({ error: 'Invalid retained-version cursor; restart the search' }, 400); }
 	}
-	const rows = await queryRows<RemoteFileVersion>(db.prepare('SELECT storage_key, path, hash, size, reason, created_at, expires_at FROM file_versions WHERE '
+	const rows = await queryRows<RemoteFileVersion & { descriptor: string | null }>(db.prepare('SELECT storage_key, path, hash, size, reason, created_at, expires_at, descriptor FROM file_versions WHERE '
 		+ clauses.join(' AND ') + ' ORDER BY created_at DESC, storage_key DESC LIMIT ?').bind(...values, PAGE_SIZE + 1));
 	const hasMore = rows.length > PAGE_SIZE;
-	const versions = rows.slice(0, PAGE_SIZE);
+	const versions: RemoteFileVersion[] = rows.slice(0, PAGE_SIZE).map(({ descriptor, ...version }) => ({ ...version, ...descriptorField(descriptor) }));
 	const last = versions.at(-1);
 	const nextCursor = hasMore && last ? btoa(JSON.stringify([1, last.created_at, encodeURIComponent(last.storage_key), encodeURIComponent(path ?? ''), encodeURIComponent(search)])) : undefined;
 	return corsResponse({ versions, hasMore, ...(nextCursor ? { nextCursor } : {}) });

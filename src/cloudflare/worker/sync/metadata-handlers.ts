@@ -8,6 +8,7 @@ import { BATCH_DOWNLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import type { FileEntry } from '../../../protocol/sync-types';
 import { createPathRecord } from '../../../protocol/path-record';
 import { SHARED_SETTINGS_KEY } from '../../../protocol/storage-keys';
+import { descriptorField } from '../encryption/state';
 
 function batchRows<T>(result: unknown): T[] {
 	if (!result || typeof result !== 'object') return [];
@@ -28,10 +29,11 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 	if (since === null) return corsResponse({ error: 'Invalid since parameter' }, 400);
 
 	const [changesResult, boundsResult] = await db.batch([
-		db.prepare('SELECT seq, path, action, hash, size, revision, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
+		db.prepare('SELECT seq, path, action, hash, size, revision, created_at, descriptor FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
 		db.prepare(CHANGELOG_BOUNDS_SQL),
 	]);
-	const changeRows = batchRows(changesResult);
+	const changeRows = batchRows<Record<string, unknown> & { descriptor: string | null }>(changesResult)
+		.map(({ descriptor, ...change }) => ({ ...change, ...descriptorField(descriptor) }));
 	const [bounds] = batchRows<{ lastSeq: number | null; minSeq: number | null; snapshotSeq?: number }>(boundsResult);
 	const lastSeq = bounds?.lastSeq ?? 0;
 	const cursorExpired = isChangelogCursorExpired(since, { lastSeq, minSeq: bounds?.minSeq ?? null, snapshotSeq: bounds?.snapshotSeq ?? 0 });
@@ -58,21 +60,21 @@ export async function handleGetManifest(request: Request, db: D1Database): Promi
 		return corsResponse({ error: 'Invalid manifest snapshot cursor' }, 400);
 	}
 	const filesStatement = after
-		? db.prepare(`SELECT path, hash, size, modified, storage_key AS revision FROM files
+		? db.prepare(`SELECT path, hash, size, modified, storage_key AS revision, descriptor FROM files
 			WHERE portable_path > ? ORDER BY portable_path ASC LIMIT ?`).bind(portablePathKey(after), requestedLimit + 1)
-		: db.prepare('SELECT path, hash, size, modified, storage_key AS revision FROM files ORDER BY portable_path ASC LIMIT ?')
+		: db.prepare('SELECT path, hash, size, modified, storage_key AS revision, descriptor FROM files ORDER BY portable_path ASC LIMIT ?')
 			.bind(requestedLimit + 1);
 	const [filesResult, seqResult] = await db.batch([
 		filesStatement,
 		db.prepare(CHANGELOG_BOUNDS_SQL),
 	]);
-	const filesRows = batchRows<{ path: string; hash: string; size: number; modified: string; revision?: string }>(filesResult);
+	const filesRows = batchRows<{ path: string; hash: string; size: number; modified: string; revision?: string; descriptor: string | null }>(filesResult);
 	const seqRows = batchRows<{ lastSeq: number | null }>(seqResult);
 	const hasMore = filesRows.length > requestedLimit;
 	const rows = hasMore ? filesRows.slice(0, requestedLimit) : filesRows;
 	const files = createPathRecord<FileEntry>();
 	for (const row of rows) {
-		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision };
+		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision, ...descriptorField(row.descriptor) };
 	}
 	const lastSeq = seqRows[0]?.lastSeq ?? 0;
 	const snapshotSeq = requestedSnapshotSeq ?? lastSeq;
@@ -113,15 +115,15 @@ export async function handleGetFileMetadata(request: Request, db: D1Database): P
 
 	const placeholders = paths.map(() => '?').join(', ');
 	const result = await db.prepare(
-		`SELECT path, hash, size, modified, storage_key AS revision FROM files WHERE portable_path IN (${placeholders})`,
+		`SELECT path, hash, size, modified, storage_key AS revision, descriptor FROM files WHERE portable_path IN (${placeholders})`,
 	).bind(...paths.map(portablePathKey)).all();
 	const rows = Array.isArray(result.results)
-		? result.results as Array<{ path: string; hash: string; size: number; modified: string; revision?: string }>
+		? result.results as Array<{ path: string; hash: string; size: number; modified: string; revision?: string; descriptor: string | null }>
 		: [];
 	const files = createPathRecord<FileEntry>();
 	for (const row of rows) {
 		if (!paths.includes(row.path)) continue;
-		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision };
+		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision, ...descriptorField(row.descriptor) };
 	}
 	return corsResponse({ files });
 }

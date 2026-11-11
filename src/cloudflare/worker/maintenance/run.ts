@@ -9,7 +9,6 @@ import { pruneExpiredTokens, recordMaintenanceRun } from './database';
 import { pruneReminderOccurrences } from './reminder-history';
 import { pruneOperationReceipts } from './operation-receipts';
 import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
-import { pruneEncryptionMetadata, releaseExpiredVersionDescriptors, releasePrunedChangelogDescriptors } from './encryption-metadata';
 import { wakeProjection } from '../coordinator/coordinator';
 import { countD1Queries } from '../d1/d1-query-count';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
@@ -24,8 +23,6 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true, rese
 	if (await deploymentFenceHeld(db)) return { removedObjects: 0, backlog: false };
 	const encryption = await readEncryptionState(db);
 	if (encryption?.mode === 'resetting') return { removedObjects: 0, backlog: false };
-	// Descriptors exist only in an active encrypted vault; each release rechecks that.
-	const encrypted = encryption?.mode === 'active';
 	const errors: string[] = [];
 	let removedObjects = 0, backlog = false;
 	const bounded = (task: () => Promise<boolean>) => async () => { if (await task()) backlog = true; };
@@ -37,11 +34,9 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true, rese
 			}
 		}],
 				['prune shared checkpoints', bounded(() => pruneSharedCheckpoints(env.BUCKET, db))],
-		// Changelog entries usually expire before the versions of their revisions, so each
-		// descriptor is released with its last reference.
-		['prune changelog', bounded(() => pruneChangelog(db, encrypted ? expired => releasePrunedChangelogDescriptors(db, expired) : undefined))],
-		['expire file versions', bounded(() => expireFileVersions(env.BUCKET, db, Date.now(),
-			encrypted ? expired => releaseExpiredVersionDescriptors(db, expired) : undefined))],
+		// Encrypted file descriptors live in these rows, so pruning them releases the descriptors too.
+		['prune changelog', bounded(() => pruneChangelog(db))],
+		['expire file versions', bounded(() => expireFileVersions(env.BUCKET, db, Date.now()))],
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, db); }],
 		// Unbounded scans of retained history: once per episode, not on every follow-up pass.
 		['prune obsolete reminder occurrences', async () => { if (firstPass) await pruneReminderOccurrences(db); }],
@@ -51,7 +46,6 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true, rese
 		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, db); }],
 		['clean unfinished upload batches', async () => { removedObjects += await cleanStagedBatches(env.BUCKET, db); }],
 	];
-	if (encrypted) tasks.push(['prune unused encryption metadata', bounded(() => pruneEncryptionMetadata(db, firstPass))]);
 	// Three queries plus the run record's batch; on a pass whose earlier work leaves
 	// too few, this waits for the next one.
 	tasks.push(['prune expired encrypted response chunks', async () => {

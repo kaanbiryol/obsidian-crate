@@ -27,6 +27,8 @@ No unsupported database or checkpoint is silently interpreted as empty. Signing 
 
 Encrypted vaults additionally require matching vault/generation headers. Their content envelopes use `crate-e2ee-v1`; browser private records use `crate-local-e2ee-v1`. Server paths are keyed name tags, and feature folders carry encrypted labels. Turning encryption on replaces the server copy, so no pre-encryption receipt or history carries over. Encryption cannot be rolled back by deploying an older server. See [encryption](e2ee-implementation.md).
 
+Read responses list an encrypted file's `descriptor` beside its revision as an optional field. A client that finds none, from an older server or in a shared checkpoint, asks `POST /encryption/metadata`, and the current server keeps answering that route for older clients from the same rows.
+
 File and folder moves use existing encrypted sync; every file uses the vault key. Encrypted upload journals and saved encrypted attempts always record their key generation and server path, so a retry reaches the same server path with the same bytes.
 
 ## Upgrade order

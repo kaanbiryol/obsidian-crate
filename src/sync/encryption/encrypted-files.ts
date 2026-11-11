@@ -16,7 +16,8 @@ import { BATCH_DOWNLOAD_MAX_FILES, ENCRYPTION_METADATA_BATCH } from '../../proto
 import { sha256Hex } from '../../platform/sha256';
 import { PathIndex } from './path-index';
 
-interface WireMetadata { hash: string; size: number; revision?: string }
+/** `descriptor` is the revision's descriptor when the listing carried it inline. */
+interface WireMetadata { hash: string; size: number; revision?: string; descriptor?: unknown }
 const METADATA_CONCURRENCY = 4;
 // Reuse across the overlapping requests of one large inventory.
 const MAX_VERIFIED_METADATA = ENCRYPTION_METADATA_BATCH * METADATA_CONCURRENCY;
@@ -91,7 +92,8 @@ export class EncryptedFiles {
 		for (const { entry } of chunk) {
 			if (!entry.revision) throw new Error('Encrypted file metadata is missing its immutable revision');
 			const verified = this.verifiedMetadata.get(entry.revision);
-			if (verified) cached.set(entry.revision, verified); else missing.add(entry.revision);
+			// Older servers and shared checkpoints list revisions without their descriptors.
+			if (verified) cached.set(entry.revision, verified); else if (entry.descriptor === undefined) missing.add(entry.revision);
 		}
 		const response = missing.size ? await this.http.requestJson<{ descriptors: Record<string, unknown> }>('/encryption/metadata', {
 			method: 'POST', body: JSON.stringify({ revisions: [...missing] }),
@@ -100,7 +102,7 @@ export class EncryptedFiles {
 		for (const { path, entry } of chunk) {
 			let verified = cached.get(entry.revision!);
 			if (!verified) {
-				const descriptor = response?.descriptors?.[entry.revision!];
+				const descriptor = entry.descriptor ?? response?.descriptors?.[entry.revision!];
 				validateFileDescriptor(descriptor);
 				const metadata = await openFileMetadata(descriptor, this.binding(path, options), this.keys.forPath(path));
 				verified = { metadata, wireHash: entry.hash, wire: path };
@@ -110,7 +112,8 @@ export class EncryptedFiles {
 			}
 			// A revision opened at one server path names the same file under no other.
 			if (verified.wire !== path) throw new Error('Encrypted file metadata does not match the requested file');
-			result.push({ path: verified.metadata.path, wire: path, entry: { ...entry, hash: verified.metadata.hash, size: verified.metadata.size } });
+			const { descriptor: _descriptor, ...listed } = entry;
+			result.push({ path: verified.metadata.path, wire: path, entry: { ...listed, hash: verified.metadata.hash, size: verified.metadata.size } as T });
 		}
 		return result;
 	}
@@ -167,9 +170,10 @@ export class EncryptedFiles {
 
 	private async absentExpectedHash(path: string, wire: string, expected: string, revision?: string | null): Promise<string | HttpError> {
 		if (revision) {
-			const result = await this.http.requestJson<{ receipt: { hash: string } | null }>(`/encryption/deletion-precondition?${new URLSearchParams({ path: wire, revision })}`);
+			const result = await this.http.requestJson<{ receipt: { hash: string; descriptor?: unknown } | null }>(`/encryption/deletion-precondition?${new URLSearchParams({ path: wire, revision })}`);
 			if (result.receipt) {
-				const [plain] = await this.metadata([{ path: wire, entry: { hash: result.receipt.hash, size: 0, revision } }], { historical: true });
+				const [plain] = await this.metadata([{ path: wire, entry: { hash: result.receipt.hash, size: 0, revision,
+					...(result.receipt.descriptor === undefined ? {} : { descriptor: result.receipt.descriptor }) } }], { historical: true });
 				if (plain?.path === path && plain.entry.hash === expected) return result.receipt.hash;
 			}
 		}
