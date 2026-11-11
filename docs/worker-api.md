@@ -479,7 +479,7 @@ Response: `{ sent, failed, pruned, errors }`
 
 ## ReminderAlarm Durable Object
 
-Exported class `ReminderAlarm` from the worker. Each reminder gets its own DO instance keyed by `reminderId`. When the alarm fires, the DO sends Web Push notifications to all subscribed devices via `web-push-browser`, then clears the completed schedule from D1 while retaining its occurrence receipt in Durable Object storage.
+Exported class `ReminderAlarm` from the worker. Named instances of it run the coordinator, maintenance, Reading, transfer and notification dispatcher roles. The dispatcher keeps one alarm at the earliest scheduled reminder in `reminder_projections`. When it fires, it sends Web Push notifications for a bounded batch of due reminders to all subscribed devices via `web-push-browser` and records each delivered occurrence in its D1 row.
 
 Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarative `exports.ReminderAlarm` entry with SQLite storage on deploy.
 
@@ -487,7 +487,7 @@ Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarat
 
 The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 1; no migrations are registered. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
 
-The schema stores file metadata, changelog entries, retained versions, upload/deletion receipts and cleanup work; device credentials and folder-bound web enrollment tokens; reminder receipts and identity reservations; shared notification policy, projections, and delivery jobs; authenticated push subscriptions and request limits. Derived schedules are rebuilt from committed Markdown during an isolated restore.
+The schema stores file metadata, changelog entries, retained versions, upload/deletion receipts and cleanup work; device credentials and folder-bound web enrollment tokens; reminder receipts and identity reservations; shared notification policy and projections, which carry each reminder's delivery schedule; authenticated push subscriptions and request limits. Derived schedules are rebuilt from committed Markdown during an isolated restore.
 
 Reminder mutations replay a matching operation receipt before rereading a moved or deleted source; a different payload under the same operation ID returns 409. Notification time comes from the saved server policy. Successful create/update/completion responses include the acknowledged `reminder` and its new revision.
 

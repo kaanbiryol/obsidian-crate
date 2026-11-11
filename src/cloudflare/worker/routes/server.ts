@@ -12,7 +12,7 @@ export async function handleServerRoute(
 	env: Env,
 	{ path, method, principal }: Pick<AuthenticatedRouteContext, 'path' | 'method' | 'principal'>,
 ): Promise<Response | null> {
-	if (path === '/features' && ['GET', 'POST'].includes(method)) return handleFeaturePolicy(request, env.DB);
+	if (path === '/features' && ['GET', 'POST'].includes(method)) return handleFeaturePolicy(request, env);
 	if (path === '/links/title' && method === 'POST') {
 		if (env.NOTIFICATION_REQUEST_LIMITER && !(await env.NOTIFICATION_REQUEST_LIMITER.limit({ key: `link-titles:${principal.tokenId}` })).success) {
 			return corsResponse({ title: null }, 429, { 'Retry-After': '60' });

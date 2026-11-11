@@ -14,7 +14,6 @@ const READY_SQL = `NOT EXISTS (SELECT 1 FROM notification_policy) OR (
   AND NOT EXISTS (SELECT 1 FROM reminder_source_state WHERE parser_version < ${REMINDER_CACHE_PARSER_VERSION} LIMIT 1)
   AND NOT EXISTS (SELECT 1 FROM reminder_source_state WHERE verified = 0 LIMIT 1)
   AND NOT EXISTS (SELECT 1 FROM notification_projection_jobs LIMIT 1)
-  AND NOT EXISTS (SELECT 1 FROM notification_jobs LIMIT 1)
   AND NOT EXISTS (SELECT 1 FROM notification_file_retries LIMIT 1)
 )`;
 
@@ -30,8 +29,7 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
 		db.prepare(`DELETE FROM maintenance_state WHERE key = ? AND value = ? AND (${READY_SQL})`)
 			.bind(INITIAL_REMINDERS_PENDING, current.token),
 		db.prepare(`SELECT NOT EXISTS(SELECT 1 FROM maintenance_state WHERE key = ? AND value = ?) AS ready,
-      COALESCE((SELECT path || ': ' || error FROM notification_file_retries ORDER BY path LIMIT 1),
-        (SELECT last_error FROM notification_jobs ORDER BY available_at LIMIT 1)) AS error`)
+      (SELECT path || ': ' || error FROM notification_file_retries ORDER BY path LIMIT 1) AS error`)
 			.bind(INITIAL_REMINDERS_PENDING, current.token),
 	]);
 	const status = result[1]!.results[0]!;
@@ -49,7 +47,8 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
       UNION SELECT * FROM (SELECT path FROM notification_projection_jobs LIMIT ${REMINDER_SETUP_PROGRESS_CAP})
       LIMIT ${REMINDER_SETUP_PROGRESS_CAP}
     )) AS remainingFiles,
-    (SELECT COUNT(*) FROM (SELECT 1 FROM notification_jobs LIMIT ${REMINDER_SETUP_PROGRESS_CAP})) AS remainingSchedules`).first<{
+    -- Projection commits write schedules, so none wait separately.
+    0 AS remainingSchedules`).first<{
 			scanning: number; remainingFiles: number; remainingSchedules: number;
 		}>();
 	return corsResponse({ ready: Boolean(status.ready),

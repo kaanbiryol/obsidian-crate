@@ -7,7 +7,7 @@ import { handleNotificationPolicy } from './policy';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { runNotificationCoordinator } from './coordinator';
 import { drainNotificationProjections } from './projection';
-import { dispatchNotificationJobs } from './outbox';
+import { wakeReminderDispatcher } from './dispatcher';
 import { armNotificationCoordinator } from './lifecycle';
 import { runCoordinatorAlarm } from '../coordinator/coordinator-alarms';
 import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
@@ -15,13 +15,13 @@ import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 
 // Delivery runs in its own Durable Object invocation with a separate budget.
-vi.mock('./outbox', async original => ({ ...await original<typeof import('./outbox')>(), dispatchNotificationJobs: vi.fn() }));
+vi.mock('./dispatcher', async original => ({ ...await original<typeof import('./dispatcher')>(), wakeReminderDispatcher: vi.fn() }));
 
 beforeEach(async () => {
 	await applySchema(env.DB);
 	await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00' }) }), env.DB);
 });
-afterEach(async () => { vi.mocked(dispatchNotificationJobs).mockClear(); await reset(); });
+afterEach(async () => { vi.mocked(wakeReminderDispatcher).mockClear(); await reset(); });
 
 async function countQueries(run: () => Promise<unknown>): Promise<{ total: number; setup: number }> {
 	const count = installD1QueryCounter(env.DB);
@@ -39,12 +39,12 @@ it('reads encryption, feature and notification settings once per coordinator run
 	// Before, counted in statements: 31 with 8 setup reads, then 16 with 7. Encryption, features,
 	// the import state and the notification policy now share one read. A due dispatch
 	// is reported to the alarm, which sends it after releasing the coordinator lock.
-	let due: boolean | undefined;
+	let due: Awaited<ReturnType<typeof runNotificationCoordinator>> | undefined;
 	expect(await countQueries(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 18, setup: 1 });
-	expect(due).toBe(true);
+	expect(due).toEqual({ wrote: true, dispatchAt: Date.parse('2099-01-01T12:00:00.000Z') });
 	expect(await countQueries(() => runNotificationCoordinator(state, env))).toEqual({ total: 9, setup: 1 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS jobs FROM notification_jobs').first()).toEqual({ jobs: 1 });
-	expect(dispatchNotificationJobs).not.toHaveBeenCalled();
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 1 });
+	expect(wakeReminderDispatcher).not.toHaveBeenCalled();
 });
 
 it('verifies and projects eight files per pass, reading each once, within the query budget', async () => {
@@ -98,18 +98,17 @@ it('does not read a source that awaits verification with the current parser', as
 		.toEqual({ last_error: expect.stringContaining('awaiting verification') as string });
 });
 
-it('skips the dispatcher when no alarm update is due', async () => {
+it('leaves scheduled reminders off the coordinator alarm', async () => {
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`, null);
 	const setAlarm = vi.fn(async (_time: number) => {});
 	const state = { storage: { setAlarm } } as unknown as DurableObjectState;
 	await runNotificationCoordinator(state, env);
-	const retryAt = Date.now() + 60_000;
-	await env.DB.prepare('UPDATE notification_jobs SET available_at = ?').bind(retryAt).run();
-	// An idle pass reads the queue head once and does not wake the dispatcher.
-	let due: boolean | undefined;
+	setAlarm.mockClear();
+	// An idle pass reads the queue head once and writes no schedule.
+	let due: Awaited<ReturnType<typeof runNotificationCoordinator>> | undefined;
 	expect(await countQueries(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 9, setup: 1 });
-	expect(due).toBe(false);
-	expect(setAlarm).toHaveBeenLastCalledWith(retryAt);
+	expect(due).toMatchObject({ wrote: false });
+	expect(setAlarm).not.toHaveBeenCalled();
 });
 
 function coordinatorAlarm() {
@@ -120,23 +119,27 @@ function coordinatorAlarm() {
 		put: async (key: string, value: unknown) => { values.set(key, structuredClone(value)); },
 		setAlarm: async (time: number) => { alarm = time; },
 		deleteAlarm: async () => { alarm = null; },
+		delete: async (key: string) => values.delete(key),
 	};
 	const state = { storage } as unknown as DurableObjectState;
 	const withStateLock = async <T>(action: () => Promise<T>) => { locked = true; try { return await action(); } finally { locked = false; } };
 	return { state, values, alarm: () => alarm, locked: () => locked, run: () => runCoordinatorAlarm(state, env, withStateLock) };
 }
 
-it('dispatches due schedules after releasing the coordinator lock', async () => {
+it('wakes the dispatcher once after releasing the coordinator lock', async () => {
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`, null);
 	const coordinator = coordinatorAlarm();
 	await armNotificationCoordinator(coordinator.state);
 	let lockedDuringDispatch: boolean | undefined;
-	vi.mocked(dispatchNotificationJobs).mockImplementationOnce(async () => { lockedDuringDispatch = coordinator.locked(); });
+	vi.mocked(wakeReminderDispatcher).mockImplementationOnce(async () => { lockedDuringDispatch = coordinator.locked(); });
 	expect(await coordinator.run()).toBe(true);
 	expect(lockedDuringDispatch).toBe(false);
-	// The locked pass armed the next one, which checks for more due schedules.
-	expect(coordinator.alarm()).toBeLessThanOrEqual(Date.now() + 1);
+	expect(wakeReminderDispatcher).toHaveBeenCalledExactlyOnceWith(env, Date.parse('2099-01-01T12:00:00.000Z'));
+	expect(coordinator.values.get('notificationDispatchPending')).toBeUndefined();
 	expect(coordinator.values.get('notificationRun')).toMatchObject({ passes: 1, failures: 0 });
+	// A later pass with no schedule change does not wake it again.
+	await coordinator.run();
+	expect(wakeReminderDispatcher).toHaveBeenCalledOnce();
 });
 
 it('counts a failed dispatch against its episode unless a change started a new one', async () => {
@@ -144,12 +147,14 @@ it('counts a failed dispatch against its episode unless a change started a new o
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`, null);
 	const coordinator = coordinatorAlarm();
 	await armNotificationCoordinator(coordinator.state);
-	vi.mocked(dispatchNotificationJobs).mockRejectedValueOnce(new Error('dispatcher unavailable'));
+	vi.mocked(wakeReminderDispatcher).mockRejectedValueOnce(new Error('dispatcher unavailable'));
 	await coordinator.run();
 	expect(coordinator.values.get('notificationRun')).toMatchObject({ passes: 1, failures: 1 });
 	expect(coordinator.alarm()).toBeGreaterThan(Date.now() + 50_000);
+	// The retry pass wakes the dispatcher again although its projection already committed.
+	expect(coordinator.values.get('notificationDispatchPending')).toBe(true);
 	// A change committed while the dispatch was in flight keeps its fresh budget and immediate pass.
-	vi.mocked(dispatchNotificationJobs).mockImplementationOnce(async () => {
+	vi.mocked(wakeReminderDispatcher).mockImplementationOnce(async () => {
 		await armNotificationCoordinator(coordinator.state);
 		throw new Error('dispatcher unavailable');
 	});

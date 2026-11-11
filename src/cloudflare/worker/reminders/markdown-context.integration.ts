@@ -27,7 +27,7 @@ it('excludes fenced examples from identities, list results and notification jobs
 	const listed = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env);
 	expect(await listed.json()).toMatchObject({ reminders: [{ id: 'first' }], issues: [] });
 	await drainNotificationProjections(env);
-	expect(await env.DB.prepare('SELECT reminder_id, operation FROM notification_jobs').all()).toMatchObject({ results: [{ reminder_id: 'first', operation: 'schedule' }] });
+	expect(await env.DB.prepare('SELECT reminder_id FROM reminder_projections WHERE due_at IS NOT NULL').all()).toMatchObject({ results: [{ reminder_id: 'first' }] });
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))?.content).toBe(content);
 });
 

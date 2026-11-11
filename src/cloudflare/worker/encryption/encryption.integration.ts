@@ -16,7 +16,6 @@ import { trackStagedUpload } from '../sync/staging/staged-uploads';
 import { uploadMutation } from '../sync/mutations';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
-import { drainNotificationJobs } from '../notifications/outbox';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { parseEncryptedNotification } from '../../../encryption/notification-format';
 import { handleEncryptionRoute } from '../routes/encryption';
@@ -62,8 +61,7 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	expect(descriptors.results.map(row => row.descriptor)).toEqual([JSON.stringify(file.descriptor), JSON.stringify(file.descriptor)]);
 	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).toBeNull();
 	await drainNotificationProjections(env);
-	await drainNotificationJobs(env);
-	const alarm = await env.DB.prepare('SELECT content FROM scheduled_reminders WHERE reminder_id = ?').bind('r1').first<{ content: string }>();
+	const alarm = await env.DB.prepare('SELECT content FROM reminder_projections WHERE reminder_id = ?').bind('r1').first<{ content: string }>();
 	expect(alarm?.content).not.toContain('Secret medical');
 	expect(parseEncryptedNotification(alarm!.content)).toMatchObject({ vaultId: bundle.vaultId, reminderId: 'r1' });
 	// Every session reads the same public configuration; none of it is secret.

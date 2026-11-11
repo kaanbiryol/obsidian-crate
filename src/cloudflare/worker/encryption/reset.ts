@@ -8,7 +8,6 @@ import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { validateEncryptionState, type EncryptionServerState, type ResetReceipt } from '../../../encryption/server-state';
 import { isSha256Hex } from '../../../platform/validation';
-import { cancelAllNotificationJobs, drainNotificationCancellations } from '../notifications/outbox';
 import { sha256Hex } from '../../../platform/sha256';
 import { putMaintenanceValue, readMaintenanceValue } from '../d1/db';
 import { saveServerState } from '../d1/server-state';
@@ -73,7 +72,9 @@ export async function handleEncryptionReset(request: Request, env: Env, principa
 		// Invalidate the Reading generation and grants in the same transaction as
 		// device revocation. Late extraction cannot publish into a replacement policy.
 		...READING_TABLES.map(table => env.DB.prepare(`DELETE FROM ${table}`)),
-		...cancelAllNotificationJobs(env.DB),
+		// Unschedule every reminder in the same transaction, so the dispatcher sends nothing
+		// more. Completion later deletes the rows with the other reminder tables.
+		env.DB.prepare('UPDATE reminder_projections SET due_at = NULL WHERE due_at IS NOT NULL'),
 		// Keep cleanup authority for an R2 put that finishes after the reset.
 		env.DB.prepare("UPDATE staged_uploads SET state = 'deleting'"),
 		env.DB.prepare("UPDATE staged_upload_batches SET state = 'deleting'"),
@@ -86,7 +87,6 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 	if (state?.mode !== 'resetting' || state.vaultId !== receipt.vaultId || state.generation !== receipt.generation) {
 		return corsResponse({ error: 'The vault changed during reset. Stop and reconnect.' }, 409);
 	}
-	if (await drainNotificationCancellations(env)) return corsResponse(receipt);
 	// Delete from the start each time. No cursor can skip objects after deletion,
 	// and a timeout after R2 deletion simply retries the remaining page.
 	const objects = await env.BUCKET.list({ limit: R2_KEYS_PER_CALL });

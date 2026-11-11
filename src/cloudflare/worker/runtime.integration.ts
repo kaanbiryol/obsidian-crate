@@ -1,12 +1,12 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
-import { reset, runDurableObjectAlarm } from 'cloudflare:test';
+import { reset, runInDurableObject } from 'cloudflare:test';
 import { applySchema } from './test-support/schema-test-harness';
 import { writeCommittedMarkdownFilePair } from './sync/atomic-markdown-write';
 import { MAINTENANCE_DELETE_LIMIT, pruneChangelog } from './d1/db';
-import { drainNotificationJobs } from './notifications/outbox';
+import { armReminderDispatcher } from './coordinator/coordinator';
 import type { Env } from './types';
 import { handleListReminders } from './reminders/handlers/list';
 import {
@@ -38,7 +38,7 @@ describe('Cloudflare runtime integration', () => {
 			'files',
 			'object_cleanup_queue',
 			'reminder_file_cache',
-			'scheduled_reminders',
+			'reminder_projections',
 		]));
 	});
 
@@ -273,22 +273,22 @@ describe('Cloudflare runtime integration', () => {
 		expect((await runtimeEnv.DB.prepare('SELECT COUNT(*) AS rows FROM changelog').first<{ rows: number }>())?.rows).toBe(1);
 	});
 
-	it('fences an unprojected alarm in real Durable Object storage', async () => {
+	it('fences an unprojected schedule on the real dispatcher Durable Object', async () => {
 		const reminderId = 'runtime-reminder';
-		await runtimeEnv.DB.prepare("INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, available_at) VALUES (?, ?, 'schedule', ?, 0)")
-			.bind(reminderId, 'runtime-job', JSON.stringify({ reminderId, content: 'Runtime alarm', project: 'Work', dueDatetime: '2099-01-01T00:00:00.000Z' })).run();
-		await drainNotificationJobs(runtimeEnv);
-		const stub = runtimeEnv.REMINDER_ALARMS.get(runtimeEnv.REMINDER_ALARMS.idFromName(reminderId));
-
-		expect(await runDurableObjectAlarm(stub as never)).toBe(false);
-		const scheduled = await runtimeEnv.DB.prepare(
-			'SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = ?',
-		).bind(reminderId).first();
-		expect(scheduled).toBeNull();
-		const pending = await runtimeEnv.DB.prepare(
-			'SELECT job_token, operation, attempts, available_at FROM notification_jobs WHERE reminder_id = ?',
-		).bind(reminderId).first<{ job_token: string; operation: string; attempts: number; available_at: number }>();
-		expect(pending).toMatchObject({ job_token: 'runtime-job', operation: 'schedule', attempts: 1 });
-		expect(pending!.available_at).toBeGreaterThan(Date.now());
+		const dueAt = Date.now();
+		await runtimeEnv.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, notification_token, due_datetime, content, project, due_at)
+			VALUES (?, 'Reminders/Missing.md', 'runtime-token', '2099-01-01T00:00:00.000Z', 'Runtime alarm', 'Work', ?)`).bind(reminderId, dueAt).run();
+		// The armed alarm is already due, so the runtime runs it at once.
+		expect(await armReminderDispatcher(runtimeEnv)).toBe(true);
+		const stub = runtimeEnv.REMINDER_ALARMS.get(runtimeEnv.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
+		const read = () => runtimeEnv.DB.prepare(
+			'SELECT attempts, due_at, delivered_due, last_error FROM reminder_projections WHERE reminder_id = ?',
+		).bind(reminderId).first<{ attempts: number; due_at: number; delivered_due: string | null; last_error: string }>();
+		await vi.waitFor(async () => expect(await read()).toMatchObject({ attempts: 1 }));
+		const pending = await read();
+		expect(pending).toMatchObject({ attempts: 1, delivered_due: null, last_error: expect.stringContaining('awaiting') as string });
+		expect(pending!.due_at).toBeGreaterThan(Date.now());
+		// The dispatcher's one alarm now waits for that retry.
+		expect(await runInDurableObject(stub as never, (_instance, state) => state.storage.getAlarm())).toBe(pending!.due_at);
 	});
 });

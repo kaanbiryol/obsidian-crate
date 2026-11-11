@@ -49,20 +49,17 @@ it.each([false, true])('bounds initial-upload writes and preserves retries with 
 	expect(meter.writes() - beforeRetry).toBe(0);
 });
 
-it.each([false, true])('keeps cleanup work when a new upload replaces stale reminder state (scheduled: %s)', async scheduled => {
+it.each([false, true])('keeps cleanup work when a new upload replaces stale reminder state (delivered: %s)', async delivered => {
 	await initialize();
-	await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, notification_token)
-    VALUES ('old-reminder', 'Notes/recreated.md', 'old-token')`).run();
-	// A departed reminder needs a cancel only when it still has a schedule or a job.
-	if (scheduled) await env.DB.prepare(`INSERT INTO scheduled_reminders(reminder_id, schedule_token, content, due_datetime)
-    VALUES ('old-reminder', 'old-token', 'Old', '2099-01-01T00:00:00.000Z')`).run();
+	await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, notification_token, due_datetime, content, due_at, delivered_due)
+    VALUES ('old-reminder', 'Notes/recreated.md', 'old-token', '2099-01-01T00:00:00.000Z', 'Old', 4070908800000, ?)`).bind(delivered ? new Date().toISOString() : null).run();
 	const result = await (await handleBatchUpload(request([file('Notes/recreated.md')]), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
 	expect(result.success).toBe(true);
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toEqual({ path: 'Notes/recreated.md' });
 	await drainNotificationProjections(env, 8);
-	expect(await env.DB.prepare('SELECT reminder_id FROM reminder_projections').first()).toBeNull();
-	expect(await env.DB.prepare('SELECT reminder_id, operation FROM notification_jobs').first())
-		.toEqual(scheduled ? { reminder_id: 'old-reminder', operation: 'cancel' } : null);
+	// The departed schedule is cancelled with its row; a recent delivery stays as a detached tombstone.
+	expect(await env.DB.prepare('SELECT reminder_id, file_path, due_at FROM reminder_projections').first())
+		.toEqual(delivered ? { reminder_id: 'old-reminder', file_path: null, due_at: null } : null);
 });
 
 it('passes batch leases through the real reminder coordinator and schedules actual reminders', async () => {

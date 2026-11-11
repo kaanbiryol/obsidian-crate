@@ -10,7 +10,7 @@ import { handleNotificationPolicy } from '../notifications/policy';
 import { handleListReminders } from './handlers/list';
 import { handleBatchDelete } from '../sync/batch/delete';
 import { getStoredFileRow } from '../sync/storage';
-import { ReminderAlarm } from '../coordinator/reminder-alarm';
+import { deliverDueReminders } from '../notifications/dispatcher';
 import { sendToAllSubscriptions } from '../notifications/push';
 import { handleDiagnostics } from '../maintenance/diagnostics';
 import { assertUniqueReminderSources } from './source-identity';
@@ -31,17 +31,15 @@ async function remove(path: string) {
 	const file = await getStoredFileRow(env.DB, path);
 	expect(await (await handleBatchDelete(new Request('https://test/delete', { method: 'POST', body: JSON.stringify({ files: [{ path, expectedHash: file?.hash, expectedRevision: file?.storageKey }] }) }), env.BUCKET, env.DB)).json()).toMatchObject({ deleted: [path] });
 }
+/** The reminder's scheduled occurrence, or null when nothing is scheduled. */
 async function command() {
-	return env.DB.prepare('SELECT operation, job_token, payload_json FROM notification_jobs WHERE reminder_id = ?').bind(id).first<{ operation: string; job_token: string; payload_json: string }>();
+	return env.DB.prepare('SELECT due_datetime, content, due_at FROM reminder_projections WHERE reminder_id = ? AND due_datetime IS NOT NULL').bind(id).first<{ due_datetime: string; content: string; due_at: number | null }>();
 }
-async function alarmFromCommand() {
-	const job = await command();
-	const values = new Map<string, unknown>();
-	let alarmTime: number | null = null;
-	const state = { storage: { get: async (key: string) => values.get(key), put: async (key: string, value: unknown) => { values.set(key, value); }, delete: async (key: string) => values.delete(key), getAlarm: async () => alarmTime, setAlarm: async (value: number | Date) => { alarmTime = Number(value); }, deleteAlarm: async () => { alarmTime = null; } } };
-	const alarm = new ReminderAlarm(state as never, env);
-	expect((await alarm.fetch(new Request('https://do/schedule', { method: 'PUT', body: JSON.stringify({ ...JSON.parse(job!.payload_json), jobToken: job!.job_token }) }))).status).toBe(200);
-	return { alarm, state };
+const scheduled = { due_datetime: expect.any(String) as string };
+/** Runs a dispatcher pass with the scheduled attempt brought forward. */
+async function deliver() {
+	await env.DB.prepare('UPDATE reminder_projections SET due_at = ? WHERE due_at IS NOT NULL').bind(Date.now()).run();
+	await deliverDueReminders(env);
 }
 
 it.each(['unchanged', 'title edit', 'project move', 'rename'])('delivers a first projection delayed across its deadline (%s)', async action => {
@@ -54,9 +52,8 @@ it.each(['unchanged', 'title edit', 'project move', 'rename'])('delivers a first
 	if (action === 'project move') await writeCommittedMarkdownFilePair(env.BUCKET, env.DB, { source: { path: 'Reminders/A.md', content: '', expectedHash: first.hash }, destination: { path: 'Reminders/B.md', content, expectedHash: null } });
 	if (action === 'rename') { await remove('Reminders/A.md'); await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/B.md', content, null); }
 	await drainNotificationProjections(env);
-	expect(await command()).toMatchObject({ operation: 'schedule' });
-	const { alarm } = await alarmFromCommand();
-	await alarm.alarm();
+	expect(await command()).toMatchObject(scheduled);
+	await deliver();
 	expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
 });
 
@@ -64,7 +61,6 @@ it('does not notify newly imported historical reminders', async () => {
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/A.md', note('Historical', new Date(Date.now() - 60_000).toISOString()), null);
 	await drainNotificationProjections(env);
 	expect(await command()).toBeNull();
-	expect(await env.DB.prepare('SELECT 1 FROM scheduled_reminders').first()).toBeNull();
 });
 
 it('records a missed delivery after the late window instead of sending or silently cancelling', async () => {
@@ -72,10 +68,9 @@ it('records a missed delivery after the late window instead of sending or silent
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/A.md', note('Due', new Date(now + 60_000).toISOString()), null);
 	vi.spyOn(Date, 'now').mockReturnValue(now + 25 * 60 * 60_000);
 	await drainNotificationProjections(env);
-	const { alarm, state } = await alarmFromCommand();
-	await alarm.alarm();
+	await deliverDueReminders(env);
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
-	expect(await state.storage.getAlarm()).toBeNull();
+	expect(await command()).toMatchObject({ due_at: null });
 	expect(await (await handleDiagnostics(env.DB)).json()).toMatchObject({ counts: { failedNotificationDeliveries: 1 } });
 });
 
@@ -87,7 +82,7 @@ it.each(['A', 'Z'])('quarantines duplicate ownership, rejects edits, and resumes
 	await drainNotificationProjections(env);
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, duplicatePath, note('Copied and completed', due, true), null);
 	await drainNotificationProjections(env);
-	expect(await command()).toMatchObject({ operation: 'schedule' });
+	expect(await command()).toMatchObject(scheduled);
 	expect(await env.DB.prepare('SELECT file_path FROM reminder_projections WHERE reminder_id = ?').bind(id).first()).toMatchObject({ file_path: originalPath });
 	const listing = await list() as { reminders: unknown[]; issues: Array<{ path: string; reason: string }> };
 	expect(listing.reminders).toEqual([]);
@@ -97,6 +92,6 @@ it.each(['A', 'Z'])('quarantines duplicate ownership, rejects edits, and resumes
 	await remove(duplicatePath);
 	await drainNotificationProjections(env);
 	expect((await env.DB.prepare('SELECT last_error FROM notification_projection_jobs WHERE last_error IS NOT NULL').all()).results).toEqual([]);
-	expect(await command()).toMatchObject({ operation: 'schedule' });
+	expect(await command()).toMatchObject(scheduled);
 	expect(await list()).toMatchObject({ reminders: [{ id, filePath: originalPath }], issues: [] });
 });

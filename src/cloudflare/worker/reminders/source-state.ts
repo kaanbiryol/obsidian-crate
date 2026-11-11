@@ -26,18 +26,21 @@ export function sourcesChangedSql(path: string, sourcesDigest: string): { sql: s
     AND verified = 1 AND parser_version = ?)`, args: [path, sourcesDigest, REMINDER_CACHE_PARSER_VERSION] };
 }
 
-/** Queued commands and existing alarms both need current source and projection authority.
- * Every commit that records a verified source revision also queues that file's projection
- * job, and a projection removes the job only with its own writes. So a verified current
- * revision without a job proves the reminder's row was projected from that revision. */
-export async function hasNotificationAuthority(db: D1Database, reminderId: string, token: string): Promise<boolean> {
-	const projection = await db.prepare('SELECT file_path FROM reminder_projections WHERE reminder_id = ?').bind(reminderId).first<{ file_path: string }>();
-	if (!projection) return false;
-	return Boolean(await db.prepare(`SELECT 1 FROM reminder_projections p
-    JOIN files f ON f.portable_path = ? AND f.path = p.file_path
+/** Scheduled deliveries need current source and projection authority. Every commit that
+ * records a verified source revision also queues that file's projection job, and a
+ * projection removes the job only with its own writes. So a verified current revision
+ * without a job proves the reminder's row was projected from that revision. Returns the
+ * IDs whose row still has the given token and that authority. */
+export async function notificationAuthority(db: D1Database, rows: ReadonlyArray<{ id: string; token: string; filePath: string }>): Promise<Set<string>> {
+	if (!rows.length) return new Set();
+	const keyed = rows.map(row => ({ id: row.id, token: row.token, portable: portablePathKey(row.filePath) }));
+	const authorized = await db.prepare(`SELECT p.reminder_id AS id FROM json_each(?) r
+    JOIN reminder_projections p ON p.reminder_id = json_extract(r.value, '$.id') AND p.notification_token = json_extract(r.value, '$.token')
+    JOIN files f ON f.portable_path = json_extract(r.value, '$.portable') AND f.path = p.file_path
     JOIN reminder_source_state source ON source.file_path = p.file_path AND source.file_revision = f.storage_key
     JOIN notification_policy policy ON policy.id = 1 AND policy.enabled = 1
-    WHERE p.reminder_id = ? AND p.notification_token = ? AND source.parser_version = ? AND source.verified = 1
+    WHERE source.parser_version = ? AND source.verified = 1
       AND NOT EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = p.file_path)`)
-		.bind(portablePathKey(projection.file_path), reminderId, token, REMINDER_CACHE_PARSER_VERSION).first());
+		.bind(JSON.stringify(keyed), REMINDER_CACHE_PARSER_VERSION).all<{ id: string }>();
+	return new Set(authorized.results.map(row => row.id));
 }

@@ -19,6 +19,9 @@ afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 type MeasuredRows = { results: Record<string, unknown>[]; meta: { rows_read: number } };
 
 const oldSelection = "SELECT path, job_token FROM notification_projection_jobs WHERE last_error IS NULL OR updated_at < datetime('now', '-1 hour') ORDER BY updated_at, path LIMIT ?";
+// The old counts also read the alarm-job table, which the dispatcher redesign removed.
+// Each measurement recreates it, empty, as the old schema had it.
+const OLD_JOBS_TABLE = 'CREATE TABLE IF NOT EXISTS notification_jobs (reminder_id TEXT PRIMARY KEY, available_at INTEGER NOT NULL) WITHOUT ROWID';
 const oldCounts = `SELECT
   (SELECT COUNT(*) FROM notification_projection_jobs) + (SELECT COUNT(*) FROM notification_jobs) AS count,
   (SELECT COUNT(*) FROM notification_projection_jobs WHERE last_error IS NULL) +
@@ -27,6 +30,7 @@ const oldCounts = `SELECT
 it.each([2000, 10000])('uses bounded row reads to select work from %i queued files', async count => {
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
     INSERT INTO notification_projection_jobs(path, job_token) SELECT 'note-'||x, 'token-'||x FROM n`).bind(count).run();
+	await env.DB.prepare(OLD_JOBS_TABLE).run();
 	const before = await env.DB.prepare(oldSelection).bind(1).all() as MeasuredRows;
 	const beforeCounts = await env.DB.prepare(oldCounts).bind(Date.now()).all() as MeasuredRows;
 	const after = await env.DB.prepare(READY_PROJECTION_JOBS_SQL).bind('[]', 1, 1, 1).all() as MeasuredRows;

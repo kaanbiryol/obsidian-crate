@@ -272,8 +272,8 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		]));
 		assert.equal((await runtime.db.prepare('SELECT device_name FROM auth_tokens WHERE id = ?').bind(first.id).first()).device_name, 'Mac');
 
-		// Persist a real ReminderAlarm with verified authority. With no push
-		// recipients it completes locally when its alarm wakes after restart.
+		// Persist a schedule with verified authority and arm the real dispatcher. With no
+		// push recipients it completes locally when its alarm wakes after restart.
 		const due = new Date(Date.now() + 3000).toISOString();
 		const parserSource = await readFile(new URL('../../../src/cloudflare/worker/reminders/cache/types.ts', import.meta.url), 'utf8');
 		const parserVersion = Number(/REMINDER_CACHE_PARSER_VERSION = (\d+)/.exec(parserSource)[1]);
@@ -281,17 +281,13 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		await runtime.db.prepare("INSERT INTO notification_policy (id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'UTC', 'policy', 1)").run();
 		await runtime.db.prepare("INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified) VALUES ('hello.txt', ?, ?, 1)")
 			.bind(file.storage_key, parserVersion).run();
-		await runtime.db.prepare("INSERT INTO reminder_projections (reminder_id, file_path, notification_token) VALUES ('restart-alarm', 'hello.txt', 'job')").run();
-		await runtime.db.prepare("INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, available_at) VALUES ('restart-alarm', 'job', 'schedule', '{}', ?)")
-			.bind(Date.now() + 60_000).run();
+		await runtime.db.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, notification_token, due_datetime, content, due_at)
+			VALUES ('restart-alarm', 'hello.txt', 'job', ?, 'Restart test', ?)`).bind(due, Date.parse(due)).run();
 		const alarms = await runtime.mf.getDurableObjectNamespace('REMINDER_ALARMS');
-		const alarm = alarms.get(alarms.idFromName('restart-alarm'));
-		response = await alarm.fetch('https://do/', { method: 'PUT', body: JSON.stringify({
-			reminderId: 'restart-alarm', content: 'Restart test', dueDatetime: due, jobToken: 'job',
-		}) });
-		assert.equal(response.status, 200, await response.clone().text());
+		const dispatcher = alarms.get(alarms.idFromName('__crate__/notification-dispatch'));
+		response = await dispatcher.fetch('https://do/arm-dispatcher', { method: 'POST', body: '{}' });
+		assert.equal(response.status, 204, await response.clone().text());
 		await response.text();
-		assert.ok(await runtime.db.prepare("SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = 'restart-alarm'").first());
 		await stop();
 		await delay(3100);
 		origin = await start();
@@ -304,7 +300,7 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		assert.deepEqual(await response.json(), written);
 		assert.equal((await runtime.db.prepare('SELECT COUNT(*) AS count FROM changelog').first()).count, 1);
 		const deadline = Date.now() + 10_000;
-		while (await runtime.db.prepare("SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = 'restart-alarm'").first()) {
+		while (!await runtime.db.prepare("SELECT reminder_id FROM reminder_projections WHERE reminder_id = 'restart-alarm' AND delivered_due IS NOT NULL").first()) {
 			assert.ok(Date.now() < deadline, 'Persisted alarm did not wake after restart');
 			await delay(100);
 		}

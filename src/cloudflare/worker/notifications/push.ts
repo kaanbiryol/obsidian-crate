@@ -22,6 +22,8 @@ export interface PushDeliveryResult {
 	quarantined: number;
 	errors: string[];
 	failedSubscriptionIds: string[];
+	/** Pruned or quarantined recipients, which later sends in the same pass can skip. */
+	removedSubscriptionIds?: string[];
 }
 
 
@@ -79,6 +81,11 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload, o
 	});
 }
 
+/** The stored VAPID key pair, created on first use. */
+export async function loadVapidKeys(db: D1Database): Promise<CryptoKeyPair> {
+	return importVapidKeys(await getOrCreateVapidKeys(db));
+}
+
 export function listPushSubscriptions(db: D1Database): Promise<PushSubscriptionRow[]> {
 	return queryRows<PushSubscriptionRow>(
 		db.prepare(`SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE ${PUSH_RECIPIENT_AUTHORITY}`).bind(Date.now()),
@@ -96,7 +103,7 @@ function isRetryablePushStatus(status: number): boolean {
 export async function sendToAllSubscriptions(
 	db: D1Database,
 	payload: PushNotificationPayload,
-	options: { origin: string; subscriptionIds?: readonly string[]; subscriptions?: readonly PushSubscriptionRow[] },
+	options: { origin: string; subscriptionIds?: readonly string[]; subscriptions?: readonly PushSubscriptionRow[]; keys?: () => Promise<CryptoKeyPair> },
 ): Promise<PushDeliveryResult> {
 	// Callers that just read the recipients pass them in to avoid a second query.
 	const allSubscriptions = options.subscriptions ?? await listPushSubscriptions(db);
@@ -113,11 +120,11 @@ export async function sendToAllSubscriptions(
 			quarantined: 0,
 			errors: requestedIds?.size ? [] : ['no subscriptions in db'],
 			failedSubscriptionIds: [],
+			removedSubscriptionIds: [],
 		};
 	}
 
-	const serializedKeys = await getOrCreateVapidKeys(db);
-	const keys = await importVapidKeys(serializedKeys);
+	const keys = await (options.keys ?? (() => loadVapidKeys(db)))();
 	const authorizations = new Map<string, Promise<string>>();
 	const payloadString = JSON.stringify(createDeclarativePushPayload(payload, options.origin));
 	let sent = 0;
@@ -126,6 +133,7 @@ export async function sendToAllSubscriptions(
 	let quarantined = 0;
 	const errors: string[] = [];
 	const failedSubscriptionIds: string[] = [];
+	const removedSubscriptionIds: string[] = [];
 
 	// Each delivery records its own failure, so one failed push never stops the others.
 	await mapBounded(subscriptions, SIMULTANEOUS_OPEN_CONNECTIONS, async (subscription) => {
@@ -143,6 +151,7 @@ export async function sendToAllSubscriptions(
 			if (isExpiredSubscriptionStatus(response.status)) {
 				await db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(subscription.id).run();
 				pruned += 1;
+				removedSubscriptionIds.push(subscription.id);
 			} else if (response.ok) {
 				sent += 1;
 			} else if (isRetryablePushStatus(response.status)) {
@@ -162,6 +171,7 @@ export async function sendToAllSubscriptions(
 				console.error('Push subscription quarantined:', message);
 				errors.push(message);
 				quarantined += 1;
+				removedSubscriptionIds.push(subscription.id);
 			}
 		} catch (error) {
 			const message = `${subscription.id}: ${error instanceof Error ? error.message : String(error)}`;
@@ -172,5 +182,5 @@ export async function sendToAllSubscriptions(
 		}
 	});
 
-	return { sent, failed, pruned, quarantined, errors, failedSubscriptionIds };
+	return { sent, failed, pruned, quarantined, errors, failedSubscriptionIds, removedSubscriptionIds };
 }

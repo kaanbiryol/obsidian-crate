@@ -93,7 +93,7 @@ describe('reminder route mutations with D1 and R2', () => {
 		const create = await handleCreateReminder(await request('create', { content: 'Check article', project: 'Inbox', dueDatetime: '2099-01-10T10:00:00.000Z' }), env);
 		expect(create.status).toBe(200);
 		expect(await read('Reminders/Inbox.md')).toContain('Check article');
-		// The request coordinator owns wake-ups; file handlers only commit their outbox work.
+		// The request coordinator owns wake-ups; file handlers only commit their projection work.
 		expect(idFromName).not.toHaveBeenCalled();
 
 		const listing = await list();
@@ -103,7 +103,7 @@ describe('reminder route mutations with D1 and R2', () => {
 		const deletion = await handleDeleteReminder(await request('delete', { id: createdId, filePath: 'Reminders/Inbox.md' }, 'DELETE'), env);
 		expect(deletion.status).toBe(200);
 		expect(await read('Reminders/Inbox.md')).not.toContain('Check article');
-		expect(await db.prepare('SELECT COUNT(*) AS count FROM scheduled_reminders').first()).toEqual({ count: 0 });
+		expect(await db.prepare('SELECT COUNT(*) AS count FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ count: 0 });
 	});
 
 	it('rejects unsafe project paths', async () => {

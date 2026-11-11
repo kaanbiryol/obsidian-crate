@@ -7,6 +7,8 @@ export const PROJECTION_COORDINATOR_KEY = 'projectionCoordinator';
 /** Coordinator storage: the reminder parser version projection was last armed for. */
 export const PROJECTION_PARSER_VERSION_KEY = 'projectionParserVersion';
 const RUN_KEY = 'notificationRun';
+/** Set by a pass that wrote a schedule until the dispatcher accepts the new alarm time. */
+const DISPATCH_PENDING_KEY = 'notificationDispatchPending';
 const MAX_RUN_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_RUN_PASSES = 10_000;
 const MAX_FAILURES = 8;
@@ -20,8 +22,8 @@ export async function armNotificationCoordinator(state: DurableObjectState): Pro
 }
 
 /** A finite processing episode. Unfinished D1 jobs survive an exhausted episode.
- * Returns the episode's run when schedule dispatch is due. */
-export async function runBoundedNotificationCoordinator(state: DurableObjectState, env: Env): Promise<NotificationRun | null> {
+ * Returns the episode's run and the earliest due time when the dispatcher needs waking. */
+export async function runBoundedNotificationCoordinator(state: DurableObjectState, env: Env): Promise<{ episode: NotificationRun; dispatchAt: number } | null> {
 	const run = await state.storage.get<NotificationRun>(RUN_KEY)
 		?? { startedAt: Date.now(), passes: 0, failures: 0 };
 	if (Date.now() - run.startedAt >= MAX_RUN_AGE_MS || run.passes >= MAX_RUN_PASSES || run.failures >= MAX_FAILURES) {
@@ -32,11 +34,25 @@ export async function runBoundedNotificationCoordinator(state: DurableObjectStat
 	run.passes++;
 	await state.storage.put(RUN_KEY, run);
 	try {
-		return await runNotificationCoordinator(state, env) ? run : null;
+		const scheduled = await runNotificationCoordinator(state, env);
+		if (scheduled.wrote) await state.storage.put(DISPATCH_PENDING_KEY, true);
+		if (!await state.storage.get<boolean>(DISPATCH_PENDING_KEY)) return null;
+		if (scheduled.dispatchAt === undefined) return null;
+		if (scheduled.dispatchAt === null) {
+			await state.storage.delete(DISPATCH_PENDING_KEY);
+			return null;
+		}
+		return { episode: run, dispatchAt: scheduled.dispatchAt };
 	} catch (error) {
 		await recordFailure(state, run, error);
 		return null;
 	}
+}
+
+/** Called under the lock once the dispatcher accepted the alarm time a pass reported. A
+ * later pass that writes a schedule sets the flag again before reporting its own. */
+export async function recordNotificationDispatched(state: DurableObjectState): Promise<void> {
+	await state.storage.delete(DISPATCH_PENDING_KEY);
 }
 
 /** Called under the lock when the dispatch after `episode`'s pass failed. A change since

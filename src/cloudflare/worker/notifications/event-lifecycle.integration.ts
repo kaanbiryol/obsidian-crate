@@ -36,9 +36,8 @@ it('processes a saved reminder without cron and leaves both coordinators idle', 
 		// This request shares the coordinator lock, so any in-flight pass finishes first.
 		await coordinator.fetch('https://do/ensure', { method: 'POST' });
 	}
-	expect(await env.DB.prepare('SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = ?').bind(id).first())
-		.toEqual({ reminder_id: id });
-	expect(await env.DB.prepare('SELECT 1 FROM notification_jobs LIMIT 1').first()).toBeNull();
+	expect(await env.DB.prepare('SELECT due_at FROM reminder_projections WHERE reminder_id = ?').bind(id).first())
+		.toEqual({ due_at: Date.parse('2099-01-02T10:00:00.000Z') });
 	expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.getAlarm())).toBeNull();
 	expect(await runDurableObjectAlarm(coordinator)).toBe(false);
 
@@ -46,9 +45,12 @@ it('processes a saved reminder without cron and leaves both coordinators idle', 
 	expect(await runDurableObjectAlarm(maintenance)).toBe(true);
 	expect(await runInDurableObject(maintenance, (_instance, state) => state.storage.getAlarm())).toBeNull();
 	expect(await runDurableObjectAlarm(maintenance)).toBe(false);
-	const reminder = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName(id));
-	expect(await runInDurableObject(reminder, (_instance, state) => state.storage.getAlarm()))
+	// One dispatcher alarm covers every scheduled reminder; no per-reminder object exists.
+	const dispatcher = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
+	expect(await runInDurableObject(dispatcher, (_instance, state) => state.storage.getAlarm()))
 		.toBe(Date.parse('2099-01-02T10:00:00.000Z'));
+	const reminder = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName(id));
+	expect(await runInDurableObject(reminder, (_instance, state) => state.storage.getAlarm())).toBeNull();
 });
 
 it('does not wake notifications for settings, binary uploads or notes outside the feature folders', async () => {

@@ -59,7 +59,7 @@ it.each(['quarantined', 'missing'])('repairs already-active vaults with %s sourc
 	expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state WHERE file_path = ?').bind(path).first())
 		.toEqual({ verified: 1, parser_version: REMINDER_CACHE_PARSER_VERSION });
 	expect(await env.DB.prepare('SELECT 1 FROM notification_file_retries WHERE path = ?').bind(path).first()).toBeNull();
-	expect(await env.DB.prepare("SELECT operation FROM notification_jobs WHERE reminder_id = 'r0'").first()).toEqual({ operation: 'schedule' });
+	expect(await env.DB.prepare("SELECT due_at IS NOT NULL AS scheduled FROM reminder_projections WHERE reminder_id = 'r0'").first()).toEqual({ scheduled: 1 });
 });
 
 it('reports a reminders-folder note uploaded without schedules instead of scheduling it', async () => {
@@ -69,8 +69,8 @@ it('reports a reminders-folder note uploaded without schedules instead of schedu
 	const { path } = await upload(encryption, 'Reminders/Later.md', content, false);
 	await drainNotificationProjections(env);
 	expect(await env.DB.prepare('SELECT error FROM notification_file_retries WHERE path = ?').bind(path).first()).toEqual({ error: 'Edit this note in Obsidian to schedule its reminders.' });
-	expect(await env.DB.prepare("SELECT 1 FROM notification_jobs WHERE reminder_id = 'later'").first()).toBeNull();
-	expect(await env.DB.prepare("SELECT operation FROM notification_jobs WHERE reminder_id = 'r0'").first()).toEqual({ operation: 'schedule' });
+	expect(await env.DB.prepare("SELECT 1 FROM reminder_projections WHERE reminder_id = 'later' AND due_at IS NOT NULL").first()).toBeNull();
+	expect(await env.DB.prepare("SELECT due_at IS NOT NULL AS scheduled FROM reminder_projections WHERE reminder_id = 'r0'").first()).toEqual({ scheduled: 1 });
 });
 
 it.each([1200, 2000])('rebuilds a valid encrypted source larger than the old byte budget (%i reminders)', async count => {
@@ -82,28 +82,27 @@ it.each([1200, 2000])('rebuilds a valid encrypted source larger than the old byt
 	expect(get).toHaveBeenCalledOnce();
 	expect(await env.DB.prepare('SELECT verified FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ verified: 1 });
 	await drainNotificationProjections(env);
-	expect(await env.DB.prepare('SELECT operation FROM notification_jobs WHERE reminder_id = ?').bind(`r${count - 1}`).first()).toEqual({ operation: 'schedule' });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM notification_jobs').first()).toEqual({ count });
+	expect(await env.DB.prepare('SELECT due_at IS NOT NULL AS scheduled FROM reminder_projections WHERE reminder_id = ?').bind(`r${count - 1}`).first()).toEqual({ scheduled: 1 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ count });
 });
 
-it('rolls back every scheduling chunk on failure and retries without replacing unchanged command tokens', async () => {
+it('rolls back every scheduling chunk on failure and retries without replacing unchanged schedule tokens', async () => {
 	const { path } = await fixture(800_000, 2000);
 	const batch = env.DB.batch.bind(env.DB);
 	vi.spyOn(env.DB, 'batch').mockImplementationOnce(statements => batch([
 		...statements.slice(0, 3),
-		env.DB.prepare("INSERT INTO notification_jobs(reminder_id, job_token, operation) VALUES ('injected', NULL, 'schedule')"),
+		env.DB.prepare("INSERT INTO reminder_projections(reminder_id, file_path) VALUES (NULL, 'injected')"),
 		...statements.slice(3),
 	]));
 	await drainNotificationProjections(env);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM notification_jobs').first()).toEqual({ count: 0 });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections').first()).toEqual({ count: 0 });
 	await env.DB.prepare('UPDATE notification_file_retries SET available_at = 0').run();
 	await drainNotificationProjections(env);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM notification_jobs').first()).toEqual({ count: 2000 });
-	const before = await env.DB.prepare('SELECT reminder_id, job_token FROM notification_jobs ORDER BY reminder_id').all();
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ count: 2000 });
+	const before = await env.DB.prepare('SELECT reminder_id, notification_token FROM reminder_projections ORDER BY reminder_id').all();
 	await env.DB.prepare('INSERT INTO notification_projection_jobs(path, job_token) VALUES (?, ?)').bind(path, 'revisit').run();
 	await drainNotificationProjections(env);
-	expect((await env.DB.prepare('SELECT reminder_id, job_token FROM notification_jobs ORDER BY reminder_id').all()).results).toEqual(before.results);
+	expect((await env.DB.prepare('SELECT reminder_id, notification_token FROM reminder_projections ORDER BY reminder_id').all()).results).toEqual(before.results);
 });
 
 it('keeps coordinator passes within their query budget while rebuilding two dense encrypted sources', async () => {

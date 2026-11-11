@@ -73,7 +73,7 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 |---|---|
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog, serves the reminders PWA |
 | **Cloudflare R2** | Object storage for vault file content and shared settings |
-| **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, reminder alarm records, and parsed reminder caches |
+| **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, reminder schedules, and parsed reminder caches |
 | **Cloudflare OAuth deployment** | Uses PKCE in Obsidian to provision the bundled Worker and schema; retains account authorization in secret storage for explicit management and usage requests |
 | **Static GitHub Pages callback** | Removes OAuth parameters and hands the response to Obsidian; has no backend, analytics, or token exchange |
 | **OS Keychain** | Stores auth tokens via Obsidian's `secretStorage` API |
@@ -90,7 +90,7 @@ builders; binding names, compatibility settings and the rate limit come from
 |---|---|---|
 | `BUCKET` | R2 Bucket | File storage |
 | `DB` | D1 Database | Changelog, file manifest, authentication, subscriptions, and parsed reminder cache |
-| `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
+| `REMINDER_ALARMS` | Durable Object Namespace | Coordinator, maintenance, Reading, transfer and notification dispatcher roles |
 | `NOTIFICATION_REQUEST_LIMITER` | Rate Limiting API | Limits unrecognized API credentials and sensitive actions per source before D1; verified sessions use a separate bounded sync budget |
 
 ## Component Ownership
@@ -649,13 +649,13 @@ Reading adds its own capability requirements; shared feature settings require
 only their own capability.
 
 `worker/coordinator/` holds the Durable Object. `ReminderAlarm` retains the class,
-storage identities, and mutation lock; `worker/notifications/reminder-schedule.ts`
-owns the per-reminder schedule, cancellation, delivery and retry state. `coordinator.ts` names every role instance
-(coordinator, notification dispatcher, maintenance, Reading, transfer pools and
-one instance per reminder) and owns the internal endpoint paths behind typed
-helpers. `coordinator-requests.ts` dispatches those endpoints with that lock,
-keeping upload preparation outside it. `coordinator-alarms.ts` dispatches Reading,
-maintenance, and projection roles; other alarms deliver the instance's reminder.
+storage identities, and mutation lock; `worker/notifications/dispatcher.ts` owns
+reminder delivery and retries from the schedule columns of `reminder_projections`.
+`coordinator.ts` names every role instance (coordinator, notification dispatcher,
+maintenance, Reading and transfer pools) and owns the internal endpoint paths behind
+typed helpers. `coordinator-requests.ts` dispatches those endpoints with that lock,
+keeping upload preparation outside it. `coordinator-alarms.ts` dispatches the
+dispatcher, Reading, maintenance and projection roles' alarms.
 
 `worker/sync/` is also the committed-file store every feature writes through.
 Reminders, Reading, notifications and encrypted folders use its file identity guards

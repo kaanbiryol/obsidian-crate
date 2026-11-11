@@ -13,7 +13,7 @@ function fixture() {
 	};
 	return { values, storage, state: { storage } as never };
 }
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(runNotificationCoordinator).mockResolvedValue(false); });
+beforeEach(() => { vi.clearAllMocks(); vi.mocked(runNotificationCoordinator).mockResolvedValue({ wrote: false, dispatchAt: undefined }); });
 
 it('persists its processing budget and alarm before accepting work', async () => {
 	const { state, values, storage } = fixture();

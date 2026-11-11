@@ -6,8 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { handleNotificationPolicy } from './policy';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { drainNotificationProjections } from './projection';
-import { dispatchNotificationJobs, drainNotificationJobs, OUTBOX_BATCH_SIZE } from './outbox';
-import { hasNotificationAuthority } from '../reminders/source-state';
+import { notificationAuthority } from '../reminders/source-state';
 import { runNotificationCoordinator } from './coordinator';
 
 const path = 'Reminders/Inbox.md';
@@ -20,127 +19,94 @@ beforeEach(async () => {
 	}) }), env.DB);
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
-const jobs = async () => (await env.DB.prepare('SELECT reminder_id, job_token, operation, attempts, available_at FROM notification_jobs ORDER BY reminder_id').all()).results;
+const schedules = async () => (await env.DB.prepare(`SELECT reminder_id, notification_token, due_datetime, content, due_at, attempts, last_error
+  FROM reminder_projections ORDER BY reminder_id`).all<Record<string, unknown>>()).results;
+const scheduled = async () => (await schedules()).filter(row => row.due_at !== null);
 
-it('edits one installed schedule without requeuing its eleven unchanged neighbors', async () => {
+it('edits one schedule without rewriting its eleven unchanged neighbors', async () => {
 	const ids = Array.from({ length: 12 }, () => crypto.randomUUID());
 	const content = ids.map(id => note(id)).join('\n');
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	await drainNotificationProjections(env);
-	await drainNotificationJobs(env); await drainNotificationJobs(env);
-	const original = (await env.DB.prepare('SELECT reminder_id, schedule_token FROM scheduled_reminders ORDER BY reminder_id').all<{ reminder_id: string; schedule_token: string }>()).results;
+	const original = await schedules();
+	expect(original).toHaveLength(12);
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content.replace(note(ids[0]!), note(ids[0]!, 'Changed')), first.hash);
 	await drainNotificationProjections(env);
-	expect(await jobs()).toMatchObject([{ reminder_id: ids[0], operation: 'schedule' }]);
-	for (const row of original.filter(row => row.reminder_id !== ids[0])) {
-		expect(await hasNotificationAuthority(env.DB, row.reminder_id, row.schedule_token)).toBe(true);
-	}
-	await drainNotificationJobs(env);
-	const after = (await env.DB.prepare('SELECT reminder_id, schedule_token FROM scheduled_reminders ORDER BY reminder_id').all()).results;
+	const after = await schedules();
 	expect(after.filter(row => row.reminder_id !== ids[0])).toEqual(original.filter(row => row.reminder_id !== ids[0]));
-	expect(await env.DB.prepare('SELECT content FROM scheduled_reminders WHERE reminder_id = ?').bind(ids[0]).first()).toEqual({ content: 'Changed' });
+	expect(after.find(row => row.reminder_id === ids[0])).toMatchObject({ content: 'Changed', due_at: Date.parse(due) });
+	const authorized = await notificationAuthority(env.DB, after.map(row => ({ id: String(row.reminder_id), token: String(row.notification_token), filePath: path })));
+	expect(authorized.size).toBe(12);
 });
 
-it('preserves matching pending jobs and their retry deadlines when another reminder changes', async () => {
+it('preserves neighbors and their retry deadlines when another reminder changes', async () => {
 	const ids = Array.from({ length: 3 }, () => crypto.randomUUID());
 	const content = ids.map(id => note(id)).join('\n');
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	await drainNotificationProjections(env);
-	await env.DB.prepare('UPDATE notification_jobs SET attempts = 3, available_at = ?, last_error = ?').bind(Date.now() + 60_000, 'temporary').run();
-	const before = await jobs();
+	await env.DB.prepare('UPDATE reminder_projections SET attempts = 3, due_at = ?, last_error = ?').bind(Date.now() + 60_000, 'temporary').run();
+	const before = await schedules();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content.replace(note(ids[0]!), note(ids[0]!).replace('[ ]', '[x]')), first.hash);
 	await drainNotificationProjections(env);
-	const after = await jobs();
+	const after = await schedules();
 	expect(after.filter(row => row.reminder_id !== ids[0])).toEqual(before.filter(row => row.reminder_id !== ids[0]));
-	expect(after.find(row => row.reminder_id === ids[0])).toMatchObject({ operation: 'cancel', attempts: 0, available_at: 0 });
+	expect(after.find(row => row.reminder_id === ids[0])).toMatchObject({ due_datetime: null, due_at: null, attempts: 0, last_error: null });
 });
 
-it('queues just one alarm when adding a date among 400 previously projected undated reminders', async () => {
+it('schedules just one reminder when adding a date among 400 previously projected undated reminders', async () => {
 	const ids = Array.from({ length: 400 }, () => crypto.randomUUID());
 	const content = ids.map(id => note(id, 'Task', '')).join('\n');
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	await drainNotificationProjections(env);
-	expect(await jobs()).toEqual([]);
+	expect(await scheduled()).toEqual([]);
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content.replace(note(ids[0]!, 'Task', ''), note(ids[0]!)), first.hash);
 	await drainNotificationProjections(env);
-	expect(await jobs()).toMatchObject([{ reminder_id: ids[0], operation: 'schedule' }]);
+	expect(await scheduled()).toMatchObject([{ reminder_id: ids[0], due_datetime: due }]);
 });
 
-it('repairs missing schedule state instead of treating a projection record as proof of installation', async () => {
+it('repairs a schedule missing from its projection row on the next projection', async () => {
 	const content = note(crypto.randomUUID());
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	await drainNotificationProjections(env);
-	await env.DB.prepare('DELETE FROM notification_jobs').run();
+	await env.DB.prepare('UPDATE reminder_projections SET due_datetime = NULL, content = NULL, due_at = NULL').run();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content + '\nUnrelated note', first.hash);
 	await drainNotificationProjections(env);
-	expect(await jobs()).toHaveLength(1);
-	await drainNotificationJobs(env);
-	expect(await env.DB.prepare('SELECT content FROM scheduled_reminders').first()).toEqual({ content: 'Task' });
+	expect(await scheduled()).toMatchObject([{ content: 'Task', due_at: Date.parse(due) }]);
 });
 
-it('continues ready batches immediately and keeps future retry deadlines', async () => {
-	const content = Array.from({ length: OUTBOX_BATCH_SIZE + 1 }, () => note(crypto.randomUUID())).join('\n');
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+it('reports schedule writes to the dispatcher and leaves due times off the coordinator alarm', async () => {
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, note(crypto.randomUUID()), null);
 	const setAlarm = vi.fn();
 	const state = { storage: { setAlarm } } as never;
-	// Like the coordinator alarm: dispatch after the pass, and the next pass decides what follows.
-	const pass = async () => { if (await runNotificationCoordinator(state, env)) await dispatchNotificationJobs(env, true); };
-	const now = Date.now();
-	vi.spyOn(Date, 'now').mockReturnValue(now);
-	await pass();
-	expect(await jobs()).toHaveLength(1);
-	expect(setAlarm).toHaveBeenLastCalledWith(now + 1);
-	const retryAt = now + 60_000;
-	await env.DB.prepare('UPDATE notification_jobs SET available_at = ?').bind(retryAt).run();
-	setAlarm.mockClear();
-	await pass();
-	expect(setAlarm).toHaveBeenCalledExactlyOnceWith(retryAt);
-	vi.mocked(Date.now).mockReturnValue(retryAt);
-	setAlarm.mockClear();
-	await pass();
-	expect(await jobs()).toEqual([]);
-	expect(setAlarm).toHaveBeenCalledExactlyOnceWith(retryAt + 1);
-	setAlarm.mockClear();
-	await pass();
-	expect(setAlarm).not.toHaveBeenCalled();
+	expect(await runNotificationCoordinator(state, env)).toEqual({ wrote: true, dispatchAt: Date.parse(due) });
+	expect(await runNotificationCoordinator(state, env)).toEqual({ wrote: false, dispatchAt: Date.parse(due) });
+	expect(setAlarm).not.toHaveBeenCalledWith(Date.parse(due));
 });
 
-it('does not requeue delivered occurrences outside the delivery window on unrelated edits', async () => {
+it('does not reschedule a delivered occurrence on unrelated edits', async () => {
 	const id = crypto.randomUUID();
 	const content = note(id);
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	await drainNotificationProjections(env);
-	await drainNotificationJobs(env);
-	// Delivery removes the installed schedule.
-	await env.DB.prepare('DELETE FROM scheduled_reminders').run();
-	const dueAt = Date.parse(due);
-	vi.spyOn(Date, 'now').mockReturnValue(dueAt + 60 * 60 * 1000);
+	await env.DB.prepare('UPDATE reminder_projections SET due_at = NULL, delivered_due = due_datetime').run();
 	const second = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, `${content}\nUnrelated note`, first.hash);
 	await drainNotificationProjections(env);
-	expect(await jobs()).toMatchObject([{ reminder_id: id, operation: 'schedule' }]);
-	await env.DB.prepare('DELETE FROM notification_jobs').run();
-	vi.mocked(Date.now).mockReturnValue(dueAt + 25 * 60 * 60 * 1000);
-	const third = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, `${content}\nAnother note`, second.hash);
-	await drainNotificationProjections(env);
-	expect(await jobs()).toEqual([]);
+	expect(await scheduled()).toEqual([]);
 	const snoozed = '2099-01-03T12:00:00.000Z';
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, note(id, 'Task', snoozed), third.hash);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, note(id, 'Task', snoozed), second.hash);
 	await drainNotificationProjections(env);
-	expect(await jobs()).toMatchObject([{ reminder_id: id, operation: 'schedule' }]);
+	expect(await scheduled()).toMatchObject([{ reminder_id: id, due_datetime: snoozed, due_at: Date.parse(snoozed) }]);
 });
 
 it('keeps a reminder scheduled when it moves to another note projected in the same pass', async () => {
 	const id = crypto.randomUUID(), other = crypto.randomUUID();
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/A.md', `${note(id)}\n${note(other)}`, null);
 	await drainNotificationProjections(env);
-	await drainNotificationJobs(env);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 2 });
-	// Both notes' jobs run in one pass: A queues a cancel that B's schedule must override.
+	expect(await scheduled()).toHaveLength(2);
+	// Both notes' jobs run in one pass: A's departure must not remove B's schedule.
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/A.md', note(other), first.hash);
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/B.md', note(id), null);
 	await drainNotificationProjections(env, 8);
-	expect(await env.DB.prepare('SELECT file_path FROM reminder_projections WHERE reminder_id = ?').bind(id).first()).toEqual({ file_path: 'Reminders/B.md' });
-	await drainNotificationJobs(env);
-	expect(await jobs()).toEqual([]);
-	expect(await env.DB.prepare('SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = ?').bind(id).first()).toEqual({ reminder_id: id });
+	expect(await env.DB.prepare('SELECT file_path, due_at FROM reminder_projections WHERE reminder_id = ?').bind(id).first())
+		.toEqual({ file_path: 'Reminders/B.md', due_at: Date.parse(due) });
 });

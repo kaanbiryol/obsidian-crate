@@ -1,17 +1,15 @@
 import { queryRows } from '../d1/db';
 import { parseEncryptedNotification } from '../../../encryption/notification-format';
 
-/** Reminder alarms never deliver an occurrence this long after its due time. */
+/** The dispatcher never delivers an occurrence this long after its due time. */
 export const NOTIFICATION_DELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** A schedule job's `notification_jobs.payload_json`. */
-export interface SchedulePayload {
+/** The occurrence and push text a projection row schedules. */
+interface SchedulePayload {
 	reminderId: string;
 	content: string;
 	project?: string | null;
 	dueDatetime: string;
-	/** Set when re-enabling Reminders requeues an installed schedule. */
-	resume?: boolean;
 }
 export type NotificationOperation =
 	| { id: string; operation: 'schedule'; payload: SchedulePayload }
@@ -19,10 +17,6 @@ export type NotificationOperation =
 interface ExistingNotification {
 	id: string;
 	token: string | null;
-	jobToken: string | null;
-	operation: string | null;
-	payload: string | null;
-	scheduleToken: string | null;
 	content: string | null;
 	project: string | null;
 	dueDatetime: string | null;
@@ -43,44 +37,29 @@ function sameContent(left: string, right: string): boolean {
 }
 
 function canReuse(row: ExistingNotification, operation: NotificationOperation): boolean {
-	if (row.jobToken !== null) {
-		if (!row.token || row.token !== row.jobToken || row.operation !== operation.operation) return false;
-		if (operation.operation === 'cancel') return true;
-		try { return samePayload(JSON.parse(row.payload ?? 'null') as SchedulePayload | null, operation.payload); }
-		catch { return false; }
-	}
-	if (operation.operation === 'cancel') return row.scheduleToken === null;
-	// Delivery and cancellation remove schedule state. A previously projected
-	// occurrence outside the delivery window cannot notify, so requeuing it would
-	// only ask its alarm to complete or fail again.
-	if (row.token && row.scheduleToken === null && operation.payload
-		&& Date.now() - Date.parse(operation.payload.dueDatetime) >= NOTIFICATION_DELIVERY_WINDOW_MS) return true;
-	return Boolean(row.token && row.token === row.scheduleToken && operation.payload
-		&& samePayload({ reminderId: row.id, content: row.content!, project: row.project, dueDatetime: row.dueDatetime! }, operation.payload));
+	if (!row.token) return false;
+	if (operation.operation === 'cancel') return row.dueDatetime === null;
+	return row.dueDatetime !== null && samePayload({ reminderId: row.id, content: row.content ?? '', project: row.project, dueDatetime: row.dueDatetime }, operation.payload);
 }
 
-/** Current command, projection and schedule state of each reminder. */
+/** Current projection and schedule of each reminder. */
 export async function readExistingNotifications(db: D1Database, ids: readonly string[]): Promise<Map<string, ExistingNotification>> {
 	if (!ids.length) return new Map();
 	const rows = await queryRows<ExistingNotification>(db.prepare(`SELECT ids.value AS id,
-    p.notification_token AS token, j.job_token AS jobToken, j.operation, j.payload_json AS payload,
-    s.schedule_token AS scheduleToken, s.content, s.project, s.due_datetime AS dueDatetime
+    p.notification_token AS token, p.content, p.project, p.due_datetime AS dueDatetime
     FROM json_each(?) ids
-    LEFT JOIN reminder_projections p ON p.reminder_id = ids.value
-    LEFT JOIN notification_jobs j ON j.reminder_id = ids.value
-    LEFT JOIN scheduled_reminders s ON s.reminder_id = ids.value`)
+    LEFT JOIN reminder_projections p ON p.reminder_id = ids.value`)
 		.bind(JSON.stringify(ids)));
 	return new Map(rows.map(row => [row.id, row]));
 }
 
-/** Preserve command tokens and retry state when the effective alarm is unchanged.
- * File and policy authority still advance atomically in the projection commit.
- * Missing or mismatched schedule state takes the ordinary repair path.
- */
+/** Keep the token, and so skip the row write, when the schedule is unchanged.
+ * File and policy authority still advance atomically in the projection commit. */
 export function planNotificationOperations(existing: ReadonlyMap<string, ExistingNotification>, operations: NotificationOperation[], token: string) {
 	return operations.map(operation => {
 		const row = existing.get(operation.id);
 		const reuse = row && canReuse(row, operation);
-		return { ...operation, token: reuse ? row.token ?? token : token, enqueue: !reuse };
+		return { ...operation, token: reuse ? row.token! : token,
+			dueAt: operation.payload ? Date.parse(operation.payload.dueDatetime) : null };
 	});
 }

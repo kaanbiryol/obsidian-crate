@@ -62,7 +62,7 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
 		// rows carry no policy revision: this job is what withholds their authority.
 		db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
       SELECT path, ? FROM (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'
-        UNION SELECT file_path FROM reminder_projections)
+        UNION SELECT file_path FROM reminder_projections WHERE file_path IS NOT NULL)
       WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
       ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, ...fileFolderArgs(folder), revision),
 		db.prepare(`DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'

@@ -223,9 +223,8 @@ it('projects an adopted schedule after midnight using the same committed due key
 	clock('2026-09-09T00:01:00Z');
 	await drainNotificationProjections(env);
 	expect(await env.DB.prepare('SELECT last_error FROM notification_projection_jobs WHERE path = ?').bind(path).first()).toBeNull();
-	const job = await env.DB.prepare('SELECT reminder_id, payload_json FROM notification_jobs').first<{ reminder_id: string; payload_json: string }>();
-	expect(job?.reminder_id).toBe('invoice');
-	expect(JSON.parse(job!.payload_json)).toMatchObject({ dueDatetime: '2026-09-09T09:00:00.000Z' });
+	expect(await env.DB.prepare('SELECT reminder_id, due_datetime FROM reminder_projections WHERE due_at IS NOT NULL').first())
+		.toEqual({ reminder_id: 'invoice', due_datetime: '2026-09-09T09:00:00.000Z' });
 });
 
 it('preserves raw ambiguous bytes as an issue until Obsidian saves an explicit schedule', async () => {

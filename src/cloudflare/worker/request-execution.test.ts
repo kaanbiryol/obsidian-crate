@@ -60,8 +60,7 @@ it('reauthenticates inside the transfer queue before a revoked upload can be dis
 		const target = new URL(request.url);
 		target.pathname = path;
 		return handleCoordinatorRequest(new Request(target, request), {} as DurableObjectState, transferEnv,
-			async action => { queued(); await gate; return action(); },
-			async () => { throw new Error('Unexpected reminder route'); });
+			async action => { queued(); await gate; return action(); });
 	});
 	const pending = fetchWorkerRequest(upload(), env);
 	await waiting;

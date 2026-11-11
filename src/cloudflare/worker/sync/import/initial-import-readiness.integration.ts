@@ -5,7 +5,6 @@ import { reset, runDurableObjectAlarm } from 'cloudflare:test';
 import { applySchema } from '../../test-support/schema-test-harness';
 import { INITIAL_REMINDERS_PENDING, finishInitialReminderSetup } from './initial-import-readiness';
 import { runNotificationCoordinator } from '../../notifications/coordinator';
-import { dispatchNotificationJobs, OUTBOX_BATCH_SIZE } from '../../notifications/outbox';
 import { writeCommittedMarkdownFile } from '../markdown-files';
 import { handleNotificationPolicy } from '../../notifications/policy';
 import { meterD1Writes } from '../../test-support/d1-write-meter-test-harness';
@@ -15,8 +14,6 @@ import { REMINDER_CACHE_PARSER_VERSION } from '../../reminders/cache/types';
 import { reminderSourceScanKey } from '../../reminders/source-migration';
 import { handleListReminders } from '../../reminders/handlers/list';
 import type { ReminderSetupStatus } from '../../../../protocol/initial-import';
-import { countD1Queries } from '../../d1/d1-query-count';
-import { D1_QUERIES_PER_INVOCATION } from '../../d1/platform-limits';
 
 const clients: SyncTestDevice[] = [];
 const json = (body: unknown) => new Request('https://test', { method: 'POST', body: JSON.stringify(body) });
@@ -33,24 +30,22 @@ async function pendingImport() {
 	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(INITIAL_REMINDERS_PENDING, 'import').run();
 }
 const readiness = async (db = env.DB) => (await finishInitialReminderSetup(json({ token: 'import' }), db)).json() as Promise<ReminderSetupStatus>;
-// A coordinator alarm dispatches due schedules after its locked pass.
-const pass = async () => { if (await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, env)) await dispatchNotificationJobs(env, true); };
+// A coordinator pass projects schedules into their rows; nothing else installs them.
+const pass = async () => { await runNotificationCoordinator({ storage: { setAlarm: vi.fn() } } as never, env); };
 
-it('keeps readiness pending until every schedule is installed and writes nothing on pending probes', async () => {
+it('keeps readiness pending until every schedule is projected and writes nothing on pending probes', async () => {
 	await pendingImport();
-	const content = Array.from({ length: OUTBOX_BATCH_SIZE + 2 }, () => note('2099-01-01T12:00:00.000Z')).join('\n');
+	const count = 202;
+	const content = Array.from({ length: count }, () => note('2099-01-01T12:00:00.000Z')).join('\n');
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/tasks.md', content, null);
 	const meter = meterD1Writes(env.DB);
-	expect(await readiness(meter.db)).toMatchObject({ ready: false });
+	expect(await readiness(meter.db)).toMatchObject({ ready: false, progress: { remainingFiles: 1, remainingSchedules: 0 } });
 	expect(meter.writes()).toBe(0);
+	// The projection commit writes every schedule; no separate installation step remains.
 	await pass();
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: OUTBOX_BATCH_SIZE });
-	expect(await readiness(meter.db)).toMatchObject({ ready: false, progress: { scanning: false, remainingFiles: 0, remainingSchedules: 2 } });
-	expect(meter.writes()).toBe(0);
-	await pass(); await pass();
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: count });
 	expect(await readiness(meter.db)).toEqual({ ready: true });
 	expect(meter.writes()).toBe(1);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: OUTBOX_BATCH_SIZE + 2 });
 	expect(await readiness(meter.db)).toEqual({ ready: true });
 	expect(meter.writes()).toBe(1);
 });
@@ -82,7 +77,7 @@ it.each(['old 100% details', 'line one\nline two %20 café 😀'])('completes in
 	expect(await syncing).toMatchObject({ success: true, uploaded: 2, errors: [] });
 	expect(device.engine.getState()).toMatchObject({ status: 'idle', lastError: null });
 	expect((await device.api.downloadFile(path)).content).toEqual(new TextEncoder().encode(content).buffer);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 1 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 1 });
 	const list = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env);
 	expect(list.status).toBe(200);
 	expect(await list.json()).toMatchObject({ reminders: [{ description }], issues: [] });
@@ -146,7 +141,7 @@ it('does not create catch-up schedules for reminders already overdue when indexe
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/overdue.md', note('2020-01-01T12:00:00.000Z'), null);
 	await pass();
 	expect(await readiness()).toEqual({ ready: true });
-	expect(await env.DB.prepare('SELECT 1 FROM scheduled_reminders').first()).toBeNull();
+	expect(await env.DB.prepare('SELECT 1 FROM reminder_projections WHERE due_at IS NOT NULL').first()).toBeNull();
 });
 
 it('probes ten thousand verified files with bounded reads', async () => {
@@ -173,11 +168,10 @@ it('caps the progress counts of a pending probe over a large setup queue', async
 	await seed(`INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified)
     SELECT 'Reminders/'||x||'.md', 'key-'||x, ${REMINDER_CACHE_PARSER_VERSION}, 0 FROM n`);
 	await seed("INSERT INTO notification_projection_jobs(path, job_token) SELECT 'Reminders/job-'||x||'.md', 'token' FROM n");
-	await seed("INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at) SELECT 'reminder-'||x, 'token', 'cancel', x FROM n");
 	const meter = meterD1Usage(env.DB);
-	expect(await readiness(meter.db)).toMatchObject({ ready: false, progress: { remainingFiles: 1000, remainingSchedules: 1000 } });
+	expect(await readiness(meter.db)).toMatchObject({ ready: false, progress: { remainingFiles: 1000, remainingSchedules: 0 } });
 	expect(meter.usage.complete).toBe(true);
-	// Unbounded counts would read every queued row (30,000 here) on each one-second poll.
+	// Unbounded counts would read every queued row (20,000 here) on each one-second poll.
 	expect(meter.usage.rowsRead).toBeLessThan(5000);
 });
 
@@ -211,7 +205,7 @@ it.each([false, true])('resumes reminder setup and syncs a local repair before w
 	for (let i = 0; i < 5; i++) await runDurableObjectAlarm(coordinator);
 	expect((await resumed).success).toBe(true);
 	expect(upload).not.toHaveBeenCalled(); expect(put).toHaveBeenCalledTimes(repair ? 1 : 0);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 12 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 12 });
 	expect((await env.DB.prepare('SELECT file_path FROM reminder_source_state').all()).results).toEqual([{ file_path: 'Reminders/tasks.md' }]);
 }, 15_000);
 
@@ -226,7 +220,7 @@ it('keeps first-time sync active until the reminder schedule is ready', async ()
 	const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 	await runDurableObjectAlarm(coordinator);
 	expect((await syncing).success).toBe(true);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 1 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 1 });
 }, 15_000);
 
 it('preserves initial uploads when reminder settings fail and resumes without uploading those bytes again', async () => {
@@ -254,7 +248,7 @@ it('preserves initial uploads when reminder settings fail and resumes without up
 	await runDurableObjectAlarm(coordinator);
 	expect(await resumed).toMatchObject({ success: true, uploaded: 0 });
 	expect(upload).not.toHaveBeenCalled(); expect(put).not.toHaveBeenCalled();
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 1 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 1 });
 }, 15_000);
 
 it('schedules a reminder that gets its ID before the first upload from that one upload', async () => {
@@ -280,7 +274,7 @@ it('schedules a reminder that gets its ID before the first upload from that one 
 	expect(writesVault).toBe(false);
 	// Before: the ID was written after the upload, so the schedule needed a second upload.
 	expect(upload).toHaveBeenCalledOnce();
-	expect(await env.DB.prepare('SELECT reminder_id FROM scheduled_reminders').all()).toMatchObject({ results: [{ reminder_id: id }] });
+	expect(await env.DB.prepare('SELECT reminder_id FROM reminder_projections WHERE due_at IS NOT NULL').all()).toMatchObject({ results: [{ reminder_id: id }] });
 }, 15_000);
 
 it.each(['failed', 'pending'])('syncs an ordinary edit while reminder settings are %s', async status => {
@@ -305,7 +299,7 @@ it.each(['failed', 'pending'])('syncs an ordinary edit while reminder settings a
 	} finally { release(); }
 }, 15_000);
 
-it('finishes 400 newly imported overdue reminders without creating cancellation jobs', async () => {
+it('finishes 400 newly imported overdue reminders without scheduling them', async () => {
 	await pendingImport();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/history.md',
 		Array.from({ length: 400 }, () => note('2020-01-01T12:00:00.000Z')).join('\n'), null);
@@ -313,50 +307,23 @@ it('finishes 400 newly imported overdue reminders without creating cancellation 
 	await pass();
 	expect(await readiness()).toEqual({ ready: true });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections').first()).toEqual({ n: 400 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_jobs').first()).toEqual({ n: 0 });
-	// With no alarm update due, neither the dispatcher nor per-reminder objects are opened.
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 0 });
+	// Projection opens no Durable Object; only the coordinator alarm wakes the dispatcher.
 	expect(dispatch).not.toHaveBeenCalled();
 });
 
-it.each([false, true])('cancels a completed reminder with an existing alarm or pending schedule (dispatched=%s)', async dispatched => {
+it.each([false, true])('cancels a completed reminder in its projection commit (delivered=%s)', async delivered => {
 	await pendingImport();
 	const path = 'Reminders/task.md';
 	const content = note('2099-01-01T12:00:00.000Z');
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	const { drainNotificationProjections } = await import('../../notifications/projection');
 	await drainNotificationProjections(env);
-	if (dispatched) await pass();
+	if (delivered) await env.DB.prepare('UPDATE reminder_projections SET due_at = NULL, delivered_due = due_datetime').run();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content.replace('[ ]', '[x]'), first.hash);
 	await drainNotificationProjections(env);
-	expect(await env.DB.prepare('SELECT operation FROM notification_jobs').first()).toEqual({ operation: 'cancel' });
+	expect(await env.DB.prepare('SELECT due_datetime, due_at, delivered_due IS NOT NULL AS delivered FROM reminder_projections').first())
+		.toEqual({ due_datetime: null, due_at: null, delivered: delivered ? 1 : 0 });
 	await pass();
-	expect(await env.DB.prepare('SELECT 1 FROM scheduled_reminders').first()).toBeNull();
 	expect(await readiness()).toEqual({ ready: true });
-});
-
-it('dispatches a full batch of jobs in bounded parallel groups within the request query budget', async () => {
-	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
-    INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at)
-    SELECT 'parallel-'||x, 'token-'||x, 'cancel', 0 FROM n`).bind(OUTBOX_BATCH_SIZE).run();
-	let active = 0, peak = 0;
-	let release!: () => void;
-	const gate = new Promise<void>(resolve => { release = resolve; });
-	const fetch = vi.fn(async () => {
-		active++; peak = Math.max(peak, active);
-		await gate; active--;
-		return new Response(null, { status: 204 });
-	});
-	const { db, count } = countD1Queries(env.DB);
-	const { drainNotificationJobs } = await import('../../notifications/outbox');
-	const draining = drainNotificationJobs({ ...env, DB: db, REMINDER_ALARMS: {
-		idFromName: (id: string) => id, get: () => ({ fetch }),
-	} } as never);
-	try { await vi.waitFor(() => expect(active).toBe(5)); }
-	finally { release(); await draining; }
-	expect(peak).toBe(5);
-	expect(fetch).toHaveBeenCalledTimes(OUTBOX_BATCH_SIZE);
-	// The feature check and the job read, then one acknowledgement batch per group of five.
-	expect(count.queries).toBe(2 + OUTBOX_BATCH_SIZE / 5);
-	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
-	expect(await env.DB.prepare('SELECT 1 FROM notification_jobs').first()).toBeNull();
 });

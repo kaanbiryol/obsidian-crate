@@ -1,11 +1,11 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { revalidateReminderSources } from '../reminders/source-migration';
-import { drainNotificationJobs } from './outbox';
+import { runReminderDispatch } from './dispatcher';
 import { handleDiagnostics } from '../maintenance/diagnostics';
 import { READY_PROJECTION_JOBS_SQL, NEXT_NOTIFICATION_WORK_SQL } from './queue';
 
@@ -29,19 +29,23 @@ it('pauses an invalid file immediately despite unrelated edits, then recovers af
 	expect(await failure()).toBeNull();
 });
 
-it('stops dispatching a broken alarm job after eight failures', async () => {
-	await env.DB.prepare(`INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at) VALUES ('broken', 'token', 'cancel', 0)`).run();
-	let requests = 0;
-	const failing = { ...env, REMINDER_ALARMS: { idFromName: () => '', get: () => ({ fetch: async () => {
-		requests++; return new Response(null, { status: 503 });
-	} }) } } as never;
-	for (let i = 0; i < 8; i++) {
-		await env.DB.prepare('UPDATE notification_jobs SET available_at = 0 WHERE available_at >= 0').run();
-		await drainNotificationJobs(failing);
-	}
-	for (let i = 0; i < 3; i++) await drainNotificationJobs(failing);
-	expect(requests).toBe(8);
-	expect(await env.DB.prepare('SELECT attempts, available_at FROM notification_jobs').first()).toEqual({ attempts: 8, available_at: -1 });
+it('stops retrying a failing dispatcher pass after eight failures', async () => {
+	const values = new Map<string, unknown>();
+	let alarm: number | null = null, alarms = 0;
+	const state = { storage: {
+		get: async (key: string) => values.get(key), put: async (key: string, value: unknown) => { values.set(key, value); },
+		delete: async (key: string) => values.delete(key), getAlarm: async () => alarm,
+		setAlarm: async (time: number) => { alarm = time; alarms++; },
+	} } as unknown as DurableObjectState;
+	let reads = 0;
+	const failing = { ...env, DB: { prepare: () => { reads++; throw new Error('D1 unavailable'); } } } as never;
+	const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+	for (let i = 0; i < 11; i++) { alarm = null; await runReminderDispatch(state, failing, action => action()); }
+	logged.mockRestore();
+	expect(reads).toBe(11);
+	// Seven retries with backoff; the eighth failure leaves no alarm until the next wake.
+	expect(alarms).toBe(7);
+	expect(values.get('dispatchFailures')).toBe(11);
 });
 
 it.each([null, -1])('does not scan ten thousand paused files looking for runnable work (deadline=%s)', async deadline => {

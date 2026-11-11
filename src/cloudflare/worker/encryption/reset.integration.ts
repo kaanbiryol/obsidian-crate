@@ -73,11 +73,14 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	await env.DB.prepare("INSERT INTO web_enrollment_tokens(token_hash, expires_at) VALUES ('grant', 9999999999999)").run();
 	await env.DB.prepare("INSERT INTO push_subscriptions(id, owner_token_id, endpoint, p256dh, auth) VALUES ('push', 'web', 'https://push.test', 'key', 'auth')").run();
 	await env.DB.prepare("INSERT INTO staged_uploads(storage_key, file_path, expires_at) VALUES ('late-object', 'late.md', 9999999999999)").run();
-	for (let index = 0; index < 14; index++) await env.DB.prepare("INSERT INTO scheduled_reminders(reminder_id, schedule_token, content, due_datetime) VALUES (?, 'schedule', 'encrypted', '2099-01-01T00:00:00.000Z')").bind(`alarm-${index}`).run();
+	for (let index = 0; index < 14; index++) await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, notification_token, due_datetime, content, due_at)
+    VALUES (?, 'Reminders/Inbox.md', 'schedule', '2099-01-01T00:00:00.000Z', 'encrypted', 4070908800000)`).bind(`alarm-${index}`).run();
 	for (let index = 0; index < 205; index++) await env.BUCKET.put(`object-${index}`, 'old encrypted bytes');
 	const begin = await start();
 	expect(begin.status, await begin.clone().text()).toBe(200);
 	expect((await readEncryptionState(env.DB))?.mode).toBe('resetting');
+	// Every schedule stops in the reset's own transaction.
+	expect(await env.DB.prepare('SELECT 1 FROM reminder_projections WHERE due_at IS NOT NULL').first()).toBeNull();
 	for (const table of readingTables) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 	expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 	for (const token of ['original', 'other', 'web']) expect((await request('/health', token)).status).toBe(401);
@@ -89,7 +92,7 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	expect(await readEncryptionState(env.DB)).toBeNull();
 	expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 	expect((await env.BUCKET.list()).objects).toHaveLength(0);
-	for (const table of ['files', 'file_versions', 'scheduled_reminders', 'notification_jobs']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
+	for (const table of ['files', 'file_versions', 'reminder_projections']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 	expect(await env.DB.prepare("SELECT state FROM staged_uploads WHERE storage_key = 'late-object'").first()).toEqual({ state: 'deleting' });
 	expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_deployment_fence'").first()).toEqual({ value: 'infrastructure' });
 	await env.BUCKET.put('new-plaintext', 'new note');
@@ -101,13 +104,14 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 		'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) } }), env)).status).toBe(200);
 });
 
-it('cancels installed alarms and completes while Reminders is paused', async () => {
+it('cancels scheduled reminders and completes while Reminders is paused', async () => {
 	await env.DB.prepare('UPDATE server_state SET features = ? WHERE id = 1')
 		.bind(JSON.stringify({ reading: true, reminders: false, revision: 'paused' })).run();
-	for (let index = 0; index < 14; index++) await env.DB.prepare("INSERT INTO scheduled_reminders(reminder_id, schedule_token, content, due_datetime) VALUES (?, 'schedule', 'encrypted', '2099-01-01T00:00:00.000Z')").bind(`alarm-${index}`).run();
+	for (let index = 0; index < 14; index++) await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, notification_token, due_datetime, content, due_at)
+    VALUES (?, 'Reminders/Inbox.md', 'schedule', '2099-01-01T00:00:00.000Z', 'encrypted', 4070908800000)`).bind(`alarm-${index}`).run();
 	expect((await start()).status).toBe(200);
 	await finish();
-	for (const table of ['scheduled_reminders', 'notification_jobs']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
+	expect(await env.DB.prepare('SELECT 1 FROM reminder_projections').first()).toBeNull();
 });
 
 it('rejects an encrypted upload authorized before reset, even if staging starts after completion', async () => {

@@ -1,8 +1,8 @@
 /**
  * Roles are named instances of the `ReminderAlarm` Durable Object class, whose
  * class name deployment discovery pins. The coordinator serializes sync writes,
- * imports, checkpoints, Reading publication and maintenance. Each reminder's
- * delivery state lives in an instance named by its reminder ID. Renaming a role
+ * imports, checkpoints, Reading publication and maintenance. The notification
+ * dispatcher keeps one alarm for every scheduled reminder. Renaming a role
  * orphans the state stored under its old name.
  *
  * The local server package loads this module too, directly through type stripping or
@@ -22,7 +22,7 @@ export const COORDINATOR_PATHS = {
 	maintain: '/maintain',
 	readingWake: '/reading-wake',
 	readingPublish: '/reading-publish',
-	dispatchJobs: '/dispatch-jobs',
+	armDispatcher: '/arm-dispatcher',
 	commitUpload: '/commit-upload',
 	commitUploads: '/commit-uploads',
 	commitNewFiles: '/commit-new-files',
@@ -41,8 +41,6 @@ export const TRANSFER_PATHS = {
 } as const;
 export type TransferPath = typeof TRANSFER_PATHS[keyof typeof TRANSFER_PATHS];
 
-/** Set by a coordinator pass that has just loaded the feature policy. */
-export const REMINDERS_ENABLED_HEADER = 'X-Crate-Reminders-Enabled';
 /** Marks a public request that the Worker forwarded to run under the coordinator lock. */
 export const INTERNAL_MUTATION_HEADER = 'X-Crate-Internal-Mutation';
 
@@ -98,10 +96,11 @@ export async function publishReading(env: AlarmBinding, publication: object): Pr
 	return (await post(coordinatorStub(env), COORDINATOR_PATHS.readingPublish, { body: JSON.stringify(publication) })).ok;
 }
 
-/** Drains due notification jobs on the dispatcher role, with its own request budget. */
-export async function dispatchNotifications(env: AlarmBinding, remindersEnabled?: boolean): Promise<boolean> {
-	return (await post(roleStub(env, NOTIFICATION_DISPATCHER_NAME), COORDINATOR_PATHS.dispatchJobs, {
-		headers: remindersEnabled ? { [REMINDERS_ENABLED_HEADER]: '1' } : undefined,
+/** Moves the dispatcher role's alarm to `at` if that is earlier, or to the earliest
+ * scheduled reminder when `at` is omitted. Returns whether the dispatcher accepted. */
+export async function armReminderDispatcher(env: AlarmBinding, at?: number): Promise<boolean> {
+	return (await post(roleStub(env, NOTIFICATION_DISPATCHER_NAME), COORDINATOR_PATHS.armDispatcher, {
+		body: JSON.stringify(at === undefined ? {} : { at }),
 	})).ok;
 }
 
@@ -121,15 +120,6 @@ export async function revokeCoordinatedCredential(env: AlarmBinding, id: string)
 	const response = await post(coordinatorStub(env), COORDINATOR_PATHS.revokeCredential, { body: JSON.stringify({ id }) });
 	if (!response.ok) throw new Error('The server could not revoke this credential. Try again.');
 	return (await response.json() as { revoked: boolean }).revoked;
-}
-
-/** Schedules one reminder's delivery on its own instance; the method selects the command. */
-export function scheduleReminderDelivery(env: AlarmBinding, reminderId: string, schedule: object): Promise<Response> {
-	return roleStub(env, reminderId).fetch('https://do/schedule', { method: 'PUT', body: JSON.stringify(schedule) });
-}
-
-export function cancelReminderDelivery(env: AlarmBinding, reminderId: string, jobToken: string): Promise<Response> {
-	return roleStub(env, reminderId).fetch(`https://do/cancel?reminderId=${encodeURIComponent(reminderId)}&jobToken=${encodeURIComponent(jobToken)}`, { method: 'DELETE' });
 }
 
 /** Commits staged new files under the coordinator lock. */

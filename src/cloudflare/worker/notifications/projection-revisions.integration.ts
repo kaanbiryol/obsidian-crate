@@ -7,8 +7,7 @@ import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { handleBatchDelete } from '../sync/batch/delete';
 import { drainNotificationProjections, notificationDatetime } from './projection';
 import { handleNotificationPolicy } from './policy';
-import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
-import { drainNotificationJobs } from './outbox';
+import { deliverDueReminders } from './dispatcher';
 import { runNotificationCoordinator } from './coordinator';
 import { getStoredFileRow } from '../sync/storage';
 
@@ -19,7 +18,7 @@ async function configure() {
 	await handleNotificationPolicy(new Request('https://test/reminders/notification-policy', { method: 'POST', body: JSON.stringify(policy) }), env.DB);
 }
 const note = '- [ ] Due 2099-01-02T10:00:00.000Z <!-- crate-id:11111111-1111-4111-8111-111111111111 -->';
-async function jobs() { expect((await env.DB.prepare('SELECT last_error FROM notification_projection_jobs WHERE last_error IS NOT NULL').all()).results).toEqual([]); return (await env.DB.prepare('SELECT reminder_id, operation, payload_json FROM notification_jobs').all()).results; }
+async function jobs() { expect((await env.DB.prepare('SELECT last_error FROM notification_projection_jobs WHERE last_error IS NOT NULL').all()).results).toEqual([]); return (await env.DB.prepare('SELECT reminder_id, due_datetime, content FROM reminder_projections WHERE due_at IS NOT NULL').all()).results; }
 
 describe('authoritative projections and file revisions', () => {
 	it('keeps a recreated same-content file when an earlier delete is retried', async () => {
@@ -37,18 +36,18 @@ describe('authoritative projections and file revisions', () => {
 		vi.spyOn(env.DB, 'batch').mockImplementationOnce(async statements => { await batch(statements); throw new Error('lost'); });
 		await expect(writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note, null)).rejects.toThrow('lost');
 		await drainNotificationProjections(env);
-		expect(await jobs()).toMatchObject([{ reminder_id: '11111111-1111-4111-8111-111111111111', operation: 'schedule' }]);
+		expect(await jobs()).toMatchObject([{ reminder_id: '11111111-1111-4111-8111-111111111111', due_datetime: '2099-01-02T10:00:00.000Z' }]);
 	});
 	it('projects the latest committed reminder after multiple updates and a deletion', async () => {
 		await configure();
 		const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note, null);
 		await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note.replace('Due', 'New title'), first.hash);
 		await drainNotificationProjections(env);
-		expect(JSON.parse(String((await jobs())[0]?.payload_json))).toMatchObject({ content: 'New title' });
+		expect(await jobs()).toMatchObject([{ content: 'New title' }]);
 		const file = await getStoredFileRow(env.DB, 'Reminders/Inbox.md');
 		await handleBatchDelete(new Request('https://test/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files: [{ path: 'Reminders/Inbox.md', expectedHash: file?.hash, expectedRevision: file?.storageKey }] }) }), env.BUCKET, env.DB);
 		await drainNotificationProjections(env);
-		expect(await jobs()).toMatchObject([{ reminder_id: '11111111-1111-4111-8111-111111111111', operation: 'cancel' }]);
+		expect(await jobs()).toEqual([]);
 	});
 	it('does not allow startup on another device to replace the saved timezone policy', async () => {
 		await configure();
@@ -61,26 +60,15 @@ describe('authoritative projections and file revisions', () => {
 it('defers delivery while its committed source revision awaits projection', async () => {
 	await configure();
 	const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note, null);
-	await drainNotificationProjections(env); await drainNotificationJobs(env);
-	const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('11111111-1111-4111-8111-111111111111'));
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note.replace('Due', 'Latest'), first.hash);
-	expect(await runDurableObjectAlarm(stub)).toBe(true);
-	expect(await env.DB.prepare('SELECT content FROM scheduled_reminders').first()).toMatchObject({ content: 'Due' });
-	const alarmTime = await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
-	expect(alarmTime).toBeGreaterThan(Date.now());
-	await drainNotificationProjections(env); await drainNotificationJobs(env);
-	expect(await env.DB.prepare('SELECT content FROM scheduled_reminders').first()).toMatchObject({ content: 'Latest' });
-});
-it('ignores an outbox command superseded by a newer projection job', async () => {
-	await configure();
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note, null);
 	await drainNotificationProjections(env);
-	const job = await env.DB.prepare('SELECT reminder_id, job_token, payload_json FROM notification_jobs').first<{ reminder_id: string; job_token: string; payload_json: string }>();
-	await env.DB.prepare("UPDATE notification_jobs SET job_token = 'newer', operation = 'cancel', payload_json = NULL").run();
-	const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName(job!.reminder_id));
-	const response = await stub.fetch('https://do/schedule', { method: 'PUT', body: JSON.stringify({ ...JSON.parse(job!.payload_json), jobToken: job!.job_token }) });
-	expect(await response.json()).toMatchObject({ superseded: true });
-	expect(await env.DB.prepare('SELECT * FROM scheduled_reminders').first()).toBeNull();
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note.replace('Due', 'Latest'), first.hash);
+	await env.DB.prepare('UPDATE reminder_projections SET due_at = ?').bind(Date.now()).run();
+	const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+	expect(await deliverDueReminders(env)).toBeGreaterThan(Date.now());
+	logged.mockRestore();
+	expect(await env.DB.prepare('SELECT content, attempts FROM reminder_projections').first()).toMatchObject({ content: 'Due', attempts: 1 });
+	await drainNotificationProjections(env);
+	expect(await env.DB.prepare('SELECT content FROM reminder_projections').first()).toMatchObject({ content: 'Latest' });
 });
 it('does not continuously wake a coordinator before a notification policy is configured', async () => {
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note, null);
@@ -91,9 +79,9 @@ it('does not continuously wake a coordinator before a notification policy is con
 it('disables all derived schedules through an explicit policy revision', async () => {
 	await configure();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note, null);
-	await drainNotificationProjections(env); await drainNotificationJobs(env);
+	await drainNotificationProjections(env);
 	const current = await env.DB.prepare('SELECT revision FROM notification_policy').first<{ revision: string }>();
 	expect((await handleNotificationPolicy(new Request('https://test/policy', { method: 'PUT', body: JSON.stringify({ ...policy, enabled: false, expectedRevision: current!.revision }) }), env.DB)).status).toBe(200);
-	await drainNotificationProjections(env); await drainNotificationJobs(env);
-	expect(await env.DB.prepare('SELECT * FROM scheduled_reminders').first()).toBeNull();
+	await drainNotificationProjections(env);
+	expect(await env.DB.prepare('SELECT due_datetime, due_at FROM reminder_projections').first()).toEqual({ due_datetime: null, due_at: null });
 });

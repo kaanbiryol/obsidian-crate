@@ -8,12 +8,13 @@ import { drainNotificationProjections } from '../notifications/projection';
 import { reminderSourceScanKey, revalidateReminderSources } from './source-migration';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { ReminderAlarm } from '../coordinator/reminder-alarm';
+import { deliverDueReminders } from '../notifications/dispatcher';
 import { sendToAllSubscriptions } from '../notifications/push';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 import { runNotificationCoordinator } from '../notifications/coordinator';
 import { countD1Queries, type D1QueryCount } from '../d1/d1-query-count';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
-import { dispatchNotificationJobs } from '../notifications/outbox';
+import { armReminderDispatcher } from '../coordinator/coordinator';
 import { handleListReminders } from './handlers/list';
 import { sha256Hex } from '../../../platform/sha256';
 
@@ -30,14 +31,15 @@ function state() {
 	const values = new Map<string, unknown>(); let alarmTime: number | null = null;
 	return { storage: { get: async (key: string) => values.get(key), put: async (key: string, value: unknown) => { values.set(key, value); }, delete: async (key: string) => values.delete(key), getAlarm: async () => alarmTime, setAlarm: async (value: number | Date) => { alarmTime = Number(value); }, deleteAlarm: async () => { alarmTime = null; } } };
 }
+/** The reminder's projected schedule, or null once its row is gone. */
 async function command() {
-	return env.DB.prepare('SELECT job_token, operation, payload_json FROM notification_jobs WHERE reminder_id = ?').bind(id).first<{ job_token: string; operation: string; payload_json: string }>();
+	return env.DB.prepare('SELECT due_datetime, content, due_at FROM reminder_projections WHERE reminder_id = ?').bind(id).first<{ due_datetime: string | null; content: string | null; due_at: number | null }>();
 }
-async function sendCommand(alarm: ReminderAlarm) {
-	const job = (await command())!;
-	return alarm.fetch(job.operation === 'cancel'
-		? new Request(`https://do/cancel?reminderId=${id}&jobToken=${job.job_token}`, { method: 'DELETE' })
-		: new Request('https://do/schedule', { method: 'PUT', body: JSON.stringify({ ...JSON.parse(job.payload_json), jobToken: job.job_token }) }));
+const scheduled = { due_datetime: expect.any(String) as string, due_at: expect.any(Number) as number };
+/** Runs a dispatcher pass with every scheduled attempt brought forward. */
+async function deliver() {
+	await env.DB.prepare('UPDATE reminder_projections SET due_at = ? WHERE due_at IS NOT NULL').bind(Date.now()).run();
+	await deliverDueReminders(env);
 }
 async function legacy(content?: (valid: string) => string) {
 	const due = new Date(Date.now() + 60_000).toISOString();
@@ -46,8 +48,7 @@ async function legacy(content?: (valid: string) => string) {
 	const row = await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind(path).first<{ storage_key: string }>();
 	const file = { ...published, storageKey: row!.storage_key };
 	await drainNotificationProjections(env);
-	const alarmState = state(); const alarm = new ReminderAlarm(alarmState as never, env);
-	expect((await sendCommand(alarm)).status).toBe(200);
+	expect(await command()).toMatchObject(scheduled);
 	if (content) {
 		// Construct an older-parser snapshot: these verified bytes were interpreted
 		// as an active reminder by that build, with its existing source/schedule rows.
@@ -56,23 +57,21 @@ async function legacy(content?: (valid: string) => string) {
 		await env.DB.prepare('UPDATE files SET hash = ?, size = ? WHERE path = ?').bind(await sha256Hex(bytes), new TextEncoder().encode(bytes).length, path).run();
 	}
 	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = ?').bind(REMINDER_CACHE_PARSER_VERSION - 1).run();
-	return { due, valid, file, alarm, alarmState };
+	return { due, valid, file };
 }
 
 it('blocks old queued and installed ghost schedules, then conclusively cancels them without changing bytes', async () => {
 	const h = await legacy(text => `\`\`\`markdown\n${text}\n\`\`\``);
 	await env.DB.prepare('DELETE FROM reminder_source_state').run(); // Schema-3 deployments have no authority rows.
-	await h.alarm.alarm();
+	await deliver();
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
-	expect((await sendCommand(new ReminderAlarm(state() as never, env))).status).toBe(409);
 	expect(await revalidateReminderSources(env, 3)).toBe(false);
 	await drainNotificationProjections(env);
-	expect(await command()).toMatchObject({ operation: 'cancel' });
+	// The reminder is gone from the reparsed note, and its schedule with it.
+	expect(await command()).toBeNull();
 	expect((await env.DB.prepare('SELECT * FROM reminder_sources').all()).results).toEqual([]);
-	expect((await sendCommand(h.alarm)).status).toBe(200);
-	await h.alarm.alarm();
+	await deliver();
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
-	expect(await env.DB.prepare('SELECT * FROM scheduled_reminders').first()).toBeNull();
 	expect(await (await env.BUCKET.get(h.file.storageKey))?.text()).toBe(`\`\`\`markdown\n${h.valid}\n\`\`\``);
 	expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(1);
 });
@@ -81,14 +80,13 @@ it('preserves first observation and resumes a genuine occurrence delayed across 
 	const h = await legacy();
 	const observed = await env.DB.prepare('SELECT first_seen_at FROM reminder_occurrences').first();
 	vi.spyOn(Date, 'now').mockReturnValue(Date.parse(h.due) + 60_000);
-	await h.alarm.alarm();
+	await deliver();
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
 	await revalidateReminderSources(env, 3);
 	await drainNotificationProjections(env);
 	expect(await env.DB.prepare('SELECT first_seen_at FROM reminder_occurrences').first()).toEqual(observed);
-	expect(await command()).toMatchObject({ operation: 'schedule' });
-	expect((await sendCommand(h.alarm)).status).toBe(200);
-	await h.alarm.alarm();
+	expect(await command()).toMatchObject(scheduled);
+	await deliver();
 	expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
 });
 
@@ -101,7 +99,7 @@ it('rediscovers CRLF tasks omitted by the previous parser without rewriting thei
 	expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state WHERE file_path = ?').bind(path).first())
 		.toEqual({ verified: 1, parser_version: REMINDER_CACHE_PARSER_VERSION });
 	expect(await (await env.BUCKET.get(h.file.storageKey))?.text()).toBe(`${h.valid}\r\n`);
-	expect(await command()).toMatchObject({ operation: 'schedule' });
+	expect(await command()).toMatchObject(scheduled);
 });
 
 it('revalidates previously quarantined legacy descriptions without reuploading or changing file bytes', async () => {
@@ -117,7 +115,7 @@ it('revalidates previously quarantined legacy descriptions without reuploading o
 	expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state WHERE file_path = ?').bind(path).first())
 		.toEqual({ verified: 1, parser_version: REMINDER_CACHE_PARSER_VERSION });
 	expect(await env.DB.prepare('SELECT 1 FROM notification_file_retries').first()).toBeNull();
-	expect(await command()).toMatchObject({ operation: 'schedule' });
+	expect(await command()).toMatchObject(scheduled);
 	const list = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env);
 	expect(list.status).toBe(200);
 	expect(await list.json()).toMatchObject({ reminders: [{ description }], issues: [] });
@@ -134,13 +132,14 @@ it('quarantines uncertain legacy metadata and permits repair without deriving ca
 	expect(await command()).toEqual(prior);
 	expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state').first()).toEqual({ verified: 0, parser_version: REMINDER_CACHE_PARSER_VERSION });
 	expect(await env.DB.prepare('SELECT last_error FROM notification_projection_jobs').first()).toMatchObject({ last_error: expect.stringContaining('Repair') as string });
-	await h.alarm.alarm();
+	await deliver();
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
 	const file = await env.DB.prepare('SELECT hash FROM files WHERE path = ?').bind(path).first<{ hash: string }>();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, h.valid, file!.hash);
 	await drainNotificationProjections(env);
-	expect(await command()).toMatchObject({ operation: 'schedule' });
-	expect((await sendCommand(h.alarm)).status).toBe(200);
+	expect(await command()).toMatchObject(scheduled);
+	await deliver();
+	expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
 });
 
 it('bounds R2 reparsing to 2 MiB and resumes source migration in later invocations', async () => {
@@ -169,7 +168,7 @@ it('does not publish a parsed older revision over a concurrent new file commit',
 	});
 	await revalidateReminderSources(env, 3);
 	await drainNotificationProjections(env);
-	expect(await command()).toMatchObject({ payload_json: expect.stringContaining('Edited while migrating') as string });
+	expect(await command()).toMatchObject({ content: expect.stringContaining('Edited while migrating') as string });
 	const current = await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind(path).first<{ storage_key: string }>();
 	expect(await env.DB.prepare('SELECT file_revision, verified FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ file_revision: current!.storage_key, verified: 1 });
 });
@@ -207,7 +206,7 @@ it('retains genuine duplicate quarantine while an older parser source is revalid
 	await drainNotificationProjections(env);
 	expect((await env.DB.prepare('SELECT last_error FROM notification_projection_jobs').all()).results).toHaveLength(2);
 	expect(JSON.stringify((await env.DB.prepare('SELECT last_error FROM notification_projection_jobs').all()).results)).toContain('Duplicate');
-	await h.alarm.alarm();
+	await deliver();
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
 });
 
@@ -245,17 +244,25 @@ it('bounds each migration, projection and dispatch invocation and resumes every 
 	for (let pass = 0; pass < 12; pass++) {
 		const count = counts.get('projection')!;
 		count.queries = 0;
-		const dispatch = await runNotificationCoordinator(state() as never, runtime);
+		const pass = await runNotificationCoordinator(state() as never, runtime);
 		peaks.set('projection', Math.max(peaks.get('projection') ?? 0, count.queries));
 		expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
-		// The coordinator alarm dispatches after its locked pass.
-		if (dispatch) await dispatchNotificationJobs(runtime, true);
+		// The coordinator alarm wakes the dispatcher after its locked pass.
+		if (pass.wrote && typeof pass.dispatchAt === 'number') expect(await armReminderDispatcher(runtime, pass.dispatchAt)).toBe(true);
 	}
-	expect(peaks.get('__crate__/notification-dispatch')).toBeGreaterThan(0);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_source_state WHERE verified = 1 AND parser_version = ?')
 		.bind(REMINDER_CACHE_PARSER_VERSION).first()).toEqual({ n: 3 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 9 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_jobs').first()).toEqual({ n: 0 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at = ?').bind(Date.parse(due)).first()).toEqual({ n: 9 });
+	// One dispatcher pass delivers all nine within its own budget.
+	await env.DB.prepare('UPDATE reminder_projections SET due_at = ?').bind(Date.now()).run();
+	const dispatcher = alarms.get('__crate__/notification-dispatch')!;
+	const count = counts.get('__crate__/notification-dispatch')!;
+	count.queries = 0;
+	await dispatcher.alarm();
+	expect(count.queries).toBeGreaterThan(0);
+	expect(count.queries).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
+	expect(sendToAllSubscriptions).toHaveBeenCalledTimes(9);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE delivered_due = ? AND due_at IS NULL').bind(due).first()).toEqual({ n: 9 });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_projection_jobs').first()).toEqual({ n: 0 });
 });
 
@@ -272,7 +279,7 @@ it('quarantines previously indexed invalid UTF-8 without changing source bytes o
 	await drainNotificationProjections(env);
 	expect(await command()).toEqual(prior);
 	expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state').first()).toEqual({ verified: 0, parser_version: REMINDER_CACHE_PARSER_VERSION });
-	await h.alarm.alarm();
+	await deliver();
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
 	expect(new Uint8Array(await (await env.BUCKET.get(h.file.storageKey))!.arrayBuffer())).toEqual(bytes);
 });

@@ -1,6 +1,6 @@
 import { featureEnabled } from '../server/feature-policy';
 import type { FeaturePolicy } from '../../../protocol/feature-policy';
-import { planNotificationOperations, readExistingNotifications, type NotificationOperation } from './projection-plan';
+import { NOTIFICATION_DELIVERY_WINDOW_MS, planNotificationOperations, readExistingNotifications, type NotificationOperation } from './projection-plan';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { recordFileFailure } from './file-retries';
 import { READY_PROJECTION_JOBS_SQL } from './queue';
@@ -47,18 +47,19 @@ function operationChunks(operations: ReturnType<typeof planNotificationOperation
 
 const AWAITING_VERIFICATION = 'Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.';
 
-/** Bounded projection of committed files. Client reminder snapshots never schedule or cancel. */
+/** Bounded projection of committed files. Client reminder snapshots never schedule or cancel.
+ * Returns whether a commit wrote a schedule, so the dispatcher may need an earlier alarm. */
 export async function drainNotificationProjections(env: Env, limit = 4, loaded?: {
 	features: FeaturePolicy; policy: NotificationPolicy | null; encryption: EncryptionServerState | null;
 	/** Bytes source verification already read in this pass. */
 	verified?: Map<string, VerifiedSourceBytes>;
-}): Promise<void> {
-	if (!(loaded ? loaded.features.reminders : await featureEnabled(env.DB, 'reminders'))) return;
+}): Promise<boolean> {
+	if (!(loaded ? loaded.features.reminders : await featureEnabled(env.DB, 'reminders'))) return false;
 	const policy = loaded ? loaded.policy : await getNotificationPolicy(env.DB);
-	if (!policy) return;
+	if (!policy) return false;
 	const jobs = await queryRows<{ path: string; job_token: string }>(env.DB.prepare(
 		READY_PROJECTION_JOBS_SQL).bind(JSON.stringify([...loaded?.verified?.keys() ?? []]), limit, limit, limit));
-	if (!jobs.length) return;
+	if (!jobs.length) return false;
 	const encrypted = (loaded ? loaded.encryption : await readEncryptionState(env.DB))?.mode === 'active';
 	// Read every job's file, verification, source and projection rows once. Projection
 	// commits write only the projection rows, which are used to detect shared reminders
@@ -127,6 +128,7 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 		duplicateReminderIds(env.DB, policy.folderPath, ids),
 		new Set(touched).size === touched.length ? readExistingNotifications(env.DB, ids) : null,
 	]);
+	let scheduled = false;
 	for (const entry of parsed) {
 		const { job } = entry;
 		try {
@@ -150,13 +152,10 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 			const token = crypto.randomUUID();
 			const current = existing ?? await readExistingNotifications(env.DB, operations.map(operation => operation.id));
 			const plan = planNotificationOperations(current, operations, token);
-			// Only changed alarms are enqueued, and a projection row already naming this file and
-			// token needs no upsert. When jobs of this pass share reminders, `projectedRows` may be
-			// stale, so every projection row is upserted.
+			// A projection row already naming this file and token needs no upsert. When jobs of
+			// this pass share reminders, `projectedRows` may be stale, so every row is upserted.
 			const projected = new Set(existing ? projectedRows.filter(row => row.file_path === job.path).map(row => row.reminder_id) : []);
-			const enqueued = plan.filter(entry => entry.enqueue);
 			const reprojected = plan.filter(entry => !projected.has(entry.id) || current.get(entry.id)?.token !== entry.token);
-			const chunks = enqueued.length ? operationChunks(enqueued) : [];
 			const projections = reprojected.length ? operationChunks(reprojected) : [];
 			const fileGuard = file ? fileRevisionGuard(job.path, file.storageKey)
 				: { sql: `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`, args: filePathArgs(job.path) };
@@ -164,32 +163,42 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
         AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
         AND ${fileGuard.sql} `;
 			const args = [job.path, job.job_token, policy.revision, ...fileGuard.args];
-			const upsertJob = `ON CONFLICT(reminder_id) DO UPDATE SET job_token = excluded.job_token,
-        operation = excluded.operation, payload_json = excluded.payload_json, attempts = 0, available_at = 0, last_error = NULL`;
-			// Only changed alarms need commands, and only changed rows are written. Delivery
-			// authority comes from the file's verified source state and the absence of a
-			// pending projection job, which this transaction removes. Every policy change
-			// queues a job for each projected file, so rows carry no policy revision.
-			// Reminders that left this file come from the pass's read: only this job's
-			// commit adds rows for its path, so an empty read means none left.
+			// Only changed rows are written, and each carries its schedule, so no separate
+			// command reaches the dispatcher. Delivery authority comes from the file's verified
+			// source state and the absence of a pending projection job, which this transaction
+			// removes. Every policy change queues a job for each projected file, so rows carry
+			// no policy revision. Reminders that left this file come from the pass's read:
+			// only this job's commit adds rows for its path, so an empty read means none left.
 			const departed = projectedRows.some(row => row.file_path === job.path && !ids.has(row.reminder_id));
+			const departedIds = JSON.stringify([...ids]);
+			// The same occurrence keeps its delivery progress: retry time, recipients and failure.
+			// A new one starts fresh, unless it is the occurrence already delivered.
+			const same = 'excluded.due_datetime IS reminder_projections.due_datetime';
 			await env.DB.batch([
-				// As for a reminder still in the file, one with no schedule and no job needs no cancel.
-				...(departed ? [env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
-          SELECT reminder_id, ?, 'cancel', NULL, 0, 0 FROM reminder_projections p WHERE file_path = ?
-          AND reminder_id NOT IN (SELECT value FROM json_each(?)) AND ${guard}
-          AND (EXISTS (SELECT 1 FROM scheduled_reminders s WHERE s.reminder_id = p.reminder_id)
-            OR EXISTS (SELECT 1 FROM notification_jobs j WHERE j.reminder_id = p.reminder_id)) ${upsertJob}`)
-					.bind(token, job.path, JSON.stringify([...ids]), ...args)] : []),
-				...chunks.map(json => env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
-          SELECT json_extract(value, '$.id'), json_extract(value, '$.token'), json_extract(value, '$.operation'), json_extract(value, '$.payload'), 0, 0
+				// A departed reminder keeps its delivered occurrence, so moving it to another note
+				// cannot notify again. Departures also remove detached rows past the delivery window.
+				...(departed ? [env.DB.prepare(`DELETE FROM reminder_projections WHERE file_path IS NULL
+          AND unixepoch(delivered_due) * 1000 < ? AND ${guard}`).bind(Date.now() - NOTIFICATION_DELIVERY_WINDOW_MS, ...args),
+				env.DB.prepare(`UPDATE reminder_projections SET file_path = NULL, notification_token = NULL,
+          due_datetime = NULL, content = NULL, project = NULL, due_at = NULL, attempts = 0,
+          pending_subscriptions = NULL, delivery_failed_at = NULL, last_error = NULL
+          WHERE file_path = ? AND reminder_id NOT IN (SELECT value FROM json_each(?)) AND delivered_due IS NOT NULL AND ${guard}`)
+					.bind(job.path, departedIds, ...args),
+				env.DB.prepare(`DELETE FROM reminder_projections WHERE file_path = ?
+          AND reminder_id NOT IN (SELECT value FROM json_each(?)) AND ${guard}`).bind(job.path, departedIds, ...args)] : []),
+				...projections.map(json => env.DB.prepare(`INSERT INTO reminder_projections
+          (reminder_id, file_path, notification_token, due_datetime, content, project, due_at)
+          SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.token'), json_extract(value, '$.payload.dueDatetime'),
+            json_extract(value, '$.payload.content'), json_extract(value, '$.payload.project'), json_extract(value, '$.dueAt')
           FROM json_each(?) WHERE ${guard}
-          ${upsertJob}`).bind(json, ...args)),
-				...(departed ? [env.DB.prepare(`DELETE FROM reminder_projections WHERE file_path = ?
-          AND reminder_id NOT IN (SELECT value FROM json_each(?)) AND ${guard}`).bind(job.path, JSON.stringify([...ids]), ...args)] : []),
-				...projections.map(json => env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, notification_token)
-          SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.token') FROM json_each(?) WHERE ${guard}
-          ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path, notification_token = excluded.notification_token
+          ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path, notification_token = excluded.notification_token,
+            due_datetime = excluded.due_datetime, content = excluded.content, project = excluded.project,
+            due_at = CASE WHEN excluded.due_datetime IS NULL THEN NULL WHEN ${same} THEN reminder_projections.due_at
+              WHEN excluded.due_datetime IS reminder_projections.delivered_due THEN NULL ELSE excluded.due_at END,
+            attempts = CASE WHEN ${same} THEN reminder_projections.attempts ELSE 0 END,
+            pending_subscriptions = CASE WHEN ${same} THEN reminder_projections.pending_subscriptions END,
+            delivery_failed_at = CASE WHEN ${same} THEN reminder_projections.delivery_failed_at END,
+            last_error = CASE WHEN ${same} THEN reminder_projections.last_error END
           WHERE reminder_projections.file_path IS NOT excluded.file_path
             OR reminder_projections.notification_token IS NOT excluded.notification_token`)
 					.bind(job.path, json, ...args)),
@@ -197,6 +206,7 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 				env.DB.prepare(`DELETE FROM notification_projection_jobs WHERE path = ? AND ${guard}`).bind(job.path, ...args),
 				...(cacheWrite ? [cacheWrite] : []),
 			]);
+			if (reprojected.some(entry => entry.operation === 'schedule')) scheduled = true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message.slice(0, 512) : 'Projection failed';
 			await env.DB.batch([
@@ -206,4 +216,5 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 			]);
 		}
 	}
+	return scheduled;
 }

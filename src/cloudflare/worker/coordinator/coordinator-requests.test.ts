@@ -15,7 +15,7 @@ it.each([
 	vi.mocked(scheduleMaintenance).mockClear();
 	const request = new Request(`https://test${path}`, { method, headers: { [INTERNAL_MUTATION_HEADER]: '1' } });
 	const response = await handleCoordinatorRequest(request, {} as DurableObjectState, {} as Env,
-		action => action(), async () => new Response(null, { status: 404 }));
+		action => action());
 	expect(response.status).toBe(204);
 	expect(scheduleMaintenance).toHaveBeenCalledTimes(arms ? 1 : 0);
 });
@@ -35,7 +35,7 @@ it('revokes a credential only while holding the coordinator lock', async () => {
 	const response = await handleCoordinatorRequest(request, {} as DurableObjectState, { DB: db } as unknown as Env, async action => {
 		locked = true;
 		try { return await action(); } finally { locked = false; }
-	}, async () => new Response(null, { status: 404 }));
+	});
 	expect(await response.json()).toEqual({ revoked: true });
 	expect(statements).toEqual([
 		'DELETE FROM push_subscriptions WHERE owner_token_id IN (?)',

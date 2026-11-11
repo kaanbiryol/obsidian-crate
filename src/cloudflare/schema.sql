@@ -44,28 +44,6 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
  reading_generation TEXT
 );
 
-CREATE TABLE IF NOT EXISTS scheduled_reminders (
-	delivery_failed_at TEXT,
-	reminder_id TEXT PRIMARY KEY,
-	schedule_token TEXT NOT NULL,
-	content TEXT NOT NULL,
-	project TEXT,
-	due_datetime TEXT NOT NULL
-) WITHOUT ROWID;
-
-CREATE TABLE IF NOT EXISTS notification_jobs (
-	reminder_id TEXT PRIMARY KEY,
-	job_token TEXT NOT NULL,
-	operation TEXT NOT NULL CHECK (operation IN ('schedule', 'cancel')),
-	payload_json TEXT,
-	attempts INTEGER NOT NULL DEFAULT 0,
-	available_at INTEGER NOT NULL,
-	last_error TEXT
-) WITHOUT ROWID;
-
-CREATE INDEX IF NOT EXISTS notification_jobs_available_at_idx
-	ON notification_jobs(available_at);
-
 CREATE TABLE IF NOT EXISTS vapid_keys (
 	id INTEGER PRIMARY KEY CHECK (id = 1),
 	public_key TEXT NOT NULL,
@@ -166,11 +144,23 @@ CREATE TABLE IF NOT EXISTS notification_projection_jobs (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS notification_projection_ready_idx
  ON notification_projection_jobs(updated_at, path) WHERE last_error IS NULL;
+-- One row per projected reminder, holding its delivery schedule. A row whose reminder
+-- left every note keeps only its delivered occurrence (file_path NULL) through the
+-- delivery window, so a move between notes cannot notify twice.
 CREATE TABLE IF NOT EXISTS reminder_projections (
  notification_token TEXT,
- reminder_id TEXT PRIMARY KEY, file_path TEXT NOT NULL
+ reminder_id TEXT PRIMARY KEY, file_path TEXT,
+ -- The scheduled occurrence and its push text, or NULL when nothing is scheduled.
+ due_datetime TEXT, content TEXT, project TEXT,
+ -- Next delivery attempt in ms, or NULL once delivered, failed or cancelled.
+ due_at INTEGER,
+ attempts INTEGER NOT NULL DEFAULT 0,
+ -- JSON array of subscription IDs still owed this occurrence, or NULL for every recipient.
+ pending_subscriptions TEXT,
+ delivered_due TEXT, delivery_failed_at TEXT, last_error TEXT
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS reminder_projections_path_idx ON reminder_projections(file_path);
+CREATE INDEX IF NOT EXISTS reminder_projections_due_idx ON reminder_projections(due_at) WHERE due_at IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS reminder_sources (
  file_path TEXT NOT NULL, reminder_id TEXT NOT NULL, due_key TEXT NOT NULL,

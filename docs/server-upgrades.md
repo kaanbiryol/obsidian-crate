@@ -139,9 +139,10 @@ counts as unconfirmed, and a vault without plugin data starts with both off.
 
 Pausing stops server APIs and background work without deleting sources, indexes,
 credentials, or queued work. Reading checks before fetching and publication;
-reminder alarms retain their occurrence and recipient progress without polling
-while paused. Resume queues existing schedules with the same identity, preserves
-completed deliveries, and wakes pending projections and extraction. Notification
+reminder schedules retain their occurrence, attempts and recipient progress, and the
+dispatcher keeps no alarm while paused. Resume rearms the dispatcher for the earliest
+schedule with the same identity, preserves completed deliveries, and wakes pending
+projections and extraction. Notification
 retry-age limits remain in effect; a pause does not make old notifications valid
 indefinitely. Requests already sent to websites or push providers cannot be recalled.
 

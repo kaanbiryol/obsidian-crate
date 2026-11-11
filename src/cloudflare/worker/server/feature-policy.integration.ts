@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
-import { reset } from 'cloudflare:test';
+import { reset, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { featurePolicy } from './feature-policy';
 import { handleFeaturePolicy } from './feature-policy-handler';
@@ -13,12 +13,10 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
-import { ReminderAlarm } from '../coordinator/reminder-alarm';
-import { sendToAllSubscriptions } from '../notifications/push';
+import { armReminderDispatcher } from '../coordinator/coordinator';
 import { handleAuthenticatedRoute, isAuthenticatedRouteAllowed } from '../router';
 import { authenticateWorkerRequest } from '../auth/authenticate';
 import { sha256Hex } from '@/platform/sha256';
-vi.mock('../notifications/push', () => ({ listPushSubscriptions: vi.fn(async () => [{ id: 'sub', endpoint: 'https://push.example/sub', p256dh: 'key', auth: 'auth' }]), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
 beforeEach(async () => {
 	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO auth_tokens(id,token_hash) VALUES ('vault','hash')").run();
@@ -28,13 +26,13 @@ const req = (path: string, body: unknown) => new Request(`https://test/${path}`,
 const reading = (path: string, body: Record<string, unknown>) => handleReadingRoute(req(`reading/${path}`, body), env, { tokenId: 'vault', scope: 'vault' });
 async function toggle(feature: 'reading' | 'reminders', enabled: boolean) {
 	const current = await featurePolicy(env.DB);
-	const response = await handleFeaturePolicy(req('features', { feature, enabled, revision: current.revision }), env.DB);
+	const response = await handleFeaturePolicy(req('features', { feature, enabled, revision: current.revision }), env);
 	expect(response.status, await response.clone().text()).toBe(200);
 }
 it('defaults on, rejects stale edits, and limits writes to vault credentials', async () => {
 	expect(await featurePolicy(env.DB)).toEqual({ reading: true, reminders: true, revision: null });
 	await toggle('reading', false);
-	expect((await handleFeaturePolicy(req('features', { feature: 'reminders', enabled: false, revision: null }), env.DB)).status).toBe(409);
+	expect((await handleFeaturePolicy(req('features', { feature: 'reminders', enabled: false, revision: null }), env)).status).toBe(409);
 	expect(await featurePolicy(env.DB)).toMatchObject({ reading: false, reminders: true });
 	expect(isAuthenticatedRouteAllowed({ tokenId: 'browser', scope: 'reminders' }, '/features', 'GET')).toBe(true);
 	expect(isAuthenticatedRouteAllowed({ tokenId: 'browser', scope: 'reminders' }, '/features', 'POST')).toBe(false);
@@ -75,31 +73,27 @@ it('retains notification state while paused, rearms on resume, and never repeats
 	const id = '11111111-1111-4111-8111-111111111111';
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', `- [ ] Task @2099-01-02T10:00:00.000Z <!-- crate-id:${id} -->`, null);
 	await drainNotificationProjections(env);
-	const values = new Map<string, unknown>(); let alarmTime: number | null = null;
-	const state = { storage: { get: async (key: string) => values.get(key), put: async (key: string, value: unknown) => { values.set(key, value); }, delete: async (key: string) => values.delete(key), deleteAll: async () => values.clear(), getAlarm: async () => alarmTime, setAlarm: async (value: number | Date) => { alarmTime = Number(value); }, deleteAlarm: async () => { alarmTime = null; } } };
-	const alarm = new ReminderAlarm(state as never, env);
-	const schedule = async () => {
-		const job = (await env.DB.prepare('SELECT job_token,payload_json FROM notification_jobs').first<{ job_token: string; payload_json: string }>())!;
-		const body = { ...JSON.parse(job.payload_json) as Record<string, unknown>, jobToken: job.job_token };
-		const response = await alarm.fetch(new Request('https://do/schedule', { method: 'PUT', body: JSON.stringify(body) }));
-		expect(response.status, await response.clone().text()).toBe(200);
-		await env.DB.prepare('DELETE FROM notification_jobs').run();
-	};
-	await schedule();
+	const dispatcher = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
+	const alarmTime = () => runInDurableObject(dispatcher, (_instance, state) => state.storage.getAlarm());
+	expect(await armReminderDispatcher(env)).toBe(true);
+	expect(await alarmTime()).toBe(Date.parse('2099-01-02T10:00:00.000Z'));
 	await toggle('reminders', false);
-	await alarm.alarm();
-	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
-	expect(alarmTime).toBeNull();
-	expect(await env.DB.prepare('SELECT 1 FROM scheduled_reminders').first()).not.toBeNull();
+	// Bring the attempt forward; the paused pass, which runs at once, sends nothing and leaves no alarm.
+	await env.DB.prepare('UPDATE reminder_projections SET due_at = ?').bind(Date.now()).run();
+	await runInDurableObject(dispatcher, (_instance, state) => state.storage.setAlarm(Date.now()));
+	await vi.waitFor(async () => expect(await alarmTime()).toBeNull());
+	expect(await env.DB.prepare('SELECT attempts, due_at IS NOT NULL AS scheduled, delivered_due FROM reminder_projections').first())
+		.toEqual({ attempts: 0, scheduled: 1, delivered_due: null });
 	expect(await env.DB.prepare('SELECT enabled FROM notification_policy').first()).toEqual({ enabled: 1 });
+	// Resuming arms the dispatcher for the overdue attempt, which delivers it. The Durable
+	// Object runs the bundled Worker, outside this file's push mock, with no recipients.
 	await toggle('reminders', true);
-	await schedule();
-	expect(alarmTime).not.toBeNull();
-	await alarm.alarm();
-	expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
+	await vi.waitFor(async () => expect(await env.DB.prepare('SELECT due_at, delivered_due FROM reminder_projections').first())
+		.toEqual({ due_at: null, delivered_due: '2099-01-02T10:00:00.000Z' }));
+	// Pausing and resuming again leaves nothing to deliver, so no alarm is armed.
 	await toggle('reminders', false); await toggle('reminders', true);
-	await alarm.alarm();
-	expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
+	expect(await alarmTime()).toBeNull();
+	expect(await runDurableObjectAlarm(dispatcher)).toBe(false);
 });
 
 

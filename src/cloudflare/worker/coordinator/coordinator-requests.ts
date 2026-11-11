@@ -5,8 +5,8 @@ import type { Env } from '../types';
 
 import { armReadingCoordinator, publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
-import { drainNotificationJobs } from '../notifications/outbox';
-import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, REMINDERS_ENABLED_HEADER, TRANSFER_PATHS } from './coordinator';
+import { armDispatcher } from '../notifications/dispatcher';
+import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, TRANSFER_PATHS } from './coordinator';
 import { uploadInitialFiles } from '../sync/import/initial-import-upload';
 import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/staging/bulk-upload-dispatch';
@@ -21,7 +21,7 @@ export type StateLock = <T>(action: () => Promise<T>) => Promise<T>;
 /** Preparation may read large bodies; only publication and state changes hold the lock. */
 export async function handleCoordinatorRequest(
 	request: Request, state: DurableObjectState, env: Env,
-	withStateLock: StateLock, handleReminder: () => Promise<Response>,
+	withStateLock: StateLock,
 ): Promise<Response> {
 	const path = new URL(request.url).pathname;
 	if ((path === TRANSFER_PATHS.syncUpload && request.method === 'PUT') || (path === TRANSFER_PATHS.syncBatchUpload && request.method === 'POST')) {
@@ -52,6 +52,12 @@ export async function handleCoordinatorRequest(
 	// pass holds this object's lock, and mutations must not wait for it.
 	if (path === COORDINATOR_PATHS.maintain && request.method === 'POST' && await state.storage.get<boolean>(MAINTENANCE_COORDINATOR_KEY)
 		&& await state.storage.getAlarm() !== null) return new Response(null, { status: 204 });
+	// The dispatcher takes its lock only to move its alarm.
+	if (path === COORDINATOR_PATHS.armDispatcher && request.method === 'POST') {
+		const { at } = await request.json() as { at?: unknown };
+		await armDispatcher(state, env, withStateLock, typeof at === 'number' && Number.isFinite(at) ? at : undefined);
+		return new Response(null, { status: 204 });
+	}
 	// Schedule cleanup before queuing, so a running maintenance pass delays only
 	// this request rather than every coordinated mutation behind it. Reads arm nothing.
 	if (request.headers.get(INTERNAL_MUTATION_HEADER) === '1' && isCrateMutation(path, request.method)) await scheduleMaintenance(env, state);
@@ -64,10 +70,6 @@ export async function handleCoordinatorRequest(
 			await publishExtraction(env, await request.json() as Publication);
 			return new Response(null, { status: 204 });
 		}
-		if (path === COORDINATOR_PATHS.dispatchJobs && request.method === 'POST') {
-			await drainNotificationJobs(env, undefined, request.headers.get(REMINDERS_ENABLED_HEADER) === '1' || undefined);
-			return new Response(null, { status: 204 });
-		}
 		if (path === TRANSFER_PATHS.historyCheckpoint && request.method === 'GET') return getSharedCheckpoint(request, env.BUCKET);
 		if (path === TRANSFER_PATHS.historyCheckpointFile && request.method === 'GET') return downloadCheckpointFile(request, env.BUCKET, env.DB);
 		if (path === TRANSFER_PATHS.batchDownload && request.method === 'POST') return handleBatchDownload(request, env.BUCKET, env.DB);
@@ -75,7 +77,7 @@ export async function handleCoordinatorRequest(
 			// One unpublished batch at a time bounds decoded attachment memory.
 			return uploadInitialFiles(request, env.BUCKET, env.DB);
 		}
-		return await handleLockedCoordinatorRequest(request, state, env) ?? handleReminder();
+		return await handleLockedCoordinatorRequest(request, state, env) ?? new Response('Not found', { status: 404 });
 	});
 }
 

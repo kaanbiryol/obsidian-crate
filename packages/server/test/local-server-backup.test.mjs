@@ -21,15 +21,13 @@ test('verified backup restores files, credentials and durable alarm storage into
 		await runtime.db.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('backup.txt', 'backup.txt', 'backup-test')").run();
 		await runtime.db.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'UTC', 'policy', 1)").run();
 		await runtime.db.prepare("INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified) VALUES ('backup.txt', 'backup-test', ?, 1)").bind(parserVersion).run();
-		await runtime.db.prepare("INSERT INTO reminder_projections(reminder_id, file_path, notification_token) VALUES ('backup-reminder', 'backup.txt', 'job')").run();
-		await runtime.db.prepare("INSERT INTO notification_jobs(reminder_id, job_token, operation, payload_json, available_at) VALUES ('backup-reminder', 'job', 'schedule', '{}', ?)").bind(Date.now() + 60_000).run();
+		const due = new Date(Date.now() + 10_000).toISOString();
+		await runtime.db.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, notification_token, due_datetime, content, due_at)
+			VALUES ('backup-reminder', 'backup.txt', 'job', ?, 'Restored alarm', ?)`).bind(due, Date.parse(due)).run();
 		const namespace = await runtime.mf.getDurableObjectNamespace('REMINDER_ALARMS');
-		const response = await namespace.get(namespace.idFromName('backup-reminder')).fetch('https://do/', {
-			method: 'PUT', body: JSON.stringify({ reminderId: 'backup-reminder', jobToken: 'job', content: 'Restored alarm', dueDatetime: new Date(Date.now() + 10_000).toISOString() }),
-		});
-		assert.equal(response.status, 200);
+		const response = await namespace.get(namespace.idFromName('__crate__/notification-dispatch')).fetch('https://do/arm-dispatcher', { method: 'POST', body: '{}' });
+		assert.equal(response.status, 204);
 		await response.text();
-		assert.ok(await runtime.db.prepare("SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = 'backup-reminder'").first());
 		await assert.rejects(backupLocalServer(source, backup), /locked/);
 		await runtime.close(); runtime = null;
 		const before = await readFile(join(source, 'server.json'), 'utf8');
@@ -46,8 +44,8 @@ test('verified backup restores files, credentials and durable alarm storage into
 		assert.equal(await (await (await runtime.mf.getR2Bucket('BUCKET')).get('backup-test')).text(), 'persistent bytes');
 		assert.equal((await runtime.mf.dispatchFetch('http://localhost:8787/health', { headers: { Authorization: `Bearer ${credential.token}` } })).status, 200);
 		const deadline = Date.now() + 15_000;
-		while (await runtime.db.prepare("SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = 'backup-reminder'").first()) {
-			assert.ok(Date.now() < deadline, 'Restored durable alarm must wake and finish its empty-recipient delivery');
+		while (!await runtime.db.prepare("SELECT reminder_id FROM reminder_projections WHERE reminder_id = 'backup-reminder' AND delivered_due IS NOT NULL").first()) {
+			assert.ok(Date.now() < deadline, 'Restored dispatcher alarm must wake and finish its empty-recipient delivery');
 			await delay(100);
 		}
 		await runtime.close(); runtime = null;

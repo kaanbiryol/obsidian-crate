@@ -81,7 +81,7 @@ for (const policy of ['none', 'outside', 'inside']) {
 		if (policy === 'inside') expect((await quarantine(path))?.last_error).toBeNull();
 		else expect(await quarantine(path)).toBeNull();
 		await drainNotificationProjections(env);
-		if (policy === 'inside') expect(await rows('notification_jobs')).toMatchObject([{ reminder_id: id, operation: 'schedule' }]);
+		if (policy === 'inside') expect(await rows('reminder_projections')).toMatchObject([{ reminder_id: id, due_at: expect.any(Number) as number }]);
 	});
 }
 
@@ -90,7 +90,7 @@ it('quarantines an uncertain replacement without cancelling or changing verified
 	const path = 'Reminders/Inbox.md';
 	const first = await put(path, valid);
 	await drainNotificationProjections(env);
-	const tables = ['reminder_sources', 'reminder_occurrences', 'reminder_projections', 'notification_jobs'];
+	const tables = ['reminder_sources', 'reminder_occurrences', 'reminder_projections'];
 	const before = await Promise.all(tables.map(rows));
 	const changed = await put(path, invalid.replace('- [ ]', '- [x]'), first.hash);
 	await retryProjection();
@@ -109,7 +109,7 @@ it('quarantines an uncertain replacement without cancelling or changing verified
 	expect(await quarantine(path)).toBeNull();
 	const list = await request('/reminders/list?folderPath=Reminders');
 	expect(await list.json()).toMatchObject({ issues: [] });
-	expect(await env.DB.prepare('SELECT payload_json FROM notification_jobs WHERE reminder_id = ?').bind(id).first()).toMatchObject({ payload_json: expect.stringContaining('Repaired') as string });
+	expect(await env.DB.prepare('SELECT content FROM reminder_projections WHERE reminder_id = ?').bind(id).first()).toMatchObject({ content: expect.stringContaining('Repaired') as string });
 });
 
 it('publishes quarantine atomically even when the D1 commit response is lost', async () => {
@@ -133,7 +133,8 @@ it.each([{ kind: 'malformed', content: invalid }, { kind: 'oversized', content: 
 	const policy = await env.DB.prepare('SELECT revision FROM notification_policy').first<{ revision: string }>();
 	expect((await request('/reminders/notification-policy', { method: 'PUT', body: JSON.stringify({ folderPath: 'Other', timezone: 'UTC', allDayTime: '09:00', expectedRevision: policy!.revision }) })).status).toBe(200);
 	await drainNotificationProjections(env);
-	expect(await rows('notification_jobs')).toMatchObject([{ reminder_id: id, operation: 'cancel' }]);
+	// The reminder left the folder, so its schedule row is gone.
+	expect(await rows('reminder_projections')).toEqual([]);
 	expect(await quarantine(path)).toBeNull();
 });
 
@@ -147,7 +148,7 @@ it('permits explicit deletion of a quarantined source to cancel its verified rem
 	await drainNotificationProjections(env);
 	expect(await quarantine(path)).toBeNull();
 	expect(await rows('reminder_sources')).toEqual([]);
-	expect(await rows('notification_jobs')).toMatchObject([{ reminder_id: id, operation: 'cancel' }]);
+	expect(await rows('reminder_projections')).toEqual([]);
 });
 
 it('does not publish quarantine for a failed compare-and-swap or rolled-back transaction', async () => {

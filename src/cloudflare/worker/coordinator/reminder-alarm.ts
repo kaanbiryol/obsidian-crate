@@ -2,14 +2,13 @@ import { handleCoordinatorRequest } from './coordinator-requests';
 import { runCoordinatorAlarm } from './coordinator-alarms';
 import { withD1Usage } from '../d1/d1-usage';
 import type { Env } from '../types';
-import { deliverScheduledReminder, handleReminderScheduleRequest, type ReminderScheduleContext } from '../notifications/reminder-schedule';
 
 export class ReminderAlarm implements DurableObject {
 	private stateWrites: Promise<void> = Promise.resolve();
 	private deliveries: Promise<void> = Promise.resolve();
 
-	// Serialize short state transitions, but allow a new schedule to arrive while
-	// a push request is in flight. Every delivery write checks its schedule token.
+	// Serialize short state transitions, but let the dispatcher be armed while a push
+	// request is in flight. Every delivery write checks its occurrence.
 	private withStateLock<T>(action: () => Promise<T>): Promise<T> {
 		const result = this.stateWrites.then(action);
 		this.stateWrites = result.then(() => undefined, () => undefined);
@@ -26,8 +25,7 @@ export class ReminderAlarm implements DurableObject {
 	}
 
 	private fetchMeasured(request: Request, env: Env): Promise<Response> {
-		return handleCoordinatorRequest(request, this.state, env,
-			action => this.withStateLock(action), () => handleReminderScheduleRequest(request, this.scheduleContext(env)));
+		return handleCoordinatorRequest(request, this.state, env, action => this.withStateLock(action));
 	}
 
 	alarm(): Promise<void> {
@@ -39,11 +37,6 @@ export class ReminderAlarm implements DurableObject {
 	}
 
 	private async handleAlarm(): Promise<void> {
-		if (await runCoordinatorAlarm(this.state, this.env as Env, action => this.withStateLock(action))) return;
-		await deliverScheduledReminder(this.scheduleContext(this.env as Env));
-	}
-
-	private scheduleContext(env: Env): ReminderScheduleContext {
-		return { state: this.state, env, withStateLock: action => this.withStateLock(action) };
+		await runCoordinatorAlarm(this.state, this.env as Env, action => this.withStateLock(action));
 	}
 }

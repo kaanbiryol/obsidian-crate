@@ -23,7 +23,7 @@ locally during the pause. There is no expiry on committed import progress.
 
 Upload completion verifies the inventory checksum and records one sync baseline.
 The client then shows “Preparing reminder schedules” until the selected folder has
-been verified, projected and its schedule/cancel queue has drained. A durable
+been verified and projected; projection writes each schedule in the same commit. A durable
 marker resumes this phase after a restart without uploading unchanged files.
 Reminder errors keep setup incomplete and are surfaced to the user; reminders
 already overdue when first indexed do not receive catch-up notifications. Later
