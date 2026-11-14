@@ -98,7 +98,8 @@ describe('reminder draft content helpers', () => {
 	it('rebuilds content with selected metadata and trailing edit space', () => {
 		const content = rebuildReminderContent(
 			'Task',
-			'2026-04-03T15:30:00.000Z',
+			// 15:30 local time, so the day is Apr 3 in every time zone.
+			new Date(2026, 3, 3, 15, 30).toISOString(),
 			undefined,
 			'Work',
 			1,

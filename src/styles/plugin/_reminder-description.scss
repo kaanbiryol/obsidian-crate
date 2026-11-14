@@ -16,3 +16,30 @@
 .crate-reminder-description__text:hover {
 	color: var(--text-normal);
 }
+
+/* The same description on its reminder's line as its text to edit, while the cursor is on the reminder or in it. */
+.crate-reminder-description-source {
+	color: var(--text-muted);
+	font-size: var(--font-smaller);
+}
+
+/* A description typed after ` //` on a reminder line: the description's bar in place of the separator, then the text as it will read under the title. */
+.crate-reminder-description-marker {
+	display: inline-block;
+	height: 1em;
+	/* Space after the bar is padding, inside the element, so a cursor after it sits clear of the bar. */
+	margin-inline-start: var(--size-4-3);
+	padding-inline-end: var(--size-4-2);
+	border-inline-start: var(--blockquote-border-thickness) solid var(--blockquote-border-color);
+	vertical-align: -0.15em;
+}
+
+.crate-reminder-description-phrase {
+	color: var(--text-muted);
+	font-size: var(--font-smaller);
+}
+
+.crate-reminder-description-break {
+	margin-inline: var(--size-4-1);
+	color: var(--text-faint);
+}

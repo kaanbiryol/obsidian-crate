@@ -2,18 +2,21 @@ import { parseCheckboxLine, type ParsedCheckbox } from '../core/grammar/checkbox
 import { UnresolvedReminderScheduleError } from '../core/grammar/reminderParser';
 import { findAllMatches } from '../core/grammar/richTextMatchers';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
-import { isReminderOverdue, isStoredReminderDate, isStoredReminderDatetime } from '../core/dates/reminderDate';
+import { formatLocalDateKey, isReminderOverdue, isStoredReminderDate, isStoredReminderDatetime, parseReminderDateValue } from '../core/dates/reminderDate';
 import { formatDueDate } from '../ui/format/dateFormatting';
+import { inlineDescription } from './inline-description';
 
 /**
  * How a reminder line's schedule shows in a note, relative to the line's start:
  * a saved date as a chip, a typed phrase with the date saving will write, or a
- * phrase that cannot become a date with the parser's error.
+ * phrase that cannot become a date with the parser's error, and a description
+ * typed after ` //` that leaving the line moves under the reminder.
  */
 export type ReminderDateDisplay =
-	| { kind: 'chip'; from: number; to: number; label: string; overdue: boolean }
-	| { kind: 'phrase'; from: number; to: number; label: string }
-	| { kind: 'error'; from: number; to: number; message: string };
+	| { kind: 'chip'; from: number; to: number; label: string; overdue: boolean; typed?: true }
+	| { kind: 'phrase'; from: number; to: number; label: string; overdue: boolean }
+	| { kind: 'error'; from: number; to: number; message: string }
+	| { kind: 'description'; from: number; start: number; to: number; breaks: number[] };
 
 const TASK_WITH_TEXT = /^\s*-\s*\[[ xX]\]\s*\S/;
 
@@ -49,12 +52,13 @@ function typedSchedule(text: string, now: Date): ReminderDateDisplay | null {
 	let saved: string;
 	try { saved = normalizeReminderScheduleLine(text); } catch { return null; }
 	const display = saved === text ? null : reminderDateDisplay(saved, now);
-	return display?.kind === 'chip' ? { kind: 'phrase', from: range.from, to: range.to, label: display.label } : null;
+	return display?.kind === 'chip' ? { kind: 'phrase', from: range.from, to: range.to, label: display.label, overdue: display.overdue } : null;
 }
 
-/** A reminder line's schedule display, or null for lines without one. */
-export function reminderDateDisplay(text: string, now = new Date()): ReminderDateDisplay | null {
-	if (!TASK_WITH_TEXT.test(text)) return null;
+/** A reminder line's schedule display, or null for lines without one. A typed description's dates are not its schedule. */
+export function reminderDateDisplay(line: string, now = new Date()): ReminderDateDisplay | null {
+	if (!TASK_WITH_TEXT.test(line)) return null;
+	const description = inlineDescription(line), text = description ? line.slice(0, description.from) : line;
 	let checkbox: ParsedCheckbox | null;
 	try {
 		checkbox = parseCheckboxLine(text, { persisted: true });
@@ -65,13 +69,62 @@ export function reminderDateDisplay(text: string, now = new Date()): ReminderDat
 	return checkbox && savedChip(text, checkbox, now);
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 /**
- * A saved date chip that runs `activate` when selected. Presses never reach the
- * editor: the browser would place its cursor beside the chip, which shows the
- * line's text and removes the chip before the click arrives.
+ * English phrases the date parser reads as `date`, shortest first. The local
+ * `YYYY-MM-DD` form comes last: past dates are only read in that form.
  */
+function datePhrases(date: Date, hasTime: boolean, now: Date): string[] {
+	const relative = (days: number) => {
+		const day = new Date(now);
+		day.setDate(day.getDate() + days);
+		return formatLocalDateKey(day);
+	};
+	const key = formatLocalDateKey(date), day = `${MONTHS[date.getMonth()]} ${date.getDate()}`;
+	const named = key === relative(0) ? ['today'] : key === relative(1) ? ['tomorrow'] : key === relative(-1) ? ['yesterday'] : [];
+	const days = [...named, day, `${day} ${date.getFullYear()}`, key];
+	const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+	return days.map(text => hasTime ? `${text} ${time}` : text);
+}
+
+/**
+ * A saved date's chip range and a phrase to edit in its place, which saving
+ * turns back into exactly the same line; null when no phrase does, as for some
+ * repeat rules.
+ */
+export function editableDatePhrase(text: string, now = new Date()): { from: number; to: number; phrase: string } | null {
+	const display = reminderDateDisplay(text, now);
+	if (display?.kind !== 'chip') return null;
+	const stored = text.slice(display.from, display.to), hasTime = isStoredReminderDatetime(stored);
+	const date = parseReminderDateValue(stored, hasTime);
+	if (!date) return null;
+	for (const phrase of datePhrases(date, hasTime, now)) {
+		const edited = text.slice(0, display.from) + phrase + text.slice(display.to);
+		try {
+			if (normalizeReminderScheduleLine(edited) === text) return { from: display.from, to: display.to, phrase };
+		} catch { /* Not a phrase the parser takes; try a longer one. */ }
+	}
+	return null;
+}
+
+/** A reminder line's schedule display and typed description, in line order. */
+export function reminderLineDisplays(text: string, now = new Date()): ReminderDateDisplay[] {
+	const schedule = reminderDateDisplay(text, now), description = TASK_WITH_TEXT.test(text) ? inlineDescription(text) : null;
+	return [...schedule ? [schedule] : [], ...description ? [{ kind: 'description' as const, from: description.from, start: description.start, to: description.to, breaks: description.breaks }] : []];
+}
+
+/** A saved date chip that runs `activate` when selected. */
 export function createReminderDateChip(label: string, overdue: boolean, activate: (element: HTMLElement) => void): HTMLElement {
-	const element = createSpan({ cls: ['crate-reminder-date', ...overdue ? ['is-overdue'] : []], text: label, attr: { role: 'button' } });
+	return pressable(createSpan({ cls: ['crate-reminder-date', ...overdue ? ['is-overdue'] : []], text: label, attr: { role: 'button' } }), activate);
+}
+
+/**
+ * Runs `activate` when `element` is selected. Presses never reach the editor:
+ * the browser would place its cursor beside the element, which shows the line's
+ * text and removes the element before the click arrives.
+ */
+function pressable(element: HTMLElement, activate: (element: HTMLElement) => void): HTMLElement {
 	element.addEventListener('mousedown', event => event.preventDefault());
 	element.addEventListener('click', event => {
 		event.preventDefault();

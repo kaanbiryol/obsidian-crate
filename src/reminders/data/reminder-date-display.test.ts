@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reminderDateDisplay } from './reminder-date-display';
+import { reminderDateDisplay, reminderLineDisplays } from './reminder-date-display';
 import { formatDueDate } from '../ui/format/dateFormatting';
 import { parseReminderContent } from '../core/grammar/reminderParser';
 
@@ -69,5 +69,14 @@ describe('typed reminder dates', () => {
 	it('finds the phrase the reminder editor parses, not the first match in the line', () => {
 		const text = '- [ ] Move tomorrow lunch to friday';
 		expect(covered(text)).toEqual({ kind: 'phrase', text: parseReminderContent('Move tomorrow lunch to friday').datePart });
+	});
+});
+
+describe('typed descriptions', () => {
+	it('takes the schedule from the title and marks the description', () => {
+		const text = '- [ ] Call Mia 2026-12-24 // before friday <!-- crate-id:a -->';
+		expect(reminderLineDisplays(text, now).map(found => `${found.kind}:${text.slice(found.from, found.to)}`))
+			.toEqual(['chip:2026-12-24', 'description: // before friday']);
+		expect(covered('- [ ] Call Mia // before friday')).toBeNull();
 	});
 });

@@ -27,6 +27,7 @@
 		"tests/reading-extraction/*.ts"
 	],
 	"ignoreDependencies": [
+		"@codemirror/commands",
 		"@plugin-build/styles.css",
 		"cloudflare",
 		"electron",

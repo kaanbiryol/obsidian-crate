@@ -63,6 +63,7 @@ export const browserScripts = [
 	'tests/browser/reading/reading-touch-test.mjs',
 	'tests/browser/reading/reading-appearance-test.mjs',
 	'tests/browser/plugin/shared-press-feedback-test.mjs',
+	'tests/browser/plugin/reminder-live-editing-test.mjs',
 ];
 
 // Plugin UI groups run on their own (`--group <name>`) after `npm run build`; CI

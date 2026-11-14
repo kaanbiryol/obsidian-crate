@@ -46,7 +46,7 @@ describe("reminder view models", () => {
 
 	it("groups today, overdue, and completed-due-today reminders", () => {
 		vi.useFakeTimers();
-		vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
+		vi.setSystemTime(new Date(2026, 0, 10, 9));
 
 		const viewModel = buildTodayViewModel([
 			makeReminder({ id: "today", dueDate: "2026-01-10" }),
@@ -73,7 +73,7 @@ describe("reminder view models", () => {
 
 	it("builds the upcoming reminder order and project stats/details", () => {
 		vi.useFakeTimers();
-		vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
+		vi.setSystemTime(new Date(2026, 0, 10, 9));
 
 		const reminders = [
 			makeReminder({ id: "work-active", project: "Work", dueDate: "2026-01-11" }),

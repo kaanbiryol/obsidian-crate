@@ -1,8 +1,11 @@
 import { EditorSelection, EditorState, StateField, Transaction, type ChangeSpec, type Line, type SelectionRange, type Text, type TransactionSpec } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { normalizeReminderIds } from '../core/normalizeReminderIds';
+import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { readDescriptionBlock } from '../core/reminderDescription';
 import { extractReminderId, findReminderIdMarker } from '../core/reminderIdentity';
+import { DescriptionBreakWidget, DescriptionMarkerWidget } from './description-widgets';
+import { inlineDescriptionChanges } from './inline-description';
 
 /** The part of a view update that decides which lines a cursor left. */
 interface LineLeave {
@@ -16,36 +19,62 @@ interface LineLeave {
 /** A task with text. Only these can gain an ID, so leaving any other line skips reading the whole note. */
 const TASK_WITH_TEXT = /^\s*-\s*\[[ xX]\]\s*\S/;
 
-/**
- * Identifies reminder lines the cursor just left, so a new reminder gets its ID
- * when the user moves on instead of after the next save and scan. The scan still
- * owns collision repair and lines edited outside an editor.
- */
-export function reminderIdChangesForLeftLines({ startState, state, changes, wasFocused, isFocused }: LineLeave): ChangeSpec[] {
+/** Task lines with text that the cursor just left. */
+function leftTaskLines({ startState, state, changes, wasFocused, isFocused }: LineLeave): number[] {
 	// Lines left by an unfocused editor were not being typed, so the scan writes them.
 	if (!wasFocused) return [];
 	const { doc } = state;
 	// Map each old cursor's line start: Obsidian's Enter rewrites the line's last character, which would carry the cursor itself along.
 	const previous = new Set(startState.selection.ranges.map(range => doc.lineAt(changes.mapPos(startState.doc.lineAt(range.head).from, -1)).number));
 	const current = new Set(isFocused ? state.selection.ranges.map(range => doc.lineAt(range.head).number) : []);
-	const left = [...previous].filter(line => {
-		const { text } = doc.line(line);
-		return !current.has(line) && TASK_WITH_TEXT.test(text) && !extractReminderId(text);
-	});
-	if (!left.length) return [];
-	const normalized = normalizeReminderIds(doc.toString(), undefined, undefined, new Set(left.map(number => number - 1))).content.split('\n');
-	return left.flatMap(number => {
-		const line = doc.line(number), text = normalized[number - 1], before = line.text;
-		if (text === undefined || text === before || !extractReminderId(text)) return [];
-		// Change only the differing span, so undo history keeps the typing on the line.
-		let start = 0, end = 0;
-		while (start < before.length && start < text.length && before[start] === text[start]) start++;
-		while (end < before.length - start && end < text.length - start && before[before.length - 1 - end] === text[text.length - 1 - end]) end++;
-		return [{ from: line.from + start, to: line.to - end, insert: text.slice(start, text.length - end) }];
+	return [...previous].filter(line => !current.has(line) && TASK_WITH_TEXT.test(doc.line(line).text));
+}
+
+/** The change that replaces a line's text with `text`, touching only the span that differs. */
+function lineChange(line: Line, text: string): ChangeSpec {
+	const before = line.text;
+	let start = 0, end = 0;
+	while (start < before.length && start < text.length && before[start] === text[start]) start++;
+	while (end < before.length - start && end < text.length - start && before[before.length - 1 - end] === text[text.length - 1 - end]) end++;
+	return { from: line.from + start, to: line.to - end, insert: text.slice(start, text.length - end) };
+}
+
+/** Typed dates saved on the new reminder lines among `lineNumbers`; lines with an ID are saved by the scan. */
+function scheduleChanges(doc: Text, lineNumbers: readonly number[]): ChangeSpec[] {
+	return lineNumbers.flatMap(number => {
+		const line = doc.line(number);
+		if (extractReminderId(line.text)) return [];
+		let saved: string;
+		try { saved = normalizeReminderScheduleLine(line.text); } catch { return []; }
+		return saved === line.text ? [] : [lineChange(line, saved)];
 	});
 }
 
-/** Adds reminder IDs as the cursor leaves a line in an editor `canAssign` accepts. */
+/** IDs for the reminder lines among `lineNumbers` that have none. */
+function reminderIdChanges(doc: Text, lineNumbers: readonly number[]): ChangeSpec[] {
+	const left = lineNumbers.filter(number => !extractReminderId(doc.line(number).text));
+	if (!left.length) return [];
+	const normalized = normalizeReminderIds(doc.toString(), undefined, undefined, new Set(left.map(number => number - 1))).content.split('\n');
+	return left.flatMap(number => {
+		const line = doc.line(number), text = normalized[number - 1];
+		// Change only the differing span, so undo history keeps the typing on the line.
+		return text === undefined || text === line.text || !extractReminderId(text) ? [] : [lineChange(line, text)];
+	});
+}
+
+/**
+ * Identifies reminder lines the cursor just left, so a new reminder gets its ID
+ * when the user moves on instead of after the next save and scan. The scan still
+ * owns collision repair and lines edited outside an editor.
+ */
+export function reminderIdChangesForLeftLines(leave: LineLeave): ChangeSpec[] {
+	return reminderIdChanges(leave.state.doc, leftTaskLines(leave));
+}
+
+/**
+ * As the cursor leaves a line in an editor `canAssign` accepts, moves a
+ * description typed after ` // ` under the reminder, then adds the reminder's ID.
+ */
 export function createReminderLineLeaveExtension(canAssign: (state: EditorState) => boolean) {
 	return EditorView.updateListener.of(update => {
 		// Obsidian's Enter in a list sets no selection, so a document change can leave a line too.
@@ -53,30 +82,56 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 		const isFocused = update.view.hasFocus;
 		const wasFocused = update.focusChanged ? !isFocused : isFocused;
 		if (!canAssign(update.state)) return;
-		const changes = reminderIdChangesForLeftLines({ ...update, wasFocused, isFocused });
-		if (!changes.length) return;
+		const left = leftTaskLines({ ...update, wasFocused, isFocused });
+		if (!left.length) return;
+		const { view } = update, descriptions = inlineDescriptionChanges(update.state.doc, left);
+		const dates = descriptions.length ? null : scheduleChanges(update.state.doc, left);
+		// Without a description or date to save the IDs are known now; otherwise they follow the edited lines.
+		const known = descriptions.length || dates?.length ? null : reminderIdChanges(update.state.doc, left);
+		if (known && !known.length) return;
 		// A view cannot dispatch during its own update; skip if the text moved on meanwhile.
-		// Undo would remove the hidden ID unseen, and leaving the line again would mint another.
 		queueMicrotask(() => {
-			if (update.view.state.doc === update.state.doc) update.view.dispatch({ changes, annotations: Transaction.addToHistory.of(false) });
+			if (view.state.doc !== update.state.doc) return;
+			let lines = left;
+			// Undo brings back what each step replaced, so it never leaves half of it.
+			const apply = (spec: TransactionSpec) => {
+				const before = view.state.doc, transaction = view.state.update(spec);
+				view.dispatch(transaction);
+				lines = lines.map(number => view.state.doc.lineAt(transaction.changes.mapPos(before.line(number).from, -1)).number);
+			};
+			// Filters would keep the block from landing after the line's hidden markers.
+			if (descriptions.length) apply({ changes: descriptions, userEvent: 'input.description', filter: false });
+			const saved = dates ?? scheduleChanges(view.state.doc, lines);
+			if (saved.length) apply({ changes: saved, userEvent: 'input.date', filter: false });
+			// Undo would remove the hidden ID unseen, and leaving the line again would mint another.
+			const ids = known ?? reminderIdChanges(view.state.doc, lines);
+			if (ids.length) view.dispatch({ changes: ids, annotations: Transaction.addToHistory.of(false) });
 		});
 	});
 }
 
 const hiddenMarker = Decoration.replace({});
+const descriptionMarker = Decoration.replace({ widget: new DescriptionMarkerWidget() });
+const descriptionBreak = Decoration.replace({ widget: new DescriptionBreakWidget() });
+const descriptionText = Decoration.mark({ class: 'crate-reminder-description-source' });
+
+/** Revealed reminder line starts, moved through a change. */
+const mapRevealed = (revealed: string, transaction: Transaction) =>
+	revealed ? revealed.split(',').map(from => transaction.changes.mapPos(Number(from))).sort((a, b) => a - b).join() : '';
 
 const RULE_MARKERS_REGEX = /<!-- crate-rule:[^>]*? -->/g;
 const DESCRIPTION_PREFIX = '<!-- crate-desc:';
 
-/** A line's ID and rule markers, each with its leading whitespace, merged where they touch. */
+/**
+ * A line's ID and rule markers, each with the one space it is written after,
+ * merged where they touch. Other spaces before a marker stay visible, so a space
+ * typed at the end of a reminder shows.
+ */
 function lineMarkers(text: string): { from: number; to: number }[] {
-	const spans = [...text.matchAll(RULE_MARKERS_REGEX)].map(match => {
-		let from = match.index;
-		while (from > 0 && /\s/.test(text[from - 1]!)) from--;
-		return { from, to: match.index + match[0].length };
-	});
+	const withSpace = (start: number, to: number) => ({ from: start > 0 && /\s/.test(text[start - 1]!) ? start - 1 : start, to });
+	const spans = [...text.matchAll(RULE_MARKERS_REGEX)].map(match => withSpace(match.index, match.index + match[0].length));
 	const id = findReminderIdMarker(text);
-	if (id) spans.push(id);
+	if (id) spans.push(withSpace(text.indexOf('<!--', id.from), id.to));
 	spans.sort((a, b) => a.from - b.from);
 	const merged: { from: number; to: number }[] = [];
 	for (const span of spans) {
@@ -85,6 +140,15 @@ function lineMarkers(text: string): { from: number; to: number }[] {
 		else merged.push({ ...span });
 	}
 	return merged;
+}
+
+/** Whether a line holds nothing but a reminder's hidden markers, as when its text and checkbox were deleted. */
+function onlyMarkers(line: Line): boolean {
+	const markers = lineMarkers(line.text);
+	if (!markers.length) return false;
+	let rest = line.text;
+	for (const { from, to } of [...markers].reverse()) rest = rest.slice(0, from) + rest.slice(to);
+	return !rest.trim();
 }
 
 /** Markers that end their line, which is the span the editor hides and keeps edits out of. */
@@ -98,7 +162,9 @@ function endMarker(line: Line): { from: number; to: number } | null {
  * to the block's end. Broken blocks stay visible so they can be repaired.
  */
 function descriptionBlock(doc: Text, line: Line): { from: number; to: number; description?: string } | null {
-	if (line.number >= doc.lines || !TASK_WITH_TEXT.test(line.text) || !doc.line(line.number + 1).text.startsWith(DESCRIPTION_PREFIX)) return null;
+	// A reminder whose checkbox is being edited away keeps its ID, and its description stays hidden with it.
+	const owner = TASK_WITH_TEXT.test(line.text) || findReminderIdMarker(line.text) !== null;
+	if (line.number >= doc.lines || !owner || !doc.line(line.number + 1).text.startsWith(DESCRIPTION_PREFIX)) return null;
 	const lines = [line.text];
 	for (let number = line.number + 1; number <= doc.lines; number++) {
 		const { text } = doc.line(number);
@@ -116,6 +182,150 @@ function hiddenTail(doc: Text, line: Line): { from: number; to: number; descript
 	const marker = endMarker(line), description = descriptionBlock(doc, line);
 	if (!marker && !description) return null;
 	return { from: marker?.from ?? line.to, to: description?.to ?? line.to, description: Boolean(description) };
+}
+
+const DESCRIPTION_SUFFIX = ' -->';
+
+/**
+ * A description block stored as literal text, which the editor can show as text
+ * to edit, with the text between its comment markers. Encoded blocks are edited
+ * in the reminder editor.
+ */
+interface EditableDescription {
+	reminder: Line;
+	from: number;
+	to: number;
+	textFrom: number;
+	textTo: number;
+}
+
+function editableDescription(doc: Text, reminder: Line): EditableDescription | null {
+	const block = descriptionBlock(doc, reminder);
+	if (!block) return null;
+	const first = doc.line(reminder.number + 1);
+	if (/^v\d+:/.test(first.text.slice(DESCRIPTION_PREFIX.length).trimStart())) return null;
+	return { reminder, from: first.from, to: block.to, textFrom: first.from + DESCRIPTION_PREFIX.length, textTo: block.to - DESCRIPTION_SUFFIX.length };
+}
+
+/** The editable description whose comment lines hold `position`. */
+function editableDescriptionAt(doc: Text, position: number): EditableDescription | null {
+	const at = doc.lineAt(position).number;
+	// Only a block's first line opens its comment; an earlier close ends another block.
+	for (let number = at; number > 1 && number > at - 200; number--) {
+		const { text } = doc.line(number);
+		if (number < at && text.includes('-->')) return null;
+		if (text.startsWith(DESCRIPTION_PREFIX)) {
+			const description = editableDescription(doc, doc.line(number - 1));
+			return description && position <= description.to ? description : null;
+		}
+		if (text.includes('<!--')) return null;
+	}
+	return null;
+}
+
+/** The reminders whose descriptions show as text: those a selection starts or ends on, or in. */
+function revealedDescriptions(doc: Text, selection: EditorSelection): Set<number> {
+	const revealed = new Set<number>();
+	for (const range of selection.ranges) {
+		for (const position of [range.anchor, range.head]) {
+			const line = doc.lineAt(position);
+			const description = editableDescriptionAt(doc, position) ?? editableDescription(doc, line);
+			if (description) revealed.add(description.reminder.from);
+		}
+	}
+	return revealed;
+}
+
+/**
+ * Whether a change inside a description's text would break the comment that
+ * stores it, such as typing a comment marker or deleting one.
+ */
+function breaksDescription(transaction: Transaction): boolean {
+	const { doc } = transaction.startState;
+	let broken = false;
+	transaction.changes.iterChangedRanges((fromA, toA) => {
+		// An edit may also reach into the comment from the reminder's line above it.
+		const before = broken ? null : editableDescriptionAt(doc, fromA) ?? (toA > fromA ? editableDescriptionAt(doc, toA) : null);
+		// An edit starting where the comment ends is after it, one ending where it starts is before it,
+		// and one covering all of it removes it.
+		if (!before || toA > before.to || fromA === before.to || (fromA < before.from && (toA <= before.from || toA === before.to))) return;
+		const reminder = transaction.newDoc.lineAt(transaction.changes.mapPos(before.reminder.from));
+		const after = editableDescription(transaction.newDoc, reminder);
+		broken = !after || after.to !== transaction.changes.mapPos(before.to, -1);
+	});
+	return broken;
+}
+
+/**
+ * A deletion that reaches into a shown description's hidden parts, its
+ * reminder's markers and comment opener or its comment closer, deletes only
+ * what shows; one covering the whole reminder from its text deletes all of it.
+ */
+function deletingAroundDescription(transaction: Transaction): TransactionSpec | null {
+	const { doc } = transaction.startState;
+	const changes: { from: number; to: number; text: string }[] = [];
+	transaction.changes.iterChanges((from, to, _fromB, _toB, inserted) => changes.push({ from, to, text: inserted.toString() }));
+	const [change] = changes;
+	if (changes.length !== 1 || !change || change.text || change.to <= change.from) return null;
+	const description = editableDescriptionAt(doc, change.to - 1) ?? editableDescriptionAt(doc, change.from);
+	if (!description) return null;
+	const { reminder } = description, textStart = reminder.from + TEXT_START.exec(reminder.text)![0].length;
+	if (change.from <= textStart && change.to >= description.to) return null;
+	// The comment's closer and the line break after it, which would join the next line onto the comment.
+	const closerEnd = Math.min(description.to + 1, doc.length);
+	const hidden = [[endMarker(reminder)?.from ?? reminder.to, description.textFrom], [description.textTo, closerEnd]] as const;
+	if (!hidden.some(([from, to]) => change.from < to && change.to > from)) return null;
+	// A key across the whole hidden end of a reminder shown as a block, which the rules below handle.
+	if (change.from <= hidden[0][0] && change.to >= description.to) return null;
+	const pieces: { from: number; to: number }[] = [];
+	let at = change.from;
+	for (const [from, to] of hidden) {
+		if (to <= at || from >= change.to) continue;
+		if (from > at) pieces.push({ from: at, to: from });
+		at = Math.max(at, to);
+	}
+	if (at < change.to) pieces.push({ from: at, to: change.to });
+	// Deleting only hidden parts is a key at their edge, which the rules below handle.
+	if (!pieces.length) return null;
+	const userEvent = transaction.annotation(Transaction.userEvent);
+	const cursor = Math.min(Math.max(change.from, description.textFrom), description.textTo);
+	const specChanges = transaction.startState.changes(pieces);
+	const spec: TransactionSpec = { changes: specChanges, selection: { anchor: specChanges.mapPos(change.from < description.textFrom ? (endMarker(reminder)?.from ?? reminder.to) : cursor, -1) }, ...userEvent ? { userEvent } : {} };
+	// A deletion across more than one description may still break another; it is kept out.
+	return breaksDescription(transaction.startState.update({ ...spec, filter: false })) ? { selection: transaction.startState.selection } : spec;
+}
+
+/**
+ * Typing that the browser placed on a description's hidden comment markers,
+ * moved into its text; Enter at the end of a description, which starts a new
+ * task after it as at the end of any reminder; and backspace at the start of
+ * its text. Null for any other change.
+ */
+function typingIntoDescription(transaction: Transaction): TransactionSpec | null {
+	const { doc } = transaction.startState;
+	let only: { from: number; to: number; text: string } | null = null, count = 0;
+	transaction.changes.iterChanges((from, to, _fromB, _toB, inserted) => { count++; only = { from, to, text: inserted.toString() }; });
+	const change = count === 1 ? only as { from: number; to: number; text: string } | null : null;
+	if (!change) return null;
+	const userEvent = transaction.annotation(Transaction.userEvent);
+	// Backspace at the start of a description's text never deletes what is hidden before it: it removes an
+	// empty description, or moves to the end of the title.
+	const deleted = !change.text && transaction.isUserEvent('delete.backward') ? editableDescriptionAt(doc, change.to) : null;
+	if (deleted && change.to === deleted.textFrom && change.from < deleted.textFrom) {
+		const titleEnd = endMarker(deleted.reminder)?.from ?? deleted.reminder.to;
+		if (deleted.textFrom === deleted.textTo) return { changes: { from: deleted.reminder.to, to: deleted.to }, selection: { anchor: titleEnd }, ...userEvent ? { userEvent } : {} };
+		return { selection: { anchor: titleEnd } };
+	}
+	const description = change.text ? editableDescriptionAt(doc, change.from) : null;
+	if (!description) return null;
+	// Enter, which may also take the whitespace after the cursor: here, the space of the hidden end marker.
+	if (change.text.startsWith('\n') && !change.text.trim() && change.from >= description.textTo && change.to <= description.to) {
+		const task = `\n${/^\s*/.exec(description.reminder.text)![0]}- [ ] `;
+		return { changes: { from: description.to, insert: task }, selection: { anchor: description.to + task.length }, ...userEvent ? { userEvent } : {} };
+	}
+	if (change.from !== change.to || (change.from >= description.textFrom && change.from <= description.textTo)) return null;
+	const at = change.from < description.textFrom ? description.textFrom : description.textTo;
+	return { changes: { from: at, insert: change.text }, selection: { anchor: at + change.text.length }, ...userEvent ? { userEvent } : {} };
 }
 
 /** The tail of the reminder whose description block ends at `position`, a line end. */
@@ -286,6 +496,14 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 	const { startState } = transaction;
 	const { doc } = startState;
 	if (transaction.docChanged && transaction.isUserEvent('move.line')) return moveLinesWithDescriptions(transaction) ?? transaction;
+	if (transaction.docChanged && (transaction.isUserEvent('input') || transaction.isUserEvent('delete'))) {
+		const around = deletingAroundDescription(transaction);
+		if (around) return around;
+		const inside = typingIntoDescription(transaction);
+		// Moved typing must keep the comment readable too, as typing a comment marker would not.
+		if (inside) return breaksDescription(startState.update({ ...inside, filter: false })) ? [] : inside;
+	}
+	if (transaction.docChanged && breaksDescription(transaction)) return [];
 	const changes: { fromA: number; toA: number; text: string }[] = [];
 	if (transaction.docChanged) transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => changes.push({ fromA, toA, text: inserted.toString() }));
 	const selected = (from: number, to: number) => startState.selection.ranges.some(range => !range.empty && range.from <= from && range.to >= to);
@@ -336,6 +554,12 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 		}
 		// Backspace at the start of the line after a description joins that line to the reminder, not into the description.
 		if (change && changes.length === 1 && !change.text && change.toA === change.fromA + 1 && doc.sliceString(change.fromA, change.toA) === '\n') {
+			// A line left with only a deleted reminder's hidden markers goes with its description instead of joining.
+			const below = doc.lineAt(change.toA);
+			if (onlyMarkers(below)) {
+				const above = doc.lineAt(change.fromA);
+				return spec({ from: change.fromA, to: Math.max(below.to, hiddenTail(doc, below)?.to ?? below.to) }, endMarker(above)?.from ?? change.fromA);
+			}
 			const above = tailEndingAt(doc, change.fromA);
 			if (above) return join(above);
 		}
@@ -348,6 +572,14 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 	let moved = false;
 	const ranges = transaction.newSelection.ranges.map((range, index) => {
 		const line = next.lineAt(range.head);
+		// A cursor in a description's text stays between its comment markers.
+		const description = range.empty ? editableDescriptionAt(next, range.head) : null;
+		if (description) {
+			const head = Math.min(Math.max(range.head, description.textFrom), description.textTo);
+			if (head === range.head) return range;
+			moved = true;
+			return EditorSelection.cursor(head);
+		}
 		// A click past a hidden description lands at its end, where typing would break it.
 		const marker = range.empty ? endMarker(line) ?? (range.head === line.to ? tailEndingAt(next, range.head) : null) : null;
 		if (!marker || range.head <= marker.from) return range;
@@ -355,6 +587,9 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 		// ArrowRight from the visible end skips into the hidden tail; as at any line end, it moves on to the next line.
 		const start = keyboard ? startState.selection.ranges[index] : undefined;
 		const tail = start?.empty && start.head === marker.from ? hiddenTail(next, next.lineAt(marker.from)) : null;
+		// A description shown as text is next; one shown as a block is skipped.
+		const editable = tail?.description ? editableDescription(next, next.lineAt(marker.from)) : null;
+		if (editable) return EditorSelection.cursor(editable.textFrom);
 		return EditorSelection.cursor(tail && tail.to < next.length ? tail.to + 1 : marker.from);
 	});
 	return moved ? [transaction, { selection: EditorSelection.create(ranges, transaction.newSelection.mainIndex), sequential: true }] : transaction;
@@ -368,11 +603,11 @@ function describedReminder(view: EditorView, element: HTMLElement): Line | null 
 
 /**
  * A reminder's description, shown as text under its title while the comment
- * that stores it stays hidden. Selecting it opens the reminder for editing, so
- * typing never lands inside the comment.
+ * that stores it stays hidden. Selecting it opens the reminder for editing, or,
+ * before the reminder is indexed, puts the cursor at the end of its text.
  */
 class DescriptionWidget extends WidgetType {
-	constructor(readonly description: string, readonly open: (reminderId: string) => void) { super(); }
+	constructor(readonly description: string, readonly open: (reminderId: string) => boolean) { super(); }
 
 	eq(other: DescriptionWidget) { return other.description === this.description; }
 
@@ -381,7 +616,11 @@ class DescriptionWidget extends WidgetType {
 		element.createDiv({ cls: 'crate-reminder-description__text', text: this.description, attr: { role: 'button' } }).addEventListener('click', event => {
 			event.preventDefault();
 			const reminder = describedReminder(view, element), id = reminder && extractReminderId(reminder.text);
-			if (id) this.open(id);
+			if (!reminder || (id && this.open(id))) return;
+			const description = editableDescription(view.state.doc, reminder);
+			if (!description) return;
+			view.focus();
+			view.dispatch({ selection: { anchor: description.textTo } });
 		});
 		return element;
 	}
@@ -409,7 +648,7 @@ const alignDescriptions = ViewPlugin.define(view => {
  * shows description blocks as text, keeps the cursor in front of them, and
  * copies a reminder's whole text with what is hidden.
  */
-export function createReminderMarkerHiding(isReminderEditor: (state: EditorState) => boolean, openReminder: (reminderId: string) => void) {
+export function createReminderMarkerHiding(isReminderEditor: (state: EditorState) => boolean, openReminder: (reminderId: string) => boolean) {
 	const decorate = (view: EditorView): DecorationSet => isReminderEditor(view.state)
 		? Decoration.set(hiddenReminderMarkerRanges(view.state, view.visibleRanges).map(({ from, to }) => hiddenMarker.range(from, to)))
 		: Decoration.none;
@@ -421,18 +660,43 @@ export function createReminderMarkerHiding(isReminderEditor: (state: EditorState
 	}), { decorations: plugin => plugin.decorations });
 	// Replacing line breaks and adding block widgets change line layout, which only a state
 	// field may do. As a block below the title, the text is skipped by moving up and down.
-	const decorateDescriptions = (state: EditorState): DecorationSet => isReminderEditor(state)
-		? Decoration.set(hiddenDescriptionRanges(state.doc).flatMap(({ from, to, description }) => [
-			hiddenMarker.range(from, to),
-			...description ? [Decoration.widget({ widget: new DescriptionWidget(description, openReminder), block: true, side: 1 }).range(to)] : [],
-		]), true)
-		: Decoration.none;
-	const descriptions = StateField.define<DecorationSet>({
-		create: decorateDescriptions,
+	// While a selection is on a reminder or in its description, the description shows on the reminder's line as its text to edit.
+	// Built from a transaction's new text and selection: a field may not read the state it is part of.
+	const decorateDescriptions = (enabled: boolean, doc: Text, selection: EditorSelection): { decorations: DecorationSet; revealed: string } => {
+		if (!enabled) return { decorations: Decoration.none, revealed: '' };
+		const revealed = revealedDescriptions(doc, selection);
+		const decorations = Decoration.set(hiddenDescriptionRanges(doc).flatMap(({ from, to, description }) => {
+			const editable = revealed.has(doc.lineAt(from).from) ? editableDescription(doc, doc.lineAt(from)) : null;
+			if (editable) {
+				// On the reminder's line after its bar, as it was typed there, with its line breaks marked.
+				const breaks: number[] = [];
+				for (let number = doc.lineAt(editable.from).number; number < doc.lineAt(editable.to).number; number++) breaks.push(doc.line(number).to);
+				return [
+					descriptionMarker.range(from, editable.textFrom),
+					...editable.textFrom < editable.textTo ? [descriptionText.range(editable.textFrom, editable.textTo)] : [],
+					...breaks.map(position => descriptionBreak.range(position, position + 1)),
+					hiddenMarker.range(editable.textTo, editable.to),
+				];
+			}
+			return [
+				hiddenMarker.range(from, to),
+				...description ? [Decoration.widget({ widget: new DescriptionWidget(description, openReminder), block: true, side: 1 }).range(to)] : [],
+			];
+		}), true);
+		return { decorations, revealed: [...revealed].sort((a, b) => a - b).join() };
+	};
+	const descriptions = StateField.define<{ decorations: DecorationSet; revealed: string }>({
+		create: state => decorateDescriptions(isReminderEditor(state), state.doc, state.selection),
 		// Rescanning the note on every keystroke is slow in long notes; other edits only move the blocks.
-		update: (value, transaction) => !transaction.docChanged ? value
-			: touchesDescriptions(transaction) ? decorateDescriptions(transaction.state) : value.map(transaction.changes),
-		provide: field => EditorView.decorations.from(field),
+		update: (value, transaction) => {
+			const { newDoc, newSelection } = transaction;
+			const redecorate = () => decorateDescriptions(isReminderEditor(transaction.startState), newDoc, newSelection);
+			if (transaction.docChanged && touchesDescriptions(transaction)) return redecorate();
+			const revealed = transaction.selection || transaction.docChanged ? [...revealedDescriptions(newDoc, newSelection)].sort((a, b) => a - b).join() : value.revealed;
+			if (revealed !== (transaction.docChanged ? mapRevealed(value.revealed, transaction) : value.revealed)) return redecorate();
+			return transaction.docChanged ? { decorations: value.decorations.map(transaction.changes), revealed } : value;
+		},
+		provide: field => EditorView.decorations.from(field, value => value.decorations),
 	});
 	// CodeMirror copies only the selected text; a reminder's whole text also takes what is hidden.
 	const copy = (event: ClipboardEvent, view: EditorView) => {
@@ -450,7 +714,11 @@ export function createReminderMarkerHiding(isReminderEditor: (state: EditorState
 		descriptions,
 		alignDescriptions,
 		EditorView.atomicRanges.of(view => view.plugin(hiding)?.decorations ?? Decoration.none),
-		EditorView.atomicRanges.of(view => view.state.field(descriptions, false) ?? Decoration.none),
+		// Hidden text moves and deletes as one; the description's own text edits normally.
+		EditorView.atomicRanges.of(view => {
+			const decorations = view.state.field(descriptions, false)?.decorations;
+			return decorations ? decorations.update({ filter: (_from, _to, value) => value !== descriptionText }) : Decoration.none;
+		}),
 		EditorView.domEventHandlers({ copy, cut: copy }),
 		EditorState.transactionFilter.of(transaction => isReminderEditor(transaction.startState) ? protectReminderIdMarker(transaction) : transaction),
 	];

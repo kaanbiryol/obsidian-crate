@@ -39,9 +39,11 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 
 	setReminderRibbon(plugin, ribbon);
 	const editorPath = (state: EditorState) => state.field(editorInfoField, false)?.file?.path;
+	// False when the reminder is not indexed yet, as right after it is written.
 	const openReminder = (reminderId: string) => {
 		const reminder = plugin.reminders?.index.getById(reminderId);
 		if (reminder) openReminderEditModal(plugin, reminder, () => undefined);
+		return Boolean(reminder);
 	};
 	plugin.registerEditorExtension([
 		createReminderLineLeaveExtension(state => {

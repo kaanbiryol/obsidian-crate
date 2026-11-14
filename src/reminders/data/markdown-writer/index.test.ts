@@ -247,7 +247,8 @@ describe('markdownWriter', () => {
 
 	it('creates an all-day recurring reminder without leaking the current clock time', async () => {
 		vi.useFakeTimers();
-		vi.setSystemTime(new Date('2026-01-10T10:00:00.000Z'));
+		// 10:00 local time, so the day is Jan 10 in every time zone.
+		vi.setSystemTime(new Date(2026, 0, 10, 10, 0));
 
 		const { app, files } = createMockAppWithVault();
 		const index = createMockIndex();

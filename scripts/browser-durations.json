@@ -1,6 +1,7 @@
 {
   "source": "https://github.com/kaanbiryol/obsidian-crate/actions/runs/36695803953",
   "additionalSources": {
+    "tests/browser/plugin/reminder-live-editing-test.mjs": "local chromium/webkit run on 2026-11-15: 9.1 seconds",
     "tests/browser/pwa/pwa-sync-coordinator-test.mjs": "local chromium/webkit run on 2026-09-29: 12.4 seconds",
     "tests/browser/pwa/pwa-reading-encryption-test.mjs": "local encrypted Reading workflow; conservative 45-second scheduling estimate",
     "tests/browser/pwa/pwa-reading-encryption-storage-test.mjs": "local Chromium/WebKit storage and key recovery; conservative 10-second scheduling estimate",
@@ -59,6 +60,7 @@
     "tests/browser/pwa/pwa-update-notice-test.mjs": 17.2,
     "tests/browser/reading/reading-touch-test.mjs": 39.2,
     "tests/browser/plugin/shared-press-feedback-test.mjs": 9,
+    "tests/browser/plugin/reminder-live-editing-test.mjs": 10,
     "tests/browser/reading/reading-appearance-test.mjs": 17.2,
     "tests/browser/pwa/pwa-encryption-storage-test.mjs": 10,
     "tests/browser/pwa/pwa-encryption-test.mjs": 35,

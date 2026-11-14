@@ -148,7 +148,7 @@ describe('reminder description hiding', () => {
 	});
 
 	describe('while editing', () => {
-		const extensions = createReminderMarkerHiding(() => true, () => undefined);
+		const extensions = createReminderMarkerHiding(() => true, () => false);
 		const reminder = '- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:Oat milk -->';
 		/** Text under the description decorations, without the shown-text widgets; the marker plugin's decorations need a view. */
 		const decorated = (state: EditorState) => state.facet(EditorView.decorations).flatMap(set => {
@@ -170,23 +170,123 @@ describe('reminder description hiding', () => {
 		});
 
 		it('rescans when an edit can detach or close a description', () => {
-			// Removing the checkbox detaches the description under it.
-			let state = EditorState.create({ doc: `${reminder}\nNotes`, extensions });
+			// Removing the checkbox keeps the description with the reminder's ID; removing the ID detaches it.
+			let state = EditorState.create({ doc: `${reminder}\nNotes`, selection: { anchor: reminder.length + 1 }, extensions });
 			state = state.update({ changes: { from: 0, to: '- [ ] '.length } }).state;
+			expect(decorated(state)).toEqual(['\n<!-- crate-desc:Oat milk -->']);
+			const id = state.doc.toString().indexOf(' <!-- crate-id:a -->');
+			state = state.update({ changes: { from: id, to: id + ' <!-- crate-id:a -->'.length } }).state;
 			expect(decorated(state)).toEqual([]);
 			// Closing a multiline description far below its first line hides it.
-			const open = '- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:One\ntwo\nthree\nfour';
+			const open = 'Notes\n- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:One\ntwo\nthree\nfour';
 			state = EditorState.create({ doc: open, extensions });
 			expect(decorated(state)).toEqual([]);
 			state = state.update({ changes: { from: open.length, insert: ' -->' }, userEvent: 'input.type' }).state;
 			expect(decorated(state)).toEqual(['\n<!-- crate-desc:One\ntwo\nthree\nfour -->']);
+		});
+
+		it("shows the description on its reminder's line as its text while a selection is on the reminder or in it", () => {
+			const doc = `${reminder}\nNotes`;
+			const at = (anchor: number) => decorated(EditorState.create({ doc, selection: { anchor }, extensions }));
+			expect(at(doc.length)).toEqual(['\n<!-- crate-desc:Oat milk -->']);
+			expect(at(0)).toEqual(['\n<!-- crate-desc:', 'Oat milk', ' -->']);
+			expect(at(doc.indexOf('milk -->'))).toEqual(['\n<!-- crate-desc:', 'Oat milk', ' -->']);
+			// Line breaks in a longer description show on the same line.
+			const longer = '- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:Oat milk\nfrom the shop -->';
+			expect(decorated(EditorState.create({ doc: longer, extensions })))
+				.toEqual(['\n<!-- crate-desc:', 'Oat milk\nfrom the shop', '\n', ' -->']);
+		});
+
+		it('edits the description text one character at a time', () => {
+			const state = EditorState.create({ doc: `${reminder}\nNotes`, selection: { anchor: 0 }, extensions });
+			// The marker plugin's ranges need a view; the description's come from the state.
+			const view = { state, plugin: () => null } as unknown as EditorView;
+			const covered: string[] = [];
+			for (const set of state.facet(EditorView.atomicRanges).map(source => source(view))) {
+				for (const iter = set.iter(); iter.value; iter.next()) if (iter.from < iter.to) covered.push(state.sliceDoc(iter.from, iter.to));
+			}
+			expect(covered).not.toContain('Oat milk');
+			expect(covered).toContain('\n<!-- crate-desc:');
+		});
+
+		it('backspace at the start of a description moves to the title, or removes an empty description', () => {
+			const doc = `${reminder}\nNotes`, textFrom = doc.indexOf('Oat');
+			const titleEnd = '- [ ] Buy milk'.length;
+			let state = EditorState.create({ doc, selection: { anchor: textFrom }, extensions });
+			// The editor deletes the hidden parts before the text as one, back to the title's end.
+			const back = (from: number) => state.update({ changes: { from, to: state.doc.toString().indexOf('<!-- crate-desc:') + '<!-- crate-desc:'.length }, userEvent: 'delete.backward' }).state;
+			const moved = back(titleEnd);
+			expect(moved.doc.toString()).toBe(doc);
+			expect(moved.selection.main.head).toBe(titleEnd);
+			// With the text deleted, the same backspace removes the description.
+			state = state.update({ changes: { from: textFrom, to: textFrom + 'Oat milk'.length } }).state;
+			const removed = back(titleEnd);
+			expect(removed.doc.toString()).toBe('- [ ] Buy milk <!-- crate-id:a -->\nNotes');
+			expect(removed.selection.main.head).toBe(titleEnd);
+		});
+
+		it("removes a deleted reminder's hidden markers and description instead of joining them to the line above", () => {
+			const doc = `Above\n<!-- crate-id:a -->\n<!-- crate-desc:Oat milk -->\nNotes`;
+			const state = EditorState.create({ doc, extensions });
+			// Backspace at the start of the emptied line, and Delete at the end of the line above.
+			for (const userEvent of ['delete.backward', 'delete.forward']) {
+				expect(state.update({ changes: { from: 5, to: 6 }, userEvent }).state.doc.toString()).toBe('Above\nNotes');
+			}
+			// A line with text keeps joining as usual.
+			// The cursor lands at the visible end of the line above, in front of its own markers.
+			const marked = EditorState.create({ doc: `- [ ] Above <!-- crate-id:z -->\n<!-- crate-id:a -->\nNotes`, extensions });
+			const joined = marked.update({ changes: { from: 31, to: 32 }, userEvent: 'delete.backward' }).state;
+			expect(joined.doc.toString()).toBe('- [ ] Above <!-- crate-id:z -->\nNotes');
+			expect(joined.selection.main.head).toBe('- [ ] Above'.length);
+			const text = EditorState.create({ doc: 'Above\n- [ ] Call <!-- crate-id:a -->', extensions });
+			expect(text.update({ changes: { from: 5, to: 6 }, userEvent: 'delete.backward' }).state.doc.toString()).toBe('Above- [ ] Call <!-- crate-id:a -->');
+		});
+
+		it('keeps an edit from the reminder line into its description from breaking the comment', () => {
+			const state = EditorState.create({ doc: `${reminder}\nNotes`, extensions });
+			const into = state.doc.toString().indexOf('crate-desc:');
+			// Deleting from the title into the middle of the hidden opener deletes only the title's text.
+			expect(state.update({ changes: { from: 6, to: into }, userEvent: 'delete.selection' }).state.doc.toString())
+				.toBe('- [ ]  <!-- crate-id:a -->\n<!-- crate-desc:Oat milk -->\nNotes');
+			// From the description's text past its end deletes the text and what follows, keeping the comment.
+			const textFrom = state.doc.toString().indexOf('milk -->');
+			expect(state.update({ changes: { from: textFrom, to: state.doc.length - 2 }, userEvent: 'delete.selection' }).state.doc.toString())
+				.toBe('- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:Oat  -->\nes');
+			// Deleting the whole reminder with its description is an edit like any other.
+			const all = state.update({ changes: { from: 0, to: state.doc.toString().indexOf('\nNotes') }, userEvent: 'delete.selection' }).state;
+			expect(all.doc.toString()).toBe('\nNotes');
+		});
+
+		it('keeps edits that would break the stored comment out of the description', () => {
+			let state = EditorState.create({ doc: `${reminder}\nNotes`, extensions });
+			const inside = state.doc.toString().indexOf('milk -->') + 4;
+			for (const typed of [' -->', '<!--']) {
+				expect(state.update({ changes: { from: inside, insert: typed }, userEvent: 'input.type' }).state.doc).toBe(state.doc);
+			}
+			// Deleting a comment marker is kept out; other text edits normally.
+			const textFrom = state.doc.toString().indexOf('Oat');
+			expect(state.update({ changes: { from: textFrom - 1, to: textFrom }, userEvent: 'delete.backward' }).state.doc).toBe(state.doc);
+			// Enter at the end of the description starts a new task after it; inside, it breaks the line.
+			const textTo = state.doc.toString().indexOf(' -->\nNotes');
+			const entered = state.update({ changes: { from: textTo, insert: '\n' }, userEvent: 'input' }).state;
+			expect(entered.doc.toString()).toBe(`${reminder}\n- [ ] \nNotes`);
+			expect(entered.selection.main.head).toBe(`${reminder}\n- [ ] `.length);
+			// The editor's Enter also takes the whitespace after the cursor, the end marker's space.
+			const command = state.update({ changes: { from: textTo, to: textTo + 1, insert: '\n' }, userEvent: 'input' }).state;
+			expect(command.doc.toString()).toBe(`${reminder}\n- [ ] \nNotes`);
+			expect(state.update({ changes: { from: textTo - 4, insert: '\n' }, userEvent: 'input' }).state.doc.toString()).toContain('Oat \nmilk -->');
+			// Typing the browser placed after the hidden end marker lands at the end of the text.
+			const end = state.doc.toString().indexOf('\nNotes');
+			expect(state.update({ changes: { from: end, insert: '!' }, userEvent: 'input.type' }).state.doc.toString()).toContain('Oat milk! -->');
+			state = state.update({ changes: { from: inside, insert: ' and\nalmond' }, userEvent: 'input.type' }).state;
+			expect(state.doc.toString()).toBe('- [ ] Buy milk <!-- crate-id:a -->\n<!-- crate-desc:Oat milk and\nalmond -->\nNotes');
 		});
 	});
 
 	it('hides the comment and shows its decoded text as a block under the reminder', () => {
 		const comment = '\n<!-- crate-desc:v1:Oat%20milk%0Afrom%20the%20shop -->';
 		const text = `- [ ] Buy milk <!-- crate-id:a -->${comment}\nNotes`, end = text.indexOf('\nNotes');
-		const state = EditorState.create({ doc: text, extensions: createReminderMarkerHiding(() => true, () => undefined) });
+		const state = EditorState.create({ doc: text, extensions: createReminderMarkerHiding(() => true, () => false) });
 		const shown: { from: number; to: number; block: unknown; description: unknown }[] = [];
 		for (const source of state.facet(EditorView.decorations)) {
 			if (typeof source !== 'function') source.between(0, text.length, (from, to, value) => {
@@ -276,15 +376,20 @@ describe('reminder ID marker protection', () => {
 			expect(edit(block, end, { changes: { from: end, to: block.length }, userEvent: 'delete.forward' }).text).toBe(block);
 		});
 
-		it('keeps the cursor in front of the markers when it lands after the description', () => {
-			expect(edit(block, 0, { selection: { anchor: block.length } }).cursor).toBe(end);
+		it('keeps a cursor in the description between its comment markers', () => {
+			expect(edit(block, 0, { selection: { anchor: block.length } }).cursor).toBe(block.length - ' -->'.length);
+			expect(edit(block, 0, { selection: { anchor: line.length + 3 } }).cursor).toBe(line.length + 1 + '<!-- crate-desc:'.length);
 		});
 
-		it('moves ArrowRight from the visible end past the description to the next line', () => {
-			expect(edit(`${block}\nNext`, end, arrowRight(line.length)).cursor).toBe(block.length + 1);
-			// Without markers, ArrowRight skips the description itself and lands at its end.
+		it('moves ArrowRight from the visible end into the description text', () => {
+			const textFrom = line.length + 1 + '<!-- crate-desc:'.length;
+			expect(edit(`${block}\nNext`, end, arrowRight(line.length)).cursor).toBe(textFrom);
+			// Without markers, ArrowRight lands at the start of the description's line.
 			const unmarked = `- [ ] Buy milk\n${description}`;
-			expect(edit(`${unmarked}\nNext`, '- [ ] Buy milk'.length, arrowRight(unmarked.length)).cursor).toBe(unmarked.length + 1);
+			expect(edit(`${unmarked}\nNext`, '- [ ] Buy milk'.length, arrowRight('- [ ] Buy milk'.length + 1)).cursor).toBe('- [ ] Buy milk\n<!-- crate-desc:'.length);
+			// An encoded description is edited in the reminder editor, so ArrowRight skips it.
+			const encoded = `${line}\n<!-- crate-desc:v1:a%20%2D%2D%20b -->`;
+			expect(edit(`${encoded}\nNext`, end, arrowRight(line.length)).cursor).toBe(encoded.length + 1);
 		});
 
 		it('deletes the description with a selection of the whole reminder text', () => {
@@ -361,3 +466,64 @@ describe('reminder ID marker protection', () => {
 		expect(edit(`${line}\nNext`, 0, { changes: { from: 0, to: line.length + 1 }, userEvent: 'delete' }).text).toBe('Next');
 	});
 });
+
+describe('inline descriptions on line leave', () => {
+	/** Leaves the reminder on line 1 through the extension, with a view that applies what it dispatches. */
+	async function leaveLine(text: string) {
+		const startState = EditorState.create({ doc: text, selection: EditorSelection.cursor(5), extensions: createReminderLineLeaveExtension(() => true) });
+		const transaction = startState.update({ selection: { anchor: text.length } });
+		const dispatched: Transaction[] = [];
+		const view = {
+			hasFocus: true,
+			state: transaction.state,
+			dispatch(spec: Transaction | TransactionSpec) {
+				const next = spec instanceof Transaction ? spec : view.state.update(spec);
+				dispatched.push(next);
+				view.state = next.state;
+			},
+		};
+		const update = { view, state: transaction.state, startState, changes: transaction.changes, selectionSet: true, focusChanged: false } as unknown as ViewUpdate;
+		for (const listener of startState.facet(EditorView.updateListener)) listener(update);
+		await Promise.resolve();
+		return { lines: view.state.doc.toString().split('\n'), dispatched };
+	}
+
+	it('moves the description under the reminder in undo history, then adds the ID outside it', async () => {
+		const { lines, dispatched } = await leaveLine('- [ ] Call Mia // bring receipts\nNext');
+		expect(lines[0]!.match(ID)![1]).toBe('Call Mia');
+		expect(lines.slice(1)).toEqual(['<!-- crate-desc:bring receipts -->', 'Next']);
+		expect(dispatched.map(transaction => transaction.annotation(Transaction.addToHistory))).toEqual([undefined, false]);
+		expect(dispatched[0]!.isUserEvent('input.description')).toBe(true);
+	});
+
+	it('schedules from the title, not dates in the description', async () => {
+		const { lines } = await leaveLine('- [ ] Call Mia tomorrow // ask before friday\nNext');
+		expect(lines[0]!.match(ID)![1]).toMatch(/^Call Mia \d{4}-\d{2}-\d{2}$/);
+		const tomorrow = new Date();
+		tomorrow.setDate(tomorrow.getDate() + 1);
+		expect(lines[0]).toContain(`${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`);
+		expect(lines[1]).toBe('<!-- crate-desc:ask before friday -->');
+	});
+
+	it('keeps an existing ID on its line', async () => {
+		const { lines, dispatched } = await leaveLine('- [ ] Call Mia // ask <!-- crate-id:kept -->\nNext');
+		expect(lines).toEqual(['- [ ] Call Mia <!-- crate-id:kept -->', '<!-- crate-desc:ask -->', 'Next']);
+		expect(dispatched).toHaveLength(1);
+	});
+});
+
+describe('typing at the end of a saved reminder', () => {
+	it('shows a typed space instead of hiding it with the ID marker', () => {
+		const doc = '- [ ] Call Mia 2026-11-15 <!-- crate-id:abc -->';
+		let state = EditorState.create({ doc, extensions: EditorState.transactionFilter.of(protectReminderIdMarker) });
+		state = state.update({ selection: EditorSelection.cursor(doc.length), userEvent: 'select.pointer' }).state;
+		for (const typed of [' ', 'a']) {
+			const at = state.selection.main.head;
+			state = state.update({ changes: { from: at, insert: typed }, selection: { anchor: at + 1 }, userEvent: 'input.type' }).state;
+		}
+		expect(state.doc.toString()).toBe('- [ ] Call Mia 2026-11-15 a <!-- crate-id:abc -->');
+		const hidden = hiddenReminderMarkerRanges(state, [{ from: 0, to: state.doc.length }]);
+		expect(hidden.map(({ from, to }) => state.doc.sliceString(from, to))).toEqual([' <!-- crate-id:abc -->']);
+	});
+});
+
