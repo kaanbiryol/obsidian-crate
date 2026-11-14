@@ -5,7 +5,7 @@ import { takeCommittedSource } from './committed-sources';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { recordFileFailure } from './file-retries';
 import { READY_PROJECTION_JOBS_SQL } from './queue';
-import { parseDateTime, toZoned } from '@internationalized/date';
+import { notificationDatetime } from '../../../reminders/core/notification-time';
 import { queryRows } from '../d1/db';
 import { duplicateReminderIds, ReminderIdentityConflictError } from '../reminders/source-identity';
 import { loadStoredFileRows, type FileStorageRow } from '../sync/storage';
@@ -22,11 +22,7 @@ import { isReminderPath } from '../reminders/scope';
 import { readEncryptionState } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 
-export function notificationDatetime(reminder: Pick<RemoteReminderRecord, 'dueDate' | 'dueDatetime'>, policy: NotificationPolicy): string | undefined {
-	if (reminder.dueDatetime) return reminder.dueDatetime;
-	if (!reminder.dueDate || !policy.allDayTime) return undefined;
-	return toZoned(parseDateTime(`${reminder.dueDate}T${policy.allDayTime}`), policy.timezone).toDate().toISOString();
-}
+export { notificationDatetime };
 
 /** Bound each D1 value without imposing a second, smaller per-note limit.
  * All chunks are published in one guarded transaction below. */

@@ -18,6 +18,7 @@ describe('normalizeRemindersSettings', () => {
 			autoOpenView: 'sidebar',
 			sidebarDefaultTab: 'today',
 			allDayNotificationTime: '09:00',
+			desktopNotifications: false,
 		});
 
 		expect(settings).toEqual({
@@ -30,6 +31,7 @@ describe('normalizeRemindersSettings', () => {
 			autoOpenView: 'sidebar',
 			sidebarDefaultTab: 'today',
 			allDayNotificationTime: '09:00',
+			desktopNotifications: false,
 		});
 	});
 

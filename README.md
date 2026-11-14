@@ -15,7 +15,7 @@ Crate is early self-hosted software. Review the code, understand the Cloudflare 
 - **Vault sync** across desktop and mobile, with attachments, deletes and renames, 30-day file history, and conflict copies instead of silent overwrites
 - **Your infrastructure:** file contents in your R2 bucket, metadata in your D1 database, deployed through Cloudflare sign-in without giving the plugin an account API token
 - **Local hosting:** run the same server on your own computer or in Docker, with no Cloudflare account required
-- **Reminders** stored as Markdown in your vault, with `reminders`, `reminders-today` and `reminders-upcoming` query blocks and push notifications through your own Worker
+- **Reminders** stored as Markdown in your vault, with `reminders`, `reminders-today` and `reminders-upcoming` query blocks, push notifications through your own Worker, and desktop notifications from Obsidian without a server
 - **Reading** list for saved links, articles and YouTube transcripts, with highlights stored as ordinary Markdown
 - **Web app** for reminders and Reading on your phone, installable to the Home Screen and usable without Obsidian open
 - **Optional end-to-end encryption** for notes, attachments, history and reminder text

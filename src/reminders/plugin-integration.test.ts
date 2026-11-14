@@ -212,6 +212,7 @@ beforeEach(() => {
 		getAll: reminderIndexGetAll,
 		rescanFile: reminderIndexRescanFile,
 		flushDeferredScans: reminderIndexFlushDeferredScans,
+		onIndexChange: () => () => {},
 	}));
 	createMarkdownWriter.mockImplementation(() => latestWriter);
 	createReminderRepository.mockReturnValue({

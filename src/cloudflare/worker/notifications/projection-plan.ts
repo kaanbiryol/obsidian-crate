@@ -3,7 +3,7 @@ import { parseEncryptedNotification } from '../../../encryption/notification-for
 import { sha256Hex } from '../../../platform/sha256';
 
 /** The dispatcher never delivers an occurrence this long after its due time. */
-export const NOTIFICATION_DELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000;
+export { NOTIFICATION_DELIVERY_WINDOW_MS } from '../../../reminders/core/notification-time';
 
 /** The occurrence and push text a projection row schedules. */
 export interface SchedulePayload {

@@ -1,5 +1,5 @@
 import { confirmFeatureFolder, setSharedFeature } from '../../../plugin/feature-settings';
-import { Notice, Setting } from 'obsidian';
+import { Notice, Platform, Setting } from 'obsidian';
 import { changeReminderFolder } from '../../plugin-integration';
 import {
 	normalizeRemindersFolderPath,
@@ -10,6 +10,7 @@ import type { TabId } from '../shared/layoutConstants';
 import { errorMessage } from '../../../platform/logger';
 import { FolderSuggest } from '../../../ui/settings/folder-suggest';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from '../../../ui/settings/input-helpers';
+import { normalizeTimeString } from '../../../platform/validation';
 import { createSettingsDisclosure } from '../../../ui/plugin/settings-disclosure';
 import type { SettingsSectionContext } from '../../../ui/settings/section-helpers';
 
@@ -31,7 +32,7 @@ export function renderRemindersSettings(context: SettingsSectionContext): () => 
 	});
 
 	new Setting(preferences).setName('Enable reminders')
-		.setDesc(`All devices · pause or resume reminders and their notifications. Notes and vault sync are preserved.${plugin.settings.workerUrl ? '' : ' Connect a server to get notifications.'}`)
+		.setDesc(`All devices · pause or resume reminders and their notifications. Notes and vault sync are preserved.${plugin.settings.workerUrl ? '' : Platform.isDesktopApp ? ' Connect a server to get notifications on your phone.' : ' Connect a server to get notifications.'}`)
 		.addToggle(toggle => toggle.setValue(settings.enabled).onChange(async enabled => {
 			toggle.setDisabled(true);
 			try {
@@ -111,5 +112,37 @@ export function renderRemindersSettings(context: SettingsSectionContext): () => 
 				value => parseSettingInteger(value, 1) !== null);
 		});
 
+	if (Platform.isDesktopApp) renderDesktopNotificationSettings(context, viewPreferences, persistSettings);
+
 	return () => folderSuggest?.close();
+}
+
+function renderDesktopNotificationSettings(context: SettingsSectionContext, containerEl: HTMLElement, persistSettings: (update: Partial<RemindersSettings>) => Promise<void>): void {
+	const { plugin } = context;
+	const connected = Boolean(plugin.settings.workerUrl);
+	const refresh = () => plugin.reminders?.notifications.refresh();
+	new Setting(containerEl)
+		.setName('Desktop notifications')
+		.setDesc(connected
+			? 'This device · show reminders while Obsidian is open. If web app notifications are on in a browser on this computer, turn this off to avoid getting each reminder twice.'
+			: 'This device · show reminders while Obsidian is open. Reminders due while Obsidian was closed show when it opens, up to a day late.')
+		.addToggle(toggle => toggle
+			.setValue(plugin.remindersSettings.desktopNotifications)
+			.onChange(async value => {
+				await persistSettings({ desktopNotifications: value });
+				refresh();
+			}));
+	// With a server, the shared notification policy in Notifications owns this time.
+	if (connected) return;
+	new Setting(containerEl)
+		.setName('All-day notification time')
+		.setDesc('This device · when reminders without a time notify. Leave empty to skip them.')
+		.addText(text => {
+			text.inputEl.type = 'time';
+			text.setPlaceholder('09:00').setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
+			bindCommittedText(text, () => plugin.remindersSettings.allDayNotificationTime ?? '', async value => {
+				await persistSettings({ allDayNotificationTime: value ? normalizeTimeString(value) : null });
+				refresh();
+			}, value => value === '' || normalizeTimeString(value) !== null);
+		});
 }

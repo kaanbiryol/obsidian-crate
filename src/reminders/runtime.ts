@@ -5,14 +5,17 @@ import { createReminderRepository, type ReminderRepository } from './data/remind
 import { VaultWatcher } from './data/vault-watcher';
 import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
-import { Notice } from 'obsidian';
+import { Notice, Platform } from 'obsidian';
 import { validateReadingFolder } from '../reading/settings';
 import { createReminderMoveJournal } from './data/reminder-move-journal';
 import { createReminderScanGate } from './scan-gate';
 import { createReminderEditorWriter } from './data/editor-normalization';
+import { startLocalReminderNotifications, type LocalNotification } from './local-notifications';
 
 /** How soon a line left under a focused cursor is tried again. */
 const EDITOR_RETRY_MS = 2000;
+/** Per vault and device, so a synced vault never carries one device's check to another. */
+const LAST_NOTIFICATION_CHECK_KEY = 'crate-reminders-last-notification-check';
 
 /** The loaded reminders folder. A folder change replaces it; disabling reminders clears it. */
 export interface ReminderBackend {
@@ -21,11 +24,13 @@ export interface ReminderBackend {
 	watcher: VaultWatcher;
 	/** Whether an editor may add reminder IDs to the file now, as a scan would. */
 	canAssignEditorIds(filePath: string): boolean;
+	/** Desktop notifications shown by Obsidian; refresh after their settings change. */
+	notifications: { refresh: () => void };
 }
 
 const remindersLogger = createLogger('Reminders');
 /** The plugin settings, vault, sync state and published backend the reminder runtime uses. */
-type ReminderRuntimeHost = Pick<CratePlugin, 'app' | 'manifest' | 'settings' | 'syncRuntime' | 'reminders'>;
+type ReminderRuntimeHost = Pick<CratePlugin, 'app' | 'manifest' | 'settings' | 'remindersSettings' | 'syncRuntime' | 'reminders'>;
 /** Reminder backend state of one plugin instance; the backend itself is `plugin.reminders`. */
 interface ReminderPluginState {
 	/** The newest setup's lifetime, including a setup that has not published its backend yet. */
@@ -159,11 +164,25 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 		throw error;
 	}
 	if (controller.signal.aborted) return undefined;
+	const notifications = startLocalReminderNotifications({
+		reminders: () => index.isInitialLoadComplete ? index.getActive() : null,
+		schedule: () => ({ allDayTime: plugin.remindersSettings.allDayNotificationTime, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+		isActive: () => desktopNotificationsActive(plugin),
+		show: showDesktopNotification,
+		loadLastChecked: () => {
+			const value: unknown = plugin.app.loadLocalStorage(LAST_NOTIFICATION_CHECK_KEY);
+			return typeof value === 'number' && Number.isFinite(value) ? value : null;
+		},
+		saveLastChecked: at => plugin.app.saveLocalStorage(LAST_NOTIFICATION_CHECK_KEY, at),
+	}, controller.signal);
+	const offIndexChange = index.onIndexChange(notifications.refresh);
+	controller.signal.addEventListener('abort', offIndexChange, { once: true });
 	const backend: ReminderBackend = {
 		index,
 		repository: createReminderRepository(index, createMarkdownWriter(plugin.app, index, journal)),
 		watcher: new VaultWatcher(plugin.app.vault, index),
 		canAssignEditorIds: filePath => index.isReminderFile(filePath) && !gate.shouldDeferWrites(filePath),
+		notifications,
 	};
 	plugin.reminders = backend;
 	backend.watcher.register();
@@ -180,4 +199,19 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 	}
 	state.listeners.forEach(listener => listener());
 	return backend;
+}
+
+/** Obsidian shows notifications on desktop only. */
+export function desktopNotificationsActive(plugin: Pick<CratePlugin, 'remindersSettings'>): boolean {
+	return Platform.isDesktopApp && plugin.remindersSettings.desktopNotifications;
+}
+
+function showDesktopNotification({ title, body, tag }: LocalNotification): void {
+	if (typeof Notification === 'undefined' || Notification.permission === 'denied') return;
+	const show = () => {
+		const notification = new Notification(title, { body, tag });
+		notification.onclick = () => window.focus();
+	};
+	if (Notification.permission === 'granted') show();
+	else void Notification.requestPermission().then(permission => { if (permission === 'granted') show(); });
 }

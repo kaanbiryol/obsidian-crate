@@ -28,6 +28,8 @@ export type RemindersSettings = {
 	autoOpenView: AutoOpenSetting;
 	sidebarDefaultTab: TabId;
 	allDayNotificationTime: string | null;
+	/** This device shows reminder notifications itself while Obsidian is open, on desktop. */
+	desktopNotifications: boolean;
 };
 
 /** A fresh install: reminders change no notes until they are turned on in this vault. */
@@ -41,6 +43,7 @@ export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
 	autoOpenView: 'none',
 	sidebarDefaultTab: 'inbox',
 	allDayNotificationTime: null,
+	desktopNotifications: true,
 };
 
 function isTabId(value: unknown): value is TabId {
@@ -132,6 +135,9 @@ export function normalizeRemindersSettings(
 			DEFAULT_REMINDERS_SETTINGS.sidebarDefaultTab,
 		),
 		allDayNotificationTime: normalizeTimeString(value?.allDayNotificationTime),
+		desktopNotifications: typeof value?.desktopNotifications === 'boolean'
+			? value.desktopNotifications
+			: DEFAULT_REMINDERS_SETTINGS.desktopNotifications,
 	};
 }
 

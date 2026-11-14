@@ -38,14 +38,13 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 					});
 				});
 
-			const options = notificationContent.createDiv();
-			options.hidden = !plugin.settings.pushEnabled;
 			const saveAllDayTime = async (time: string | null) => {
 				await opened.save({ allDayTime: time });
 				await plugin.writeRemindersSettings({ allDayNotificationTime: time }, opened.assertCurrent);
 			};
 			let timeInput: TextComponent;
-			const timeSetting = new Setting(options)
+			// Shown with push off too: Obsidian's desktop notifications use the same time.
+			const timeSetting = new Setting(notificationContent)
 				.setName('All-day notification time')
 				.setDesc('All devices · loading the notification timezone…')
 				.addText(text => {
@@ -72,6 +71,8 @@ export function renderNotificationsSection(context: SettingsSectionContext): () 
 					}
 				}));
 
+			const options = notificationContent.createDiv();
+			options.hidden = !plugin.settings.pushEnabled;
 			const policyDescription = options.createEl('p', { cls: 'setting-item-description' });
 			void opened.loaded.then(() => {
 				if (!active) return;

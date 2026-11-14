@@ -167,6 +167,16 @@ describe('renderNotificationsSection', () => {
 		expect(setting.texts[0]?.inputEl.value).toBe('');
 	});
 
+	it('keeps the all-day time visible with push off, since desktop notifications use it', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({ getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })) }) as unknown as { settings: { pushEnabled: boolean } };
+		plugin.settings.pushEnabled = false;
+		renderNotificationsSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		const visible = (element: FakeElement | null): boolean => !element || (!element.hidden && visible(element.parentElement));
+		expect(visible(getSettingByName('All-day notification time').settingEl)).toBe(true);
+		expect(visible(getSettingByName('Notification folder and timezone').settingEl)).toBe(false);
+	});
+
 	it('saves an edited all-day time once, with the field disabled while it saves', async () => {
 		const { renderNotificationsSection } = await loadNotificationsSectionModule();
 		const plugin = createPlugin({ getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })) }) as unknown as { writeRemindersSettings: ReturnType<typeof vi.fn> };

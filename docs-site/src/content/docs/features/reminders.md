@@ -14,7 +14,7 @@ Crate reminders are ordinary Markdown checkboxes in your vault. Plan your day in
 3. Type something natural, like "Send the proposal tomorrow at 12", and check the date Crate picked up. You can also set the date yourself, choose a project, add a description, set a priority, or make it repeat.
 4. Save it, then run **Crate: Open sidebar** to see your reminders.
 
-Reminders are saved in your reminders folder, `Reminders` unless you choose another, and work without a server. You need a server for syncing and notifications.
+Reminders are saved in your reminders folder, `Reminders` unless you choose another, and work without a server. On desktop, Obsidian can show [notifications](/docs/features/notifications/#desktop-notifications-without-a-server) while it's open. You need a server for syncing and for notifications on your phone or with Obsidian closed.
 
 Words like "tomorrow" become a real date when you save, so the reminder doesn't keep drifting forward each time you open it.
 

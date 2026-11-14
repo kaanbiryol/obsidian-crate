@@ -32,8 +32,10 @@ async function createPlugin() {
 		'Tasks/Inbox.md': '- [ ] Task from the new folder <!-- crate-id:new -->\n',
 	});
 	fixtures.push(h);
+	// The backend starts reminder notification timers before the list renders a window.
+	vi.stubGlobal('window', globalThis);
 	Object.assign(h.vault, { on: () => ({}), offref: () => {} });
-	Object.assign(h.app, { workspace: { layoutReady: true, onLayoutReady: () => {}, getLeavesOfType: () => [], on: () => ({}), offref: () => {} } });
+	Object.assign(h.app, { workspace: { layoutReady: true, onLayoutReady: () => {}, getLeavesOfType: () => [], on: () => ({}), offref: () => {} }, loadLocalStorage: () => null, saveLocalStorage: () => {} });
 	useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS, enabled: true, confirmed: true }, true);
 	const plugin = {
 		app: h.app,
