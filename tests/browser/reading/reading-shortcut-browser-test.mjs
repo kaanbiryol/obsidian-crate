@@ -271,7 +271,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(page.getByRole('link', { name: 'Open shortcut setup', exact: true })).toBeHidden(); assert.equal(handoffs, 0);
 
     const stale = await prepare(); const staleToken = new URL(stale.launchUrl).hash.slice(1);
-    await runtime.db.prepare('UPDATE reading_handoffs SET expires_at=1 WHERE token_hash=?').bind(createHash('sha256').update(staleToken).digest('hex')).run();
+    await runtime.db.prepare("UPDATE grants SET expires_at=1 WHERE kind='reading_handoff' AND key=?").bind(createHash('sha256').update(staleToken).digest('hex')).run();
     await page.goto(stale.launchUrl);
     await expect(page.getByRole('heading', { name: 'Share this link again', exact: true })).toBeVisible(); await noSuccess();
     await expect(page.getByRole('button', { name: 'Retry save', exact: true })).toBeHidden(); assert.equal((await diagnostic()).status, 410);

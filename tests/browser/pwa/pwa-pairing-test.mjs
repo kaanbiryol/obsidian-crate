@@ -100,7 +100,7 @@ try {
           await phone.route('**/encryption',route=>route.fulfill({json:{encryption:state,folderPath:remindersFolder.wire,folderLabel:remindersFolder.label}}));
           await phone.route('**/reading/encryption',route=>route.fulfill({json:{encryption:state,folderLabel:readingFolder.label}}));
           await phone.route('**/reading/session',route=>route.fulfill({json:{id:'paired',folderPath:readingFolder.wire,generation:'g1',expiresAt:Date.now()+600000}}));
-          await phone.route('**/*/encrypted-files?*',route=>route.fulfill({json:{files:[],nextCursor:null,generation:bundle.generation,sequence:1}}));
+          await phone.route('**/*/encrypted-files?*',route=>route.fulfill({json:{files:[],nextCursor:null,generation:bundle.generation,changeToken:'1'.repeat(32),deltaBase:`1.${'1'.repeat(32)}`}}));
           await mac.route('**/pairing-host',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html><head><style>${hostCss}</style><style>${obsidianCss}</style><style>${pluginCss}</style></head><body class="theme-dark"><script>${host.outputFiles[0].text}</script></body></html>`}));
           const p=await phone.newPage(), m=await mac.newPage();
           await m.goto(`${origin}/pairing-host`);

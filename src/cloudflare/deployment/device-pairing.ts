@@ -2,7 +2,7 @@ import type { CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentMetadata } from './types';
 import { createRandomHexToken } from '../../platform/random-hex';
 import { sha256Hex } from '../../platform/sha256';
-import { DEVICE_PAIRING_END, DEVICE_PAIRING_LIFETIME, DEVICE_PAIRING_PREFIX } from '../../protocol/device-pairing';
+import { DEVICE_PAIRING_GRANT, DEVICE_PAIRING_LIFETIME } from '../../protocol/device-pairing';
 
 /** `expiresAt` is this device's display deadline; the stored code expires by D1's clock. */
 export interface IssuedDevicePairing { code: string; tokenId: string; expiresAt: number }
@@ -21,11 +21,11 @@ export async function issueDevicePairingCode(input: {
 	const code = createRandomHexToken(), tokenId = createRandomHexToken(16), expiresAt = input.now + DEVICE_PAIRING_LIFETIME;
 	const { deletion: _deletion, ...deployment } = input.metadata;
 	await input.api.queryD1(input.accountId, input.databaseId,
-		'DELETE FROM maintenance_state WHERE key >= ? AND key < ?;', [DEVICE_PAIRING_PREFIX, DEVICE_PAIRING_END]);
+		'DELETE FROM grants WHERE kind = ?;', [DEVICE_PAIRING_GRANT]);
 	await input.api.queryD1(input.accountId, input.databaseId,
-		`INSERT INTO maintenance_state (key, value)
-			SELECT ?, json_set(?, '$.resetGeneration', COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), ''),
-				'$.expiresAt', unixepoch('now') * 1000 + ${DEVICE_PAIRING_LIFETIME});`,
-		[DEVICE_PAIRING_PREFIX + await sha256Hex(code), JSON.stringify({ id: tokenId, expiresAt: 0, resetGeneration: '', deployment })]);
+		`INSERT INTO grants (kind, key, payload, expires_at)
+			SELECT ?, ?, json_set(?, '$.resetGeneration', COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), ''),
+				'$.expiresAt', unixepoch('now') * 1000 + ${DEVICE_PAIRING_LIFETIME}), unixepoch('now') * 1000 + ${DEVICE_PAIRING_LIFETIME};`,
+		[DEVICE_PAIRING_GRANT, await sha256Hex(code), JSON.stringify({ id: tokenId, expiresAt: 0, resetGeneration: '', deployment })]);
 	return { code, tokenId, expiresAt };
 }

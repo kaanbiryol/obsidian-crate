@@ -21,8 +21,8 @@ const READY_SQL = `NOT EXISTS (SELECT 1 FROM notification_policy) OR (
 export async function finishInitialReminderSetup(request: Request, db: D1Database): Promise<Response> {
 	const parsed = await parseJsonObject(request);
 	if (!parsed.ok) return parsed.response;
-	const current = await db.prepare('SELECT token, state FROM initial_import WHERE id = 1').first<{ token: string; state: string }>();
-	if (!current || current.token !== parsed.value.token || current.state !== 'complete') {
+	const current = await db.prepare('SELECT import_token AS token, import_state AS state FROM server_state WHERE id = 1').first<{ token: string | null; state: string | null }>();
+	if (!current?.token || current.token !== parsed.value.token || current.state !== 'complete') {
 		return corsResponse({ error: 'Initial upload is not complete' }, 409);
 	}
 	const result = await db.batch<{ results: Array<{ ready: number; error: string | null }> }>([

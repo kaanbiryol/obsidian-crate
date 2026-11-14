@@ -68,7 +68,7 @@ def verify(directory):
         validate_schema(db)
         expected = references(db)
         objects = {item['key']: item for item in manifest['objects']}
-        if len(objects) != len(manifest['objects']) or set(objects) != set(expected) | ({'__crate__/settings.json'} if '__crate__/settings.json' in objects else set()):
+        if len(objects) != len(manifest['objects']) or set(objects) != set(expected):
             raise ValueError('Archive object inventory does not match the database')
         for key, item in objects.items():
             data = object_path(directory, key).read_bytes()
@@ -91,6 +91,8 @@ def prepare_restore_sql(directory, restored_at=None):
         upgrade_schema(db)
         for table in RESTORE_POLICY['resetTables']:
             db.execute(f'DELETE FROM "{table}"')
+        for table, columns in RESTORE_POLICY['resetColumns'].items():
+            db.execute(f'UPDATE "{table}" SET ' + ', '.join(f'"{column}" = NULL' for column in columns))
         # Restored retained content gets a fresh recovery window before collection.
         restored_at = int(time.time() * 1000) if restored_at is None else restored_at
         db.execute('UPDATE file_versions SET expires_at = ?', (restored_at + RESTORE_POLICY['fileVersionRetentionMs'],))

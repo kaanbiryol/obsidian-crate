@@ -43,7 +43,7 @@ async function seedSourceStates(db: D1Database, folder: string): Promise<boolean
         parser_version = 0, verified = 0, sources_digest = NULL
       WHERE reminder_source_state.file_revision != excluded.file_revision`).bind(JSON.stringify(files.map(file => portablePathKey(file.path)))),
 		db.prepare(`INSERT INTO maintenance_state (key, value) VALUES (?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`).bind(scanKey, next),
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(scanKey, next),
 	]);
 	return next !== '';
 }
@@ -52,7 +52,7 @@ async function seedSourceStates(db: D1Database, folder: string): Promise<boolean
  * The byte budget always admits one valid file, so a large source cannot stall it. */
 /** `verified` receives each verified file's bytes, keyed by path, for a projection in the same pass. */
 export async function revalidateReminderSources(env: Env, limit: number, scope?: { folder: string | null; encryption?: EncryptionServerState | null }, verified?: Map<string, VerifiedSourceBytes>): Promise<boolean> {
-	if (!scope && await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return false;
+	if (!scope && await env.DB.prepare("SELECT 1 FROM server_state WHERE id = 1 AND import_state = 'importing'").first()) return false;
 	const folder = scope ? scope.folder : await getReminderFolder(env.DB);
 	const cleaning = await retireOutOfScopeSources(env.DB, folder);
 	if (folder === null || cleaning) return cleaning;
@@ -100,7 +100,10 @@ export async function revalidateReminderSources(env: Env, limit: number, scope?:
 			if (!text) throw new Error('Committed reminder content could not be verified');
 			await env.DB.batch([
 				...resetRetries,
-				...await enqueueFileProjection(env.DB, file.path, file.storageKey, text.content, { preserveRetries: true, encrypted, reminderFolder: folder }),
+				// A parser upgrade can change what a row should hold, so each reminder's row is
+				// checked again. The caller keeps the verified bytes for the projection.
+				...await enqueueFileProjection(env.DB, file.path, file.storageKey, text.content,
+					{ preserveRetries: true, encrypted, reminderFolder: folder, recheck: upgraded.has(file.path), cacheBytes: false }),
 				env.DB.prepare(`UPDATE notification_file_retries SET available_at = NULL WHERE path = ?
           AND EXISTS (SELECT 1 FROM reminder_source_state WHERE file_path = ? AND file_revision = ? AND verified = 1)`)
 					.bind(file.path, file.path, file.storageKey),

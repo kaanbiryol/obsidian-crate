@@ -14,12 +14,6 @@ export async function registerCloudflareAuthorizedDevice(input: {
 	databaseId: string;
 	device: CloudflareAuthorizedDevice;
 }): Promise<void> {
-	await input.api.queryD1(
-		input.accountId,
-		input.databaseId,
-		`DELETE FROM auth_tokens
-			WHERE device_id IS NULL AND device_name = 'setup-link' AND last_seen_at IS NULL;`,
-	);
 	const existing = await queryD1Rows(
 		input.api,
 		input.accountId,

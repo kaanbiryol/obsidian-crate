@@ -109,7 +109,7 @@ it.each(uploadKinds)('fences %s bodies delayed across activation and reset, incl
 			expect(response.status, await response.clone().text()).toBe(428);
 			expect(await response.json()).toMatchObject({ code: 'encryption_required' });
 		}
-		for (const table of ['files', 'changelog', 'staged_uploads', 'staged_upload_batches', 'upload_operations']) {
+		for (const table of ['files', 'changelog', 'upload_leases', 'operations']) {
 			expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 		}
 		expect((await env.BUCKET.list()).objects).toHaveLength(0);

@@ -51,7 +51,7 @@ it('transfers only encrypted browser keys after approval, including retry after 
 	await expect(computer.approve(payload)).rejects.toThrow('Response lost');
 	await computer.approve(payload);
 	expect((await app.poll()).payload).toEqual(payload);
-	const stored = JSON.stringify((await env.DB.prepare("SELECT value FROM maintenance_state WHERE key LIKE 'crate_web_pairing:%'").all()).results);
+	const stored = JSON.stringify((await env.DB.prepare("SELECT payload AS value FROM grants WHERE kind = 'web_pairing'").all()).results);
 	for (const secret of [f.recovery, f.bundle.vault.secret, f.bundle.notifications.secret, f.bundle.seal.privateKey]) expect(stored).not.toContain(secret);
 	expect((await transport('other-app').read(app.id)).requests).toEqual([]);
 	expect((await send('other-app', { action: 'cancel', id: app.id })).status).toBe(403);
@@ -101,19 +101,19 @@ it.each(['cancel','expire','revoke','generation','reset'] as const)('fences a pe
 	const computer = await answerAppPairing((await mac.read()).requests[0]!, mac, current);
 	await app.poll(); await computer.poll();
 	if (reason === 'cancel') await app.close();
-	if (reason === 'expire') await env.DB.prepare("UPDATE maintenance_state SET value=json_set(value,'$.expiresAt',1) WHERE key=?").bind('crate_web_pairing:' + app.id).run();
+	if (reason === 'expire') await env.DB.prepare("UPDATE grants SET payload=json_set(payload,'$.expiresAt',1), expires_at=1 WHERE kind='web_pairing' AND key=?").bind(app.id).run();
 	if (reason === 'revoke') await env.DB.prepare("DELETE FROM auth_tokens WHERE id='app'").run();
 	if (reason === 'generation' || reason === 'reset') await env.DB.prepare('UPDATE server_state SET encryption=? WHERE id=1').bind(JSON.stringify({ ...f.state, ...(reason === 'generation' ? { generation: 9 } : { mode: 'resetting' }) })).run();
 	await expect(computer.approve({ bundle: f.bundle })).rejects.toThrow();
-	expect((await env.DB.prepare('SELECT value FROM maintenance_state WHERE key=?').bind('crate_web_pairing:' + app.id).first<{ value: string }>())?.value).not.toContain('payload');
+	expect((await env.DB.prepare("SELECT payload AS value FROM grants WHERE kind='web_pairing' AND key=?").bind(app.id).first<{ value: string }>())?.value).not.toContain('payload');
 });
 
 it('caps attempts without polling writes, including cancelled attempts', async () => {
 	const f = await configure(); const web = transport('app');
 	for (let n = 0; n < 3; n++) { const app = await requestAppPairing(f.context(), web, current); await app.close(); }
-	const before = await env.DB.prepare("SELECT value,updated_at FROM maintenance_state WHERE key LIKE 'crate_web_pairing:%'").all();
+	const before = await env.DB.prepare("SELECT payload AS value FROM grants WHERE kind = 'web_pairing'").all();
 	for (let n = 0; n < 5; n++) await transport('vault').read();
-	expect((await env.DB.prepare("SELECT value,updated_at FROM maintenance_state WHERE key LIKE 'crate_web_pairing:%'").all()).results).toEqual(before.results);
+	expect((await env.DB.prepare("SELECT payload AS value FROM grants WHERE kind = 'web_pairing'").all()).results).toEqual(before.results);
 	expect((await send('app', { action: 'start', ...(await createPairingRequester(f.context())).request })).status).toBe(429);
 });
 

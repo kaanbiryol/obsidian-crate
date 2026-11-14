@@ -15,7 +15,7 @@ import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import { revalidateReminderSources } from '../reminders/source-migration';
 import { drainNotificationProjections } from '../notifications/projection';
 import { runNotificationCoordinator } from '../notifications/coordinator';
-import { countD1Queries } from '../d1/d1-query-count';
+import { countD1Queries } from '../test-support/d1-query-test-harness';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 
 beforeEach(async () => { await applySchema(env.DB); });
@@ -27,7 +27,7 @@ type Fixture = Awaited<ReturnType<typeof createEncryptionFixture>>;
 async function upload(fixture: Fixture, plain: string, content: Uint8Array<ArrayBuffer>, scheduled = true) {
 	const { keys, notifications, paths } = fixture;
 	const path = await paths.wire(plain);
-	const file = await sealFile({ path: plain, content, contentType: 'text/markdown',
+	const file = await sealFile({ path: plain, content, 
 		publicData: scheduled ? await createReminderProjection(notifications, ['Reminders'], plain, content.buffer) : null }, keys.forPath(path));
 	const response = await handleUpload(new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),

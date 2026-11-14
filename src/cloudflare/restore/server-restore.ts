@@ -49,7 +49,7 @@ async function verifyRows(api: CloudflareApiClient, account: string, database: s
 	}
 	if (!groups.has('maintenance_state')) groups.set('maintenance_state', []);
 	for (const [table, expected] of groups) {
-		const columns = expected[0]?.columns ?? ['key','value','updated_at'];
+		const columns = expected[0]?.columns ?? ['key','value'];
 		if (expected.some(row => JSON.stringify(row.columns) !== JSON.stringify(columns))) throw new Error('Inconsistent backup columns');
 		const actual: string[] = [];
 		for (let offset = 0; ; offset += 500) {

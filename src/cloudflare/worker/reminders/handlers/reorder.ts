@@ -6,11 +6,11 @@ import { parseFolderPath, parseProjectPath } from '../requests';
 import { commitReminderCommand } from '../command';
 import { MAX_REMINDERS_PER_NOTE } from '@/reminders/core/constants';
 
-export async function handleReorderReminders(request: Request, env: Env): Promise<Response> {
+export async function handleReorderReminders(request: Request, env: Env, arm?: () => Promise<void>): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) return parsedBody.response;
 
-	const operation = await beginReminderOperation(env.DB, parsedBody.value, 'reorder');
+	const operation = await beginReminderOperation(env.DB, parsedBody.value, 'reorder', arm);
 	if (operation instanceof Response) return operation;
 
 	const folderPath = parseFolderPath(parsedBody.value.folderPath);

@@ -9,8 +9,9 @@ import { notificationRetryDelayMs } from './queue';
 import { isD1DailyLimitError, nextD1DailyReset } from '../d1/d1-usage';
 import { armReminderDispatcher } from '../coordinator/coordinator';
 import type { StateLock } from '../coordinator/coordinator-requests';
+import { markRole } from '../coordinator/role-flags';
 
-/** Dispatcher role storage flag: its alarm delivers due reminders. */
+/** Dispatcher role storage flag, for runtimes without instance names: its alarm delivers due reminders. */
 export const DISPATCHER_KEY = 'reminderDispatcher';
 const FAILURES_KEY = 'dispatchFailures';
 const MAX_PASS_FAILURES = 8;
@@ -45,9 +46,9 @@ export async function wakeReminderDispatcher(env: Env, at?: number): Promise<voi
 export async function armDispatcher(state: DurableObjectState, env: Env, withStateLock: StateLock, at?: number | null): Promise<void> {
 	const requested = at ?? (await env.DB.prepare(NEXT_DUE_SQL).first<{ dueAt: number }>())?.dueAt ?? null;
 	await withStateLock(async () => {
-		await state.storage.put(DISPATCHER_KEY, true);
+		await markRole(state, DISPATCHER_KEY);
 		// A new schedule gets a fresh pass budget.
-		await state.storage.delete(FAILURES_KEY);
+		if (await state.storage.get(FAILURES_KEY) !== undefined) await state.storage.delete(FAILURES_KEY);
 		if (requested === null) return;
 		const current = await state.storage.getAlarm();
 		if (current === null || requested < current) await state.storage.setAlarm(Math.max(requested, Date.now()));
@@ -102,19 +103,20 @@ export async function deliverDueReminders(env: Env): Promise<number | null> {
 		// other pass moved its attempt time.
 		const guard = 'WHERE reminder_id = ? AND due_datetime IS ? AND due_at = ?';
 		const guardArgs = [row.id, row.due, row.dueAt];
-		const fail = (message: string) => db.prepare(`UPDATE reminder_projections SET due_at = NULL, delivery_failed_at = ?, last_error = ? ${guard}`)
-			.bind(new Date().toISOString(), message.slice(0, 1024), ...guardArgs);
-		const retry = (message: string, pending: string | null) => {
-			if (row.attempts >= MAX_DELIVERY_ATTEMPTS) return fail(message);
-			return db.prepare(`UPDATE reminder_projections SET attempts = ?, due_at = ?, pending_subscriptions = ?, last_error = ? ${guard}`)
-				.bind(row.attempts + 1, Date.now() + notificationRetryDelayMs(row.attempts), pending, message.slice(0, 1024), ...guardArgs);
+		// An invalid schedule, a missed 24-hour window, an oversized payload or exhausted attempts.
+		const fail = () => db.prepare(`UPDATE reminder_projections SET due_at = NULL, delivery_failed_at = ? ${guard}`)
+			.bind(new Date().toISOString(), ...guardArgs);
+		const retry = (pending: string | null) => {
+			if (row.attempts >= MAX_DELIVERY_ATTEMPTS) return fail();
+			return db.prepare(`UPDATE reminder_projections SET attempts = ?, due_at = ?, pending_subscriptions = ? ${guard}`)
+				.bind(row.attempts + 1, Date.now() + notificationRetryDelayMs(row.attempts), pending, ...guardArgs);
 		};
 		const dueTime = row.due ? Date.parse(row.due) : NaN;
-		if (!Number.isFinite(dueTime) || row.content === null) { outcomes.push(fail('Notification schedule is invalid')); continue; }
-		if (Date.now() - dueTime >= NOTIFICATION_DELIVERY_WINDOW_MS) { outcomes.push(fail('Notification missed its 24-hour delivery window')); continue; }
+		if (!Number.isFinite(dueTime) || row.content === null) { outcomes.push(fail()); continue; }
+		if (Date.now() - dueTime >= NOTIFICATION_DELIVERY_WINDOW_MS) { outcomes.push(fail()); continue; }
 		// The file commit and its projection job are atomic. Do not send from a schedule
 		// whose source has changed while projection is still catching up.
-		if (!authorized.has(row.id)) { outcomes.push(retry('Reminder source is awaiting notification projection', row.pending)); continue; }
+		if (!authorized.has(row.id)) { outcomes.push(retry(row.pending)); continue; }
 		try {
 			subscriptions ??= await listPushSubscriptions(db);
 			const delivery = await sendToAllSubscriptions(db, {
@@ -134,7 +136,7 @@ export async function deliverDueReminders(env: Env): Promise<number | null> {
 			const removed = new Set(delivery.removedSubscriptionIds);
 			if (removed.size) subscriptions = subscriptions.filter(subscription => !removed.has(subscription.id));
 			if (delivery.failed > 0) {
-				outcomes.push(retry(`Push delivery failed for ${delivery.failed} subscription(s)`, JSON.stringify(delivery.failedSubscriptionIds)));
+				outcomes.push(retry(JSON.stringify(delivery.failedSubscriptionIds)));
 				continue;
 			}
 			// Recorded even if the reminder moved or changed meanwhile: this occurrence was sent.
@@ -142,13 +144,11 @@ export async function deliverDueReminders(env: Env): Promise<number | null> {
 			outcomes.push(db.prepare(`UPDATE reminder_projections SET delivered_due = ?,
         due_at = CASE WHEN ${same} THEN NULL ELSE due_at END,
         attempts = CASE WHEN ${same} THEN 0 ELSE attempts END,
-        pending_subscriptions = CASE WHEN ${same} THEN NULL ELSE pending_subscriptions END,
-        last_error = CASE WHEN ${same} THEN NULL ELSE last_error END
-        WHERE reminder_id = ?`).bind(row.due, row.due, row.due, row.due, row.due, row.id));
+        pending_subscriptions = CASE WHEN ${same} THEN NULL ELSE pending_subscriptions END
+        WHERE reminder_id = ?`).bind(row.due, row.due, row.due, row.due, row.id));
 		} catch (error) {
 			if (isD1DailyLimitError(error)) throw error;
-			const message = error instanceof Error ? error.message : String(error);
-			outcomes.push(error instanceof PushPayloadError ? fail(message) : retry(message, row.pending));
+			outcomes.push(error instanceof PushPayloadError ? fail() : retry(row.pending));
 		}
 	}
 	// Outcomes move every attempt of this pass out of the due range, so an earliest due time

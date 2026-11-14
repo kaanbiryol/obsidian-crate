@@ -12,7 +12,7 @@ import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { handleUpload } from '../sync/file-handlers';
 import { getStoredFileRow } from '../sync/storage';
-import { trackStagedUpload } from '../sync/staging/staged-uploads';
+import { trackUploadLease } from '../sync/staging/upload-leases';
 import { uploadMutation } from '../sync/mutations';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
@@ -25,6 +25,7 @@ import { sha256Hex } from '../../../platform/sha256';
 import { sealFolderLabel } from '../../../encryption/folder-label';
 import { importEncryptionSecret } from '../../../encryption/envelope';
 import { handleEncryptedFolderFiles } from './encrypted-folder-files';
+import { unpackDescriptor } from './descriptor-column';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
@@ -46,7 +47,7 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	const plain = 'Reminders/Inbox.md', path = await paths.wire(plain);
 	const text = '- [ ] Secret medical appointment 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->';
 	const content = new TextEncoder().encode(text);
-	const file = await sealFile({ path: plain, content, contentType: 'text/markdown', publicData: await createReminderProjection(notifications, ['Reminders'], plain, content.buffer) }, keys.forPath(path));
+	const file = await sealFile({ path: plain, content, publicData: await createReminderProjection(notifications, ['Reminders'], plain, content.buffer) }, keys.forPath(path));
 	const request = new Request(`https://test/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: file.bytes,
 		headers: { 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)) } });
@@ -58,7 +59,8 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	// The descriptor is written with the file's row and its changelog put, nowhere else.
 	const descriptors = await env.DB.prepare(`SELECT descriptor FROM files WHERE storage_key = ?1
 		UNION ALL SELECT descriptor FROM changelog WHERE revision = ?1`).bind(stored!.storageKey).all<{ descriptor: string }>();
-	expect(descriptors.results.map(row => row.descriptor)).toEqual([JSON.stringify(file.descriptor), JSON.stringify(file.descriptor)]);
+	expect(descriptors.results.map(row => JSON.stringify(unpackDescriptor(row.descriptor)))).toEqual([JSON.stringify(file.descriptor), JSON.stringify(file.descriptor)]);
+	expect(descriptors.results[0]!.descriptor.startsWith('2.')).toBe(true);
 	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).toBeNull();
 	await drainNotificationProjections(env);
 	const alarm = await env.DB.prepare('SELECT content FROM reminder_projections WHERE reminder_id = ?').bind('r1').first<{ content: string }>();
@@ -72,18 +74,18 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 
 it('rejects an in-flight plaintext publication whose SQL was prepared before encryption began', async () => {
 	const hash = 'a'.repeat(64), path = 'late.md', key = createManagedObjectKey(hash);
-	await trackStagedUpload(env.DB, key, path);
-	const pending = uploadMutation(env.DB, { path, hash, size: 5, objectKey: key, expectedHash: null });
+	const { id: leaseId } = await trackUploadLease(env.DB, [{ storageKey: key, path }]);
+	const pending = uploadMutation(env.DB, { path, hash, size: 5, objectKey: key, leaseId, expectedHash: null });
 	await configure();
 	await pending.run();
 	expect(await getStoredFileRow(env.DB, path)).toBeNull();
-	await expect(trackStagedUpload(env.DB, createManagedObjectKey(hash), 'new-plaintext.md')).rejects.toThrow('Encryption changed');
+	await expect(trackUploadLease(env.DB, [{ storageKey: createManagedObjectKey(hash), path: 'new-plaintext.md' }])).rejects.toThrow('Encryption changed');
 });
 
 it('commits a web app note with the encryption state authentication already read', async () => {
 	const { state, keys, paths } = await configure();
 	const path = await paths.wire('Reminders/Inbox.md');
-	const sealed = await sealFile({ path: 'Reminders/Inbox.md', content: new TextEncoder().encode('- [ ] Private task'), contentType: 'text/markdown; charset=utf-8' }, keys.forPath(path));
+	const sealed = await sealFile({ path: 'Reminders/Inbox.md', content: new TextEncoder().encode('- [ ] Private task') }, keys.forPath(path));
 	const body = JSON.stringify({ folderPath: path.slice(0, path.lastIndexOf('/')), operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)),
 		files: [{ path, content: new TextDecoder().decode(sealed.bytes), expectedHash: null }], acknowledgment: 'a.b.c.d.e' });
 	const prepare = vi.spyOn(env.DB, 'prepare');

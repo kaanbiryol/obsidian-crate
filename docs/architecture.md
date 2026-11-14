@@ -72,8 +72,8 @@ enrollment endpoints or migration behavior to Cloudflare-hosted Workers.
 | Service | Role |
 |---|---|
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog, serves the reminders PWA |
-| **Cloudflare R2** | Object storage for vault file content and shared settings |
-| **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, reminder schedules, and parsed reminder caches |
+| **Cloudflare R2** | Object storage for vault file content |
+| **Cloudflare D1** | SQLite database with sync metadata, shared settings, auth tokens, push subscriptions, reminder schedules, and parsed reminder caches |
 | **Cloudflare OAuth deployment** | Uses PKCE in Obsidian to provision the bundled Worker and schema; retains account authorization in secret storage for explicit management and usage requests |
 | **Static GitHub Pages callback** | Removes OAuth parameters and hands the response to Obsidian; has no backend, analytics, or token exchange |
 | **OS Keychain** | Stores auth tokens via Obsidian's `secretStorage` API |
@@ -241,18 +241,19 @@ the plugin too. `reminders/list-parity.integration.ts` checks that both lists ag
 transfer execution with a tagged argument. `request-guards.ts` owns stateless
 protocol and encryption checks; the handler retains their ordering around
 admission, authentication, scope authorization and route dispatch. Transfer
-requests authenticate again after entering the queue. Coordinator routes are
-forwarded after edge admission and authenticate inside the coordinator, under the
-lock that device, session and reset revocations also take; the edge remembers a
-credential the coordinator accepted for admission. A credential the edge has not
-recently accepted authenticates there first, so an invalid one never queues on
-that lock. Two revocations run
+requests are forwarded after edge admission and authenticate after entering their
+object's queue, before it reads bytes. Coordinator routes are forwarded the same way
+and authenticate inside the coordinator, under the lock that device, session and reset
+revocations also take; the edge remembers a credential either accepted for admission.
+A credential the edge has not recently accepted authenticates there first, so an
+invalid one never queues on either. Two revocations run
 outside that lock: a web app enrollment exchange revokes the credential it replaces
 at the edge, and maintenance prunes expired tokens. A push subscription is therefore
 saved only while its owner token exists, and maintenance removes subscriptions
 whose owner is gone. The encrypted shortcut capture
 still authenticates at the edge, where it downloads the page. Coordinator execution
-receives the Durable Object state and persists notification wakes before mutations.
+receives the Durable Object state and persists notification wakes before mutations
+that can queue notification or Reading work (`notifications/arming.ts`).
 The handler selects required `UploadCommitters` from that execution kind and passes
 them through the routes. Worker `Env` contains bindings, not optional publication
 callbacks. Upload handlers retain staging and validation; direct publication and
@@ -261,11 +262,14 @@ coordinator forwarding remain explicit choices without fallback defaults.
 explicit JSON metadata. Direct `commitStagedFile` callers retain transaction-local
 effects for atomic domain receipts.
 
-`cloudflare/worker/d1/operation-receipts.ts` owns the shared retry floor and window check used by
-Reminders, Reading, uploads and encryption recovery. Its persisted
-`reminder_operation_floor` key remains unchanged. `maintenance/operation-receipts.ts`
-publishes that floor and prunes receipts in the same transaction, and coordinates
-expired enrollment and pairing cleanup. Reminder-specific expiration copy and
+`cloudflare/worker/d1/operation-receipts.ts` owns the retry floors and window checks:
+`reminder_operation_floor` (180 days) for Reminders, Reading and encryption recovery,
+and `upload_operation_floor` (30 days) for upload and restore receipts.
+All receipts share the `operations` table, keyed by kind and operation ID, so each kind
+is pruned by its own key range. `maintenance/operation-receipts.ts` publishes each floor
+and prunes its receipts, with their `operation_chunks`, in the same transaction. One-time
+grants (enrollment links, Reading codes and save links, device and app pairings) share
+`grants`, and `maintenance/database.ts` deletes expired ones in one statement. Reminder-specific expiration copy and
 occurrence retention stay with the reminder modules.
 
 `cloudflare/worker/maintenance/object-cleanup.ts` owns reference-aware R2 deletion
@@ -655,19 +659,21 @@ reminder delivery and retries from the schedule columns of `reminder_projections
 maintenance, Reading and transfer pools) and owns the internal endpoint paths behind
 typed helpers. `coordinator-requests.ts` dispatches those endpoints with that lock,
 keeping upload preparation outside it. `coordinator-alarms.ts` dispatches the
-dispatcher, Reading, maintenance and projection roles' alarms.
+dispatcher, Reading, maintenance and projection roles' alarms by instance name.
 
 `worker/sync/` is also the committed-file store every feature writes through.
 Reminders, Reading, notifications and encrypted folders use its file identity guards
 (`file-identity.ts`), Markdown reads and staging (`markdown-files.ts`,
 `markdown-file-staging.ts`), commits (`mutations.ts`, `atomic-markdown-*.ts`) and
-change tokens (`change-token.ts`). These commits share the staged-upload guards in
-`worker/sync/staging/`, so the store stays in `worker/sync/` rather than in a folder of
+change tokens (`change-token.ts`). These commits share the upload-lease guard in
+`worker/sync/staging/upload-leases.ts`, so the store stays in `worker/sync/` rather than in a folder of
 its own. A change there affects every feature's writes, not only the sync API.
 
 `worker/sync/import/` holds the server side of the initial import and its reminder
-readiness. `worker/sync/staging/` holds staged uploads, bulk new-file commits and
-the upload committers that publish them.
+readiness. `worker/sync/staging/` holds the request-scoped upload leases
+(`upload-leases.ts`, one `upload_leases` row per request), bulk new-file commits and
+the upload committers that publish them. `maintenance/upload-lease-cleanup.ts` claims
+expired leases and reclaims their unpublished objects.
 
 `worker/sync/batch/upload-validation.ts` decodes and validates upload candidates and
 request budgets before storage work. `worker/sync/batch/upload.ts` retains receipt
@@ -761,10 +767,11 @@ See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).
 
 Encrypted Reading uses the trusted plugin/PWA for decryption, indexing, extraction and Markdown edits. `pwa/reading/encrypted-api.ts` owns the conditional ciphertext transport; `pwa/connection/` owns app enrollment and shared verification, while `pwa/reading/session/encryption-session.ts` and `storage/private-storage.ts` adapt that readiness to Reading's protected local storage. The Worker stores ciphertext and public key/policy metadata; its plaintext Reading projector/extractor remains only for unencrypted vaults. See [Reading encryption](reading-e2ee-assessment.md).
 
-`encryption/file-inventory.ts` validates shared encrypted inventory pages and bounds
-traversal independently of file counts. Reading and Reminders retain their own file
-limits, projections and sequence checks; each publishes its derived source cache
-only after a complete, confirmed load.
+`encryption/file-inventory.ts` validates shared encrypted inventory pages and deltas and
+bounds traversal independently of file counts. Each inventory response is one server
+snapshot named by its change token, so pages must share the first page's token. Reading
+and Reminders retain their own file limits and projections; each publishes its derived
+source cache only after a complete load.
 
 `encryption/` owns the single-key vault bundle, authenticated formats and identity comparison. Both browser enrollment flows check every key identity against the server's public configuration (`assertEncryptionKeys`) before persisting keys. `sync/encryption/encrypted-files.ts` translates verified private metadata into local sync identities and maintains a bounded cache of authenticated metadata.
 

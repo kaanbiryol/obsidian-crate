@@ -73,7 +73,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 	const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
 	if (path === '/reading/policy') {
 		if (principal.scope !== 'vault') throw new ReadingError('Open Crate settings in Obsidian to change Reading setup.', 403);
-		if (request.method === 'GET') return readingResponse({ policy: await labelledPolicy(env.DB, await policy(env.DB)) });
+		if (request.method === 'GET') return readingResponse({ policy: await labelledPolicy(env.DB, await policy(env.DB), encryption) });
 		if (request.method === 'POST') return await updatePolicy(env.DB, body);
 	}
 	const loaded = isLibraryRead(request, path) ? await loadLibraryRead(env.DB, url) : undefined;

@@ -7,8 +7,9 @@ import { parseJsonObject } from '../http/request-validation';
 import { parseFolderPath } from '../reminders/requests';
 import { readEncryptionState } from '../encryption/state';
 import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
+import type { EncryptionServerState } from '../../../encryption/server-state';
 
-const FOLDER_SCOPED_TABLES = ['auth_tokens', 'push_subscriptions', 'web_enrollment_tokens'] as const;
+const FOLDER_SCOPED_TABLES = ['auth_tokens', 'push_subscriptions'] as const;
 
 /** Columns of `notification_policy` as `notificationPolicyFromRow` reads them. */
 export const NOTIFICATION_POLICY_COLUMNS = 'enabled, folder_path, timezone, all_day_time, revision';
@@ -25,14 +26,15 @@ export async function getNotificationPolicy(db: D1Database): Promise<Notificatio
 }
 
 /** For clients: an encrypted vault's policy also carries the folder's sealed name. */
-async function labelledNotificationPolicy(db: D1Database): Promise<NotificationPolicy | null> {
+async function labelledNotificationPolicy(db: D1Database, encryption: EncryptionServerState | null): Promise<NotificationPolicy | null> {
 	const policy = await getNotificationPolicy(db);
-	const label = policy && await readEncryptionState(db) ? await readFolderLabel(db, policy.folderPath) : null;
+	const label = policy && encryption ? await readFolderLabel(db, policy.folderPath) : null;
 	return policy && label ? { ...policy, folderLabel: label } : policy;
 }
 
-export async function handleNotificationPolicy(request: Request, db: D1Database): Promise<Response> {
-	if (request.method === 'GET') return corsResponse({ policy: await labelledNotificationPolicy(db) });
+/** `loaded` is the encryption state authentication returned; a change reads it again. */
+export async function handleNotificationPolicy(request: Request, db: D1Database, loaded?: EncryptionServerState | null): Promise<Response> {
+	if (request.method === 'GET') return corsResponse({ policy: await labelledNotificationPolicy(db, loaded === undefined ? await readEncryptionState(db) : loaded) });
 	const parsed = await parseJsonObject(request);
 	if (!parsed.ok) return parsed.response;
 	const { timezone, allDayTime, expectedRevision, enabled = true } = parsed.value;
@@ -52,9 +54,13 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
 		: db.prepare('UPDATE notification_policy SET folder_path = ?, timezone = ?, all_day_time = ?, revision = ?, enabled = ? WHERE id = 1 AND revision = ?').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0, typeof expectedRevision === 'string' ? expectedRevision : '');
 	// Web app sessions, their push subscriptions and unused setup links follow a
 	// changed folder. These run first, while the policy still names the old one.
-	const follow = request.method === 'PUT' ? FOLDER_SCOPED_TABLES.map(table => db.prepare(`UPDATE ${table} SET folder_path = ?
-    WHERE folder_path = (SELECT folder_path FROM notification_policy WHERE id = 1 AND revision = ?) AND folder_path != ?
-      ${table === 'auth_tokens' ? "AND scope = 'reminders'" : ''}`).bind(folder, typeof expectedRevision === 'string' ? expectedRevision : '', folder)) : [];
+	const previous = '(SELECT folder_path FROM notification_policy WHERE id = 1 AND revision = ?)';
+	const expected = typeof expectedRevision === 'string' ? expectedRevision : '';
+	const follow = request.method === 'PUT' ? [...FOLDER_SCOPED_TABLES.map(table => db.prepare(`UPDATE ${table} SET folder_path = ?
+    WHERE folder_path = ${previous} AND folder_path != ?
+      ${table === 'auth_tokens' ? "AND scope = 'reminders'" : ''}`).bind(folder, expected, folder)),
+	db.prepare(`UPDATE grants SET payload = json_set(payload, '$.folderPath', ?) WHERE kind = 'web_enrollment'
+    AND json_extract(payload, '$.folderPath') = ${previous} AND json_extract(payload, '$.folderPath') != ?`).bind(folder, expected, folder)] : [];
 	const results = await db.batch([...follow, mutation,
 		...(encryption ? [saveFolderLabel(db, folder, parsed.value.folderLabel as string)] : []),
 		db.prepare('DELETE FROM notification_file_retries WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)').bind(revision),
@@ -69,5 +75,5 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
       AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)`).bind(revision),
 	]);
 	if (request.method === 'PUT' && changedRows(results[follow.length]) !== 1) return corsResponse({ error: 'Notification settings changed on another device. Refresh before saving.' }, 409);
-	return corsResponse({ policy: await labelledNotificationPolicy(db) });
+	return corsResponse({ policy: await labelledNotificationPolicy(db, encryption) });
 }

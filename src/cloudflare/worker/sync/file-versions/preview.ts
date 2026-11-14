@@ -14,8 +14,8 @@ export async function handleFileVersionPreview(request: Request, bucket: R2Bucke
 	const key = params.get('storageKey');
 	const path = sanitizePath(params.get('path') ?? '');
 	if (!isSyncRevision(key) || !path) return corsResponse({ error: 'A retained version and path are required' }, 400);
-	const version = await db.prepare('SELECT * FROM file_versions WHERE storage_key = ? AND path = ? AND expires_at > ?')
-		.bind(key, path, Date.now()).first<RemoteFileVersion>();
+	const version = await db.prepare('SELECT hash, size FROM file_versions WHERE storage_key = ? AND path = ? AND expires_at > ?')
+		.bind(key, path, Date.now()).first<Pick<RemoteFileVersion, 'hash' | 'size'>>();
 	if (!version) return corsResponse({ error: 'File version not found or expired' }, 404);
 	if (version.size > MAX_ENCRYPTED_FILE_BYTES) return corsResponse({ error: 'This file is too large to preview.' }, 413);
 	const object = await bucket.get(key);

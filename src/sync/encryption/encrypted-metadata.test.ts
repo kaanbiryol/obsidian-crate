@@ -10,7 +10,7 @@ it('retries a repaired descriptor after authentication fails instead of caching 
 	const keys = await createVaultKeyBundle(), path = 'note.md';
 	const authority = await FileKeyAuthority.fromBundle(keys);
 	const wire = await (await PathTags.fromSecret(keys.vaultId, keys.vault)).wire(path);
-	const sealed = await sealFile({ path, content: new TextEncoder().encode('Private content'), contentType: 'text/markdown' }, authority.forPath(path));
+	const sealed = await sealFile({ path, content: new TextEncoder().encode('Private content') }, authority.forPath(path));
 	const requestJson = vi.fn().mockResolvedValueOnce({ descriptors: { revision: { ...sealed.descriptor, keyId: 'wrong-key' } } })
 		.mockResolvedValue({ descriptors: { revision: sealed.descriptor } });
 	const files = await EncryptedFiles.create({ requestJson } as unknown as WorkerApiHttpClient, keys, async () => null);

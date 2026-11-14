@@ -8,7 +8,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { handleBatchUpload } from './batch/upload';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
-import { countD1Queries } from '../d1/d1-query-count';
+import { countD1Queries } from '../test-support/d1-query-test-harness';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { BATCH_UPLOAD_MAX_FILES } from '@/protocol/sync-limits';
 
@@ -50,7 +50,7 @@ it('uses one lease write and commit-returned receipts for a full asset batch', a
 	const receipts = await response.json() as BatchUploadResponse;
 	expect(receipts.results).toHaveLength(payload.length);
 	expect(receipts.success).toBe(true);
-	expect(prepare.mock.calls.filter(([sql]) => sql.startsWith('INSERT INTO staged_uploads'))).toHaveLength(1);
+	expect(prepare.mock.calls.filter(([sql]) => sql.startsWith('INSERT INTO upload_leases'))).toHaveLength(1);
 	expect(prepare.mock.calls.filter(([sql]) => sql.startsWith('SELECT request_hash, response_json') && !sql.includes('UNION ALL'))).toHaveLength(0);
 	expect(put).toHaveBeenCalledTimes(payload.length);
 	expectWithinQueryBudget();
@@ -81,7 +81,7 @@ it('rejects batches above the limit before storing objects', async () => {
 it('never sends objects if shared lease registration fails', async () => {
 	const prepare = env.DB.prepare.bind(env.DB);
 	vi.spyOn(env.DB, 'prepare').mockImplementation(sql => {
-		if (sql.startsWith('INSERT INTO staged_uploads')) throw new Error('Storage unavailable');
+		if (sql.startsWith('INSERT INTO upload_leases')) throw new Error('Storage unavailable');
 		return prepare(sql);
 	});
 	const put = vi.spyOn(env.BUCKET, 'put');

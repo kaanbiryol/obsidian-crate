@@ -1,25 +1,21 @@
 import { pruneSharedCheckpoints } from '../sync/history-checkpoints';
 import { readEncryptionState } from '../encryption/state';
-import { cleanStagedUploads } from './staged-upload-cleanup';
-import { cleanStagedBatches } from './staged-batch-cleanup';
+import { cleanUploadLeases } from './upload-lease-cleanup';
 import { deploymentFenceHeld, pruneChangelog } from '../d1/db';
 import { drainObjectCleanupQueue, expireFileVersions } from './object-cleanup';
 import type { Env } from '../types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './database';
 import { pruneReminderOccurrences } from './reminder-history';
 import { pruneOperationReceipts } from './operation-receipts';
-import { pruneEncryptedReceiptChunks } from '../encryption/receipt-storage';
+import { pruneFolderLabels } from '../encryption/folder-labels';
 import { wakeProjection } from '../coordinator/coordinator';
-import { countD1Queries } from '../d1/d1-query-count';
-import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }
 
-/** `backlog` reports a bounded pruning task that filled its batch or a task left
- * for a later pass. `firstPass` is false for the follow-up passes of one maintenance
- * episode. `reserved` counts D1 queries the caller runs in the same invocation. */
-export async function runScheduledMaintenance(env: Env, { firstPass = true, reserved = 0 }: { firstPass?: boolean; reserved?: number } = {}): Promise<MaintenanceResult> {
-	const { db, count } = countD1Queries(env.DB, { queries: reserved, statements: reserved });
+/** `backlog` reports a bounded pruning task that filled its batch. `firstPass` is
+ * false for the follow-up passes of one maintenance episode. */
+export async function runScheduledMaintenance(env: Env, { firstPass = true }: { firstPass?: boolean } = {}): Promise<MaintenanceResult> {
+	const db = env.DB;
 	if (await deploymentFenceHeld(db)) return { removedObjects: 0, backlog: false };
 	const encryption = await readEncryptionState(db);
 	if (encryption?.mode === 'resetting') return { removedObjects: 0, backlog: false };
@@ -43,15 +39,10 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true, rese
 		['prune expired operation receipts', bounded(() => pruneOperationReceipts(db, firstPass))],
 		['prune request limits', () => db.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(db)],
-		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, db); }],
-		['clean unfinished upload batches', async () => { removedObjects += await cleanStagedBatches(env.BUCKET, db); }],
+		// After expired credentials go, so their folders' labels go in the same pass.
+		['prune folder labels', async () => { if (firstPass) await pruneFolderLabels(db).run(); }],
+		['clean unfinished uploads', async () => { removedObjects += await cleanUploadLeases(env.BUCKET, db); }],
 	];
-	// Three queries plus the run record's batch; on a pass whose earlier work leaves
-	// too few, this waits for the next one.
-	tasks.push(['prune expired encrypted response chunks', async () => {
-		if (count.queries + 4 > D1_QUERIES_PER_INVOCATION) backlog = true;
-		else await pruneEncryptedReceiptChunks(db);
-	}]);
 	for (const [name, task] of tasks) {
 		try {
 			await task();

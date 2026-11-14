@@ -1,11 +1,12 @@
 import { expect, it, vi } from 'vitest';
-import { createEncryptedInventoryProgress, encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryPage, ENCRYPTED_INVENTORY_PAGE, sameInventoryFile } from './file-inventory';
+import { createEncryptedInventoryProgress, encryptedInventoryPages, parseEncryptedInventoryPage, parseEncryptedInventoryResponse, type EncryptedInventoryPage, ENCRYPTED_INVENTORY_PAGE, sameInventoryFile } from './file-inventory';
 
 const file = (path = 'Reading/Article.md') => ({ path, hash: 'a'.repeat(64), size: 12, revision: 'revision' });
-const page = (patch: Partial<EncryptedInventoryPage> = {}): EncryptedInventoryPage => ({ files: [], sequence: 1, generation: 1, nextCursor: null, ...patch });
+const token = (digit: string) => digit.repeat(32);
+const page = (patch: Partial<EncryptedInventoryPage> = {}): EncryptedInventoryPage => ({ files: [], generation: 1, changeToken: token('1'), deltaBase: `7.${token('b')}`, nextCursor: null, ...patch });
 
 it.each([
-	null, [], {}, page({ sequence: -1 }), page({ sequence: 1.5 }), page({ generation: 2 }),
+	null, [], {}, page({ changeToken: 'short' }), page({ changeToken: 'A'.repeat(32) }), page({ deltaBase: token('b') }), page({ deltaBase: `-1.${token('b')}` }), page({ generation: 2 }),
 	{ ...page(), files: null }, { ...page(), files: [null] }, page({ files: Array.from({ length: ENCRYPTED_INVENTORY_PAGE + 1 }, () => file()) }),
 	...[false, 5, '', 'x'.repeat(4097)].map(nextCursor => ({ ...page(), nextCursor })),
 	...['Elsewhere/Article.md', 'Reading//Article.md', 'Reading/../Article.md', 'Reading/./Article.md', 'Reading/Bad\\Path.md'].map(path => page({ files: [file(path)] })),
@@ -53,11 +54,11 @@ async function collect(pages: AsyncIterable<EncryptedInventoryPage>, onPage = (_
 	return seen;
 }
 
-it('pages from a supplied first page through each cursor at one sequence', async () => {
+it('pages from a supplied first page through each cursor at one snapshot', async () => {
 	const fetchPage = vi.fn(async (after?: string) => after === 'A' ? page({ files: [file('Reading/2.md')], nextCursor: 'B' }) : page({ files: [file('Reading/3.md')] }));
 	const pages = encryptedInventoryPages(fetchPage, { maxFiles: 3, first: page({ files: [file('Reading/1.md')], nextCursor: 'A' }), changed });
 	expect(await collect(pages)).toEqual(['A', 'B', null]);
-	// The supplied first page is not fetched again, and nothing confirms by default.
+	// The supplied first page is not fetched again, and nothing confirms afterwards.
 	expect(fetchPage.mock.calls).toEqual([['A'], ['B']]);
 });
 
@@ -67,8 +68,8 @@ it('fetches the first page when none is supplied', async () => {
 	expect(fetchPage.mock.calls).toEqual([[]]);
 });
 
-it('throws the caller error when a later page reports another sequence', async () => {
-	const pages = encryptedInventoryPages(async () => page({ sequence: 2 }), { maxFiles: 1, first: page({ nextCursor: 'A' }), changed });
+it('throws the caller error when a later page reports another snapshot', async () => {
+	const pages = encryptedInventoryPages(async () => page({ changeToken: token('2') }), { maxFiles: 1, first: page({ nextCursor: 'A' }), changed });
 	await expect(collect(pages)).rejects.toThrow('changed while loading');
 });
 
@@ -79,17 +80,19 @@ it('checks device limits before yielding a page', async () => {
 	expect(handled).toEqual(['A']);
 });
 
-it.each([[1, null], [2, 'changed while loading']])('confirms sequence %i after the caller handles the last page', async (confirmedSequence, error) => {
-	const events: string[] = [];
-	const fetchPage = vi.fn(async (after?: string) => {
-		events.push(`fetch ${after ?? 'first'}`);
-		return after ? page() : page({ sequence: confirmedSequence });
-	});
-	const pages = encryptedInventoryPages(fetchPage, { maxFiles: 1, first: page({ nextCursor: 'A' }), confirm: true, changed });
-	const result = collect(pages, value => events.push(`handled ${value.nextCursor ?? 'last'}`));
-	if (error) await expect(result).rejects.toThrow(error);
-	else await expect(result).resolves.toEqual(['A', null]);
-	expect(events).toEqual(['handled A', 'fetch A', 'handled last', 'fetch first']);
+it('parses a delta of changed and removed notes', () => {
+	const delta = { delta: true, files: [file('Reading/1.md')], removed: ['Reading/2.md'], generation: 1, changeToken: token('2'), deltaBase: `8.${token('b')}` };
+	expect(parseEncryptedInventoryResponse(delta, 'Reading', 1)).toEqual({ ...delta, files: [file('Reading/1.md')] });
+	// A delta never answers a page request.
+	expect(() => parseEncryptedInventoryPage(delta, 'Reading', 1)).toThrow('Invalid encrypted file inventory');
+});
+
+it.each([
+	{ removed: null }, { removed: ['Elsewhere/2.md'] }, { removed: ['Reading/1.md'] }, { nextCursor: null },
+	{ removed: Array.from({ length: ENCRYPTED_INVENTORY_PAGE + 1 }, (_, index) => `Reading/${index}.md`) },
+])('rejects a malformed delta: %#', patch => {
+	const delta = { delta: true, files: [file('Reading/1.md')], removed: [], generation: 1, changeToken: token('2'), deltaBase: `8.${token('b')}`, ...patch };
+	expect(() => parseEncryptedInventoryResponse(delta, 'Reading', 1)).toThrow(/Invalid encrypted file|repeated a file/);
 });
 
 it('treats a listed file as the same only when its path, revision, hash and size all match', () => {

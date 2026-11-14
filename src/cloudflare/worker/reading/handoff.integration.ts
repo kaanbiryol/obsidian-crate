@@ -43,7 +43,7 @@ it.each(['reading_capture'])('redeems and replays a handoff prepared by %s exact
 it.each([
 	['revoked issuer', "DELETE FROM auth_tokens WHERE id='issuer'", 410],
 	['expired issuer', "UPDATE auth_tokens SET expires_at=1 WHERE id='issuer'", 410],
-	['expired capability', 'UPDATE reading_handoffs SET expires_at=1', 410],
+	['expired capability', "UPDATE grants SET expires_at=1 WHERE kind='reading_handoff'", 410],
 	// A Shortcut credential is bound to the Reading generation, so the credential itself expires.
 	['changed generation', "UPDATE reading_policy SET generation='new'", 401],
 	['paused Reading', `INSERT INTO server_state(id,features) VALUES (1,'{"reading":false,"reminders":true,"revision":"r"}')`, 423],

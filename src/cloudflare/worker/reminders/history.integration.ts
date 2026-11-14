@@ -38,14 +38,14 @@ it('preserves active, quarantined, recent and future occurrences while pruning o
 it('bounds deletion to 500 rows and resumes idempotently without pruning mutation receipts or identities', async () => {
 	await env.DB.prepare(`INSERT INTO reminder_occurrences SELECT value, ?, ? FROM json_each(?)`)
 		.bind(due, old, JSON.stringify(Array.from({ length: 501 }, (_, index) => `history-${index}`))).run();
-	await env.DB.prepare("INSERT INTO reminder_operations VALUES ('old-operation', 'hash', '{}')").run();
+	await env.DB.prepare("INSERT INTO operations (kind, operation_id, request_hash, response_json) VALUES ('reminder', 'old-operation', 'hash', '{}')").run();
 	await env.DB.prepare("INSERT INTO reminder_identities VALUES ('old-identity')").run();
 	await pruneReminderOccurrences(env.DB);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_occurrences').first()).toEqual({ count: 1 });
 	await pruneReminderOccurrences(env.DB);
 	await pruneReminderOccurrences(env.DB);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_occurrences').first()).toEqual({ count: 0 });
-	expect(await env.DB.prepare('SELECT operation_id FROM reminder_operations').first()).toEqual({ operation_id: 'old-operation' });
+	expect(await env.DB.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder'").first()).toEqual({ operation_id: 'old-operation' });
 	expect(await env.DB.prepare('SELECT reminder_id FROM reminder_identities').first()).toEqual({ reminder_id: 'old-identity' });
 });
 

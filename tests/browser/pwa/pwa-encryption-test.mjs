@@ -178,7 +178,7 @@ async function verify(type) {
 			const text = await (await bucket.get(row.storage_key)).text();
 			assert.ok(text.startsWith('CRATE-E2EE/1\n')); assert.ok(!text.includes('secret paragraph')); assert.ok(!text.includes('Private surrounding'));
 		}
-		assert.equal((await runtime.db.prepare('SELECT folder_path FROM web_enrollment_tokens LIMIT 1').first()).folder_path, enrolled.wires.folder);
+		assert.equal((await runtime.db.prepare("SELECT json_extract(payload, '$.folderPath') AS folder_path FROM grants WHERE kind = 'web_enrollment' LIMIT 1").first()).folder_path, enrolled.wires.folder);
 		await assertNoPlaintextNames(runtime.db, PLAINTEXT_NAMES);
 		context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 		// Every request the web app sends while the vault is encrypted, URL and body.

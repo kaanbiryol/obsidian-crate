@@ -7,7 +7,11 @@ import { corsHeaders, corsResponse } from '../http/cors';
 import { parseJsonObject, sanitizePath } from '../http/request-validation';
 import { readEncryptionState, prepareEncryptedFileCommit, EncryptionStateError } from './state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { getStoredFileRow, LAST_SEQ_SQL, storedObjectMatchesMetadata } from '../sync/storage';
+import { getStoredFileRow, loadStoredFileRows, MAX_BATCH_DOWNLOAD_BYTES, MAX_BATCH_DOWNLOAD_FILES, storedObjectMatchesMetadata } from '../sync/storage';
+import { changedPathsSince, deltaBase, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../sync/change-token';
+import { portablePathKey } from '../../../protocol/portable-path';
+import { mapBounded } from '../../../platform/map-bounded';
+import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../d1/platform-limits';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import { writeCommittedMarkdownMove } from '../sync/atomic-markdown-move';
@@ -37,33 +41,16 @@ const FEATURE_LABELS = { reminders: 'reminders', reading: 'Reading' } as const;
 export async function handleEncryptedFolderFiles(request: Request, env: Env, path: string, feature: keyof typeof FEATURE_LABELS = 'reminders', expectedFolder?: string, authenticated?: EncryptionServerState | null): Promise<Response | null> {
 	const prefix = `/${feature}`;
 	const label = FEATURE_LABELS[feature];
-	if (![`${prefix}/encrypted-files`, `${prefix}/encrypted-file`, `${prefix}/encrypted-commit`].includes(path)) return null;
+	if (![`${prefix}/encrypted-files`, `${prefix}/encrypted-files/download`, `${prefix}/encrypted-file`, `${prefix}/encrypted-commit`].includes(path)) return null;
 	const state = authenticated !== undefined ? authenticated : await readEncryptionState(env.DB);
 	if (!state || state.mode !== 'active') throw new EncryptionStateError(`Finish setting up encryption before using encrypted ${label}`);
 	if (path === `${prefix}/encrypted-commit` && request.method === 'POST') return commitEncryptedFiles(request, env, state, expectedFolder);
+	if (path === `${prefix}/encrypted-files/download` && request.method === 'POST') return downloadEncryptedFiles(request, env, label, expectedFolder);
 	if (request.method !== 'GET') return null;
 	const params = new URL(request.url).searchParams;
 	const folder = params.get('folderPath');
 	if (!isFolder(folder) || (expectedFolder && folder !== expectedFolder)) return corsResponse({ error: `Unknown encrypted ${label} folder` }, 403);
-	if (path === `${prefix}/encrypted-files`) {
-		const after = params.get('after') ?? '';
-		if (after.length > 1024) return corsResponse({ error: 'Invalid file cursor' }, 400);
-		const sequence = await env.DB.prepare(`SELECT ${LAST_SEQ_SQL} AS seq`).first<{ seq: number }>();
-		// Page in primary-key order from a single lower bound, so each page reads only
-		// its own rows. The cursor is opaque to clients.
-		const [keyStart = '', keyEnd, pathStart, pathEnd] = fileFolderArgs(folder);
-		const [lower, lowerBound] = after >= keyStart ? ['portable_path > ?', after] : ['portable_path >= ?', keyStart];
-		const rows = await env.DB.prepare(`SELECT path, portable_path, hash, size, storage_key AS revision, modified FROM files
-			WHERE ${lower} AND portable_path < ? AND path >= ? AND path < ? AND lower(path) LIKE '%.md'
-			ORDER BY portable_path LIMIT ${ENCRYPTED_INVENTORY_PAGE}`)
-			.bind(lowerBound, keyEnd, pathStart, pathEnd).all<{ path: string; portable_path: string; hash: string; size: number; revision: string; modified: string }>();
-		// `modified` is the server's own time of the last write, which it already knows; the
-		// Reading app keeps the most recently changed notes when a library exceeds its limit.
-		const files = rows.results.filter(file => scopedPath(file.path, folder))
-			.map(({ path, hash, size, revision, modified }) => ({ path, hash, size, revision, modified }));
-		return corsResponse({ files, sequence: sequence?.seq ?? 0, generation: state.generation,
-			nextCursor: rows.results.length === ENCRYPTED_INVENTORY_PAGE ? rows.results.at(-1)!.portable_path : null });
-	}
+	if (path === `${prefix}/encrypted-files`) return listEncryptedFiles(request, env, state, folder, params);
 	const filePath = scopedPath(params.get('path'), folder);
 	if (!filePath) return corsResponse({ error: 'File is outside this enrollment' }, 403);
 	const file = await getStoredFileRow(env.DB, filePath);
@@ -74,6 +61,111 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 	if (!object || !storedObjectMatchesMetadata(object, file)) return corsResponse({ error: 'Note is unavailable' }, 503);
 	return new Response(object.body, { headers: { ...corsHeaders(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE,
 		'Content-Length': String(file.size), 'Cache-Control': 'private, no-store', [FILE_HASH_HEADER]: file.hash, [REVISION_HEADER]: file.storageKey } });
+}
+
+interface InventoryRow { path: string; portable_path: string; hash: string; size: number; revision: string; modified: string }
+// `modified` is the server's own time of the last write, which it already knows; the
+// Reading app keeps the most recently changed notes when a library exceeds its limit.
+const INVENTORY_COLUMNS = 'path, portable_path, hash, size, storage_key AS revision, modified';
+const inventoryEntry = ({ path, hash, size, revision, modified }: InventoryRow) => ({ path, hash, size, revision, modified });
+
+/** One inventory page, or with `since` only the folder notes changed after that delta base.
+ * `If-None-Match` with the last change token answers 304 before the folder is read. Rows
+ * are read between two equal reads of the vault change state, so each 200 is one snapshot
+ * at its `changeToken`, and pages reporting the same token belong to one snapshot. */
+async function listEncryptedFiles(request: Request, env: Env, state: EncryptionServerState, folder: string, params: URLSearchParams): Promise<Response> {
+	const after = params.get('after') ?? '';
+	if (after.length > 1024) return corsResponse({ error: 'Invalid file cursor' }, 400);
+	const scope = `encrypted-files\nfolder:${folder}\ngeneration:${state.generation}`;
+	const change = await readVaultChangeState(env.DB);
+	const changeToken = await vaultChangeToken(env.DB, scope, change);
+	const headers = { 'Cache-Control': 'private, no-cache', ETag: `"${changeToken}"` };
+	if (!after && request.headers.get('If-None-Match')?.split(',').some(value => value.trim() === headers.ETag)) {
+		return new Response(null, { status: 304, headers: { ...corsHeaders(), ...headers } });
+	}
+	const base = await deltaBase(scope, change);
+	const since = after ? null : parseDeltaBase(params.get('since'));
+	// The change state already read the changelog bounds, so a delta costs one more query.
+	const changed = since && since.scope === base.slice(base.indexOf('.') + 1)
+		? await changedPathsSince(env.DB, folder, since.seq, change.bounds) : null;
+	const snapshot = { generation: state.generation, changeToken, deltaBase: base };
+	// No folder path changed, so no rows were read that a concurrent write could split.
+	if (changed?.length === 0) return corsResponse({ delta: true, files: [], removed: [], ...snapshot }, 200, headers);
+	let body: Record<string, unknown>;
+	if (changed && changed.length <= ENCRYPTED_INVENTORY_PAGE) {
+		const rows = await env.DB.prepare(`SELECT ${INVENTORY_COLUMNS} FROM files WHERE portable_path IN (SELECT value FROM json_each(?))`)
+			.bind(JSON.stringify([...new Set(changed.map(portablePathKey))])).all<InventoryRow>();
+		const listed = new Set(changed);
+		const files = rows.results.filter(file => listed.has(file.path) && scopedPath(file.path, folder));
+		const present = new Set(files.map(file => file.path));
+		body = { delta: true, files: files.map(inventoryEntry), removed: changed.filter(path => !present.has(path) && scopedPath(path, folder)) };
+	} else {
+		// Page in primary-key order from a single lower bound, so each page reads only
+		// its own rows. The cursor is opaque to clients.
+		const [keyStart = '', keyEnd, pathStart, pathEnd] = fileFolderArgs(folder);
+		const [lower, lowerBound] = after >= keyStart ? ['portable_path > ?', after] : ['portable_path >= ?', keyStart];
+		const rows = await env.DB.prepare(`SELECT ${INVENTORY_COLUMNS} FROM files
+			WHERE ${lower} AND portable_path < ? AND path >= ? AND path < ? AND lower(path) LIKE '%.md'
+			ORDER BY portable_path LIMIT ${ENCRYPTED_INVENTORY_PAGE}`)
+			.bind(lowerBound, keyEnd, pathStart, pathEnd).all<InventoryRow>();
+		body = { files: rows.results.filter(file => scopedPath(file.path, folder)).map(inventoryEntry),
+			nextCursor: rows.results.length === ENCRYPTED_INVENTORY_PAGE ? rows.results.at(-1)!.portable_path : null };
+	}
+	// A write since the first read could pair these rows with another snapshot.
+	if (await vaultChangeToken(env.DB, scope) !== changeToken) {
+		return corsResponse({ error: 'Files changed while listing. Refresh again.', code: 'inventory_changed' }, 409);
+	}
+	return corsResponse({ ...body, ...snapshot }, 200, headers);
+}
+
+interface DownloadedNote { path: string; revision: string; hash?: string; size?: number; content?: string; error?: string; code?: string }
+
+/** Up to 50 listed notes and 8 MB in one response, each at the revision the client listed.
+ * A note that changed, disappeared or cannot be read is reported on its own entry, so the
+ * client decides whether to list again. */
+async function downloadEncryptedFiles(request: Request, env: Env, label: string, expectedFolder?: string): Promise<Response> {
+	const parsed = await parseJsonObject(request);
+	if (!parsed.ok) return parsed.response;
+	const { folderPath, files: raw } = parsed.value;
+	if (Object.keys(parsed.value).some(key => !['folderPath', 'files'].includes(key))) return corsResponse({ error: 'Unexpected download field' }, 400);
+	if (!isFolder(folderPath) || (expectedFolder && folderPath !== expectedFolder)) return corsResponse({ error: `Unknown encrypted ${label} folder` }, 403);
+	if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_BATCH_DOWNLOAD_FILES) {
+		return corsResponse({ error: `files array required (maximum ${MAX_BATCH_DOWNLOAD_FILES})` }, 400);
+	}
+	const requested: Array<{ path: string; revision: string }> = [];
+	for (const entry of raw as unknown[]) {
+		const file = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
+		if (Object.keys(file).some(key => !['path', 'revision'].includes(key)) || typeof file.path !== 'string' || !isSyncRevision(file.revision)) {
+			return corsResponse({ error: 'Invalid note in batch' }, 400);
+		}
+		const path = scopedPath(file.path, folderPath);
+		if (!path) return corsResponse({ error: 'File is outside this enrollment' }, 403);
+		requested.push({ path, revision: file.revision });
+	}
+	if (new Set(requested.map(file => file.path)).size !== requested.length) return corsResponse({ error: 'Duplicate paths are not allowed' }, 400);
+	const stored = await loadStoredFileRows(env.DB, requested.map(file => file.path));
+	const declared = requested.reduce((total, file) => {
+		const row = stored.get(file.path);
+		return total + (row?.storageKey === file.revision && row.size <= MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES ? row.size : 0);
+	}, 0);
+	if (declared > MAX_BATCH_DOWNLOAD_BYTES) return corsResponse({ error: 'Batch download exceeds 8MB limit; download fewer notes' }, 413);
+	const download = async (file: { path: string; revision: string }): Promise<DownloadedNote> => {
+		const row = stored.get(file.path);
+		if (!row) return { ...file, error: 'Note not found', code: 'not_found' };
+		if (row.storageKey !== file.revision) return { ...file, error: 'Note changed', code: 'version_conflict' };
+		if (row.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) return { ...file, error: `This note is too large for the ${label} app`, code: 'file_too_large' };
+		const object = await env.BUCKET.get(row.storageKey);
+		if (!object || !storedObjectMatchesMetadata(object, row)) return { ...file, error: 'Note is unavailable', code: 'unavailable' };
+		// Encrypted files are UTF-8 text, so they travel as JSON strings without base64.
+		// The client encodes each again and checks it against the listed size and hash.
+		try {
+			return { ...file, hash: row.hash, size: row.size, content: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await object.arrayBuffer()) };
+		} catch {
+			return { ...file, error: 'Note is unavailable', code: 'unavailable' };
+		}
+	};
+	// A rolling pool keeps as many R2 reads in flight as the invocation may open.
+	return corsResponse({ files: await mapBounded(requested, SIMULTANEOUS_OPEN_CONNECTIONS, download) }, 200, { 'Cache-Control': 'private, no-store' });
 }
 
 async function commitEncryptedFiles(request: Request, env: Env, state: EncryptionServerState, expectedFolder?: string): Promise<Response> {

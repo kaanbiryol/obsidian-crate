@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
-import { countD1Queries } from './d1-query-count';
+import { countD1Queries } from '../test-support/d1-query-test-harness';
 import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
 
 it('counts each query and each batch once, as the per-invocation limit does', async () => {

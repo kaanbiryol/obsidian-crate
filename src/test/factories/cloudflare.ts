@@ -186,7 +186,6 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					return statement;
 				}),
 				run: vi.fn(async () => {
-					if (sql.includes('INSERT INTO staged_uploads')) return { meta: { changes: 1 } };
 					if (sql.startsWith('CREATE TABLE') || sql.startsWith('ALTER TABLE')) {
 						return {};
 					}
@@ -194,7 +193,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 				}),
 				first: vi.fn(async () => {
 					if (sql.startsWith('SELECT 1 WHERE')) return { valid: 1 };
-					if (sql.startsWith('SELECT request_hash, response_json FROM upload_operations')) return (receipts.get(String(statement._args[0])) ?? (sql.includes('UNION ALL') ? { request_hash: null, response_json: null } : null));
+					if (sql.startsWith("SELECT request_hash, response_json FROM operations WHERE kind = 'upload'")) return (receipts.get(String(statement._args[0])) ?? (sql.includes('UNION ALL') ? { request_hash: null, response_json: null } : null));
 					if (sql.includes('FROM files WHERE portable_path = ? AND path = ?')) {
 						const path = getBoundString(statement._args, 1);
 						const file = files.get(path);
@@ -212,11 +211,11 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					return null;
 				}) as MockD1Statement['first'],
 				all: vi.fn(async <T = Record<string, unknown>>() => {
-					if (sql.includes('LEFT JOIN upload_operations o')) {
+					if (sql.includes('INSERT INTO upload_leases')) return { results: [{ encryption_state: null }] as T[] };
+					if (sql.includes("LEFT JOIN operations o ON o.kind = 'upload'")) {
 						const ids = JSON.parse(String(statement._args[0])) as Array<[string, number]>;
 						return { results: ids.map(([id]) => ({ id, ...(receipts.get(id) ?? { request_hash: null, response_json: null }), valid: 1 })) as T[] };
 					}
-					if (sql.includes('INSERT INTO staged_uploads')) return { results: (JSON.parse(String(statement._args[1])) as unknown[]).map(() => ({ encryption_state: null })) as T[] };
 					if (sql.includes('FROM files WHERE portable_path IN')) {
 						const results = statement._args.flatMap((value) => {
 							if (typeof value !== 'string') return [];
@@ -257,15 +256,15 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 						changes = 1;
 					}
 				} else if (statement._sql.startsWith('UPDATE files')) {
-					// Bound after the new portable path, hash, size, storage key and descriptor.
-					const path = getBoundString(statement._args, 6);
-					const expectedHash = getBoundString(statement._args, 7);
+					// Bound after the new hash, size, storage key and descriptor, and the portable path.
+					const path = getBoundString(statement._args, 5);
+					const expectedHash = getBoundString(statement._args, 6);
 					const current = files.get(path);
 					if (current?.hash === expectedHash) {
 						files.set(path, {
-							hash: getBoundString(statement._args, 1),
-							size: Number(statement._args[2]),
-							storageKey: getBoundString(statement._args, 3),
+							hash: getBoundString(statement._args, 0),
+							size: Number(statement._args[1]),
+							storageKey: getBoundString(statement._args, 2),
 						});
 						changes = 1;
 					}
@@ -277,7 +276,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 						files.delete(path);
 						changes = 1;
 					}
-				} else if (statement._sql.includes('INSERT INTO upload_operations')) {
+				} else if (statement._sql.includes("INTO operations (kind, operation_id, request_hash, response_json)") && statement._sql.includes("SELECT 'upload', ?, ?")) {
 					const args = statement._args;
 					const file = files.get(String(args[5]));
 					const success = file?.storageKey === args[6];

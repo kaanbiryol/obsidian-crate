@@ -33,7 +33,7 @@ it('reads only the selected folder without indexing every Markdown file', async 
 });
 
 it('prunes only named paths in a 10,000-file paused import and preserves changed files', async () => {
-	const { import: session } = await (await beginInitialImport(env.DB)).json() as { import: { token: string } };
+	const { import: session } = await (await beginInitialImport(env.DB, null)).json() as { import: { token: string } };
 	const hash = 'a'.repeat(64);
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 10000)
     INSERT INTO files(path, portable_path, storage_key, hash)
@@ -47,6 +47,6 @@ it('prunes only named paths in a 10,000-file paused import and preserves changed
 	expect(await env.DB.prepare("SELECT path FROM files WHERE path = 'Notes/1.md'").first()).toBeNull();
 	expect(await env.DB.prepare("SELECT path FROM files WHERE path = 'Notes/2.md'").first()).not.toBeNull();
 	expect((await env.DB.prepare('SELECT storage_key FROM object_cleanup_queue').all()).results).toEqual([{ storage_key: 'key-1' }]);
-	await env.DB.prepare("UPDATE initial_import SET state = 'complete'").run();
+	await env.DB.prepare("UPDATE server_state SET import_state = 'complete'").run();
 	expect((await pruneInitialImport(request(), env.DB)).status).toBe(409);
 });

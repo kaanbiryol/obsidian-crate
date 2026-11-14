@@ -244,7 +244,7 @@ describe('worker entrypoint', () => {
 		expect(result.browserToken).not.toBe(result.token);
 		expect(Number.isNaN(Date.parse(result.expiresAt))).toBe(false);
 		expect(db.db.prepare).toHaveBeenCalledWith(
-			'INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES (?, ?, ?)',
+			"INSERT INTO grants (kind, key, payload, expires_at) VALUES ('web_enrollment', ?, json_object('folderPath', ?), ?)",
 		);
 	});
 
@@ -261,7 +261,7 @@ describe('worker entrypoint', () => {
 		expect(response.status).toBe(403);
 		expect(await response.json()).toEqual({ error: 'Token is not authorized for this operation' });
 		expect(db.db.prepare).not.toHaveBeenCalledWith(
-			'INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES (?, ?, ?)',
+			"INSERT INTO grants (kind, key, payload, expires_at) VALUES ('web_enrollment', ?, json_object('folderPath', ?), ?)",
 		);
 	});
 

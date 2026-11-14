@@ -12,7 +12,7 @@ import { deliverDueReminders } from '../notifications/dispatcher';
 import { sendToAllSubscriptions } from '../notifications/push';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
 import { runNotificationCoordinator } from '../notifications/coordinator';
-import { countD1Queries, type D1QueryCount } from '../d1/d1-query-count';
+import { countD1Queries, type D1QueryCount } from '../test-support/d1-query-test-harness';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { armReminderDispatcher } from '../coordinator/coordinator';
 import { handleListReminders } from './handlers/list';

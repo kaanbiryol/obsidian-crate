@@ -40,7 +40,7 @@ async function contextFor(browser, { installed = false, reading = false, mobile 
   await context.route('**/notifications/preview-session.js', route => route.fulfill({ contentType: 'application/javascript', body: '' }));
   await context.route('**/encryption', route => route.fulfill({ json: remindersEncryption }));
   await context.route('**/reading/encryption', route => route.fulfill({ json: readingEncryption }));
-  await context.route('**/*/encrypted-files?*', route => route.fulfill({ json: { files: [], nextCursor: null, generation: bundle.generation, sequence: 1 } }));
+  await context.route('**/*/encrypted-files?*', route => route.fulfill({ json: { files: [], nextCursor: null, generation: bundle.generation, changeToken: '1'.repeat(32), deltaBase: `1.${'1'.repeat(32)}` } }));
   context.on('request', request => assert.ok(!(request.url() + (request.postData() ?? '')).includes(recovery), 'Recovery key must not reach the server'));
   return context;
 }

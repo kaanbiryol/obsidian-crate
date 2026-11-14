@@ -5,8 +5,7 @@ import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { descriptorColumn, ENCRYPTION_STATE_SQL, encryptionWriteGuard, parseEncryptionState, prepareEncryptedFileCommit } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { syncResetGenerationGuard } from './reset-generation';
-import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
-import { stagedBatchGuard } from './staging/staged-upload-batches';
+import { finishUploadLeases, uploadLeaseGuard } from './staging/upload-leases';
 import { decodeReceipt, readUploadReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
 import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from '../notifications/projection-queue';
@@ -34,7 +33,8 @@ interface UploadMutationInput {
 	expectedHash: ExpectedFileHash;
 	operation?: UploadOperation;
 	expectedRevision?: string;
-	stagingBatchId?: string;
+	/** The request's upload lease, which must name `objectKey`. */
+	leaseId: string;
 	importToken?: string;
 	encryptionState?: EncryptionServerState | null;
 	/** The `descriptor` column of an encrypted file. */
@@ -43,15 +43,15 @@ interface UploadMutationInput {
 }
 
 function uploadGuard({
-	path, objectKey, operation, stagingBatchId, importToken, encryptionState = null, resetGeneration,
+	path, objectKey, operation, leaseId, importToken, encryptionState = null, resetGeneration,
 }: UploadMutationInput): SqlGuard {
 	return allGuards(
 		fileNamespaceGuard(path),
 		encryptionWriteGuard(encryptionState),
 		syncResetGenerationGuard(resetGeneration),
-		stagingBatchId ? stagedBatchGuard(stagingBatchId, objectKey) : stagedUploadGuard(objectKey),
-		...importToken ? [{ sql: "EXISTS (SELECT 1 FROM initial_import WHERE token = ? AND state = 'importing')", args: [importToken] }] : [],
-		...operation ? [{ sql: 'NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)', args: [operation.id] }] : [],
+		uploadLeaseGuard(leaseId, objectKey),
+		...importToken ? [{ sql: "EXISTS (SELECT 1 FROM server_state WHERE id = 1 AND import_token = ? AND import_state = 'importing')", args: [importToken] }] : [],
+		...operation ? [{ sql: "NOT EXISTS (SELECT 1 FROM operations WHERE kind = 'upload' AND operation_id = ?)", args: [operation.id] }] : [],
 	);
 }
 
@@ -76,10 +76,12 @@ export function uploadMutation(db: D1Database, input: UploadMutationInput): D1Pr
 			.bind(path, portablePathKey(path), hash, size, objectKey, descriptor, ...namespace.args);
 	}
 	const replaced = replacedRow({ ...input, expectedHash });
+	// The WHERE matches the portable path already. Setting the uniquely indexed column
+	// again would write its index entry too.
 	return db.prepare(`UPDATE files
-		SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
+		SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
 		WHERE ${replaced.sql}`)
-		.bind(portablePathKey(path), hash, size, objectKey, descriptor, ...replaced.args);
+		.bind(hash, size, objectKey, descriptor, ...replaced.args);
 }
 
 /** Runs before the upload's UPDATE in the same batch and reads the live row, so a
@@ -127,6 +129,8 @@ export interface StagedFileCommitInput {
 	hash: string;
 	size: number;
 	objectKey: string;
+	/** The upload lease that names `objectKey`. */
+	leaseId: string;
 	content: string | ArrayBuffer;
 	effects?: CommitEffects;
 	encryptionState?: EncryptionServerState | null;
@@ -154,14 +158,15 @@ export function parseCommitContext(row: CommitContextRow | null): CommitContext 
 
 /** One upload's statements, in the order they keep within a batch. `mutationIndex` is
  * the `files` write and a receipt, when the upload has an operation, is last. A caller
- * that commits several uploads together adds the Reading index for all of them itself. */
+ * that commits several uploads together adds the Reading index for all of them itself,
+ * and every caller settles the leases after these statements. */
 async function stagedFileStatements(db: D1Database, params: StagedFileCommitInput, readingIndex: boolean): Promise<{ statements: D1PreparedStatement[]; mutationIndex: number; encrypted: boolean }> {
 	const encryption = await prepareEncryptedFileCommit(db, params.path, params.content, params.encryptionState);
 	const upload: UploadMutationInput = {
 		path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey,
 		expectedHash: params.expectedHash, expectedRevision: params.expectedRevision,
 		operation: params.operation, encryptionState: encryption.state, descriptor: descriptorColumn(encryption.descriptor),
-		resetGeneration: params.resetGeneration,
+		resetGeneration: params.resetGeneration, leaseId: params.leaseId,
 	};
 	const retained = retainReplacedUpload(db, upload, params.keepReplacedVersion === true);
 	return { mutationIndex: retained.length, encrypted: Boolean(encryption.state), statements: [
@@ -172,7 +177,6 @@ async function stagedFileStatements(db: D1Database, params: StagedFileCommitInpu
 		...(readingIndex ? await readingIndexStatements(db, [{ path: params.path, storageKey: params.objectKey, hash: params.hash, size: params.size, content: params.content }],
 			{ policy: params.readingPolicy, encrypted: Boolean(encryption.state) }) : []),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
-		finishStagedUpload(db, params.objectKey, params.path),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),
 	] };
 }
@@ -183,7 +187,8 @@ export async function commitStagedFile(
 	params: StagedFileCommitInput,
 ): Promise<CommitResult> {
 	const plan = await stagedFileStatements(db, params, true);
-	return settleStagedFile(bucket, db, params, await db.batch(plan.statements), plan.mutationIndex);
+	const results: unknown[] = await db.batch([...plan.statements, ...finishUploadLeases(db, [params])]);
+	return settleStagedFile(bucket, db, params, results.slice(0, plan.statements.length), plan.mutationIndex);
 }
 
 /** `commitStagedFile` for several uploads in one transaction and one round trip. Each
@@ -202,7 +207,7 @@ export async function commitStagedFiles(bucket: R2Bucket, db: D1Database, files:
 	});
 	// Index rows apply only to revisions this batch committed, so they follow every file.
 	statements.push(...await readingIndexStatements(db, files.map(file => ({ path: file.path, storageKey: file.objectKey, hash: file.hash, size: file.size, content: file.content })),
-		{ policy: files[0]!.readingPolicy, encrypted: plans[0]!.encrypted }));
+		{ policy: files[0]!.readingPolicy, encrypted: plans[0]!.encrypted }), ...finishUploadLeases(db, files));
 	const results: unknown[] = await db.batch(statements);
 	const commits: CommitResult[] = [];
 	// Unpublished uploads are cleaned up together, so a batch of stale uploads stays

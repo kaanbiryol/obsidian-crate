@@ -107,9 +107,8 @@ export function parseBackupRows(sql: string): BackupRow[] {
 	if (quoted || sql.slice(start).trim()) throw new Error('Incomplete backup database');
 	const rows: BackupRow[] = [];
 	for (const statement of statements) {
-		if (!statement || /^PRAGMA foreign_keys=OFF$/i.test(statement) || /^CREATE (?:TABLE|(?:UNIQUE )?INDEX)\b/i.test(statement) || statement === 'DELETE FROM sqlite_sequence') continue;
-		const insert = /^INSERT INTO "([a-z_][a-z0-9_]*)"\s*\(([^)]+)\) VALUES \(([\s\S]*)\)$/i.exec(statement)
-			?? /^INSERT INTO (sqlite_sequence)\(([^)]+)\) VALUES \(([\s\S]*)\)$/i.exec(statement);
+		if (!statement || /^PRAGMA foreign_keys=OFF$/i.test(statement) || /^CREATE (?:TABLE|(?:UNIQUE )?INDEX)\b/i.test(statement)) continue;
+		const insert = /^INSERT INTO "([a-z_][a-z0-9_]*)"\s*\(([^)]+)\) VALUES \(([\s\S]*)\)$/i.exec(statement);
 		if (!insert) throw new Error('Unsupported statement in backup database');
 		const columns = insert[2]!.split(',').map(value => value.trim().replace(/^"([a-z_][a-z0-9_]*)"$/, '$1'));
 		columns.forEach(quote);

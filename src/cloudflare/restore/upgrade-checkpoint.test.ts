@@ -30,7 +30,7 @@ async function harness() {
 	db.prepare('INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES (?,?,?,?,?)').run('note.md', 'note.md', await sha256Hex(live), live.length, 'existing-object');
 	db.prepare('INSERT INTO file_versions(storage_key,path,hash,size,reason,expires_at) VALUES (?,?,?,?,?,?)').run('historical-object', 'note.md', await sha256Hex(history), history.length, 'replaced', 2_000_000_000);
 	db.prepare('INSERT INTO auth_tokens(id,token_hash,scope) VALUES (?,?,?)').run('old-device', 'hashed-secret', 'vault');
-	const objects = new Map<string, Uint8Array>([['existing-object', live], ['historical-object', history], ['__crate__/settings.json', new TextEncoder().encode('{"setting":true}')]]);
+	const objects = new Map<string, Uint8Array>([['existing-object', live], ['historical-object', history]]);
 	const api = {
 		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]) => [{ results: runQuery(db, sql, params) }]),
 		getRecoveryObject: vi.fn(async (_account: string, _bucket: string, key: string) => { const value = objects.get(key); if (!value) throw new CloudflareApiError('Object not found', 404, null); return value; }),
@@ -94,7 +94,7 @@ it('copies files before pausing writers, then exports a paused database that res
 	const manifest = h.manifest();
 	expect(manifest).toMatchObject({ format: 2, complete: true });
 	expect(manifest.databaseParts.map(part => part.sha256)).toEqual([expect.stringMatching(/^[a-f0-9]{64}$/)]);
-	expect(manifest.objects.map(item => item.key)).toEqual(['__crate__/settings.json', 'existing-object', 'historical-object']);
+	expect(manifest.objects.map(item => item.key)).toEqual(['existing-object', 'historical-object']);
 	for (const item of manifest.objects) expect(await sha256Hex(h.objects.get(upgradeBackupStoreKey(item.sha256))!)).toBe(item.sha256);
 	// Three requests per file became two: read the original, write the shared copy.
 	expect(h.api.putRecoveryObject.mock.calls.filter(([, , key]) => key.includes('/objects/')).length).toBe(manifest.objects.length + manifest.databaseParts.length);
@@ -172,7 +172,7 @@ it('resumes copying files without pausing writers or repeating verified copies',
 
 it('resumes an interrupted export from its saved row while writers stay paused', async () => {
 	const h = await harness();
-	const receipt = h.db.prepare('INSERT INTO upload_operations(operation_id,request_hash,response_json) VALUES (?,?,?)');
+	const receipt = h.db.prepare("INSERT INTO operations(kind,operation_id,request_hash,response_json) VALUES ('upload',?,?,?)");
 	for (let index = 0; index < 2600; index++) receipt.run(`op-${String(index).padStart(5, '0')}`, `hash-${index}`, JSON.stringify({ padding: 'x'.repeat(3500), index }));
 	const write = h.api.putRecoveryObject.getMockImplementation()!;
 	let parts = 0;
@@ -181,19 +181,19 @@ it('resumes an interrupted export from its saved row while writers stay paused',
 		return write(...args);
 	});
 	await expect(h.run()).rejects.toThrow('Obsidian closed');
-	expect(h.progress()).toMatchObject({ phase: 'dumping', after: ['op-01499'] });
+	expect(h.progress()).toMatchObject({ phase: 'dumping', after: ['upload', 'op-01499'] });
 	expect(h.progress()!.parts).toHaveLength(1);
-	expect(() => h.db.exec('DELETE FROM upload_operations')).toThrow('upgrade in progress');
+	expect(() => h.db.exec('DELETE FROM operations')).toThrow('upgrade in progress');
 	h.api.queryD1.mockClear(); h.fence.mutate.mockClear();
 	await h.run();
 	const resumed = h.api.queryD1.mock.calls.map(([, , sql]) => sql);
-	expect(resumed).toContain(`SELECT * FROM "upload_operations" WHERE ("operation_id") > ('op-01499') ORDER BY "operation_id" LIMIT 500;`);
+	expect(resumed).toContain(`SELECT * FROM "operations" WHERE ("kind","operation_id") > ('upload','op-01499') ORDER BY "kind","operation_id" LIMIT 500;`);
 	expect(resumed.some(sql => sql.includes('FROM "auth_tokens"'))).toBe(false);
 	expect(h.fence.mutate.mock.calls.map(([, step]) => step)).toEqual(['verify-upgrade-checkpoint']);
 	expect(h.manifest().databaseParts).toHaveLength(2);
 	const restored = database(h.exported());
-	expect(restored.prepare('SELECT COUNT(*) AS n FROM upload_operations').get()).toEqual({ n: 2600 });
-	expect(restored.prepare('SELECT * FROM upload_operations ORDER BY 1').all()).toEqual(h.db.prepare('SELECT * FROM upload_operations ORDER BY 1').all());
+	expect(restored.prepare('SELECT COUNT(*) AS n FROM operations').get()).toEqual({ n: 2600 });
+	expect(restored.prepare('SELECT * FROM operations ORDER BY 2').all()).toEqual(h.db.prepare('SELECT * FROM operations ORDER BY 2').all());
 });
 
 it('restarts a saved export after its write guards were removed', async () => {
@@ -269,14 +269,14 @@ it('waits for Cloudflare rate limits through the real API client and completes',
 
 it('pages large tables by key so each row is read once', async () => {
 	const h = await harness();
-	const receipt = h.db.prepare('INSERT INTO upload_operations(operation_id,request_hash,response_json) VALUES (?,?,?)');
+	const receipt = h.db.prepare("INSERT INTO operations(kind,operation_id,request_hash,response_json) VALUES ('upload',?,?,?)");
 	for (let index = 0; index < 1234; index++) receipt.run(`op-${String(index).padStart(5, '0')}`, `hash-${index}`, `{"index":${index}}`);
 	const identity = h.db.prepare('INSERT INTO reminder_identities(reminder_id) VALUES (?)');
 	for (let index = 0; index < 1001; index++) identity.run(`reminder-${index}`);
 	await h.run();
-	const pages = h.api.queryD1.mock.calls.map(([, , sql]) => sql).filter(sql => /FROM "(upload_operations|reminder_identities)"/.test(sql));
+	const pages = h.api.queryD1.mock.calls.map(([, , sql]) => sql).filter(sql => /FROM "(operations|reminder_identities)"/.test(sql));
 	expect(h.api.queryD1.mock.calls.some(([, , sql]) => /\bOFFSET\b/i.test(sql))).toBe(false);
-	for (const [table, count] of [['upload_operations', 1234], ['reminder_identities', 1001]] as const) {
+	for (const [table, count] of [['operations', 1234], ['reminder_identities', 1001]] as const) {
 		const tablePages = pages.filter(sql => sql.includes(`FROM "${table}"`));
 		expect(tablePages.reduce((sum, sql) => sum + h.db.prepare(sql).all().length, 0)).toBe(count);
 		expect(tablePages).toHaveLength(Math.floor(count / 500) + 1);
@@ -287,7 +287,7 @@ it('pages large tables by key so each row is read once', async () => {
 		}
 	}
 	const restored = database(h.exported());
-	for (const table of ['upload_operations', 'reminder_identities']) {
+	for (const table of ['operations', 'reminder_identities']) {
 		expect(restored.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()).toEqual(h.db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all());
 	}
 });

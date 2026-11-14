@@ -1,30 +1,31 @@
 import { runScheduledMaintenance } from './run';
 import type { Env } from '../types';
+import { markRole } from '../coordinator/role-flags';
 
-/** Maintenance role storage flag: its alarm runs maintenance episodes. */
+/** Maintenance role storage flag, for runtimes without instance names: its alarm runs maintenance episodes. */
 export const MAINTENANCE_COORDINATOR_KEY = 'maintenanceCoordinator';
 /** Maintenance role storage: passes run in the current episode. */
 const MAINTENANCE_PASS_KEY = 'maintenancePass';
+/** Maintenance role storage: whether the last pass was still draining retained objects. */
+const DRAINING_KEY = 'maintenanceDraining';
 const MAX_PASSES = 10;
 // Retained-object draining (the cleanup queue or expired versions) continues past
 // MAX_PASSES; at 500 objects per pass this bounds one episode at 100,000 deletions.
 const MAX_DRAIN_PASSES = 200;
 
 async function position(db: D1Database) {
-	const [queued, expired, staged, batch] = await Promise.all([
+	const [queued, expired, lease] = await Promise.all([
 		db.prepare('SELECT storage_key FROM object_cleanup_queue ORDER BY storage_key LIMIT 1').first<{ storage_key: string }>(),
 		db.prepare('SELECT storage_key FROM file_versions WHERE expires_at <= ? ORDER BY expires_at LIMIT 1').bind(Date.now()).first<{ storage_key: string }>(),
-		db.prepare('SELECT storage_key, expires_at FROM staged_uploads WHERE expires_at IS NOT NULL ORDER BY expires_at, storage_key LIMIT 1').first<{ storage_key: string; expires_at: number }>(),
-		db.prepare('SELECT id, expires_at FROM staged_upload_batches WHERE expires_at IS NOT NULL ORDER BY expires_at, id LIMIT 1').first<{ id: string; expires_at: number }>(),
+		db.prepare('SELECT id, expires_at FROM upload_leases WHERE expires_at IS NOT NULL ORDER BY expires_at, id LIMIT 1').first<{ id: string; expires_at: number }>(),
 	]);
 	return { queued: queued?.storage_key, expired: expired?.storage_key,
-		staged: staged && staged.expires_at <= Date.now() ? staged.storage_key : undefined, stagedAt: staged?.expires_at,
-		batch: batch && batch.expires_at <= Date.now() ? batch.id : undefined, batchAt: batch?.expires_at };
+		lease: lease && lease.expires_at <= Date.now() ? lease.id : undefined, leaseAt: lease?.expires_at };
 }
 
 /** Called under the maintenance role's lock. A scheduled episode keeps its alarm and pass count. */
 export async function armMaintenanceCoordinator(state: DurableObjectState): Promise<void> {
-	await state.storage.put(MAINTENANCE_COORDINATOR_KEY, true);
+	await markRole(state, MAINTENANCE_COORDINATOR_KEY);
 	if (await state.storage.getAlarm() === null) {
 		await state.storage.put(MAINTENANCE_PASS_KEY, 0);
 		await state.storage.setAlarm(Date.now() + 24 * 60 * 60 * 1000);
@@ -37,21 +38,19 @@ export async function armMaintenanceCoordinator(state: DurableObjectState): Prom
 export async function runMaintenanceEpisode(state: DurableObjectState, env: Env): Promise<void> {
 	const pass = (await state.storage.get<number>(MAINTENANCE_PASS_KEY) ?? 0) + 1;
 	await state.storage.put(MAINTENANCE_PASS_KEY, pass);
-	if (pass > MAX_DRAIN_PASSES || pass > MAX_PASSES && !await state.storage.get<boolean>('maintenanceDraining')) return;
+	const wasDraining = await state.storage.get<boolean>(DRAINING_KEY);
+	if (pass > MAX_DRAIN_PASSES || pass > MAX_PASSES && !wasDraining) return;
 	const before = await position(env.DB);
-	// Both position reads, four queries each, share the pass's D1 budget.
-	const { removedObjects: removed, backlog } = await runScheduledMaintenance(env, { firstPass: pass === 1, reserved: 8 });
+	const { removedObjects: removed, backlog } = await runScheduledMaintenance(env, { firstPass: pass === 1 });
 	const after = await position(env.DB);
 	const draining = Boolean(after.queued && after.queued !== before.queued || after.expired && after.expired !== before.expired);
-	await state.storage.put('maintenanceDraining', draining);
-	const advancing = backlog || Boolean(after.staged && (removed > 0 || after.staged !== before.staged))
-		|| Boolean(after.batch && (removed > 0 || after.batch !== before.batch))
+	if (draining !== Boolean(wasDraining)) await state.storage.put(DRAINING_KEY, draining);
+	const advancing = backlog || Boolean(after.lease && (removed > 0 || after.lease !== before.lease))
 		|| Boolean(after.queued && (removed > 0 || after.queued !== before.queued));
 	if (pass < (draining ? MAX_DRAIN_PASSES : MAX_PASSES)) {
 		if (advancing) await state.storage.setAlarm(Date.now() + 5000);
 		else {
-			const next = [after.stagedAt, after.batchAt].filter((time): time is number => typeof time === 'number' && time > Date.now());
-			if (next.length) await state.storage.setAlarm(Math.min(...next));
+			if (after.leaseAt !== undefined && after.leaseAt > Date.now()) await state.storage.setAlarm(after.leaseAt);
 		}
 	}
 }

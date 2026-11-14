@@ -8,12 +8,10 @@ import {
 	handleGetChanges,
 	handleGetFileMetadata,
 	handleGetManifest,
-	handleGetSettings,
-	handlePutSettings,
+	handleSharedSettings,
 	handleUpload,
 } from '../sync/index';
 import { handleListFileVersions, handleRestoreFileVersion } from '../sync/file-versions/handlers';
-import { handleEncryptedSettings } from '../encryption/settings';
 import { readEncryptionState } from '../encryption/state';
 import type { Env } from '../types';
 import { mutationAuditContext } from '../http/request-diagnostics';
@@ -36,7 +34,7 @@ export async function handleSyncRoute(
 		if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(bucket, db);
 		if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpoint);
 		if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpointFile);
-	if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, async () => {
+	if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, encryption ?? null, async () => {
 		if (!await wakeProjection(env)) throw new Error('Unable to resume reminder setup');
 	});
 	if (path === '/sync/import/complete' && method === 'POST') return finishInitialImport(request, db);
@@ -85,10 +83,7 @@ export async function handleSyncRoute(
 		return await handleRestoreFileVersion(request, bucket, db);
 	}
 	if (path === '/settings' && (method === 'GET' || method === 'PUT')) {
-		// Encrypted vaults keep shared settings as a D1 ciphertext record instead of the R2 file.
-		const encryptionState = await readEncryptionState(db);
-		if (encryptionState) return await handleEncryptedSettings(request, db, encryptionState);
-		return method === 'GET' ? await handleGetSettings(bucket) : await handlePutSettings(request, bucket);
+		return await handleSharedSettings(request, db, encryption === undefined ? await readEncryptionState(db) : encryption);
 	}
 
 	return null;

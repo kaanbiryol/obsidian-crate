@@ -173,7 +173,7 @@ it('keeps article highlights, annotations, tags and archive changes encrypted an
 	expect(opened.markdown).toContain(`==${quote}==`);
 	const file = await env.DB.prepare('SELECT storage_key FROM files').first<{ storage_key: string }>();
 	const serverBytes = await (await env.BUCKET.get(file!.storage_key))!.text();
-	const receipts = JSON.stringify((await env.DB.prepare('SELECT * FROM reminder_operations').all()).results);
+	const receipts = JSON.stringify((await env.DB.prepare("SELECT * FROM operations WHERE kind = 'reminder'").all()).results);
 	for (const secret of [quote, highlight.note, 'private-tag']) {
 		expect(serverBytes).not.toContain(secret); expect(receipts).not.toContain(secret); expect(h.requests.join()).not.toContain(secret);
 	}
@@ -187,7 +187,7 @@ it.each(['active', 'resetting'] as const)('refuses Shortcut saves before parsing
 	expect(response.status).toBe(409);
 	expect(await response.json()).toMatchObject({ code: 'shortcut_encrypted_vault' });
 	expect(request.bodyUsed).toBe(false);
-	expect(await env.DB.prepare('SELECT 1 FROM reading_handoffs').first()).toBeNull();
+	expect(await env.DB.prepare("SELECT 1 FROM grants WHERE kind = 'reading_handoff'").first()).toBeNull();
 });
 
 it('names captures after their title and renames a link-named note once a retry finds the title', async () => {

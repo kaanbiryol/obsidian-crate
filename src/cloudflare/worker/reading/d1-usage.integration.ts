@@ -50,7 +50,7 @@ beforeEach(async () => {
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('vault', ?, 'vault')").bind(await sha256Hex('vault-credential')).run();
 	await env.DB.prepare('INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, ?, ?, ?, ?)')
 		.bind(policy.enabled, policy.folder_path, policy.generation, policy.revision).run();
-	await env.DB.prepare("INSERT INTO reading_index(id, scope) VALUES (1, ?)").bind(readingIndexScope(policy)).run();
+	await env.DB.prepare("UPDATE reading_policy SET index_scope = ? WHERE id = 1").bind(readingIndexScope(policy)).run();
 	// Unrelated files sort on both sides of the Reading folder's primary-key range.
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
     INSERT INTO files(path, portable_path, storage_key, hash, size)

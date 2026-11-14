@@ -10,13 +10,13 @@ import {
 } from '../requests';
 import { commitReminderCommand, plaintextFailureResponse } from '../command';
 
-export async function handleCreateReminder(request: Request, env: Env): Promise<Response> {
+export async function handleCreateReminder(request: Request, env: Env, arm?: () => Promise<void>): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}
 
-	const operation = await beginReminderOperation(env.DB, parsedBody.value, 'create');
+	const operation = await beginReminderOperation(env.DB, parsedBody.value, 'create', arm);
 	if (operation instanceof Response) return operation;
 	if (parsedBody.value.id !== operation.id) return corsResponse({ error: 'A new reminder must use its operation identity.' }, 400);
 

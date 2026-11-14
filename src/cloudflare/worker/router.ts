@@ -38,6 +38,8 @@ export interface AuthenticatedRouteContext {
 	encryption?: EncryptionServerState | null;
 	featurePolicyValue?: string | null;
 	coordinatorState?: DurableObjectState;
+	/** Arms the notification pass for a route that decides itself; see `notifications/arming.ts`. */
+	armNotifications?: () => Promise<void>;
 }
 
 /** Dispatch a request whose principal the caller has already checked with isAuthenticatedRouteAllowed. */

@@ -62,11 +62,6 @@ def backup(remote, directory):
         items.append(capture(key, integrity))
         if index % 100 == 0:
             print(f'Verified {index} archive objects', flush=True)
-    try:
-        items.append(capture('__crate__/settings.json'))
-    except RuntimeError as error:
-        if str(error) != 'Cloudflare request failed with HTTP 404':
-            raise
     manifest = {'format': 1, 'complete': True, 'createdAt': datetime.now(timezone.utc).isoformat(),
                 'source': source, 'bookmark': state['bookmark'], 'databaseSha256': state['databaseSha256'], 'objects': items}
     save(directory / 'archive.json', manifest)

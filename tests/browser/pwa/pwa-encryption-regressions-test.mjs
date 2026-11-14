@@ -133,7 +133,7 @@ async function verify(browser, scenario) {
 			assert.ok(result.ackLength > 32 * 1024);
 			if (scenario === 'large-receipt') {
 				// The acknowledgment exceeds one D1 value, so its receipt is stored in bounded chunks.
-				const chunks = await runtime.db.prepare("SELECT COUNT(*) AS count, MAX(LENGTH(value)) AS longest FROM maintenance_state WHERE key GLOB 'e2ee:receipt:reminder:*'").first();
+				const chunks = await runtime.db.prepare("SELECT COUNT(*) AS count, MAX(LENGTH(body)) AS longest FROM operation_chunks WHERE kind = 'reminder'").first();
 				assert.ok(chunks.count >= 2, `Expected a chunked receipt, found ${chunks.count} rows`);
 				assert.ok(chunks.longest <= 512 * 1024);
 			}

@@ -73,7 +73,7 @@ it.each([{ content: 'x'.repeat(1025) }, { content: null }, { content: 42 }, { de
 	expect(response.status).toBe(400);
 	expect(await response.json()).toMatchObject({ code: 'invalid_reminder_input' });
 	expect(await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath)).toEqual(stored);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_operations').first()).toEqual({ n: 0 });
+	expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM operations WHERE kind = 'reminder'").first()).toEqual({ n: 0 });
 });
 
 it.each(['', null])('distinguishes explicit clears from omitted fields: %j', async description => {

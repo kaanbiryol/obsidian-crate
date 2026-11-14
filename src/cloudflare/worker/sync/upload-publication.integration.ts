@@ -56,7 +56,7 @@ it.each(['single', 'batch', 'bulk'] as const)('keeps a %s Markdown upload staged
 	expect(response.status, await response.clone().text()).toBe(503);
 	expect(forwarded).toEqual([kind === 'bulk' ? '/commit-new-files' : '/commit-upload']);
 	expect((await env.BUCKET.list()).objects).toHaveLength(1);
-	for (const table of ['files', 'changelog', 'upload_operations']) {
+	for (const table of ['files', 'changelog', 'operations']) {
 		expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first(), table).toBeNull();
 	}
 });

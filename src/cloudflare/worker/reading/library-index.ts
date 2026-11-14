@@ -118,7 +118,7 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 	for (const change of changes.filter(change => isReadingNotePath(change.path, policy.folder_path))) {
 		const row = await indexRow(change, options.encrypted === true);
 		// Without the bytes, the only safe outcome is a rebuild from R2.
-		if (row === 'unknown') return [db.prepare('DELETE FROM reading_index')];
+		if (row === 'unknown') return [db.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL WHERE id = 1')];
 		rows.push(row);
 	}
 	if (!rows.length) return [];
@@ -220,7 +220,7 @@ export interface StoredReadingFile { path: string; storageKey: string; hash: str
 export type ReadingIndexState = { state: 'complete' | 'pending' | 'unavailable'; rebuilt?: boolean };
 
 export interface ReadingIndexRow { scope: string; cursor: string | null }
-export const readingIndexStatement = (db: D1Database) => db.prepare('SELECT scope, cursor FROM reading_index WHERE id = 1');
+export const readingIndexStatement = (db: D1Database) => db.prepare('SELECT index_scope AS scope, index_cursor AS cursor FROM reading_policy WHERE id = 1 AND index_scope IS NOT NULL');
 
 /** The state of an index row that is complete for `current`, or null when it must be (re)built. */
 export function completeReadingIndex(current: ReadingPolicy, index: ReadingIndexRow | null): ReadingIndexState | null {
@@ -243,8 +243,7 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 			db.prepare('DELETE FROM reading_items'),
 			db.prepare('DELETE FROM note_terms'),
 			db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
-			db.prepare(`INSERT INTO reading_index(id, scope, cursor) VALUES (1, ?, '')
-        ON CONFLICT(id) DO UPDATE SET scope = excluded.scope, cursor = excluded.cursor`).bind(scope),
+			db.prepare("UPDATE reading_policy SET index_scope = ?, index_cursor = '' WHERE id = 1").bind(scope),
 		]);
 	}
 	const { results } = await db.prepare(`SELECT path, portable_path, hash, size, storage_key FROM files WHERE ${FILE_FOLDER_MATCH} AND portable_path > ?
@@ -267,7 +266,7 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 	const next = !unavailable && results.length < REBUILD_PAGE ? null : cursor;
 	await db.batch([
 		...await readingIndexStatements(db, changes, { policy: current, encrypted }),
-		db.prepare('UPDATE reading_index SET cursor = ? WHERE id = 1 AND scope = ?').bind(next, scope),
+		db.prepare('UPDATE reading_policy SET index_cursor = ? WHERE id = 1 AND index_scope = ?').bind(next, scope),
 	]);
 	return { state: unavailable ? 'unavailable' : next === null ? 'complete' : 'pending', rebuilt: true };
 }

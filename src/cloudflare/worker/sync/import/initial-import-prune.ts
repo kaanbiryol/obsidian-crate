@@ -23,12 +23,12 @@ export async function pruneInitialImport(request: Request, db: D1Database): Prom
 	const predicate = `portable_path IN (SELECT json_extract(value, '$.portable') FROM json_each(?1))
     AND EXISTS (SELECT 1 FROM json_each(?1) i WHERE json_extract(i.value, '$.path') = files.path
     AND json_extract(i.value, '$.hash') = files.hash)
-    AND EXISTS (SELECT 1 FROM initial_import WHERE token = ?2 AND state = 'importing')`;
+    AND EXISTS (SELECT 1 FROM server_state WHERE id = 1 AND import_token = ?2 AND import_state = 'importing')`;
 	const json = JSON.stringify((files as Array<{ path: string; hash: string }>).map(file => ({ ...file, portable: portablePathKey(file.path) })));
 	await db.batch([
 		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path) SELECT storage_key, path FROM files WHERE ${predicate}`).bind(json, current.token),
 		db.prepare(`DELETE FROM files WHERE ${predicate}`).bind(json, current.token),
-		db.prepare("UPDATE initial_import SET generation = generation + 1 WHERE token = ? AND state = 'importing'").bind(current.token),
+		db.prepare("UPDATE server_state SET import_generation = import_generation + 1 WHERE id = 1 AND import_token = ? AND import_state = 'importing'").bind(current.token),
 		...await readingIndexStatements(db, (files as Array<{ path: string }>).map(file => ({ path: file.path, storageKey: null }))),
 	]);
 	return corsResponse({ success: true });

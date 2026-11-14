@@ -6,7 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import { decryptJson, encryptJson } from '../../../encryption/envelope';
 import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, MAX_SHARED_SETTINGS_BYTES } from '../../../encryption/settings-format';
-import { handleEncryptedSettings } from './settings';
+import { handleSharedSettings as handleEncryptedSettings } from '../sync/metadata-handlers';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { await reset(); });

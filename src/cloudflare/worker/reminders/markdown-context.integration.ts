@@ -42,7 +42,7 @@ it('returns an actionable structural reorder conflict without publishing or ackn
 	expect(response.status).toBe(409);
 	expect(await response.json()).toMatchObject({ code: 'reminder_order_conflict' });
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))?.content).toBe(content);
-	expect(await env.DB.prepare('SELECT operation_id FROM reminder_operations').all()).toMatchObject({ results: [] });
+	expect(await env.DB.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder'").all()).toMatchObject({ results: [] });
 });
 
 it('maps a create inside an unclosed fence to a conflict through the authenticated Worker route', async () => {
@@ -57,7 +57,7 @@ it('maps a create inside an unclosed fence to a conflict through the authenticat
 	expect(response.status).toBe(409);
 	expect(await response.json()).toMatchObject({ code: 'reminder_markdown_context' });
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))?.content).toBe(content);
-	expect(await env.DB.prepare('SELECT operation_id FROM reminder_operations').all()).toMatchObject({ results: [] });
+	expect(await env.DB.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder'").all()).toMatchObject({ results: [] });
 });
 
 const issuedDay = Math.floor(Date.now() / 86_400_000);

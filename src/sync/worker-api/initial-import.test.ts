@@ -95,3 +95,18 @@ it('polls every second for the first minute, then every 5 seconds, and still sto
 	await vi.advanceTimersByTimeAsync(1000); await rejected;
 	expect(requestJson).toHaveBeenCalledTimes(65);
 });
+
+it('reads the server listing once when a resumed encrypted import names many server copies', async () => {
+	const requestJson = vi.fn().mockResolvedValue({ lastSeq: 1 });
+	const files = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`wire/${index}.md`, { hash: 'a'.repeat(64), size: index, revision: `r${index}`, modified: '' }]));
+	const readRawManifest = vi.fn(async () => ({ files }));
+	const api = new InitialImportApi({ requestJson, getWorkerUrl: () => 'https://test' } as never, readRawManifest);
+	api.setEncryption({} as never);
+	const inventory = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`Notes/${index}.md`, { hash: 'b'.repeat(64), size: 1, revision: `r${index}` }]));
+	expect(await api.finish('token', inventory)).toBe(1);
+	await api.prune('token', [{ path: 'Notes/0.md', hash: 'b'.repeat(64), revision: 'r0' }]);
+	expect(readRawManifest).toHaveBeenCalledOnce();
+	// A revision the listing lacks is looked up again on its next use.
+	await expect(api.prune('token', [{ path: 'Notes/new.md', hash: 'b'.repeat(64), revision: 'missing' }])).rejects.toThrow('Initial upload changed');
+	expect(readRawManifest).toHaveBeenCalledTimes(2);
+});

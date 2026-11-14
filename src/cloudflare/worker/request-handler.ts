@@ -14,6 +14,7 @@ import { coordinatedUpload, coordinatedUploads } from './sync/staging/staged-upl
 import { apiRoutePolicy } from './routes/policy';
 import { requestPlacement } from './routes/placement';
 import { armNotificationCoordinator } from './notifications/lifecycle';
+import { notificationArming } from './notifications/arming';
 import { isCrateMutation } from '../../protocol/server-info';
 import { corsHeaders, corsResponse } from './http/cors';
 import { authenticateWorkerRequest } from './auth/index';
@@ -115,15 +116,22 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	if (publicResponse) return publicResponse;
 	// Coordinator routes authenticate under the coordinator lock that every revocation
 	// also takes. A bearer this isolate has not recently authenticated is checked here
-	// first, so invalid credentials never queue on that lock.
-	if (placement === 'forward-before-auth') {
-		if (!await authenticatedAdmissionKey(request, admissionDb)) {
+	// first, so invalid credentials never queue on that lock. An upload whose bearer this
+	// isolate recently accepted is forwarded the same way: its transfer object authenticates
+	// and authorizes it after queuing, before reading bytes. Any other upload is authorized
+	// below before its bytes are streamed.
+	const recent = placement === 'forward-before-auth' || placement === 'forward-transfer'
+		? await authenticatedAdmissionKey(request, admissionDb) : undefined;
+	if (placement === 'forward-before-auth' || (placement === 'forward-transfer' && recent)) {
+		if (!recent) {
 			const authResult = await authenticateWorkerRequest(request, db);
 			await rememberAuthenticatedRequest(request, admissionDb, !authResult.response);
 			if (authResult.response) return authResult.response;
 		}
-		const response = await forwardToCoordinator(env, request);
-		// Only an authenticated coordinator response carries the encryption state.
+		const response = routeExecution?.kind === 'transfer'
+			? await forwardTransferRequest(request, env, routeExecution.path)
+			: await forwardToCoordinator(env, request);
+		// Only an authenticated coordinator or transfer response carries the encryption state.
 		if (response.headers.has(ENCRYPTION_STATE_HEADER)) await rememberAuthenticatedRequest(request, admissionDb, true);
 		else if (response.status === 401) await rememberAuthenticatedRequest(request, admissionDb, false);
 		return forwardedResponse(response, context);
@@ -151,7 +159,17 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 		if (!await ensureProjection(env)) throw new Error('Unable to initialize notification processing');
 		ensuredProjections.add(projectionBinding);
 	}
-	if (routeExecution?.kind === 'coordinator' && routeExecution.wake && execution.kind === 'coordinator') await armNotificationCoordinator(execution.state);
+	// The notification pass is armed before the commit, and only when the request can queue work.
+	let armNotifications: (() => Promise<void>) | undefined;
+	if (routeExecution?.kind === 'coordinator' && routeExecution.wake && execution.kind === 'coordinator') {
+		const { state } = execution;
+		const arming = await notificationArming(request, path, method, db);
+		if (arming === 'now') await armNotificationCoordinator(state);
+		else if (arming === 'deferred') {
+			let armed: Promise<void> | undefined;
+			armNotifications = () => armed ??= armNotificationCoordinator(state);
+		}
+	}
 	if (mutation && execution.kind !== 'coordinator') {
 		await scheduleMaintenance(env, projectionBinding);
 	}
@@ -161,7 +179,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	const response = await handleAuthenticatedRoute(request, env, {
 		uploadCommitters, path, method, principal: authResult.principal, resetGeneration: authResult.resetGeneration,
 		requestId: context.requestId, encryption, featurePolicyValue: authResult.featurePolicyValue,
-		coordinatorState: execution.kind === 'coordinator' ? execution.state : undefined,
+		coordinatorState: execution.kind === 'coordinator' ? execution.state : undefined, armNotifications,
 	}) ?? corsResponse({ error: 'Not found' }, 404);
 	if (mutation) await logMutation(request, response, context.requestId, authResult.principal);
 	return response;

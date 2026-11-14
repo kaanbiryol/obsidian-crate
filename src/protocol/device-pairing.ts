@@ -7,9 +7,8 @@ export const DEVICE_PAIRING_CAPABILITY = 'device-pairing-v1';
 export const DEVICE_PAIRING_PATH = '/auth/device-pairing';
 export const DEVICE_PAIRING_PAGE = '/notifications/pair';
 export const DEVICE_PAIRING_LIFETIME = 10 * 60_000;
-/** `maintenance_state` keys between these bounds hold pending codes, keyed by the code's hash. */
-export const DEVICE_PAIRING_PREFIX = 'crate_device_pairing:';
-export const DEVICE_PAIRING_END = 'crate_device_pairing;';
+/** The `grants` kind of a pending code, keyed by the code's hash. */
+export const DEVICE_PAIRING_GRANT = 'device_pairing';
 
 /** A pending code. `redeemed` holds the new device's token hash once claimed, so a
  * lost response can be retried until the code expires. */

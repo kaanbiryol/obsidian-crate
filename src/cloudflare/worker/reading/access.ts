@@ -6,6 +6,7 @@ import { isSha256Hex } from '@/platform/validation';
 import { sha256Hex } from '@/platform/sha256';
 import { createRandomHexToken } from '@/platform/random-hex';
 import { readEncryptionState } from '../encryption/state';
+import type { EncryptionServerState } from '../../../encryption/server-state';
 import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
 import { MAX_JOB_ATTEMPTS } from './extraction/jobs';
 
@@ -32,12 +33,12 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
 		// Jobs extract into the folder of their generation, so a new one drops the old one's.
 		db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
 		...(encryption ? [saveFolderLabel(db, folder, body.folderLabel as string)] : [])]);
-	return readingResponse({ policy: await labelledPolicy(db, current) });
+	return readingResponse({ policy: await labelledPolicy(db, current, encryption) });
 }
 
 /** Encrypted vaults store the folder by its tag; the label carries its sealed name. */
-export async function labelledPolicy(db: D1Database, current: ReadingPolicy | null): Promise<ReadingPolicy | null> {
-	const label = current && await readEncryptionState(db) ? await readFolderLabel(db, current.folder_path) : null;
+export async function labelledPolicy(db: D1Database, current: ReadingPolicy | null, encryption: EncryptionServerState | null): Promise<ReadingPolicy | null> {
+	const label = current && encryption ? await readFolderLabel(db, current.folder_path) : null;
 	return current && label ? { ...current, folder_label: label } : current;
 }
 export async function prepareHandoff(db: D1Database, principal: AuthPrincipal, body: Record<string, unknown>, origin: string) {
@@ -51,15 +52,16 @@ export async function prepareHandoff(db: D1Database, principal: AuthPrincipal, b
 	const prepared = { url, ...(typeof body.title === 'string' ? { title: body.title.slice(0, MAX_READING_TITLE_LENGTH) } : {}),
 		operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)) };
 	const token = createRandomHexToken(), expiresAt = Date.now() + 5 * 60_000;
-	await db.prepare('INSERT INTO reading_handoffs(token_hash, principal_id, generation, body, expires_at) VALUES (?, ?, ?, ?, ?)')
+	await db.prepare("INSERT INTO grants(kind, key, payload, expires_at) VALUES ('reading_handoff', ?, json_object('principal', ?, 'generation', ?, 'body', json(?)), ?)")
 		.bind(await sha256Hex(token), principal.tokenId, current.generation, JSON.stringify(prepared), expiresAt).run();
 	return readingResponse({ launchUrl: `${origin}/notifications/save-reading#${token}`, expiresAt });
 }
 export async function handoffAuthority(db: D1Database, request: Request) {
 	const token = request.headers.get('X-Crate-Capture') ?? '';
 	if (!isSha256Hex(token)) throw new ReadingError('This save link is missing. Share the article again.', 401);
-	const row = await db.prepare(`SELECT h.body, h.generation, a.id, a.scope, a.folder_path, a.reading_generation FROM reading_handoffs h
-    JOIN auth_tokens a ON a.id=h.principal_id WHERE h.token_hash=? AND h.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)`)
+	const row = await db.prepare(`SELECT json_extract(h.payload, '$.body') AS body, json_extract(h.payload, '$.generation') AS generation,
+    a.id, a.scope, a.folder_path, a.reading_generation FROM grants h
+    JOIN auth_tokens a ON a.id=json_extract(h.payload, '$.principal') WHERE h.kind='reading_handoff' AND h.key=? AND h.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)`)
 		.bind(await sha256Hex(token), Date.now(), Date.now()).first<{ body: string; generation: string; id: string; scope: string; folder_path: string; reading_generation: string }>();
 	if (!row || !canPrepareReadingHandoff(row.scope)) throw new ReadingError('This save link expired or its access was revoked. Share the article again.', 410);
 	const principal: AuthPrincipal = { tokenId: row.id, scope: row.scope, folderPath: row.folder_path, readingGeneration: row.reading_generation };

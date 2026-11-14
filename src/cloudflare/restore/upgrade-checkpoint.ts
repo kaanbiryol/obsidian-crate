@@ -1,7 +1,7 @@
 import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import { isNotFound } from '../cloudflare-api-error';
 import type { DeploymentFence } from '../deployment/fence';
-import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, SHARED_SETTINGS_KEY, upgradeBackupStoreKey } from '../../protocol/storage-keys';
+import { UPGRADE_BACKUP_PREFIX, UPGRADE_BACKUP_STORE, upgradeBackupStoreKey } from '../../protocol/storage-keys';
 import { sha256Hex } from '../../platform/sha256';
 import { isSha256Hex } from '../../platform/validation';
 import { listBackupObjects, pruneUpgradeBackups } from './upgrade-backups';
@@ -175,7 +175,7 @@ async function dumpDatabase(context: BackupContext, saved: { raw: string; progre
 		}
 		if (buffer.length >= PART_CHARACTERS) await checkpoint(index + 1, null);
 	}
-	// The changelog's sequence floor is a server_state column, exported with its row.
+	// The changelog's sequence floor and the shared settings are `server_state` columns, exported with its row.
 	buffer += definitions.filter(row => row.type === 'index').map(row => `${String(row.sql)};`).join('\n');
 	const finished: ExportedProgress = { format: 2, phase: 'finishing', prefix: progress.prefix, createdAt: progress.createdAt, parts: await savePart() };
 	return { raw: await saveProgress(query, raw, finished), progress: finished };
@@ -246,16 +246,6 @@ async function finishArchive(context: BackupContext, input: { databaseId: string
 	}
 	for (const file of files.values()) await copyToStore(context, file, stored, true);
 	const objects = [...files.values()].map(file => ({ key: file.key, sha256: file.sha256, size: file.size, contentType: 'application/octet-stream' }));
-	try {
-		await api.throttle();
-		const bytes = await api.getRecoveryObject(accountId, bucketName, SHARED_SETTINGS_KEY);
-		const sha256 = await sha256Hex(bytes);
-		if (!isStored(stored, sha256, bytes.byteLength)) {
-			await api.throttle();
-			await api.putRecoveryObject(accountId, bucketName, upgradeBackupStoreKey(sha256), bytes);
-		}
-		objects.push({ key: SHARED_SETTINGS_KEY, sha256, size: bytes.byteLength, contentType: 'application/json' });
-	} catch (error) { if (!isNotFound(error)) throw error; }
 	objects.sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 	const parts = await listBackupObjects(api, accountId, bucketName, `${progress.prefix}/objects/`);
 	if (progress.parts.some(part => !isStored(parts, part.sha256, part.size))) throw new Error('Database checkpoint verification failed');

@@ -92,19 +92,19 @@ export async function loadStoredFileRows(db: D1Database, paths: string[]): Promi
 	return new Map(rows.filter(row => paths.includes(row.path)).map(row => [row.path, toFileStorageRow(row)]));
 }
 
-// Separate indexed endpoints avoid scanning the entire retained changelog. Pruning keeps
-// the newest entry, an initial import records its snapshot and a reset records the floor,
-// so this never decreases. Entries number above the floor, so it is read only while the
-// changelog is empty: COALESCE stops at its first value.
-export const LAST_SEQ_SQL = `MAX(COALESCE((SELECT MAX(seq) FROM changelog), (SELECT seq FROM changelog_floor), 0),
-  COALESCE((SELECT snapshot_seq FROM initial_import), 0))`;
+// The indexed endpoint avoids scanning the entire retained changelog. Pruning keeps the
+// newest entry, an initial import records its snapshot and a reset records the floor, so
+// this never decreases. Entries number above the floor, so the floor counts only while the
+// changelog is empty. Both values are in the one `server_state` row.
+export const LAST_SEQ_SQL = `MAX(COALESCE((SELECT MAX(seq) FROM changelog), 0),
+  COALESCE((SELECT MAX(COALESCE(changelog_floor, 0), import_snapshot_seq) FROM server_state WHERE id = 1), 0))`;
 
 /** The `seq` of each changelog row an INSERT ... SELECT writes, numbered in `order`. The
  * subquery does not depend on the row, so SQLite evaluates it once per statement. */
 export const nextChangelogSeqSql = (order: string) => `(SELECT ${LAST_SEQ_SQL}) + ROW_NUMBER() OVER (ORDER BY ${order})`;
 export const CHANGELOG_BOUNDS_SQL = `SELECT ${LAST_SEQ_SQL} AS lastSeq,
   (SELECT MIN(seq) FROM changelog) AS minSeq,
-  COALESCE((SELECT snapshot_seq FROM initial_import), 0) AS snapshotSeq`;
+  COALESCE((SELECT import_snapshot_seq FROM server_state WHERE id = 1), 0) AS snapshotSeq`;
 
 export interface ChangelogBounds { lastSeq: number; minSeq: number | null; snapshotSeq: number }
 

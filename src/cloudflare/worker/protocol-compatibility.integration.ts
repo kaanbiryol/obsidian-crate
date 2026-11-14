@@ -39,8 +39,8 @@ describe('old and future clients against the current Worker', () => {
 			expect(await response.json()).toMatchObject({ code: 'protocol_incompatible' });
 		}
 		expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(original.results);
-		expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first()).toEqual({ count: 0 });
-		expect(await env.BUCKET.get('__crate__/settings.json')).toBeNull();
+		expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM operations WHERE kind = 'reminder'").first()).toEqual({ count: 0 });
+		expect(await env.DB.prepare('SELECT 1 FROM server_state WHERE settings IS NOT NULL').first()).toBeNull();
 	});
 	it('keeps authenticated reads available without granting mutation compatibility', async () => {
 		const older = String(CRATE_PLUGIN_PROTOCOL.oldestCompatible - 1);

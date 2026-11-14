@@ -12,8 +12,8 @@ export async function issueWebEnrollmentToken(
 	const tokenHash = await sha256Hex(token);
 	const expiresAt = Date.now() + WEB_ENROLLMENT_TOKEN_TTL_MS;
 
-	await db.prepare('INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES (?, ?, ?)')
-		.bind(tokenHash, expiresAt, folderPath)
+	await db.prepare("INSERT INTO grants (kind, key, payload, expires_at) VALUES ('web_enrollment', ?, json_object('folderPath', ?), ?)")
+		.bind(tokenHash, folderPath, expiresAt)
 		.run();
 
 	return { token, expiresAt };

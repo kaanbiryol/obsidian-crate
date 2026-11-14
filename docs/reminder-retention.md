@@ -1,6 +1,6 @@
 # Reminder retry and retention policy
 
-The current protocol gives new web commands a finite retry window without making an old request executable again after its receipt disappears. This policy covers web reminder mutations. The same window and monotonic floor apply to [upload receipts](upload-recovery.md); generic file deletion audit receipts and retained file versions still use their separate 30-day policy.
+The current protocol gives new web commands a finite retry window without making an old request executable again after its receipt disappears. This policy covers web reminder mutations and Reading commands. [Upload receipts](upload-recovery.md) follow the same rules under their own monotonic floor (`upload_operation_floor`) and a 30-date window. Generic file deletion audit receipts and retained file versions still use their separate 30-day policy.
 
 ## Commands and identities
 
@@ -10,7 +10,7 @@ The issued date and the following 179 UTC dates are valid. This is at least 179 
 
 Without a receipt, an unversioned ID, future date, or expired date receives HTTP 410 `operation_expired` before staging vault data. The D1 publication batch checks expiry again: a request that expires while R2 is being staged cannot commit either side of a project move, file pointers, source metadata or a receipt. Private staged objects remain subject to existing orphan cleanup. An uncertain commit response still requires the same request on retry.
 
-Maintenance atomically advances `maintenance_state.reminder_operation_floor` and then prunes at most 5,000 expired versioned receipts per run, and 500 expired unreferenced versioned identities once per maintenance episode. The floor never decreases; clock rollback cannot reopen an already-pruned window. Cleanup failure rolls back its floor and deletions together. Delayed maintenance may retain receipts longer, but cannot extend the ability of a missing-receipt request to mutate. Monitor maintenance failures and receipt counts through diagnostics.
+Maintenance atomically advances `maintenance_state.reminder_operation_floor` (and, for uploads, `upload_operation_floor`) and then prunes at most 5,000 expired versioned receipts per run from `operations` (each kind by its own key range, with any chunks of a pruned receipt in `operation_chunks`), and 500 expired unreferenced versioned identities once per maintenance episode. The floor never decreases; clock rollback cannot reopen an already-pruned window. Cleanup failure rolls back its floor and deletions together. Delayed maintenance may retain receipts longer, but cannot extend the ability of a missing-receipt request to mutate. Monitor maintenance failures and receipt counts through diagnostics.
 
 Active and quarantined source references preserve identity reservations. New creates cannot add unversioned identities or reuse a pruned old identity with a fresh command. The generic Markdown path continues to preserve user-chosen stable IDs; this is separate from authorizing a new web create.
 

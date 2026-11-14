@@ -1,5 +1,5 @@
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { trackStagedUploads } from './staging/staged-uploads';
+import { trackUploadLease } from './staging/upload-leases';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit, MAX_ENCRYPTED_FILE_BYTES } from '../../../encryption/file-format';
 import { EncryptionStateError, validateUploadEncryption } from '../encryption/state';
 import { beginUploadOperation } from './upload-operations';
@@ -76,7 +76,8 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		if (operation instanceof Response) return operation;
 		const objectKey = createManagedObjectKey(hash);
 		const validatedEncryption = await validateUploadEncryption(db, [{ path: safePath, content: body, contentType }], expectedEncryption);
-		const encryptionState = await trackStagedUploads(db, [{ storageKey: objectKey, path: safePath }], contentType === ENCRYPTED_FILE_CONTENT_TYPE, validatedEncryption, resetGeneration);
+		const { id: leaseId, encryptionState } = await trackUploadLease(db, [{ storageKey: objectKey, path: safePath }],
+			{ encrypted: contentType === ENCRYPTED_FILE_CONTENT_TYPE, expectedEncryption: validatedEncryption, resetGeneration });
 		await bucket.put(objectKey, body, {
 			httpMetadata: { contentType },
 			customMetadata: { hash },
@@ -89,6 +90,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				hash,
 				size,
 				objectKey,
+				leaseId,
 				content: exactArrayBuffer(body),
 				expectedHash: expectedRemoteHash,
 				operation,

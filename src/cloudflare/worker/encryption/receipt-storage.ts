@@ -1,18 +1,14 @@
 import { MAX_ENCRYPTED_REMINDER_ACK } from '../../../encryption/receipt-format';
-import { putMaintenanceValue, readMaintenanceValue, type SqlGuard } from '../d1/db';
+import type { SqlGuard } from '../d1/db';
 
 const CHUNK_SIZE = 512 * 1024;
 const MAX_CHUNKS = Math.ceil((MAX_ENCRYPTED_REMINDER_ACK + 4096) / CHUNK_SIZE);
-const PREFIX = 'e2ee:receipt:';
 type ReceiptKind = 'reminder' | 'upload' | 'reading';
-
-function chunkKey(kind: ReceiptKind, id: string, index: number): string {
-	return `${PREFIX}${kind}:${id}:${String(index).padStart(3, '0')}`;
-}
 
 /** Run these statements and the parent receipt write in the SAME D1 batch.
  * Ciphertext is ASCII; each row stays below D1's value/row limit. The caller's
- * commit predicate also guards the chunks, so rejected writes publish neither. */
+ * commit predicate also guards the chunks, so rejected writes publish neither.
+ * Maintenance deletes the chunks with their receipt (`pruneOperationReceipts`). */
 export function prepareEncryptedReceipt(db: D1Database, kind: ReceiptKind, id: string, response: Record<string, unknown>,
 	guard: SqlGuard<string | number>): { json: string; statements: D1PreparedStatement[] } {
 	const json = JSON.stringify(response);
@@ -21,8 +17,8 @@ export function prepareEncryptedReceipt(db: D1Database, kind: ReceiptKind, id: s
 	const count = Math.ceil(json.length / CHUNK_SIZE);
 	if (count > MAX_CHUNKS) throw new Error('Encrypted receipt is too large');
 	return { json: JSON.stringify({ e2eeChunks: count }),
-		statements: Array.from({ length: count }, (_, index) => db.prepare(`INSERT INTO maintenance_state(key, value)
-			SELECT ?, ? WHERE ${guard.sql}`).bind(chunkKey(kind, id, index), json.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE), ...guard.args)) };
+		statements: Array.from({ length: count }, (_, index) => db.prepare(`INSERT INTO operation_chunks(kind, operation_id, idx, body)
+			SELECT ?, ?, ?, ? WHERE ${guard.sql}`).bind(kind, id, index, json.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE), ...guard.args)) };
 }
 
 export async function readEncryptedReceipt(db: D1Database, kind: ReceiptKind, id: string, json: string): Promise<Record<string, unknown>> {
@@ -30,38 +26,8 @@ export async function readEncryptedReceipt(db: D1Database, kind: ReceiptKind, id
 	const count = response.e2eeChunks;
 	if (count === undefined) return response;
 	if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > MAX_CHUNKS) throw new Error('Invalid encrypted receipt chunks');
-	const keys = Array.from({ length: count }, (_, index) => chunkKey(kind, id, index));
-	const rows = await db.prepare('SELECT key, value FROM maintenance_state WHERE key IN (SELECT value FROM json_each(?))')
-		.bind(JSON.stringify(keys)).all<{ key: string; value: string }>();
-	const chunks = new Map(rows.results.map(row => [row.key, row.value]));
-	if (chunks.size !== count || keys.some(key => !chunks.has(key) || chunks.get(key)!.length > CHUNK_SIZE)) throw new Error('Encrypted receipt is incomplete');
-	return JSON.parse(keys.map(key => chunks.get(key)!).join('')) as Record<string, unknown>;
-}
-
-/** Expiry removes parents first. A bounded cursor eventually reclaims their
- * chunks; a concurrent transaction publishing a parent prevents deletion. */
-// Candidates are checked by receipt primary key.
-export const RECEIPT_CHUNK_PAGE = 1000;
-
-export async function pruneEncryptedReceiptChunks(db: D1Database): Promise<void> {
-	const cursorKey = 'e2ee:receipt-cleanup-cursor';
-	const cursor = await readMaintenanceValue(db, cursorKey) ?? PREFIX;
-	const page = await db.prepare('SELECT key FROM maintenance_state WHERE key > ? AND key >= ? AND key < ? ORDER BY key LIMIT ?')
-		.bind(cursor, PREFIX, 'e2ee:receipt;', RECEIPT_CHUNK_PAGE).all<{ key: string }>();
-	const candidates = page.results.flatMap(({ key }) => {
-		const match = /^e2ee:receipt:(reminder|upload|reading):([A-Za-z0-9_-]{1,128}):\d{3}$/.exec(key);
-		return match ? [{ key, kind: match[1], id: match[2] }] : [];
-	});
-	await db.batch([
-		db.prepare(`WITH candidates AS (SELECT json_extract(value, '$.key') AS key,
-			json_extract(value, '$.kind') AS kind, json_extract(value, '$.id') AS id FROM json_each(?))
-			DELETE FROM maintenance_state WHERE key IN (SELECT key FROM candidates c
-				WHERE NOT EXISTS (SELECT 1 FROM reminder_operations WHERE c.kind = 'reminder' AND operation_id = c.id)
-				AND NOT EXISTS (SELECT 1 FROM upload_operations WHERE c.kind = 'upload' AND operation_id = c.id)
-				AND NOT EXISTS (SELECT 1 FROM reading_operations WHERE c.kind = 'reading' AND operation_id = c.id))`)
-			.bind(JSON.stringify(candidates)),
-		page.results.length === RECEIPT_CHUNK_PAGE
-			? putMaintenanceValue(db, cursorKey, page.results.at(-1)!.key)
-			: db.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(cursorKey),
-	]);
+	const rows = await db.prepare('SELECT idx, body FROM operation_chunks WHERE kind = ? AND operation_id = ? ORDER BY idx')
+		.bind(kind, id).all<{ idx: number; body: string }>();
+	if (rows.results.length !== count || rows.results.some((row, index) => row.idx !== index || row.body.length > CHUNK_SIZE)) throw new Error('Encrypted receipt is incomplete');
+	return JSON.parse(rows.results.map(row => row.body).join('')) as Record<string, unknown>;
 }

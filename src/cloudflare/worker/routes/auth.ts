@@ -9,14 +9,14 @@ import type { AuthenticatedRouteContext } from '../router';
 export async function handleAuthRoute(
 	request: Request,
 	env: Env,
-	{ path, method }: Pick<AuthenticatedRouteContext, 'path' | 'method'>,
+	{ path, method, principal }: Pick<AuthenticatedRouteContext, 'path' | 'method' | 'principal'>,
 ): Promise<Response | null> {
 	const db = env.DB;
 	if (path === '/auth/tokens' && method === 'DELETE') {
 		return await handleRevokeToken(request, db);
 	}
 	if (path === '/auth/tokens' && method === 'GET') {
-		return await handleListTokens(request, db);
+		return await handleListTokens(db, principal.tokenId);
 	}
 	if (path === '/auth/session' && method === 'DELETE') {
 		return await handleRevokeCurrentToken(request, db);

@@ -18,7 +18,7 @@ export function operationReceiptStatement(db: D1Database, body: Record<string, u
 	const day = reminderOperationDay(body.operationId);
 	return db.prepare(`SELECT r.principal_id, r.generation, r.request_hash, r.response_json,
     (SELECT 1 WHERE ${OPERATION_VALID}) AS retryable, (SELECT folder_path FROM notification_policy WHERE id = 1) AS reminder_folder
-    FROM (SELECT 1) LEFT JOIN reading_operations r ON r.operation_id = ?`).bind(day, day, body.operationId);
+    FROM (SELECT 1) LEFT JOIN operations r ON r.kind = 'reading' AND r.operation_id = ?`).bind(day, day, body.operationId);
 }
 
 /** `loaded` is the `operationReceiptStatement` row when the caller already read it in a batch. */
@@ -38,8 +38,8 @@ export async function beginOperation(db: D1Database, principal: AuthPrincipal, c
 	return { id: body.operationId, principal: principal.tokenId, generation: current.generation, hash, day, reminderFolder: saved.reminder_folder };
 }
 export function operationStatement(db: D1Database, op: ReadingOperation, response: unknown, predicate = '1', args: string[] = []) {
-	return db.prepare(`INSERT INTO reading_operations(operation_id, principal_id, generation, request_hash, response_json)
-    SELECT ?, ?, ?, ?, CASE WHEN ${OPERATION_VALID}
+	return db.prepare(`INSERT INTO operations(kind, operation_id, principal_id, generation, request_hash, response_json)
+    SELECT 'reading', ?, ?, ?, ?, CASE WHEN ${OPERATION_VALID}
       AND EXISTS (SELECT 1 FROM reading_policy WHERE generation=?)
       AND EXISTS (SELECT 1 FROM auth_tokens WHERE id=? AND (expires_at IS NULL OR expires_at > ?))
       THEN ? ELSE NULL END WHERE ${predicate}`)

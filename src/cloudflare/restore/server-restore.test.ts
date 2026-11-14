@@ -36,11 +36,11 @@ async function fixture(extraRows = 0) {
 	original.prepare('INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES (?,?,?,?,?)').run("Reminders/a's.md", "reminders/a's.md", await sha256Hex(bytes), bytes.length, 'live-object');
 	original.prepare('INSERT INTO file_versions(storage_key,path,hash,size,reason,expires_at) VALUES (?,?,?,?,?,?)').run('old-object', "Reminders/a's.md", await sha256Hex(oldBytes), oldBytes.length, 'replaced', 1);
 	original.exec("INSERT INTO auth_tokens(id,token_hash) VALUES ('old-device','private-token'); INSERT INTO notification_policy(id,folder_path,timezone,revision) VALUES(1,'Reminders','Europe/Berlin','policy');");
-	original.prepare('INSERT INTO reminder_operations(operation_id,request_hash,response_json) VALUES (?,?,?)').run('op', 'request-hash', JSON.stringify({ text: "'hello'; 日本語\n\"world\"" }));
+	original.prepare("INSERT INTO operations(kind,operation_id,request_hash,response_json) VALUES ('reminder',?,?,?)").run('op', 'request-hash', JSON.stringify({ text: "'hello'; 日本語\n\"world\"" }));
 	original.exec("INSERT INTO maintenance_state(key,value) VALUES ('retained','hello'),('reminder_source_scan_old','obsolete');");
-	original.exec("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','generation','revision');");
+	original.exec("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision,index_scope,index_cursor) VALUES (1,1,'Reading','generation','revision','built',NULL);");
 	for (let index = 0; index < extraRows; index++) original.prepare('INSERT INTO reminder_identities(reminder_id) VALUES (?)').run(`id-${index}`);
-	const buckets = new Map<string, Map<string, Uint8Array>>([[source.bucket, new Map([['live-object', bytes], ['old-object', oldBytes], ['__crate__/settings.json', new TextEncoder().encode('{"setting":true}')]])]]);
+	const buckets = new Map<string, Map<string, Uint8Array>>([[source.bucket, new Map([['live-object', bytes], ['old-object', oldBytes]])]]);
 	const databases = new Map([[source.database, original]]);
 	const names = new Map<string, string>();
 	let afterQuery: ((sql: string) => void) | undefined;
@@ -102,19 +102,18 @@ async function fixture(extraRows = 0) {
 
 it('restores launch-baseline checkpoints, keeps history and receipts, and requires fresh enrollment', async () => {
 	const f = await fixture();
-	// Archives made while the changelog used AUTOINCREMENT carry its cursor in sqlite_sequence.
-	await f.rewriteSQL(sql => sql + "\nINSERT INTO sqlite_sequence(name,seq) VALUES ('changelog',90);");
+	await f.rewriteSQL(sql => sql + '\nINSERT INTO "server_state" ("id","changelog_floor","settings","settings_version") VALUES (1,90,\'{"setting":true}\',\'version\');');
 	const sourceBytes = [...f.buckets.get(source.bucket)!].map(([key, value]) => [key, [...value]]);
 	expect(await f.run()).toBe(`https://${f.state.target.workerName}.test.workers.dev`);
 	const restored = f.databases.get(destination)!;
 	expect(restored.prepare('SELECT version,created_version FROM crate_schema').get()).toEqual({ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion });
 	expect(restored.prepare('SELECT * FROM files').all()).toEqual(f.original.prepare('SELECT * FROM files').all());
-	expect(restored.prepare('SELECT * FROM reminder_operations').all()).toEqual(f.original.prepare('SELECT * FROM reminder_operations').all());
+	expect(restored.prepare("SELECT * FROM operations WHERE kind = 'reminder'").all()).toEqual(f.original.prepare("SELECT * FROM operations WHERE kind = 'reminder'").all());
 	expect(restored.prepare('SELECT expires_at FROM file_versions').get()).toEqual({ expires_at: f.state.restoredAt + 2592000000 });
 	expect(restored.prepare('SELECT * FROM auth_tokens').all()).toEqual([]);
-	expect(restored.prepare('SELECT seq FROM changelog_floor').get()).toEqual({ seq: 90 });
+	expect(restored.prepare('SELECT changelog_floor, settings, settings_version FROM server_state').get()).toEqual({ changelog_floor: 90, settings: '{"setting":true}', settings_version: 'version' });
 	expect(restored.prepare('SELECT path,job_token FROM notification_projection_jobs').get()).toEqual({ path: "Reminders/a's.md", job_token: 'live-object' });
-	expect(restored.prepare('SELECT folder_path FROM reading_policy').get()).toEqual({ folder_path: 'Reading' });
+	expect(restored.prepare('SELECT folder_path, index_scope, index_cursor FROM reading_policy').get()).toEqual({ folder_path: 'Reading', index_scope: null, index_cursor: null });
 	expect([...f.buckets.get(source.bucket)!].map(([key, value]) => [key, [...value]])).toEqual(sourceBytes);
 	expect(f.api.queryD1.mock.calls.every(([, id]) => id === destination)).toBe(true);
 	expect(f.api.putRecoveryObject).not.toHaveBeenCalled();
@@ -159,7 +158,13 @@ it('applies the shared CLI/in-app policy fixture without retaining source operat
 	}
 	for (const [key, value] of Object.entries(policyFixture.retainedState)) expect(restored.prepare('SELECT value FROM maintenance_state WHERE key = ?').get(key)).toEqual({ value });
 	for (const table of policyFixture.emptyTables) expect(restored.prepare(`SELECT * FROM ${table}`).all()).toEqual([]);
-	for (const [table, row] of Object.entries(policyFixture.preservedRows)) expect(restored.prepare(`SELECT * FROM ${table}`).all()).toEqual([expect.objectContaining(row)]);
+	// Every preserved row, and nothing else, survives in each listed table. Receipts of
+	// kinds the fixture does not list come from the base database.
+	for (const [table, rows] of Object.entries(policyFixture.preservedRows) as [string, Record<string, unknown>[]][]) {
+		const kinds = new Set<unknown>(rows.map(row => row.kind).filter(kind => kind !== undefined));
+		const restoredRows = (restored.prepare(`SELECT * FROM ${table}`).all() as Record<string, unknown>[]).filter(row => !kinds.size || kinds.has(row.kind));
+		expect(restoredRows).toEqual(rows.map((row): unknown => expect.objectContaining(row)));
+	}
 });
 
 it.each([403, 503])('does not overwrite a destination object when its read fails with %s', async status => {
@@ -200,7 +205,8 @@ it('resumes an upload with a lost acknowledgement by verifying its bytes', async
 	f.api.putRestoredObject.mockImplementationOnce(async (...args) => { await upload(...args); throw new Error('Lost upload acknowledgement'); });
 	await expect(f.run()).rejects.toThrow('Lost upload acknowledgement');
 	await f.run();
-	expect(f.api.putRestoredObject).toHaveBeenCalledTimes(3);
+	// Two objects: the first is written once and then verified, not written again.
+	expect(f.api.putRestoredObject).toHaveBeenCalledTimes(2);
 });
 
 it.each(['corrupt', 'missing'])('rejects a %s archived object before creating any destination', async mode => {
@@ -277,7 +283,7 @@ it('rejects oversized rows before creating resources and does not round unsafe i
 	const f = await fixture();
 	await f.rewriteSQL(sql => sql + `INSERT INTO "reminder_identities" ("reminder_id") VALUES ('${'x'.repeat(71000)}');`);
 	await expect(f.run()).rejects.toThrow('too large'); expect(f.api.createD1Database).not.toHaveBeenCalled();
-	expect(() => parseBackupRows('INSERT INTO "sqlite_sequence" ("name","seq") VALUES (\'changelog\',9007199254740993);')).toThrow();
+	expect(() => parseBackupRows('INSERT INTO "server_state" ("id","changelog_floor") VALUES (1,9007199254740993);')).toThrow();
 });
 
 

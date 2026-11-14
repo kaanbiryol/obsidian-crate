@@ -45,15 +45,20 @@ async function listEncrypted(): Promise<unknown> {
 	const authority = { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault };
 	const sealed = await Promise.all(Object.entries(notes).map(async ([name, content]) => {
 		const path = `Reminders/${name}`;
-		return { path, sealed: await sealFile({ path, content: new TextEncoder().encode(content), contentType: 'text/markdown', publicData: { version: 1, reminders: [] } }, authority) };
+		return { path, sealed: await sealFile({ path, content: new TextEncoder().encode(content), publicData: { version: 1, reminders: [] } }, authority) };
 	}));
 	// The server lists the notes by their tags, in tag order.
 	const files = (await Promise.all(sealed.map(async ({ path, sealed }) => ({ path: await paths.wire(path), hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }))))
 		.sort((a, b) => a.path.localeCompare(b.path));
-	const fetch = async (route: string) => {
-		if (!route.startsWith('/reminders/encrypted-file?')) return Response.json({ files, sequence: 1, generation: keys.generation, nextCursor: null });
-		const revision = new URL(route, 'https://worker.test').searchParams.get('revision');
-		return new Response(sealed.find(note => note.sealed.hash === revision)!.sealed.bytes);
+	const fetch = async (route: string, init?: RequestInit) => {
+		if (route !== '/reminders/encrypted-files/download') {
+			return Response.json({ files, generation: keys.generation, changeToken: '1'.repeat(32), deltaBase: `1.${'1'.repeat(32)}`, nextCursor: null });
+		}
+		const requested = (JSON.parse(init!.body as string) as { files: Array<{ path: string; revision: string }> }).files;
+		return Response.json({ files: requested.map(({ path, revision }) => {
+			const { bytes, hash } = sealed.find(note => note.sealed.hash === revision)!.sealed;
+			return { path, revision, hash, size: bytes.length, content: new TextDecoder().decode(bytes) };
+		}) });
 	};
 	const response = await new EncryptedReminderApi(keys, fetch).handle('/reminders/list?folderPath=Reminders');
 	expect(response?.status).toBe(200);

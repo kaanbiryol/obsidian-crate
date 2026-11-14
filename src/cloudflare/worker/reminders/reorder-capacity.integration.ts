@@ -68,7 +68,7 @@ it.each([
 	});
 	expect(await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path)).toEqual(original);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM changelog').first()).toEqual({ count: 1 });
-	expect(await env.DB.prepare('SELECT operation_id FROM reminder_operations WHERE operation_id = ?').bind(operationId).first()).toBeNull();
+	expect(await env.DB.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder' AND operation_id = ?").bind(operationId).first()).toBeNull();
 });
 
 const issuedDay = Math.floor(Date.now() / 86_400_000);

@@ -53,7 +53,7 @@ async function expectConflict(response: Response, path: string, conflictingPath:
 }
 
 async function state() {
-	const tables = ['files', 'changelog', 'file_versions', 'notification_projection_jobs', 'reminder_sources', 'reminder_operations'];
+	const tables = ['files', 'changelog', 'file_versions', 'notification_projection_jobs', 'reminder_sources', "operations WHERE kind = 'reminder'"];
 	return Promise.all(tables.map(async table => (await env.DB.prepare(`SELECT * FROM ${table}`).all()).results));
 }
 

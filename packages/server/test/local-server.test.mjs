@@ -257,7 +257,7 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		assert.equal((await fetch(`${origin}/notifications`)).status, 200);
 		const row = await runtime.db.prepare('SELECT token_hash FROM auth_tokens WHERE id = ?').bind(first.id).first();
 		assert.equal(row.token_hash, createHash('sha256').update(first.token).digest('hex'));
-		await runtime.db.prepare("INSERT INTO initial_import(id, token, state) VALUES (1, 'test', 'complete')").run();
+		await runtime.db.prepare("INSERT INTO server_state(id, import_token, import_state) VALUES (1, 'test', 'complete') ON CONFLICT(id) DO UPDATE SET import_token = excluded.import_token, import_state = excluded.import_state").run();
 		const operation = `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${randomUUID()}`;
 		const upload = () => fetch(`${origin}/sync/upload?path=hello.txt`, { method: 'PUT', headers: {
 			...headers, 'Content-Type': 'text/plain', 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': operation,

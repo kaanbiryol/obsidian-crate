@@ -46,7 +46,7 @@ it.each([0, 1, 2, 3, 4])('rolls back every exchange side effect when statement b
 		]),
 	} as unknown as D1Database;
 	await expect(handleExchangeRemindersEnrollmentToken(request(), failing)).rejects.toThrow();
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM web_enrollment_tokens').first()).toMatchObject({ count: 1 });
+	expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM grants WHERE kind = 'web_enrollment'").first()).toMatchObject({ count: 1 });
 	expect(await env.DB.prepare('SELECT id FROM auth_tokens').all()).toMatchObject({ results: [{ id: 'previous' }] });
 	expect(await env.DB.prepare('SELECT id FROM push_subscriptions').all()).toMatchObject({ results: [{ id: 'push' }] });
 	expect((await handleExchangeRemindersEnrollmentToken(request(), env.DB)).status).toBe(200);
@@ -64,7 +64,7 @@ it('allows only one concurrent exchange of an enrollment token', async () => {
 
 it.each(['expired', 'missing'])('cannot revoke a previous session with a %s enrollment token', async kind => {
 	const enrollment = await issueWebEnrollmentToken(env.DB, 'Reminders');
-	await env.DB.prepare('UPDATE web_enrollment_tokens SET expires_at = ?').bind(Date.now()).run();
+	await env.DB.prepare("UPDATE grants SET expires_at = ? WHERE kind = 'web_enrollment'").bind(Date.now()).run();
 	const previous = 'previous-session';
 	await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES ('previous', ?, 'reminders')").bind(await sha256Hex(previous)).run();
 	const response = await handleExchangeRemindersEnrollmentToken(new Request('https://test/exchange', { method: 'POST', body: JSON.stringify({ token: kind === 'expired' ? enrollment.token : 'missing', previousAuthToken: previous }) }), env.DB);
@@ -85,12 +85,12 @@ it('keeps a committed exchange single-use if its response is lost', async () => 
 });
 
 it('issues hashed ten-minute tokens and leaves expired ones to maintenance', async () => {
-	await env.DB.prepare("INSERT INTO web_enrollment_tokens (token_hash, expires_at, folder_path) VALUES ('expired', 0, 'Reminders')").run();
+	await env.DB.prepare(`INSERT INTO grants (kind, key, expires_at, payload) VALUES ('web_enrollment', 'expired', 0, '{"folderPath":"Reminders"}')`).run();
 	const before = Date.now();
 	const enrollment = await issueWebEnrollmentToken(env.DB, 'Reminders');
 	expect(enrollment.token).toHaveLength(64);
 	expect(enrollment.expiresAt).toBeGreaterThanOrEqual(before + 600_000);
 	expect(enrollment.expiresAt).toBeLessThanOrEqual(Date.now() + 600_000);
 	await pruneExpiredTokens(env.DB);
-	expect(await env.DB.prepare('SELECT token_hash FROM web_enrollment_tokens').all()).toMatchObject({ results: [{ token_hash: await sha256Hex(enrollment.token) }] });
+	expect(await env.DB.prepare("SELECT key AS token_hash FROM grants WHERE kind = 'web_enrollment'").all()).toMatchObject({ results: [{ token_hash: await sha256Hex(enrollment.token) }] });
 });

@@ -18,8 +18,8 @@ export async function issueShortcutPairing(db: D1Database, principal: AuthPrinci
 	const token = createRandomHexToken(), expiresAt = Date.now() + 10 * 60_000;
 	const scope = `reading_capture:${principal.tokenId}`;
 	await db.batch([
-		db.prepare('DELETE FROM reading_enrollments WHERE scope=?').bind(scope),
-		db.prepare('INSERT INTO reading_enrollments(token_hash,generation,scope,expires_at) VALUES (?,?,?,?)')
+		db.prepare("DELETE FROM grants WHERE kind='reading_enrollment' AND json_extract(payload,'$.scope')=?").bind(scope),
+		db.prepare("INSERT INTO grants(kind,key,payload,expires_at) VALUES ('reading_enrollment',?,json_object('generation',?,'scope',?),?)")
 			.bind(await sha256Hex(token), current.generation, scope, expiresAt),
 	]);
 	return readingResponse({ pairingCode: `${origin}/reading/shortcut-exchange#${token}`, expiresAt });
@@ -30,10 +30,10 @@ export async function issueShortcutPairing(db: D1Database, principal: AuthPrinci
 export async function exchangeShortcutPairing(db: D1Database, body: Record<string, unknown>, request: Request) {
 	if (!isSha256Hex(body.token)) throw invalidPairing();
 	const hash = await sha256Hex(body.token);
-	const grantSql = `FROM reading_enrollments e
-    JOIN auth_tokens a ON e.scope='reading_capture:' || a.id
-    JOIN reading_policy p ON p.id=1 AND p.generation=e.generation
-    WHERE e.token_hash=? AND e.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)
+	const grantSql = `FROM grants e
+    JOIN auth_tokens a ON json_extract(e.payload,'$.scope')='reading_capture:' || a.id
+    JOIN reading_policy p ON p.id=1 AND p.generation=json_extract(e.payload,'$.generation')
+    WHERE e.kind='reading_enrollment' AND e.key=? AND e.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)
       AND (a.scope='vault' OR (a.scope='reminders' AND a.folder_path IS NOT NULL))`;
 	const now = Date.now();
 	const grant = await db.prepare(`SELECT a.id ${grantSql}`).bind(hash, now, now).first<{ id: string }>();
@@ -48,7 +48,7 @@ export async function exchangeShortcutPairing(db: D1Database, body: Record<strin
       SELECT ?,?, a.id, 'Save to Crate shortcut','shortcut','reading_capture',p.folder_path,p.generation,
         min(?,coalesce(a.expires_at,?)) ${grantSql}`)
 			.bind(id, await sha256Hex(token), now + 90 * 86400_000, now + 90 * 86400_000, hash, Date.now(), Date.now()),
-		db.prepare('DELETE FROM reading_enrollments WHERE token_hash=?').bind(hash),
+		db.prepare("DELETE FROM grants WHERE kind='reading_enrollment' AND key=?").bind(hash),
 	]);
 	if (changedRows(results[0]) !== 1) throw invalidPairing();
 	const endpoint = contract.preparePath;

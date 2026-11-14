@@ -52,7 +52,7 @@ describe('reminder moves with D1 and R2', () => {
 		expect(source.content).not.toContain('Keep task');
 		expect(destination.content).toContain('- [x] Keep task Jan 1, 2026 <!-- crate-id:r-keep -->');
 		if (destinationExists) expect(destination.content).toContain('- [ ] Existing task <!-- crate-id:r-existing -->');
-		expect(await db.prepare('SELECT operation_id FROM reminder_operations WHERE operation_id = ?').bind(move.operationId).first())
+		expect(await db.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder' AND operation_id = ?").bind(move.operationId).first())
 			.toEqual({ operation_id: move.operationId });
 	});
 
@@ -70,7 +70,7 @@ describe('reminder moves with D1 and R2', () => {
 		expect((await readCommittedMarkdownFileVersion(bucket, db, sourcePath))?.content).toBe(concurrentContent);
 		expect(await readCommittedMarkdownFileVersion(bucket, db, destinationPath)).toEqual(move.destination);
 		expect(await changesSince(move.seq)).toEqual([{ path: sourcePath }]);
-		expect(await db.prepare('SELECT operation_id FROM reminder_operations WHERE operation_id = ?').bind(move.operationId).first()).toBeNull();
+		expect(await db.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder' AND operation_id = ?").bind(move.operationId).first()).toBeNull();
 	});
 
 	it('keeps the source reminder when the destination R2 write fails', async () => {
@@ -82,6 +82,6 @@ describe('reminder moves with D1 and R2', () => {
 		expect(await readCommittedMarkdownFileVersion(bucket, db, sourcePath)).toEqual(move.source);
 		expect(await readCommittedMarkdownFileVersion(bucket, db, destinationPath)).toBeNull();
 		expect(await changesSince(move.seq)).toEqual([]);
-		expect(await db.prepare('SELECT operation_id FROM reminder_operations WHERE operation_id = ?').bind(move.operationId).first()).toBeNull();
+		expect(await db.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder' AND operation_id = ?").bind(move.operationId).first()).toBeNull();
 	});
 });

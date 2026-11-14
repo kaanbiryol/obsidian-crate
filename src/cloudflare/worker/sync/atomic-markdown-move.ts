@@ -2,7 +2,7 @@ import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
 import { deletedFileStatements, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { descriptorColumn, encryptionWriteGuard, prepareEncryptedFileCommit } from '../encryption/state';
-import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
+import { finishUploadLeases, uploadLeaseGuard } from './staging/upload-leases';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements } from '../reading/library-index';
 import type { CommitEffects } from './commit-effects';
@@ -37,7 +37,7 @@ export async function writeCommittedMarkdownMove(
 	const audit = params.audit ?? { requestId: crypto.randomUUID(), deviceId: null, clientSession: null, operationId: null };
 	const deletion = `__crate__/deletions/${crypto.randomUUID()}`;
 	const descriptor = descriptorColumn(encryption.descriptor);
-	const namespace = fileNamespaceGuard(destination.path), lease = stagedUploadGuard(destination.objectKey), guard = encryptionWriteGuard(encryption.state);
+	const namespace = fileNamespaceGuard(destination.path), lease = uploadLeaseGuard(destination.leaseId, destination.objectKey), guard = encryptionWriteGuard(encryption.state);
 	const sourceMatch = `${FILE_PATH_MATCH} AND hash = ? AND storage_key = ?`;
 	const sourceArgs = [...filePathArgs(source.path), source.expectedHash, source.expectedRevision];
 	const published = fileRevisionGuard(destination.path, destination.objectKey);
@@ -52,7 +52,7 @@ export async function writeCommittedMarkdownMove(
 				...sourceArgs, ...namespace.args, ...lease.args, ...guard.args),
 		publishedChangelogStatement(db, { ...destination, descriptor }),
 		...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content, { encrypted: Boolean(encryption.state), reminderFolder: context?.reminderFolder }),
-		finishStagedUpload(db, destination.objectKey, destination.path),
+		...finishUploadLeases(db, [destination]),
 		...deletedFileStatements(db, `${sourceMatch} AND ${published.sql}`, [...sourceArgs, ...published.args], deletion, audit.requestId),
 	];
 	const results: unknown[] = await db.batch([

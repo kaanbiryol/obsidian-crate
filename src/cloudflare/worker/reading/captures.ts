@@ -31,7 +31,7 @@ export async function publishCapture(env: Env, id: string, generation: string, r
 	if (await readEncryptionState(env.DB)) return ;
 	const current = await policy(env.DB);
 	if (!current || current.generation !== generation) return;
-	const capture = await env.DB.prepare('SELECT * FROM reading_captures WHERE id=? AND generation=?').bind(id, generation).first<PendingCapture>();
+	const capture = await env.DB.prepare('SELECT note FROM reading_captures WHERE id=? AND generation=?').bind(id, generation).first<Pick<PendingCapture, 'note'>>();
 	if (!capture) return; // A repeated delivery cannot recreate a deleted note.
 	const item = parseReadingNote(capture.note)!;
 	// Turning fetching off while a request is in flight still produces a useful bookmark.
@@ -49,7 +49,7 @@ export async function publishCapture(env: Env, id: string, generation: string, r
 
 export async function runCapture(env: Env, state: DurableObjectState, enabled: boolean): Promise<void> {
 	if (await readEncryptionState(env.DB)) return ;
-	const capture = await env.DB.prepare('SELECT * FROM reading_captures WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<PendingCapture>();
+	const capture = await env.DB.prepare('SELECT id, generation, note, attempts FROM reading_captures WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Pick<PendingCapture, 'id' | 'generation' | 'note' | 'attempts'>>();
 	if (!capture) return;
 	// Queued captures are listed in this order.
 	await env.DB.prepare('UPDATE reading_captures SET available_at=?, attempts=attempts+1 WHERE id=?').bind(Date.now() + 60_000, capture.id).run();

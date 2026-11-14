@@ -1,4 +1,5 @@
-import { isEncryptionId } from './encoding';
+import { isEncryptionId, validateBase64Url } from './encoding';
+import { MAX_FILE_METADATA_ENVELOPE_BYTES, MIN_FILE_METADATA_ENVELOPE_BYTES } from './file-metadata-envelope';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export const ENCRYPTED_FILE_CONTENT_TYPE = 'application/vnd.crate.encrypted-file';
@@ -6,9 +7,11 @@ const ENCRYPTED_FILE_PREFIX = 'CRATE-E2EE/1\n';
 export const MAX_ENCRYPTED_FILE_BYTES = 38 * 1024 * 1024;
 export const MAX_ENCRYPTED_PUBLIC_DATA_BYTES = 2 * 1024 * 1024;
 
-/** This descriptor contains no plaintext content digest or decryption key. */
+/** This descriptor contains no plaintext content digest or decryption key. Version 1
+ * seals `metadata` as a JWE; version 2, which devices now write, as the compact
+ * envelope in `file-metadata-envelope.ts`. */
 export interface EncryptedFileDescriptor {
-	version: 1;
+	version: 1 | 2;
 	vaultId: string;
 	scopeId: string;
 	objectId: string;
@@ -26,10 +29,15 @@ export function validateFileDescriptor(value: unknown): asserts value is Encrypt
 	if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid encrypted file descriptor');
 	const item = value as Partial<EncryptedFileDescriptor>;
 	if (Object.keys(item).some(key => !['version', 'vaultId', 'scopeId', 'objectId', 'keyId', 'metadata'].includes(key))) throw new Error('Unexpected encrypted file descriptor field');
-	if (item.version !== 1 || ![item.vaultId, item.scopeId, item.objectId, item.keyId].every(isEncryptionId)
-		|| typeof item.metadata !== 'string' || item.metadata.length > 8192 || item.metadata.split('.').length !== 5) {
+	if ((item.version !== 1 && item.version !== 2) || ![item.vaultId, item.scopeId, item.objectId, item.keyId].every(isEncryptionId)
+		|| typeof item.metadata !== 'string' || item.metadata.length > 8192
+		|| (item.version === 1 ? item.metadata.split('.').length !== 5 : !isCompactMetadata(item.metadata))) {
 		throw new Error('Unsupported or damaged encrypted file descriptor');
 	}
+}
+
+function isCompactMetadata(value: string): boolean {
+	try { return validateBase64Url(value, MAX_FILE_METADATA_ENVELOPE_BYTES) >= MIN_FILE_METADATA_ENVELOPE_BYTES; } catch { return false; }
 }
 
 export function encodeEncryptedFile(packet: EncryptedFilePacket): Uint8Array<ArrayBuffer> {

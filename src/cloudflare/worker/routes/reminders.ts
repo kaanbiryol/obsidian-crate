@@ -16,7 +16,7 @@ import type { AuthenticatedRouteContext } from '../router';
 export async function handleRemindersRoute(
 	request: Request,
 	env: Env,
-	{ path, method, principal, encryption, featurePolicyValue }: Pick<AuthenticatedRouteContext, 'path' | 'method' | 'principal' | 'encryption' | 'featurePolicyValue'>,
+	{ path, method, principal, encryption, featurePolicyValue, armNotifications }: Pick<AuthenticatedRouteContext, 'path' | 'method' | 'principal' | 'encryption' | 'featurePolicyValue' | 'armNotifications'>,
 ): Promise<Response | null> {
 	if (!path.startsWith('/reminders/')) return null;
 	const db = env.DB;
@@ -34,25 +34,25 @@ export async function handleRemindersRoute(
 		if (folder !== principal.folderPath) return corsResponse({ error: 'The reminders folder changed', code: REMINDERS_FOLDER_CHANGED, folderPath: principal.folderPath }, 403);
 	}
 	if (path.startsWith('/reminders/encrypted-')) return handleEncryptedFolderFiles(request, env, path, 'reminders', principal.scope === 'reminders' ? principal.folderPath : undefined, encryption);
-	if (path === '/reminders/notification-policy' && ['GET', 'POST', 'PUT'].includes(method)) return handleNotificationPolicy(request, db);
+	if (path === '/reminders/notification-policy' && ['GET', 'POST', 'PUT'].includes(method)) return handleNotificationPolicy(request, db, encryption);
 
 	if (path === '/reminders/list' && method === 'GET') {
 		return await handleListReminders(request, env);
 	}
 	if (path === '/reminders/create' && method === 'POST') {
-		return await handleCreateReminder(request, env);
+		return await handleCreateReminder(request, env, armNotifications);
 	}
 	if (path === '/reminders/update' && method === 'POST') {
-		return await handleUpdateReminder(request, env);
+		return await handleUpdateReminder(request, env, armNotifications);
 	}
 	if (path === '/reminders/set-completed' && method === 'POST') {
-		return await handleSetReminderCompleted(request, env);
+		return await handleSetReminderCompleted(request, env, armNotifications);
 	}
 	if (path === '/reminders/delete' && method === 'DELETE') {
-		return await handleDeleteReminder(request, env);
+		return await handleDeleteReminder(request, env, armNotifications);
 	}
 	if (path === '/reminders/reorder' && method === 'POST') {
-		return await handleReorderReminders(request, env);
+		return await handleReorderReminders(request, env, armNotifications);
 	}
 
 

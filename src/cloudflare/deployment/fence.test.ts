@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { DeploymentFence, DeploymentRecoveryRequiredError, withDeploymentFence } from './fence';
+import { readFileSync } from 'node:fs';
+import { createFenceTable, DeploymentFence, DeploymentRecoveryRequiredError, withDeploymentFence } from './fence';
 import { createFenceQueryHarness } from './fence-test-harness';
 import { CloudflareReauthorizationRequired } from '../oauth/client';
 
 const record = JSON.stringify({ owner: 'device', worker: 'crate-server', kind: 'update', version: '1', startedAt: '2026-01-01T00:00:00.000Z' });
 
 describe('DeploymentFence', () => {
+	it('creates the fence table exactly as the schema declares it', async () => {
+		// The fence runs first on every install, so the schema's own statement is then skipped.
+		const sql: string[] = [];
+		await createFenceTable({ queryD1: async (_account: string, _database: string, statement: string) => { sql.push(statement); return []; } }, 'account', 'database');
+		const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+		const declared = /CREATE TABLE IF NOT EXISTS maintenance_state \([\s\S]*?\)[^;]*;/.exec(schema)![0];
+		const normalize = (value: string) => value.replace(/\s+/g, ' ').replace(/\( /g, '(').replace(/ \)/g, ')').trim();
+		expect(sql.map(normalize)).toEqual([normalize(declared)]);
+	});
+
 	it('keeps the D1 failure as the cause when a step cannot be checkpointed', async () => {
 		const failure = new Error('D1 unavailable');
 		const fence = new DeploymentFence({ queryD1: async () => { throw failure; } }, 'account', 'database', record);

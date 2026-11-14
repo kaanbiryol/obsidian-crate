@@ -11,6 +11,7 @@ import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { sha256Hex } from '@/platform/sha256';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
+import { wakeProjection } from '../coordinator/coordinator';
 
 // Costs include the notification pass each request arms, which the usage header omits.
 let meter: StorageCostMeter;
@@ -59,8 +60,10 @@ it('writes about the same rows for one reminder edit in a 20- and a 400-reminder
 	expect(small.cost.rowsWritten).toBeLessThan(30);
 	expect(large.cost.rowsWritten).toBeLessThan(30);
 	expect(Math.abs(large.cost.rowsWritten - small.cost.rowsWritten)).toBeLessThan(5);
-	// The pass skips the projection rows of unchanged reminders. Was 6,128 rows read.
-	expect(large.cost.rowsRead).toBeLessThan(5000);
+	// The pass compares the note with its projection snapshot and reads no row of an unchanged
+	// reminder; the commit skips the note's sources. Was 6,128 rows read, then 6,524 and 441.
+	expect(large.cost.rowsRead).toBeLessThan(200);
+	expect(Math.abs(large.cost.rowsRead - small.cost.rowsRead)).toBeLessThan(20);
 }, 60_000);
 
 it('keeps the request to a few D1 round trips and its replay to a cheap pass', async () => {
@@ -79,8 +82,13 @@ it('does not read every reminder note on a pass with nothing to project', async 
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 2000)
     INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified) SELECT 'Reminders/Other ' || x || '.md', 'revision', ?, 1 FROM n`).bind(REMINDER_CACHE_PARSER_VERSION).run();
 	const { body } = await edit(SMALL, 14);
-	const { cost } = await meter.measure(() => send('/reminders/update', body));
+	// A receipt replay arms no pass at all.
+	const { cost: replay } = await meter.measure(() => send('/reminders/update', body));
+	expect(replay).toMatchObject({ alarms: 0, rowsWritten: 0 });
+	const { cost } = await meter.measure(() => wakeProjection(env));
 	console.info('no-op pass cost with 2,002 reminder notes', cost);
 	expect(cost.alarms).toBe(1);
-	expect(cost.rowsRead).toBeLessThan(100);
+	// One read of the settings and queue heads. Was 9 queries and 22 rows.
+	expect(cost.queries).toBe(1);
+	expect(cost.rowsRead).toBeLessThan(30);
 }, 60_000);

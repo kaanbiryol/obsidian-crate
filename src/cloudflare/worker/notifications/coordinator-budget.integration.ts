@@ -39,10 +39,12 @@ it('reads encryption, feature and notification settings once per coordinator run
 	// Before, counted in statements: 31 with 8 setup reads, then 16 with 7. Encryption, features,
 	// the import state and the notification policy now share one read. A due dispatch
 	// is reported to the alarm, which sends it after releasing the coordinator lock.
+	// That read also finds the source steps idle, so the pass skips them: 18 queries, then 16.
 	let due: Awaited<ReturnType<typeof runNotificationCoordinator>> | undefined;
-	expect(await countQueries(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 18, setup: 1 });
+	expect(await countQueries(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 16, setup: 1 });
 	expect(due).toEqual({ wrote: true, dispatchAt: Date.parse('2099-01-01T12:00:00.000Z') });
-	expect(await countQueries(() => runNotificationCoordinator(state, env))).toEqual({ total: 9, setup: 1 });
+	// With nothing left to do, the pass stops after that read: 9 queries, then 1.
+	expect(await countQueries(() => runNotificationCoordinator(state, env))).toEqual({ total: 1, setup: 1 });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 1 });
 	expect(wakeReminderDispatcher).not.toHaveBeenCalled();
 });
@@ -60,12 +62,13 @@ it('verifies and projects eight files per pass, reading each once, within the qu
 	await env.DB.batch([
 		env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0, verified = 0'),
 		env.DB.prepare("UPDATE notification_projection_jobs SET updated_at = datetime('now', '-1 second')"),
-		env.DB.prepare('DELETE FROM reading_index'),
+		env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL'),
 	]);
 	const state = { storage: { setAlarm: vi.fn(async () => {}) } } as unknown as DurableObjectState;
 	const get = vi.spyOn(env.BUCKET, 'get');
 	const { total } = await countQueries(() => runNotificationCoordinator(state, env));
-	expect(total).toBe(39);
+	// Was 39: projection now reads its jobs' sources, rows and identities in one round.
+	expect(total).toBe(38);
 	// Projection reuses the bytes verification read: one read per reminder and Reading note.
 	expect(get).toHaveBeenCalledTimes(8 + 3);
 	expect(total).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);
@@ -80,8 +83,8 @@ it('parses at most the verification byte budget per projection pass and leaves l
 	for (let index = 0; index < 5; index++) await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reminders/${index}.md`, text, null);
 	const get = vi.spyOn(env.BUCKET, 'get');
 	await drainNotificationProjections(env, 8);
-	// 2 MiB admits two 900 KiB notes.
-	expect(get).toHaveBeenCalledTimes(2);
+	// 2 MiB admits two 900 KiB notes. Bytes the commits left in this isolate replace some reads.
+	expect(get.mock.calls.length).toBeLessThanOrEqual(2);
 	get.mockRestore();
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_projection_jobs WHERE last_error IS NULL').first()).toEqual({ n: 3 });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_file_retries').first()).toEqual({ n: 0 });
@@ -104,11 +107,22 @@ it('leaves scheduled reminders off the coordinator alarm', async () => {
 	const state = { storage: { setAlarm } } as unknown as DurableObjectState;
 	await runNotificationCoordinator(state, env);
 	setAlarm.mockClear();
-	// An idle pass reads the queue head once and writes no schedule.
+	// An idle pass reads the queue heads with its settings once and writes no schedule. Was 9 queries.
 	let due: Awaited<ReturnType<typeof runNotificationCoordinator>> | undefined;
-	expect(await countQueries(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 9, setup: 1 });
+	expect(await countQueries(async () => { due = await runNotificationCoordinator(state, env); })).toEqual({ total: 1, setup: 1 });
 	expect(due).toMatchObject({ wrote: false });
 	expect(setAlarm).not.toHaveBeenCalled();
+});
+
+it('stays idle while a paused job outside the folder waits for its old schedules', async () => {
+	const state = { storage: { setAlarm: vi.fn(async (_time: number) => {}) } } as unknown as DurableObjectState;
+	await runNotificationCoordinator(state, env);
+	// Source cleanup keeps a job whose note still has projection rows, so it is not source work.
+	await env.DB.batch([
+		env.DB.prepare("INSERT INTO reminder_projections(reminder_id, file_path, notification_token) VALUES ('old', 'Archive/Old.md', 'token')"),
+		env.DB.prepare("INSERT INTO notification_projection_jobs(path, job_token, last_error) VALUES ('Archive/Old.md', 'job', 'paused')"),
+	]);
+	expect(await countQueries(() => runNotificationCoordinator(state, env))).toEqual({ total: 1, setup: 1 });
 });
 
 function coordinatorAlarm() {
@@ -136,7 +150,8 @@ it('wakes the dispatcher once after releasing the coordinator lock', async () =>
 	expect(lockedDuringDispatch).toBe(false);
 	expect(wakeReminderDispatcher).toHaveBeenCalledExactlyOnceWith(env, Date.parse('2099-01-01T12:00:00.000Z'));
 	expect(coordinator.values.get('notificationDispatchPending')).toBeUndefined();
-	expect(coordinator.values.get('notificationRun')).toMatchObject({ passes: 1, failures: 0 });
+	// Storage keeps the episode's start; its passes are counted in memory.
+	expect(coordinator.values.get('notificationRun')).toMatchObject({ passes: 0, failures: 0 });
 	// A later pass with no schedule change does not wake it again.
 	await coordinator.run();
 	expect(wakeReminderDispatcher).toHaveBeenCalledOnce();

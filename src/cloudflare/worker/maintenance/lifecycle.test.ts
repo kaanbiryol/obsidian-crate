@@ -4,19 +4,19 @@ import { runScheduledMaintenance } from './run';
 vi.mock('./run', () => ({ runScheduledMaintenance: vi.fn(async () => ({ removedObjects: 0, backlog: false })) }));
 beforeEach(() => { vi.clearAllMocks(); });
 
-function fixture(advancing: 'queue' | 'staged' | null) {
+function fixture(advancing: 'queue' | 'lease' | null) {
 	let cursor = 0;
 	const values = new Map<string, unknown>();
 	const storage = { get: async (key: string) => values.get(key),
 		put: async (key: string, value: unknown) => { values.set(key, value); }, setAlarm: vi.fn() };
 	const DB = { prepare: (sql: string) => ({ bind: () => ({ first: async () => null }), first: async () => {
 		if (sql.includes('object_cleanup_queue')) return { storage_key: advancing === 'queue' ? String(cursor++) : 'unchanged' };
-		return sql.includes('staged_uploads') && advancing === 'staged' ? { storage_key: String(cursor++), expires_at: 0 } : null;
+		return sql.includes('upload_leases') && advancing === 'lease' ? { id: String(cursor++), expires_at: 0 } : null;
 	} }) };
 	return { state: { storage } as never, env: { DB } as never, storage };
 }
 it('continues other advancing backlogs but stops after ten passes', async () => {
-	const { state, env, storage } = fixture('staged');
+	const { state, env, storage } = fixture('lease');
 	for (let pass = 0; pass < 12; pass++) await runMaintenanceEpisode(state, env);
 	expect(runScheduledMaintenance).toHaveBeenCalledTimes(10);
 	expect(storage.setAlarm).toHaveBeenCalledTimes(9);

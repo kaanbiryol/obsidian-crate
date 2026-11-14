@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS changelog (
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- WITHOUT ROWID, so a new file writes one row and an initial import of 50,000 files fits
+-- one day of the Free plan's row writes. An encrypted row (about 1.3 KB with its
+-- descriptor) is over the 1 KB a page keeps and takes an overflow page of its own.
 CREATE TABLE IF NOT EXISTS files (
 	path TEXT NOT NULL,
 	portable_path TEXT PRIMARY KEY,
@@ -63,19 +66,27 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 	last_error TEXT
 );
 
-CREATE TABLE IF NOT EXISTS web_enrollment_tokens (
-	folder_path TEXT,
-	token_hash TEXT PRIMARY KEY,
-	expires_at INTEGER NOT NULL
-);
+-- One-time grants, each a small JSON payload. `key` is the hash of the secret the grant
+-- redeems, or the pairing ID of a `web_pairing`. Maintenance deletes expired rows, and every
+-- redemption checks the expiry itself.
+CREATE TABLE IF NOT EXISTS grants (
+	kind TEXT NOT NULL CHECK (kind IN ('web_enrollment', 'reading_enrollment', 'reading_handoff', 'device_pairing', 'web_pairing')),
+	key TEXT NOT NULL,
+	payload TEXT NOT NULL,
+	expires_at INTEGER NOT NULL,
+	PRIMARY KEY (kind, key)
+) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS object_cleanup_queue (
 	storage_key TEXT PRIMARY KEY,
   file_path TEXT NOT NULL
 ) WITHOUT ROWID;
 
+-- A rowid table: an encrypted row stays inside its page, where a WITHOUT ROWID row over
+-- about 1 KB takes an overflow page. Imports write no versions. Its indexes hold the 8-byte row ID.
 CREATE TABLE IF NOT EXISTS file_versions (
-	storage_key TEXT PRIMARY KEY,
+	id INTEGER PRIMARY KEY,
+	storage_key TEXT NOT NULL UNIQUE,
 	path TEXT NOT NULL,
 	hash TEXT NOT NULL,
 	size INTEGER NOT NULL,
@@ -88,30 +99,35 @@ CREATE TABLE IF NOT EXISTS file_versions (
 	descriptor TEXT,
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	expires_at INTEGER NOT NULL
-) WITHOUT ROWID;
+);
 
+-- Also orders the unfiltered version list, newest first.
 CREATE INDEX IF NOT EXISTS file_versions_expires_at_idx ON file_versions(expires_at);
-CREATE INDEX IF NOT EXISTS file_versions_created_key_idx ON file_versions(created_at DESC, storage_key DESC);
 CREATE INDEX IF NOT EXISTS file_versions_path_created_key_idx ON file_versions(path, created_at DESC, storage_key DESC);
 
+-- Small values only: fences, cursors, floors and folder labels.
 CREATE TABLE IF NOT EXISTS maintenance_state (
 	key TEXT PRIMARY KEY,
-	value TEXT NOT NULL,
-	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+	value TEXT NOT NULL
+) WITHOUT ROWID;
 
 -- Read with every authenticated request's token. The first write creates the row.
 CREATE TABLE IF NOT EXISTS server_state (
 	id INTEGER PRIMARY KEY CHECK (id = 1),
 	encryption TEXT,
 	features TEXT,
-	reset_generation TEXT
-);
-
--- The highest changelog sequence issued before a reset emptied the changelog.
-CREATE TABLE IF NOT EXISTS changelog_floor (
-	id INTEGER PRIMARY KEY CHECK (id = 1),
-	seq INTEGER NOT NULL
+	reset_generation TEXT,
+	-- The highest changelog sequence issued before a reset emptied the changelog.
+	changelog_floor INTEGER,
+	-- The initial import, or a NULL token when there is none. The generation advances with
+	-- every import upload or prune, and the snapshot is the sequence its completion published.
+	import_token TEXT,
+	import_state TEXT CHECK (import_state IN ('importing', 'complete')),
+	import_generation INTEGER NOT NULL DEFAULT 0,
+	import_snapshot_seq INTEGER NOT NULL DEFAULT 0,
+	-- Shared settings JSON, sealed in an encrypted vault, and the version a write compares.
+	settings TEXT,
+	settings_version TEXT
 );
 
 CREATE TABLE IF NOT EXISTS reminder_file_cache (
@@ -123,12 +139,26 @@ CREATE TABLE IF NOT EXISTS reminder_file_cache (
 	PRIMARY KEY (folder_path, file_path)
 );
 
--- Operation IDs sort by creation day, so receipts are pruned by key range.
-CREATE TABLE IF NOT EXISTS reminder_operations (
-    operation_id TEXT PRIMARY KEY,
+-- Receipts of reminder, upload and Reading commands. Operation IDs sort by creation day,
+-- so each kind is pruned by key range. A Reading receipt also names its principal and generation.
+CREATE TABLE IF NOT EXISTS operations (
+    kind TEXT NOT NULL CHECK (kind IN ('reminder', 'upload', 'reading')),
+    operation_id TEXT NOT NULL,
     request_hash TEXT NOT NULL,
-    response_json TEXT NOT NULL
+    response_json TEXT NOT NULL,
+    principal_id TEXT,
+    generation TEXT,
+    PRIMARY KEY (kind, operation_id)
 ) WITHOUT ROWID;
+-- A receipt response over 512 KB, in chunks written in the same batch as its receipt.
+-- A rowid table: each chunk is a large row.
+CREATE TABLE IF NOT EXISTS operation_chunks (
+    kind TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    idx INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    PRIMARY KEY (kind, operation_id, idx)
+);
 CREATE TABLE IF NOT EXISTS reminder_identities (
     reminder_id TEXT PRIMARY KEY
 ) WITHOUT ROWID;
@@ -138,15 +168,19 @@ CREATE TABLE IF NOT EXISTS notification_policy (
  id INTEGER PRIMARY KEY CHECK (id = 1), folder_path TEXT NOT NULL,
  timezone TEXT NOT NULL, all_day_time TEXT, revision TEXT NOT NULL
 );
+-- recheck is 1 when another note's commit added or removed one of this note's reminder
+-- identities, so the projection checks every identity instead of trusting its snapshot.
 CREATE TABLE IF NOT EXISTS notification_projection_jobs (
  path TEXT PRIMARY KEY, job_token TEXT NOT NULL,
- last_error TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+ last_error TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+ recheck INTEGER NOT NULL DEFAULT 0
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS notification_projection_ready_idx
  ON notification_projection_jobs(updated_at, path) WHERE last_error IS NULL;
--- One row per projected reminder, holding its delivery schedule. A row whose reminder
--- left every note keeps only its delivered occurrence (file_path NULL) through the
--- delivery window, so a move between notes cannot notify twice.
+-- One row per reminder with a delivery schedule or a delivery record. Reminders that never
+-- had a schedule have none. A row whose reminder lost its schedule stays with its schedule
+-- cleared. A row whose reminder left every note keeps only its delivered occurrence
+-- (file_path NULL) through the delivery window, so a move between notes cannot notify twice.
 CREATE TABLE IF NOT EXISTS reminder_projections (
  notification_token TEXT,
  reminder_id TEXT PRIMARY KEY, file_path TEXT,
@@ -157,7 +191,7 @@ CREATE TABLE IF NOT EXISTS reminder_projections (
  attempts INTEGER NOT NULL DEFAULT 0,
  -- JSON array of subscription IDs still owed this occurrence, or NULL for every recipient.
  pending_subscriptions TEXT,
- delivered_due TEXT, delivery_failed_at TEXT, last_error TEXT
+ delivered_due TEXT, delivery_failed_at TEXT
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS reminder_projections_path_idx ON reminder_projections(file_path);
 CREATE INDEX IF NOT EXISTS reminder_projections_due_idx ON reminder_projections(due_at) WHERE due_at IS NOT NULL;
@@ -172,7 +206,12 @@ CREATE TABLE IF NOT EXISTS reminder_source_state (
  file_path TEXT PRIMARY KEY, file_revision TEXT NOT NULL,
  parser_version INTEGER NOT NULL, verified INTEGER NOT NULL CHECK (verified IN (0, 1)),
  -- SHA-256 of the verified reminder_sources summary of this file, NULL when not verified.
- sources_digest TEXT
+ sources_digest TEXT,
+ -- JSON object written with the projection rows it describes: each reminder the last
+ -- projection of this file saw, by ID, as [due key, first observation of that due key,
+ -- row], where row is null without a projection row, an empty string for a row without
+ -- a schedule, or the payload key of its schedule. NULL when unknown.
+ projection_snapshot TEXT
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS reminder_source_state_version_idx ON reminder_source_state(parser_version, file_path);
 CREATE INDEX IF NOT EXISTS reminder_source_state_unverified_idx ON reminder_source_state(file_path) WHERE verified = 0;
@@ -183,16 +222,10 @@ CREATE TABLE IF NOT EXISTS reminder_occurrences (
 CREATE INDEX IF NOT EXISTS reminder_occurrences_first_seen_idx ON reminder_occurrences(first_seen_at);
 
 CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint);
-CREATE TABLE IF NOT EXISTS request_rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS request_rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL) WITHOUT ROWID;
 
 
 
-
-CREATE TABLE IF NOT EXISTS upload_operations (
- operation_id TEXT PRIMARY KEY,
- request_hash TEXT NOT NULL,
- response_json TEXT NOT NULL
-) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS notification_file_retries (
  path TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0,
@@ -200,28 +233,17 @@ CREATE TABLE IF NOT EXISTS notification_file_retries (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS notification_file_retries_due_idx
  ON notification_file_retries(available_at, path) WHERE available_at IS NOT NULL;
-CREATE TABLE IF NOT EXISTS staged_uploads (
- storage_key TEXT PRIMARY KEY,
- file_path TEXT NOT NULL,
- expires_at INTEGER,
- state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'deleting')),
- attempts INTEGER NOT NULL DEFAULT 0
-) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS staged_upload_batches (
+-- One publication lease per upload request: `keys` lists the `{ storageKey, path }` objects
+-- the request may publish, before any of them is put to R2. Commits remove the keys they
+-- settle, and cleanup claims a lease (`deleting`) before checking R2. NULL `expires_at` marks
+-- a lease whose cleanup could not confirm an object.
+CREATE TABLE IF NOT EXISTS upload_leases (
  id TEXT PRIMARY KEY,
- storage_keys TEXT NOT NULL CHECK (json_valid(storage_keys) AND json_type(storage_keys) = 'array'),
+ keys TEXT NOT NULL CHECK (json_valid(keys) AND json_type(keys) = 'array'),
  expires_at INTEGER,
  state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'deleting')),
  attempts INTEGER NOT NULL DEFAULT 0
 ) WITHOUT ROWID;
-
-CREATE TABLE IF NOT EXISTS initial_import (
- id INTEGER PRIMARY KEY CHECK (id = 1),
- token TEXT NOT NULL,
- state TEXT NOT NULL CHECK (state IN ('importing', 'complete')),
- generation INTEGER NOT NULL DEFAULT 0,
- snapshot_seq INTEGER NOT NULL DEFAULT 0
-);
 
 -- Committed only after the exact Worker and schema have been verified.
 CREATE TABLE IF NOT EXISTS crate_release (
@@ -233,13 +255,15 @@ CREATE TABLE IF NOT EXISTS crate_release (
 );
 CREATE TABLE IF NOT EXISTS crate_migrations (
  id TEXT PRIMARY KEY,
- checksum TEXT NOT NULL,
- applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+ checksum TEXT NOT NULL
 );
 
+-- `index_scope` is the scope reading_items was built for, NULL until a build starts, and
+-- `index_cursor` the rebuild position, NULL once the build is complete.
 CREATE TABLE IF NOT EXISTS reading_policy (
  id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL,
- folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL
+ folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL,
+ index_scope TEXT, index_cursor TEXT
 );
 -- Reading notes in the Reading folder, written in the same batch as each file commit.
 -- Lists page by `saved_at` (empty for notes with an issue). `status`, `favorite` and
@@ -247,14 +271,15 @@ CREATE TABLE IF NOT EXISTS reading_policy (
 -- sealed by the device that encrypted it, and `stale` marks an upload that carried none. `terms` is the JSON array stored in `note_terms`, and
 -- `words` an unencrypted note's title words, which confirm a search's candidates. The link of a note
 -- is its `u:` term in `note_terms`.
+-- A rowid table: card, metadata and terms put rows over the 1 KB a WITHOUT ROWID page keeps.
 CREATE TABLE IF NOT EXISTS reading_items (
- portable_path TEXT PRIMARY KEY, path TEXT NOT NULL, storage_key TEXT NOT NULL,
+ id INTEGER PRIMARY KEY, portable_path TEXT NOT NULL UNIQUE, path TEXT NOT NULL, storage_key TEXT NOT NULL,
  hash TEXT NOT NULL, size INTEGER NOT NULL, item_id TEXT,
  metadata_json TEXT, error TEXT, article_hash TEXT, article_edited INTEGER NOT NULL DEFAULT 0,
  duplicate INTEGER NOT NULL DEFAULT 0, saved_at TEXT NOT NULL DEFAULT '',
  status TEXT, favorite INTEGER NOT NULL DEFAULT 0, highlighted INTEGER NOT NULL DEFAULT 0,
  card TEXT, stale INTEGER NOT NULL DEFAULT 0, terms TEXT, words TEXT
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS reading_items_status_idx ON reading_items(status, saved_at, portable_path);
 CREATE INDEX IF NOT EXISTS reading_items_favorite_idx ON reading_items(saved_at, portable_path) WHERE favorite = 1;
 CREATE INDEX IF NOT EXISTS reading_items_highlighted_idx ON reading_items(saved_at, portable_path) WHERE highlighted = 1;
@@ -267,29 +292,12 @@ CREATE TABLE IF NOT EXISTS note_terms (
  term TEXT NOT NULL, saved_at TEXT NOT NULL, portable_path TEXT NOT NULL,
  PRIMARY KEY (term, saved_at, portable_path)
 ) WITHOUT ROWID;
--- The scope reading_items was built for and its rebuild position.
-CREATE TABLE IF NOT EXISTS reading_index (
- id INTEGER PRIMARY KEY CHECK (id = 1), scope TEXT NOT NULL, cursor TEXT
-);
 CREATE TABLE IF NOT EXISTS reading_jobs (
  path TEXT PRIMARY KEY, item_id TEXT NOT NULL, generation TEXT NOT NULL,
  source_revision TEXT NOT NULL, block_hash TEXT NOT NULL, url TEXT NOT NULL,
  attempts INTEGER NOT NULL DEFAULT 0, available_at INTEGER NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS reading_jobs_due_idx ON reading_jobs(available_at);
--- Operation IDs sort by creation day, so receipts are pruned by key range.
-CREATE TABLE IF NOT EXISTS reading_operations (
- operation_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, generation TEXT NOT NULL,
- request_hash TEXT NOT NULL, response_json TEXT NOT NULL
-) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS reading_enrollments (
- token_hash TEXT PRIMARY KEY, generation TEXT NOT NULL, scope TEXT NOT NULL,
- expires_at INTEGER NOT NULL
-) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS reading_handoffs (
- token_hash TEXT PRIMARY KEY, principal_id TEXT NOT NULL, generation TEXT NOT NULL,
- body TEXT NOT NULL, expires_at INTEGER NOT NULL
-) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS reading_captures (
  id TEXT PRIMARY KEY, generation TEXT NOT NULL, url_identity TEXT NOT NULL,

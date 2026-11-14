@@ -58,6 +58,12 @@ On Cloudflare's Free plan, the database Crate uses allows 100,000 row writes and
 
 If that happens, sync stops with **Cloudflare’s free daily database limit stopped this sync**. Nothing is lost: your changes stay on the device. After 00:00 UTC, sync again or resume encryption setup, and the upload picks up where it stopped.
 
+### Will my vault fit?
+
+As a guide, a vault of 50,000 notes and 5 GB of PDFs uploads within one day of the free limits, with or without encryption. Its first upload uses about two-thirds of the day's database writes and just over half of its reads. The number of files matters more than their size: about 90,000 files fit in a day, fewer when many of them are larger than 1 MB.
+
+File storage includes 10 GB a month for free. Your vault counts toward it, and so do the 30 days of server history. With encryption, stored files take about a third more space, so a 5 GB vault uses about 7 GB.
+
 To see where you stand, open **Settings → Crate → Server and usage → Cloudflare usage**. It compares your usage, including storage, with the free allowances. File storage beyond its free allowance is billed rather than stopped.
 
 ## Privacy and backups

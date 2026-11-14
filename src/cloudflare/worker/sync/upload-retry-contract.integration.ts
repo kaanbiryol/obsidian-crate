@@ -19,7 +19,7 @@ beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
 	vi.spyOn(console, 'info').mockImplementation(() => {});
 	await applySchema(env.DB);
-	await env.DB.prepare("INSERT INTO initial_import(id, token, state) VALUES(1, 'established', 'complete')").run();
+	await env.DB.prepare("INSERT INTO server_state(id, import_token, import_state) VALUES(1, 'established', 'complete') ON CONFLICT(id) DO UPDATE SET import_token = excluded.import_token, import_state = excluded.import_state").run();
 });
 afterEach(async () => { for (const device of devices.splice(0)) device.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });
 const day = () => Math.floor(Date.now() / 86400000);
@@ -73,9 +73,48 @@ it('serializes concurrent retries to one logical commit', async () => {
 it('rejects expired operations after pruning their receipts', async () => {
 	const operation = id();
 	await upload(operation, false);
-	await env.DB.prepare("INSERT INTO maintenance_state(key,value) VALUES('reminder_operation_floor', ?)").bind(String(day() + 1)).run();
+	await env.DB.prepare("INSERT INTO maintenance_state(key,value) VALUES('upload_operation_floor', ?)").bind(String(day() + 1)).run();
 	await pruneOperationReceipts(env.DB);
+	expect(await env.DB.prepare("SELECT 1 FROM operations WHERE kind = 'upload'").first()).toBeNull();
 	expect(await upload(operation, false)).toMatchObject({ success: false, code: 'operation_expired', status: 410 });
+});
+
+it.each([false, true])('keeps %s upload receipts for 30 days, apart from the 180-day reminder floor', async batch => {
+	const dated = (daysAgo: number) => createReminderOperationId(day() - daysAgo);
+	// A missing receipt outside the window is refused before anything is staged.
+	const expired = await upload(dated(30), batch);
+	expect(expired).toMatchObject({ success: false, code: 'operation_expired', status: 410 });
+	expect(expired.error).toContain('30-day retry window');
+	expect(await env.DB.prepare('SELECT 1 FROM upload_leases UNION ALL SELECT 1 FROM files').first()).toBeNull();
+	const kept = dated(29);
+	const committed = await upload(kept, batch);
+	expect(committed.success).toBe(true);
+	await pruneOperationReceipts(env.DB);
+	const floors = await env.DB.prepare("SELECT key, CAST(value AS INTEGER) AS value FROM maintenance_state WHERE key LIKE '%operation_floor' ORDER BY key").all();
+	expect(floors.results).toEqual([{ key: 'reminder_operation_floor', value: day() - 179 }, { key: 'upload_operation_floor', value: day() - 29 }]);
+	// The day-29 receipt is still inside the window and answers its replay.
+	expect(await upload(kept, batch)).toEqual(committed);
+	// The floor never moves back, so a later prune cannot reopen an expired day.
+	await env.DB.prepare("UPDATE maintenance_state SET value = ? WHERE key = 'upload_operation_floor'").bind(String(day() + 1)).run();
+	await pruneOperationReceipts(env.DB);
+	expect(await env.DB.prepare("SELECT CAST(value AS INTEGER) AS value FROM maintenance_state WHERE key = 'upload_operation_floor'").first()).toEqual({ value: day() + 1 });
+	expect(await env.DB.prepare("SELECT 1 FROM operations WHERE kind = 'upload'").first()).toBeNull();
+	expect(await upload(kept, batch)).toMatchObject({ success: false, code: 'operation_expired', status: 410 });
+});
+
+it('refuses a commit whose operation expired while its bytes were staged', async () => {
+	const operation = id();
+	const commit = vi.spyOn(env.DB, 'batch');
+	commit.mockImplementationOnce(async function (this: D1Database, statements) {
+		// The floor passes the operation's day between staging and publication.
+		await env.DB.prepare("INSERT INTO maintenance_state(key,value) VALUES('upload_operation_floor', ?)").bind(String(day() + 1)).run();
+		commit.mockRestore();
+		return env.DB.batch(statements);
+	});
+	const result = await upload(operation, false);
+	expect(result.success).toBe(false);
+	expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
+	expect(await env.DB.prepare("SELECT 1 FROM operations WHERE kind = 'upload'").first()).toBeNull();
 });
 
 it('recovers a lost upload response after restart before interpreting a later remote deletion', async () => {

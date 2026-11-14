@@ -6,11 +6,32 @@ import { arrayBufferToBase64 } from '../encoding';
 import type { PreparedUpload } from '../types';
 import { BATCH_FILE_SIZE_LIMIT } from '@/protocol/sync-limits';
 import { FILE_HASH_HEADER, EXPECTED_HASH_HEADER, INITIAL_IMPORT_HEADER } from '@/protocol/http-headers';
+import { ENCRYPTED_FILE_CONTENT_TYPE } from '@/encryption/file-format';
+import { createPathRecord } from '@/protocol/path-record';
+import type { EncryptedFiles } from '../encryption/encrypted-files';
+import { chunkPreparedUploads } from '../transfer/prepare';
+import { SyncWorkerApi } from './sync';
+import type { FileEntry } from '@/protocol/sync-types';
+
+/** A file of an encrypted import as the server stores it: its server path and ciphertext. */
+interface WireFile { path: string; hash: string; size: number }
+/** A file the import keeps, by plaintext path. `revision` names its server copy. */
+export interface ImportInventoryFile { hash: string; size: number; revision?: string }
 
 export class InitialImportApi {
 	private establishedAt?: string;
 	private pendingSetup?: { token: string; workerUrl: string };
-	constructor(private http: WorkerApiHttpClient) {}
+	private encryption?: EncryptedFiles;
+	/** Server copies of an encrypted import by revision: those this device uploaded, and
+	 * the server listing once a file it did not upload needs translating. */
+	private readonly wires = new Map<string, WireFile>();
+	private listing?: Promise<void>;
+	constructor(private http: WorkerApiHttpClient,
+		private readonly readRawManifest: () => Promise<{ files: Record<string, FileEntry> }> = () => new SyncWorkerApi(http).getRawManifest()) {}
+
+	/** An encrypted vault imports ciphertext: paths, hashes and sizes sent to the server are
+	 * its own, and results come back in plaintext terms. */
+	setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; }
 
 	async begin(): Promise<InitialImport | null> {
 		if (this.establishedAt === this.http.getWorkerUrl()) return null;
@@ -23,7 +44,38 @@ export class InitialImportApi {
 		return response.import;
 	}
 
-	async upload(token: string, files: PreparedUpload[]): Promise<BatchUploadResponse> {
+	/** `expectedRevision` names the server copy an upload replaces, when there is one. */
+	async upload(token: string, files: Array<PreparedUpload & { expectedRevision?: string }>): Promise<BatchUploadResponse> {
+		const encryption = this.encryption;
+		if (!encryption) return this.send(token, files);
+		const sealed = await Promise.all(files.map(async file => {
+			const wire = await encryption.sealImport(file.path, file.content, file);
+			const expected = file.expectedHash == null ? null : (await this.wireOf(file.expectedRevision))?.hash;
+			if (expected === undefined) throw new Error('Initial upload changed. Sync again to resume.');
+			const upload: PreparedUpload = { path: wire.wire, content: wire.content, hash: wire.hash, size: wire.size,
+				contentType: ENCRYPTED_FILE_CONTENT_TYPE, expectedHash: expected };
+			return { plain: file, wire, upload };
+		}));
+		// Ciphertext is larger than the plaintext the batch was sized by.
+		const results: BatchUploadResponse['results'] = [];
+		const small = sealed.filter(file => file.upload.size < BATCH_FILE_SIZE_LIMIT).map(file => file.upload);
+		for (const batch of chunkPreparedUploads(small, files.length)) results.push(...(await this.send(token, batch)).results);
+		for (const file of sealed.filter(file => file.upload.size >= BATCH_FILE_SIZE_LIMIT)) results.push(...(await this.send(token, [file.upload])).results);
+		const byWire = new Map(sealed.map(file => [file.wire.wire, file]));
+		const plain = await Promise.all(results.map(async result => {
+			const file = byWire.get(result.path);
+			if (!file) throw new Error('Invalid initial upload results');
+			// Hashes in a failure describe ciphertext, so only the outcome is passed on.
+			if (!result.success) return { path: file.plain.path, success: false, error: result.error, code: result.code, status: result.status };
+			if (result.hash !== file.wire.hash || typeof result.revision !== 'string' || !result.revision) throw new Error('Invalid initial upload metadata');
+			this.wires.set(result.revision, { path: file.wire.wire, hash: file.wire.hash, size: file.wire.size });
+			await encryption.paths.learn(file.plain.path, file.wire.wire);
+			return { ...result, path: file.plain.path, hash: file.plain.hash };
+		}));
+		return { success: plain.every(result => result.success), results: plain };
+	}
+
+	private async send(token: string, files: PreparedUpload[]): Promise<BatchUploadResponse> {
 		const first = files[0];
 		if (files.length === 1 && first && first.size >= BATCH_FILE_SIZE_LIMIT) {
 			return this.http.requestJson(`/sync/import/upload?path=${encodeURIComponent(first.path)}`, {
@@ -37,14 +89,44 @@ export class InitialImportApi {
 		return this.http.requestJson('/sync/import/upload', { method: 'POST', headers: { [INITIAL_IMPORT_HEADER]: token }, body }, transferTimeout(body.length));
 	}
 
-	async prune(token: string, files: Array<{ path: string; hash: string }>): Promise<void> {
-		for (let offset = 0; offset < files.length; offset += INITIAL_IMPORT_PRUNE_MAX_FILES) {
-			await this.http.requestJson('/sync/import/prune', { method: 'POST', body: JSON.stringify({ token, files: files.slice(offset, offset + INITIAL_IMPORT_PRUNE_MAX_FILES) }) });
+	/** The server copy a revision names. One this device did not upload is looked up in the
+	 * server manifest, read at one snapshot. */
+	private async wireOf(revision: string | undefined): Promise<WireFile | undefined> {
+		if (!revision) return undefined;
+		if (!this.wires.has(revision)) {
+			// Lookups made together share one listing, so resuming a large import reads it once.
+			this.listing ??= this.readRawManifest().then(({ files }) => {
+				for (const [path, entry] of Object.entries(files)) if (entry.revision) this.wires.set(entry.revision, { path, hash: entry.hash, size: entry.size });
+			}).finally(() => { this.listing = undefined; });
+			await this.listing;
+		}
+		return this.wires.get(revision);
+	}
+
+	/** The server copy of each listed file, which an encrypted import names by revision. */
+	private async serverFiles(files: Array<{ revision?: string }>): Promise<WireFile[]> {
+		return Promise.all(files.map(async file => {
+			const wire = await this.wireOf(file.revision);
+			if (!wire) throw new Error('Initial upload changed. Sync again to resume.');
+			return wire;
+		}));
+	}
+
+	async prune(token: string, files: Array<{ path: string; hash: string; revision?: string }>): Promise<void> {
+		const listed = this.encryption ? await this.serverFiles(files) : files;
+		for (let offset = 0; offset < listed.length; offset += INITIAL_IMPORT_PRUNE_MAX_FILES) {
+			const page = listed.slice(offset, offset + INITIAL_IMPORT_PRUNE_MAX_FILES).map(({ path, hash }) => ({ path, hash }));
+			await this.http.requestJson('/sync/import/prune', { method: 'POST', body: JSON.stringify({ token, files: page }) });
 		}
 	}
 
-	async finish(token: string, inventory: Record<string, { hash: string; size: number }>): Promise<number> {
-		const pages = importInventoryPages(inventory);
+	async finish(token: string, inventory: Record<string, ImportInventoryFile>): Promise<number> {
+		let listed: Record<string, { hash: string; size: number }> = inventory;
+		if (this.encryption) {
+			listed = createPathRecord<{ hash: string; size: number }>();
+			for (const wire of await this.serverFiles(Object.values(inventory))) listed[wire.path] = { hash: wire.hash, size: wire.size };
+		}
+		const pages = importInventoryPages(listed);
 		let after = '', result: { lastSeq?: number; cursor?: string } = {};
 		for (const [index, entries] of pages.entries()) {
 			const final = index === pages.length - 1;

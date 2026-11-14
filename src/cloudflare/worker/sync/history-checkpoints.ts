@@ -31,7 +31,7 @@ async function readIndex(bucket: R2Bucket) {
 
 async function generation(db: D1Database) {
 	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS sequence,
-        COALESCE((SELECT state FROM initial_import WHERE id = 1), 'complete') AS state,
+        COALESCE((SELECT import_state FROM server_state WHERE id = 1), 'complete') AS state,
         CAST(strftime('%s', 'now') AS INTEGER) * 1000 AS now`).first<{ sequence: number; state: string; now: number }>();
 	if (!row) throw new Error('Could not read checkpoint generation');
 	return row;

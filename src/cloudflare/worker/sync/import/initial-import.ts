@@ -5,24 +5,30 @@ import { corsResponse } from '../../http/cors';
 import { parseJsonObject } from '../../http/request-validation';
 import { INITIAL_REMINDERS_PENDING } from './initial-import-readiness';
 import { encryptionWriteGuard } from '../../encryption/state';
+import type { EncryptionServerState } from '@/encryption/server-state';
 
 const IMPORT_VERIFICATION_KEY = 'initial_import_verification';
 
 export async function readInitialImport(db: D1Database): Promise<(InitialImport & { generation: number; snapshot_seq: number }) | null> {
-	return db.prepare('SELECT token, state, generation, snapshot_seq FROM initial_import WHERE id = 1').first();
+	return db.prepare(`SELECT import_token AS token, import_state AS state, import_generation AS generation, import_snapshot_seq AS snapshot_seq
+    FROM server_state WHERE id = 1 AND import_token IS NOT NULL`).first();
 }
 
-/** Only a never-populated remote can enter import mode. Repeated starts are read-only. */
-export async function beginInitialImport(db: D1Database, wakeReminders?: () => Promise<void>): Promise<Response> {
+/** Only a never-populated remote can enter import mode, such as a plaintext vault before
+ * its first sync or an encrypted one after the reset that turned encryption on. The
+ * encryption state is the one the request was authenticated with. Repeated starts are
+ * read-only. */
+export async function beginInitialImport(db: D1Database, encryption: EncryptionServerState | null, wakeReminders?: () => Promise<void>): Promise<Response> {
 	let current = await readInitialImport(db);
 	if (!current) {
-		const plaintext = encryptionWriteGuard(null);
-		await db.prepare(`INSERT INTO initial_import(id, token, state)
+		const authority = encryptionWriteGuard(encryption);
+		await db.prepare(`INSERT INTO server_state(id, import_token, import_state)
       SELECT 1, ?, 'importing' WHERE NOT EXISTS (SELECT 1 FROM files)
         AND NOT EXISTS (SELECT 1 FROM changelog) AND NOT EXISTS (SELECT 1 FROM file_versions)
-        AND NOT EXISTS (SELECT 1 FROM upload_operations)
-        AND ${plaintext.sql}
-      ON CONFLICT(id) DO NOTHING`).bind(crypto.randomUUID(), ...plaintext.args).run();
+        AND NOT EXISTS (SELECT 1 FROM operations WHERE kind = 'upload')
+        AND ${authority.sql}
+      ON CONFLICT(id) DO UPDATE SET import_token = excluded.import_token, import_state = excluded.import_state
+        WHERE server_state.import_token IS NULL`).bind(crypto.randomUUID(), ...authority.args).run();
 		current = await readInitialImport(db);
 	}
 	const preparing = current?.state === 'complete' && Boolean(await db.prepare('SELECT 1 FROM maintenance_state WHERE key = ? AND value = ?')
@@ -66,19 +72,19 @@ export async function finishInitialImport(request: Request, db: D1Database): Pro
 	}
 	if (!final) {
 		const cursor = rows.at(-1)!.portable_path;
-		await db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime(\'now\')')
+		await db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
 			.bind(IMPORT_VERIFICATION_KEY, JSON.stringify({ token: current.token, generation: current.generation, cursor })).run();
 		return corsResponse({ cursor });
 	}
 	await db.batch([
 		// Later changelog entries number from the snapshot (see LAST_SEQ_SQL).
-		db.prepare(`UPDATE initial_import SET state = 'complete', snapshot_seq = MAX(1, ${LAST_SEQ_SQL} + 1)
-      WHERE id = 1 AND token = ? AND state = 'importing' AND generation = ?`).bind(current.token, current.generation),
+		db.prepare(`UPDATE server_state SET import_state = 'complete', import_snapshot_seq = MAX(1, ${LAST_SEQ_SQL} + 1)
+      WHERE id = 1 AND import_token = ? AND import_state = 'importing' AND import_generation = ?`).bind(current.token, current.generation),
 		// Folder setup can finish an empty reminder scan before the first upload starts.
 		db.prepare(`DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'
-      AND EXISTS (SELECT 1 FROM initial_import WHERE state = 'complete')`),
-		db.prepare(`INSERT INTO maintenance_state(key, value) SELECT ?, token FROM initial_import
-      WHERE state = 'complete' AND EXISTS (SELECT 1 FROM notification_policy)
+      AND EXISTS (SELECT 1 FROM server_state WHERE id = 1 AND import_state = 'complete')`),
+		db.prepare(`INSERT INTO maintenance_state(key, value) SELECT ?, import_token FROM server_state
+      WHERE id = 1 AND import_state = 'complete' AND EXISTS (SELECT 1 FROM notification_policy)
       ON CONFLICT(key) DO NOTHING`).bind(INITIAL_REMINDERS_PENDING),
 		db.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(IMPORT_VERIFICATION_KEY),
 	]);

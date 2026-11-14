@@ -55,7 +55,7 @@ it('revokes the Shortcut credentials a session paired when it signs out', async 
 
 it('moves Shortcut credentials to the session that replaces their web app session', async () => {
 	const capture = await pair('browser');
-	await env.DB.prepare("INSERT INTO web_enrollment_tokens(token_hash,expires_at,folder_path) VALUES (?,?,'Reminders')").bind(await sha256Hex('link'), Date.now() + 60_000).run();
+	await env.DB.prepare(`INSERT INTO grants(kind,key,expires_at,payload) VALUES ('web_enrollment',?,?,'{"folderPath":"Reminders"}')`).bind(await sha256Hex('link'), Date.now() + 60_000).run();
 	const exchange = await call('/notifications/reminders-exchange', { body: { token: 'link', previousAuthToken: 'browser' } });
 	expect(exchange.status).toBe(200);
 	const { authToken } = await exchange.json() as { authToken: string };

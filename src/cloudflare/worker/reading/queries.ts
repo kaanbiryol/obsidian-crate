@@ -72,7 +72,9 @@ const MAX_READING_QUERY_TERMS = 10;
 const SECTION_FILTERS: Record<ReadingSection | 'all', string> = {
 	inbox: "status = 'inbox'", archived: "status = 'archived'", favorites: 'favorite = 1', highlights: 'highlighted = 1', all: 'status IS NOT NULL',
 };
-const ITEM_COLUMNS = `${ROW_COLUMNS}, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted`;
+/** An encrypted page sends each card with the fields it was sorted and filtered by; a plaintext
+ * page reads `ROW_COLUMNS`. */
+const CARD_COLUMNS = 'portable_path, path, saved_at, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted';
 // A search starts from its rarest term, found by counting each term's notes up to these caps:
 // a small one first, and a larger one only when every term reaches it.
 const TERM_PROBES = [50, 500];
@@ -124,7 +126,7 @@ export function parseReadingItemsQuery(params: URLSearchParams, encrypted: boole
 	return { ...common, terms };
 }
 
-interface ItemsRow extends ReadingRow { card: string | null; storage_key: string; stale: number; hash: string; size: number; item_id: string; status: string; favorite: number; highlighted: number }
+interface CardRow extends Pick<ReadingRow, 'portable_path' | 'path' | 'saved_at'> { card: string | null; storage_key: string; stale: number; hash: string; size: number; item_id: string; status: string; favorite: number; highlighted: number }
 
 /** Newest first. Each term narrows the page through `note_terms`, so a search reads the
  * notes it matches, not the library. The first unfiltered inbox page carries the capture queue
@@ -138,6 +140,7 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	let identity: string | undefined;
 	if (!encrypted && query.url) { try { identity = readingUrlIdentity(query.url); } catch { throw new ReadingError('Enter a valid web link.'); } }
 	const terms = [...new Set(encrypted ? query.terms ?? [] : [...identity ? [`u:${identity}`] : [], ...query.tag ? [`t:${normalizedTag(query.tag)}`] : [], ...words.map(wordTerm)])];
+	const itemColumns = encrypted ? CARD_COLUMNS : ROW_COLUMNS;
 	let page: D1PreparedStatement;
 	if (terms.length) {
 		// Each term lists its notes newest first, so the search walks one term and stops after a
@@ -150,7 +153,7 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 		// The row's word list is JSON text: a quote followed by a word's start confirms the title
 		// without reading rows.
 		for (const word of words) { where.push('instr(i.words, ?) > 0'); args.push(JSON.stringify(word).slice(0, -1)); }
-		const columns = ITEM_COLUMNS.split(', ').map(column => `i.${column}`).join(', ');
+		const columns = itemColumns.split(', ').map(column => `i.${column}`).join(', ');
 		// Every other term is an exact key lookup in note_terms, where a miss reads no row.
 		const has = (alias: string) => `EXISTS (SELECT 1 FROM note_terms o WHERE o.term = ? AND o.saved_at = ${alias}.saved_at AND o.portable_path = ${alias}.portable_path)`;
 		if (driver === null) {
@@ -174,18 +177,18 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 		const where = [SECTION_FILTERS[query.section], visible], args: unknown[] = [];
 		if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
 		if (query.id) { where.push('item_id = ?'); args.push(query.id); }
-		page = env.DB.prepare(`SELECT ${ITEM_COLUMNS} FROM reading_items WHERE ${where.join(' AND ')}
+		page = env.DB.prepare(`SELECT ${itemColumns} FROM reading_items WHERE ${where.join(' AND ')}
       ORDER BY saved_at DESC, portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args);
 	}
 	const first = !after && query.section === 'inbox' && !terms.length && !query.id && !encrypted;
 	const [{ results }, queuedRows, issueRows] = await env.DB.batch(first ? [page, queuedStatement(env, current),
-		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1 LIMIT 1000`)] : [page]) as [Rows<ItemsRow>, Rows<{ note: string }>?, Rows<ReadingRow>?];
+		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1 LIMIT 1000`)] : [page]) as [Rows<ReadingRow | CardRow>, Rows<{ note: string }>?, Rows<ReadingRow>?];
 	const last = results.at(-1);
 	const cursor = results.length === READING_ITEMS_PAGE && last ? JSON.stringify([last.saved_at, last.portable_path]) : null;
 	// The device checks the fields the page was sorted and filtered by against each card.
-	const card = (row: ItemsRow) => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, ...JSON.parse(row.card!) as { card: string }, stale: row.stale === 1,
+	const card = (row: CardRow) => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, ...JSON.parse(row.card!) as { card: string }, stale: row.stale === 1,
 		fields: { item_id: row.item_id, saved_at: row.saved_at, status: row.status, favorite: row.favorite === 1, highlighted: row.highlighted === 1 } });
-	if (encrypted) return { cards: results.map(card), cursor };
-	const listed = listedPage(current, results, queuedRows?.results ?? []);
+	if (encrypted) return { cards: (results as CardRow[]).map(card), cursor };
+	const listed = listedPage(current, results as ReadingRow[], queuedRows?.results ?? []);
 	return { items: listed.items, issues: issueRows ? listedPage(current, issueRows.results, []).issues : [], cursor };
 }

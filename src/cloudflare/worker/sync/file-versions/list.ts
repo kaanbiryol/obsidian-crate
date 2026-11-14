@@ -19,23 +19,33 @@ export async function handleListFileVersions(request: Request, db: D1Database): 
 	const values: (string | number)[] = [Date.now()];
 	if (path) { clauses.push('path = ?'); values.push(path); }
 	if (search) { clauses.push('instr(lower(path), lower(?)) > 0'); values.push(search); }
+	// One file's versions page by `file_versions_path_created_key_idx`. Every version
+	// pages by its expiry, which is its creation time plus the retention period except for
+	// a deleted file's copy, kept from its deletion. `file_versions_expires_at_idx` orders
+	// it with the row ID, which the index holds: a restore or a folder delete gives many
+	// versions one expiry, and a page must not sort them all.
+	const order = path ? 'created_at' : 'expires_at', tie = path ? 'storage_key' : 'id';
+	const cursorFormat = path ? 1 : 3;
 	const rawCursor = params.get('cursor');
 	if (rawCursor !== null) {
 		try {
 			if (rawCursor.length > 8192) throw new Error();
 			const cursor: unknown = JSON.parse(atob(rawCursor));
-			if (!Array.isArray(cursor) || cursor.length !== 5 || cursor[0] !== 1 || !isSyncDate(cursor[1])
-				|| typeof cursor[2] !== 'string' || !isSyncRevision(decodeURIComponent(cursor[2]))
+			if (!Array.isArray(cursor) || cursor.length !== 5 || cursor[0] !== cursorFormat
+				|| !(path ? isSyncDate(cursor[1]) : Number.isSafeInteger(cursor[1]))
+				|| (path ? typeof cursor[2] !== 'string' || !isSyncRevision(decodeURIComponent(cursor[2])) : !Number.isSafeInteger(cursor[2]))
 				|| cursor[3] !== encodeURIComponent(path ?? '') || cursor[4] !== encodeURIComponent(search)) throw new Error();
-			clauses.push('(created_at, storage_key) < (?, ?)');
-			values.push(cursor[1], decodeURIComponent(cursor[2]));
+			clauses.push(`(${order}, ${tie}) < (?, ?)`);
+			values.push(cursor[1] as string | number, path ? decodeURIComponent(cursor[2] as string) : cursor[2] as number);
 		} catch { return corsResponse({ error: 'Invalid retained-version cursor; restart the search' }, 400); }
 	}
-	const rows = await queryRows<RemoteFileVersion & { descriptor: string | null }>(db.prepare('SELECT storage_key, path, hash, size, reason, created_at, expires_at, descriptor FROM file_versions WHERE '
-		+ clauses.join(' AND ') + ' ORDER BY created_at DESC, storage_key DESC LIMIT ?').bind(...values, PAGE_SIZE + 1));
+	const rows = await queryRows<RemoteFileVersion & { id: number; descriptor: string | null }>(db.prepare('SELECT id, storage_key, path, hash, size, reason, created_at, expires_at, descriptor FROM file_versions WHERE '
+		+ clauses.join(' AND ') + ` ORDER BY ${order} DESC, ${tie} DESC LIMIT ?`).bind(...values, PAGE_SIZE + 1));
 	const hasMore = rows.length > PAGE_SIZE;
-	const versions: RemoteFileVersion[] = rows.slice(0, PAGE_SIZE).map(({ descriptor, ...version }) => ({ ...version, ...descriptorField(descriptor) }));
-	const last = versions.at(-1);
-	const nextCursor = hasMore && last ? btoa(JSON.stringify([1, last.created_at, encodeURIComponent(last.storage_key), encodeURIComponent(path ?? ''), encodeURIComponent(search)])) : undefined;
+	const page = rows.slice(0, PAGE_SIZE);
+	const versions: RemoteFileVersion[] = page.map(({ id: _id, descriptor, ...version }) => ({ ...version, ...descriptorField(descriptor) }));
+	const last = page.at(-1);
+	const nextCursor = hasMore && last ? btoa(JSON.stringify([cursorFormat, path ? last.created_at : last.expires_at,
+		path ? encodeURIComponent(last.storage_key) : last.id, encodeURIComponent(path ?? ''), encodeURIComponent(search)])) : undefined;
 	return corsResponse({ versions, hasMore, ...(nextCursor ? { nextCursor } : {}) });
 }

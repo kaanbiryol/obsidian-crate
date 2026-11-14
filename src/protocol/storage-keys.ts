@@ -1,6 +1,5 @@
 /** R2 object keys that Crate generates. Generators and matchers share this module. */
 const MANAGED_FILES_PREFIX = '__crate__/files/';
-export const SHARED_SETTINGS_KEY = '__crate__/settings.json';
 export const HISTORY_INDEX_KEY = '__crate__/history/index.json';
 export const HISTORY_CHECKPOINT_PREFIX = '__crate__/history/checkpoints/';
 export const BACKUPS_PREFIX = '__crate__/backups/';

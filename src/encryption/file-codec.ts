@@ -1,15 +1,18 @@
-import { decryptBytes, decryptJson, encryptBytes, encryptJson, type EncryptionContext, type EncryptionKey } from './envelope';
+import { decryptBytes, decryptJson, encryptBytes, type EncryptionContext, type EncryptionKey } from './envelope';
+import { openFileMetadataEnvelope, sealFileMetadata } from './file-metadata-envelope';
 import { encodeEncryptedFile, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
 import { sha256Hex } from '../platform/sha256';
 import { isSha256Hex } from '../platform/validation';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export interface PrivateFileMetadata {
-	version: 1;
+	/** The version of the descriptor that sealed it. */
+	version: 1 | 2;
 	path: string;
 	hash: string;
 	size: number;
-	contentType: string;
+	/** Version 1 only. Files are read by their extension, so version 2 leaves it out. */
+	contentType?: string;
 	publicDataHash: string;
 }
 
@@ -42,26 +45,25 @@ export type PathBinding = string | ((metadataPath: string) => Promise<string>);
 function validateMetadata(value: unknown): asserts value is PrivateFileMetadata {
 	if (!value || typeof value !== 'object') throw new Error('Invalid encrypted file metadata');
 	const item = value as Partial<PrivateFileMetadata>;
-	if (item.version !== 1 || typeof item.path !== 'string' || !item.path || item.path.length > 4096 || !isSha256Hex(item.hash)
+	if ((item.version !== 1 && item.version !== 2) || typeof item.path !== 'string' || !item.path || item.path.length > 4096 || !isSha256Hex(item.hash)
 		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > MAX_FILE_SIZE_BYTES
-		|| typeof item.contentType !== 'string' || item.contentType.length > 256
+		|| (item.version === 1 ? typeof item.contentType !== 'string' || item.contentType.length > 256 : item.contentType !== undefined)
 		|| !isSha256Hex(item.publicDataHash)) {
 		throw new Error('Encrypted file metadata does not match the requested file');
 	}
 }
 
-type FileInput = { path: string; content: Uint8Array<ArrayBuffer>; contentType: string; publicData?: unknown };
+type FileInput = { path: string; content: Uint8Array<ArrayBuffer>; publicData?: unknown };
 type SealedFile = { bytes: Uint8Array<ArrayBuffer>; descriptor: EncryptedFileDescriptor; metadata: PrivateFileMetadata; hash: string };
 
 /** Persist these exact returned bytes before dispatching a mutating request. */
 export async function sealFile(input: FileInput, authority: FileEncryptionAuthority): Promise<SealedFile> {
 	const key = authority.key, publicData = input.publicData ?? null;
-	const metadata: PrivateFileMetadata = { version: 1, path: input.path, hash: await digest(input.content),
-		size: input.content.byteLength, contentType: input.contentType,
-		publicDataHash: await digest(new TextEncoder().encode(JSON.stringify(publicData))) };
+	const metadata: PrivateFileMetadata = { version: 2, path: input.path, hash: await digest(input.content),
+		size: input.content.byteLength, publicDataHash: await digest(new TextEncoder().encode(JSON.stringify(publicData))) };
 	validateMetadata(metadata);
-	const descriptor: EncryptedFileDescriptor = { version: 1, vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: crypto.randomUUID(), keyId: key.id, metadata: '' };
-	descriptor.metadata = await encryptJson(metadata, key, context(descriptor, 'file-metadata'));
+	const descriptor: EncryptedFileDescriptor = { version: 2, vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: crypto.randomUUID(), keyId: key.id, metadata: '' };
+	descriptor.metadata = await sealFileMetadata(metadata, key, descriptor);
 	const ciphertext = await encryptBytes(input.content, key, context(descriptor, 'file'));
 	const bytes = encodeEncryptedFile({ descriptor, ciphertext, publicData });
 	return { bytes, descriptor, metadata, hash: await digest(bytes) };
@@ -74,8 +76,10 @@ export async function openFileMetadata(descriptor: EncryptedFileDescriptor, bind
 
 async function openMetadataWithKey(descriptor: EncryptedFileDescriptor, binding: PathBinding, authority: FileEncryptionAuthority) {
 	const key = fileKey(descriptor, authority);
-	const metadata = await decryptJson(descriptor.metadata, key, context(descriptor, 'file-metadata'));
+	const metadata: unknown = descriptor.version === 1 ? await decryptJson(descriptor.metadata, key, context(descriptor, 'file-metadata'))
+		: { version: 2, ...await openFileMetadataEnvelope(descriptor.metadata, key, descriptor) };
 	validateMetadata(metadata);
+	if (metadata.version !== descriptor.version) throw new Error('Encrypted file metadata does not match the requested file');
 	const path = typeof binding === 'string' ? metadata.path === binding ? binding : null : await binding(metadata.path);
 	if (path === null) throw new Error('Encrypted file metadata does not match the requested file');
 	return { metadata: { ...metadata, path }, key };

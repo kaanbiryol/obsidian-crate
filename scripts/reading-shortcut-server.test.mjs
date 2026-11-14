@@ -124,7 +124,7 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     assert.equal((await request('/reading/shortcut-pairing')).status, 401);
     assert.equal((await request('/reading/shortcut-pairing', session.token, {}, 'http://crate.example')).status, 400);
     const grant = await pair();
-    const saved = await runtime.db.prepare('SELECT * FROM reading_enrollments WHERE token_hash=?').bind(hash(grant.token)).first();
+    const saved = await runtime.db.prepare("SELECT * FROM grants WHERE kind='reading_enrollment' AND key=?").bind(hash(grant.token)).first();
     assert.ok(saved); assert.ok(!JSON.stringify(saved).includes(grant.token));
     assert.equal((await request('/reading/exchange', '', grant)).status, 404);
     assert.equal((await request('/reading/access', session.token, { kind: 'reading' })).status, 404);
@@ -142,7 +142,7 @@ test('shortcut pairing consumes once, binds authority, and cannot create library
     assert.equal((await request(contract.preparePath, token, { url: 'https://example.invalid/test' })).status, 200);
     const replaced = await pair(), current = await pair();
     assert.equal((await request(contract.exchangePath, '', replaced)).status, 410);
-    await runtime.db.prepare('UPDATE reading_enrollments SET expires_at=0 WHERE token_hash=?').bind(hash(current.token)).run();
+    await runtime.db.prepare("UPDATE grants SET expires_at=0 WHERE kind='reading_enrollment' AND key=?").bind(hash(current.token)).run();
     assert.equal((await request(contract.exchangePath, '', current)).status, 410);
     const revoked = await pair();
     await runtime.db.prepare('DELETE FROM auth_tokens WHERE id=?').bind(session.id).run();

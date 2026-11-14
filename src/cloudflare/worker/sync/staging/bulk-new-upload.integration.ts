@@ -34,7 +34,7 @@ it('commits a full batch of notes with grouped projection writes and one transac
 	expect((await env.DB.prepare('SELECT * FROM reminder_source_state WHERE verified = 1').all()).results).toHaveLength(0);
 	expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(files.length);
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toBeNull();
-	expect(await env.DB.prepare('SELECT id FROM staged_upload_batches').first()).toBeNull();
+	expect(await env.DB.prepare('SELECT id FROM upload_leases').first()).toBeNull();
 	const repeat = await body(files);
 	expect(repeat.results.sort((a,b) => a.path.localeCompare(b.path))).toEqual(response.results.sort((a,b) => a.path.localeCompare(b.path)));
 	expect(batch).toHaveBeenCalledTimes(1);
@@ -99,8 +99,8 @@ it('recovers the missing member after an interrupted object upload', async () =>
 	expect((await body(files)).success).toBe(true);
 	expect(put).toHaveBeenCalledTimes(1);
 	expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(8);
-	const pending = await env.DB.prepare('SELECT storage_keys FROM staged_upload_batches').first<{ storage_keys: string }>();
-	expect(JSON.parse(pending!.storage_keys)).toHaveLength(1); // An uncertain put can still arrive later.
+	const pending = await env.DB.prepare('SELECT keys FROM upload_leases').first<{ keys: string }>();
+	expect(JSON.parse(pending!.keys)).toHaveLength(1); // An uncertain put can still arrive later.
 });
 it('commits each logical file once across simultaneous bulk retries', async () => {
 	const files = Array.from({ length: 8 }, (_, i) => file(`${i}.md`));
@@ -109,7 +109,7 @@ it('commits each logical file once across simultaneous bulk retries', async () =
 	expect(a.success).toBe(true); expect(b.success).toBe(true);
 	expect(sort(a)).toEqual(sort(b));
 	expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(8);
-	expect(await env.DB.prepare('SELECT id FROM staged_upload_batches').first()).toBeNull();
+	expect(await env.DB.prepare('SELECT id FROM upload_leases').first()).toBeNull();
 	expect(await env.DB.prepare('SELECT storage_key FROM object_cleanup_queue').first()).toBeNull();
 });
 it('publishes no file if the transaction fails before commit, then retries safely', async () => {

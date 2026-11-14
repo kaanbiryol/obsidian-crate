@@ -161,6 +161,12 @@ export class SyncWorkerApi {
 	}
 
 	async getManifest(): Promise<FileManifest> {
+		const { files, lastSeq } = await this.getRawManifest();
+		return { version: 1, files: await this.decryptEntries(files), lastSeq };
+	}
+
+	/** The manifest as the server stores it, at one snapshot: wire paths in an encrypted vault. */
+	async getRawManifest(): Promise<{ files: Record<string, FileEntry>; lastSeq: number }> {
 		const files = createPathRecord<FileEntry>();
 		let after: string | undefined;
 		let snapshotSeq: number | undefined;
@@ -206,7 +212,7 @@ export class SyncWorkerApi {
 		}
 
 		assertPortablePaths(Object.keys(files));
-		return { version: 1, files: await this.decryptEntries(files), lastSeq };
+		return { files, lastSeq };
 	}
 
 	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
@@ -339,7 +345,7 @@ export class SyncWorkerApi {
 			}
 			return { success: results.every(result => result.success), results };
 		}
-		const bulkNew = !this.encryption && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY)
+		const bulkNew = info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY)
 			&& files.every(file => file.expectedHash === null);
 
 		const body = JSON.stringify({ files, ...(bulkNew ? { bulkNewFiles: true } : {}) });

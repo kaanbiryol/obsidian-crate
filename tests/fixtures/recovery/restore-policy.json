@@ -1,11 +1,13 @@
 {
   "discardedKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_upgrade_backup", "crate_restore_progress", "reminder_source_scan_fixture"],
   "retainedState": {"reminder_operation_floor": "20524"},
-  "emptyTables": ["auth_tokens", "reading_jobs", "reading_enrollments"],
+  "emptyTables": ["auth_tokens", "reading_jobs", "grants"],
   "preservedRows": {
-    "server_state": {"id": 1, "features": "{\"reading\":false}"},
-    "reading_captures": {"id": "fixture-capture", "note": "queued note", "attempts": 2, "available_at": 123456789},
-    "reading_operations": {"operation_id": "fixture-reading-receipt", "request_hash": "request", "response_json": "{}"},
-    "upload_operations": {"operation_id": "fixture-upload-receipt", "request_hash": "request", "response_json": "{}"}
+    "server_state": [{"id": 1, "features": "{\"reading\":false}", "changelog_floor": 7}],
+    "reading_captures": [{"id": "fixture-capture", "note": "queued note", "attempts": 2, "available_at": 123456789}],
+    "operations": [
+      {"kind": "reading", "operation_id": "fixture-reading-receipt", "principal_id": "device", "request_hash": "request", "response_json": "{}"},
+      {"kind": "upload", "operation_id": "fixture-upload-receipt", "request_hash": "request", "response_json": "{}"}
+    ]
   }
 }

@@ -14,7 +14,7 @@ R2 stores immutable bytes under opaque object keys. D1 commits `files`, changelo
 
 Manifest and metadata entries, changelog rows, upload acknowledgements, and batch downloads include `revision`; individual downloads expose `X-Crate-Revision`. The revision identifies a file incarnation independently of its hash. Deletes require `expectedHash` and `expectedRevision`, captured from the acknowledged baseline. Missing revisions require reconciliation; a same-content recreation rejects an older delete. Uploads retain content-hash preconditions.
 
-Single uploads require `X-Crate-Upload-Operation`; every batch member requires `operationId`. The ID binds the path, verified content hash, size, content type and expected hash. The file transaction records success or rejected preconditions in `upload_operations`. A retry returns that outcome, even after a later edit or deletion, without publishing bytes again. A new logical upload needs a new ID. IDs use the server-issued UTC day and 180-date expiry mechanism below. The plugin persists exact upload bytes before dispatch, recovers unresolved receipts before reconciliation, and checkpoints acknowledgement before removing its local journal. See [upload recovery and rename preservation](upload-recovery.md).
+Single uploads require `X-Crate-Upload-Operation`; every batch member requires `operationId`. The ID binds the path, verified content hash, size, content type and expected hash. The file transaction records success or rejected preconditions as an `upload` receipt in `operations`. A retry returns that outcome, even after a later edit or deletion, without publishing bytes again. A new logical upload needs a new ID. IDs use the server-issued UTC day and expiry mechanism below, with a 30-date window for uploads. The plugin persists exact upload bytes before dispatch, recovers unresolved receipts before reconciliation, and checkpoints acknowledgement before removing its local journal. See [upload recovery and rename preservation](upload-recovery.md).
 
 Batch uploads and batch deletes each accept 32 files. Both bound D1 work below the Free-plan limit of 50 queries per invocation, where a `db.batch()` counts once, with headroom for authentication and failure cleanup. A batch delete answers stale preconditions with `version_conflict` from its one read of the current files. The per-file byte limit is 25 MiB. Clients report oversized files on either side as skipped issues; they do not fail a sync or hold back the changelog cursor.
 
@@ -78,13 +78,13 @@ Enrollment consumption, replacement-session creation and previous-session revoca
 
 ## Retained-version restore
 
-`POST /sync/restore-version` requires `operationId`, `storageKey`, `path`, `expectedHash` and `expectedRevision`. An absent target uses null for both preconditions; an existing target requires its exact hash and revision. The plugin saves this complete intent in checkpoint format 1 before dispatch and resumes it after lost responses or restarts. Restores share the upload receipt table and its 180-UTC-date retry policy; the request fingerprint also binds the retained key and operation kind.
+`POST /sync/restore-version` requires `operationId`, `storageKey`, `path`, `expectedHash` and `expectedRevision`. An absent target uses null for both preconditions; an existing target requires its exact hash and revision. The plugin saves this complete intent in checkpoint format 1 before dispatch and resumes it after lost responses or restarts. Restores share the upload receipts and their 30-UTC-date retry policy; the request fingerprint also binds the retained key and operation kind.
 
 The file pointer, changelog entry and exact result receipt commit in the same D1 transaction. A retry reads that receipt before looking up retained bytes, so expiry of the retained version or a subsequent edit/delete cannot cause replay. A changed precondition is also recorded as a terminal result. The recovery dialog offers **Resume restore** for pending intents even when their original history entry has expired. Remote confirmation and local sync completion are separate: a failed local sync keeps the committed intent until a later successful sync. Expired unresolved operations require preserving the checkpoint and comparing the current remote state; never replace their operation IDs to force a retry.
 
 ## Initial import readiness
 
-`resumable-initial-import-v1` is included in protocol 1. `/sync/import/complete` verifies the
+`resumable-initial-import-v2` is included in protocol 1, in plaintext and encrypted vaults. `/sync/import/complete` verifies the
 file inventory in pages of up to 2,000 `[path, hash, size]` entries ordered by portable path
 (UTF-8 byte order). Each non-final page returns the next `after` cursor; progress is bound to
 the import generation, so an upload or prune between pages restarts verification. The `final`

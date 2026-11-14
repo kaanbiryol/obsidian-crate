@@ -16,8 +16,7 @@ import { R2_KEYS_PER_CALL } from '../d1/platform-limits';
 const PREFIX = 'encryption-reset:';
 // Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
 const SETUP_SUFFIX = ':setup';
-const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 'reading_index', 'reading_jobs', 'reading_operations',
-	'reading_enrollments', 'reading_handoffs', 'reading_captures'] as const;
+const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 'reading_jobs', 'reading_captures'] as const;
 const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValue(db, key, JSON.stringify(value));
 
 /** Runs under the projection coordinator lock. The replacement credential and
@@ -55,7 +54,7 @@ export async function handleEncryptionReset(request: Request, env: Env, principa
 		state = encryption;
 		// The wipe cannot keep links the server is still downloading or an unfinished first sync.
 		if (await env.DB.prepare('SELECT 1 FROM reading_captures LIMIT 1').first()) return corsResponse({ error: 'Wait for saved links to finish downloading, then turn on encryption.' }, 409);
-		if (await env.DB.prepare("SELECT 1 FROM initial_import WHERE state = 'importing'").first()) return corsResponse({ error: 'Finish the initial sync before enabling encryption' }, 409);
+		if (await env.DB.prepare("SELECT 1 FROM server_state WHERE id = 1 AND import_state = 'importing'").first()) return corsResponse({ error: 'Finish the initial sync before enabling encryption' }, 409);
 	}
 	const next: ResetReceipt = { id, vaultId: state.vaultId, generation: state.generation, complete: false };
 	await env.DB.batch([
@@ -67,17 +66,21 @@ export async function handleEncryptionReset(request: Request, env: Env, principa
 			SELECT ?, ?, device_id, device_name, platform, 'vault' FROM auth_tokens WHERE id = ?`)
 			.bind(id, await sha256Hex(replacementToken), principal.tokenId),
 		env.DB.prepare('DELETE FROM auth_tokens WHERE id != ?').bind(id),
-		env.DB.prepare('DELETE FROM web_enrollment_tokens'),
+		// Every enrollment link, Reading code, save link and pairing.
+		env.DB.prepare('DELETE FROM grants'),
 		env.DB.prepare('DELETE FROM push_subscriptions'),
-		// Invalidate the Reading generation and grants in the same transaction as
+		// The shared settings belong to the old mode and keys.
+		env.DB.prepare('UPDATE server_state SET settings = NULL, settings_version = NULL WHERE id = 1'),
+		// Invalidate the Reading generation and receipts in the same transaction as
 		// device revocation. Late extraction cannot publish into a replacement policy.
 		...READING_TABLES.map(table => env.DB.prepare(`DELETE FROM ${table}`)),
+		env.DB.prepare("DELETE FROM operations WHERE kind = 'reading'"),
+		env.DB.prepare("DELETE FROM operation_chunks WHERE kind = 'reading'"),
 		// Unschedule every reminder in the same transaction, so the dispatcher sends nothing
 		// more. Completion later deletes the rows with the other reminder tables.
 		env.DB.prepare('UPDATE reminder_projections SET due_at = NULL WHERE due_at IS NOT NULL'),
 		// Keep cleanup authority for an R2 put that finishes after the reset.
-		env.DB.prepare("UPDATE staged_uploads SET state = 'deleting'"),
-		env.DB.prepare("UPDATE staged_upload_batches SET state = 'deleting'"),
+		env.DB.prepare("UPDATE upload_leases SET state = 'deleting'"),
 	]);
 	return corsResponse(next);
 }
@@ -98,17 +101,18 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 	const setup = await env.DB.prepare('SELECT 1 FROM maintenance_state WHERE key = ?').bind(PREFIX + receipt.id + SETUP_SUFFIX).first();
 	await env.DB.batch([
 		// Sequence numbers keep rising after the changelog and import snapshot are emptied.
-		env.DB.prepare(`INSERT INTO changelog_floor(id, seq) VALUES (1, ${LAST_SEQ_SQL})
-			ON CONFLICT(id) DO UPDATE SET seq = excluded.seq`),
-		...['files', 'file_versions', 'changelog', 'upload_operations', 'reminder_operations',
+		env.DB.prepare(`UPDATE server_state SET changelog_floor = ${LAST_SEQ_SQL} WHERE id = 1`),
+		...['files', 'file_versions', 'changelog', 'operations', 'operation_chunks',
 			'reminder_file_cache', 'reminder_identities', 'reminder_occurrences', 'reminder_sources', 'reminder_source_state',
-			'reminder_projections', 'notification_projection_jobs', 'notification_file_retries', 'notification_policy', 'initial_import',
-			'web_enrollment_tokens', 'push_subscriptions', ...READING_TABLES].map(table => env.DB.prepare(`DELETE FROM ${table}`)),
+			'reminder_projections', 'notification_projection_jobs', 'notification_file_retries', 'notification_policy',
+			'grants', 'push_subscriptions', ...READING_TABLES].map(table => env.DB.prepare(`DELETE FROM ${table}`)),
 		env.DB.prepare('DELETE FROM auth_tokens WHERE id != ?').bind(receipt.id),
 		env.DB.prepare('DELETE FROM maintenance_state WHERE key != ? AND key NOT LIKE ?')
 			.bind(DEPLOYMENT_FENCE_KEY, PREFIX + '%'),
-		// Keep reset authority even after the vault returns to plaintext mode; features return to their defaults.
-		env.DB.prepare('UPDATE server_state SET encryption = ?, features = NULL WHERE id = 1')
+		// Keep reset authority even after the vault returns to plaintext mode; features return to
+		// their defaults and the initial import to none.
+		env.DB.prepare(`UPDATE server_state SET encryption = ?, features = NULL, import_token = NULL, import_state = NULL,
+			import_generation = 0, import_snapshot_seq = 0, settings = NULL, settings_version = NULL WHERE id = 1`)
 			.bind(setup ? JSON.stringify({ ...state, mode: 'active' }) : null),
 		save(env.DB, PREFIX + receipt.id, complete),
 	]);

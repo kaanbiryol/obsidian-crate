@@ -16,7 +16,7 @@ type UploadParams = UploadCommitInput;
 type CommitUpload = UploadCommitters['commitUpload'];
 // Explicit fields keep local-only commit options out of the JSON transport.
 type UploadMetadata = Pick<UploadParams,
-	'path' | 'hash' | 'size' | 'objectKey' | 'expectedHash' | 'expectedRevision'
+	'path' | 'hash' | 'size' | 'objectKey' | 'leaseId' | 'expectedHash' | 'expectedRevision'
 	| 'encryptionState' | 'resetGeneration' | 'operation'>;
 
 // Markdown commits carry their bytes, framed after the metadata, so the
@@ -60,7 +60,7 @@ export function coordinatedUpload(env: Env): CommitUpload {
 	return async (bucket, db, params) => {
 		if (!isMarkdownPath(params.path)) return commitStagedFile(bucket, db, params);
 		const metadata: UploadMetadata = {
-			path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey,
+			path: params.path, hash: params.hash, size: params.size, objectKey: params.objectKey, leaseId: params.leaseId,
 			expectedHash: params.expectedHash, expectedRevision: params.expectedRevision,
 			encryptionState: params.encryptionState,
 			resetGeneration: params.resetGeneration, operation: params.operation,
@@ -90,7 +90,7 @@ export function coordinatedUploads(env: Env): NonNullable<UploadCommitters['comm
 		const commitFramed = async (): Promise<CommitResult[]> => {
 			if (!framed.length) return [];
 			const metadata = framed.map((file): UploadMetadata => ({
-				path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,
+				path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey, leaseId: file.leaseId,
 				expectedHash: file.expectedHash, expectedRevision: file.expectedRevision,
 				encryptionState: file.encryptionState, resetGeneration: file.resetGeneration, operation: file.operation,
 			}));

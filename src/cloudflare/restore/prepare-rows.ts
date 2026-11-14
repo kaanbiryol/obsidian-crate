@@ -2,7 +2,6 @@ import { SERVER_RELEASE, validateMigrationHistory } from '../deployment/database
 import type { BackupRow, Cell, UpgradeBackup } from './archive';
 import policy from './restore-policy.json';
 import { isSha256Hex } from '../../platform/validation';
-import { SHARED_SETTINGS_KEY } from '../../protocol/storage-keys';
 
 function discardMaintenanceKey(key: string): boolean {
 	return policy.resetMaintenanceKeys.includes(key) || policy.resetMaintenancePrefixes.some(prefix => key.startsWith(prefix));
@@ -15,7 +14,6 @@ export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentS
 	// Future schema changes require an explicit recovery adapter.
 	if (SERVER_RELEASE.schemaVersion > 1) throw new Error('This schema needs a newer in-app restore adapter');
 	const allowed = new Set([...currentSchema.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => match[1]));
-	allowed.add('sqlite_sequence');
 	if (rows.some(row => !allowed.has(row.table))) throw new Error('Unknown backup table');
 	const schemaRows = rows.filter(row => row.table === 'crate_schema').map(record);
 	const schema = schemaRows[0];
@@ -29,33 +27,26 @@ export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentS
 	}
 	for (const item of manifest.objects) {
 		const ref = refs.get(item.key);
-		if (ref ? ref.hash !== item.sha256 || ref.size !== item.size : item.key !== SHARED_SETTINGS_KEY) throw new Error('Backup inventory does not match its database');
+		if (!ref || ref.hash !== item.sha256 || ref.size !== item.size) throw new Error('Backup inventory does not match its database');
 		refs.delete(item.key);
 	}
 	if (refs.size) throw new Error('Backup is missing file contents');
-	const prepared = rows.filter(row => !RESET.has(row.table) && !(row.table === 'maintenance_state' && discardMaintenanceKey(String(record(row).key)))).map(row => {
+	return rows.filter(row => !RESET.has(row.table) && !(row.table === 'maintenance_state' && discardMaintenanceKey(String(record(row).key)))).map(row => {
 		const copy = { ...row, values: [...row.values] };
 		if (row.table === 'file_versions') {
 			const index = row.columns.indexOf('expires_at');
 			if (index < 0) throw new Error('Backup version has no expiry');
 			copy.values[index] = restoredAt + policy.fileVersionRetentionMs;
 		}
-		if (row.table === 'sqlite_sequence') {
-			const value = record(row);
-			if (value.name !== 'changelog' || typeof value.seq !== 'number' || !Number.isSafeInteger(value.seq) || value.seq < 0) throw new Error('Invalid backup sequence');
+		if (row.table === 'server_state') {
+			const { changelog_floor: seq } = record(row);
+			if (seq !== null && seq !== undefined && (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0)) throw new Error('Invalid backup sequence');
+		}
+		// Derived state rebuilt after the restore, such as the Reading index position.
+		for (const column of (policy.resetColumns as Record<string, string[]>)[row.table] ?? []) {
+			const index = row.columns.indexOf(column);
+			if (index >= 0) copy.values[index] = null;
 		}
 		return copy;
 	});
-	return withChangelogFloor(prepared);
-}
-
-/** Archives made while the changelog used AUTOINCREMENT keep its cursor in `sqlite_sequence`;
- * the current schema keeps it in `changelog_floor`. */
-function withChangelogFloor(rows: BackupRow[]): BackupRow[] {
-	const sequence = rows.find(row => row.table === 'sqlite_sequence');
-	const result = rows.filter(row => row.table !== 'sqlite_sequence' && row.table !== 'changelog_floor');
-	const floors = [...rows.filter(row => row.table === 'changelog_floor').map(row => record(row).seq), ...sequence ? [record(sequence).seq] : []];
-	if (!floors.length) return result;
-	if (floors.some(seq => typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0)) throw new Error('Invalid backup sequence');
-	return [...result, { table: 'changelog_floor', columns: ['id', 'seq'], values: [1, Math.max(...floors as number[])] }];
 }

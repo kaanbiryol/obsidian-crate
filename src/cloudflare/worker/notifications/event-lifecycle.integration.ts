@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
@@ -7,6 +7,7 @@ import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { sha256Hex } from '@/platform/sha256';
+import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -14,7 +15,7 @@ beforeEach(async () => {
 		.bind(await sha256Hex('event-token')).run();
 	// Ordinary scheduling tests start after the one-time legacy storage migration.
 });
-afterEach(async () => { await reset(); });
+afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
 it('processes a saved reminder without cron and leaves both coordinators idle', async () => {
 	const request = (path: string, init: RequestInit) => worker.fetch(new Request(`https://event.test${path}`, {
@@ -92,4 +93,72 @@ it('wakes notifications from Reading reads only while they rebuild the library i
 	await read('/reading/item?id=missing');
 	expect(await run()).toBeUndefined();
 	expect(await runInDurableObject(coordinator, (_instance, state) => state.storage.getAlarm())).toBeNull();
+});
+
+const vaultRequest = (path: string, init: RequestInit = {}) => worker.fetch(new Request(`https://event.test${path}`, {
+	...init, headers: { Authorization: 'Bearer event-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), ...init.headers },
+}), env);
+const coordinatorAlarm = () => runInDurableObject(env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')),
+	(_instance, state) => state.storage.getAlarm());
+async function deletion(paths: string[]) {
+	const files = await env.DB.prepare('SELECT path, hash, storage_key FROM files WHERE path IN (SELECT value FROM json_each(?))')
+		.bind(JSON.stringify(paths)).all<{ path: string; hash: string; storage_key: string }>();
+	return JSON.stringify({ files: files.results.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.storage_key })) });
+}
+
+it('arms no notification pass for a deletion outside the feature folders', async () => {
+	await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
+	for (const path of ['Notes/a.md', 'Notes/b.md', 'Reminders/image.png']) {
+		await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, `# ${path}`, null);
+	}
+	const response = await vaultRequest('/sync/batch-delete', { method: 'POST', body: await deletion(['Notes/a.md', 'Notes/b.md', 'Reminders/image.png']) });
+	expect(response.status).toBe(200);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM files').first()).toEqual({ n: 0 });
+	expect(await coordinatorAlarm()).toBeNull();
+	expect(await runInDurableObject(env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection')),
+		(_instance, state) => state.storage.get('notificationRun'))).toBeUndefined();
+});
+
+it('arms the pass before a reminder note deletion commits, so a lost response still cancels its schedule', async () => {
+	await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', `- [ ] Due @2099-01-02T10:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`, null);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Notes/a.md', '# Note', null);
+	const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+	// Alarms also fire on their own; the lock-sharing request waits for an in-flight pass.
+	const settle = async () => {
+		for (let pass = 0; pass < 5; pass++) {
+			await runDurableObjectAlarm(coordinator);
+			await coordinator.fetch('https://do/ensure', { method: 'POST' });
+		}
+	};
+	await coordinator.fetch('https://do/project', { method: 'POST' });
+	await settle();
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 1 });
+	// The commit applies, then its response is lost. Nothing else arms the coordinator.
+	const prototype = Object.getPrototypeOf(env.DB) as { batch: (statements: Array<{ statement?: string }>) => Promise<unknown[]> };
+	const batch = prototype.batch;
+	vi.spyOn(prototype, 'batch').mockImplementation(async function (this: unknown, statements) {
+		const results = await batch.call(this, statements);
+		if (statements.some(statement => statement.statement?.startsWith('DELETE FROM files'))) throw new Error('Lost commit response');
+		return results;
+	});
+	const response = await vaultRequest('/sync/batch-delete', { method: 'POST', body: await deletion(['Reminders/Inbox.md', 'Notes/a.md']) });
+	vi.mocked(prototype.batch).mockRestore();
+	expect(response.status).not.toBe(200);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM files').first()).toEqual({ n: 0 });
+	await settle();
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections').first()).toEqual({ n: 0 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_projection_jobs').first()).toEqual({ n: 0 });
+});
+
+it('runs a role alarm by its object name, without a stored role flag', async () => {
+	const dispatcher = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
+	await runInDurableObject(dispatcher, async (_instance, state) => {
+		expect(await state.storage.get('reminderDispatcher')).toBeUndefined();
+		// A failed earlier pass; a pass that runs clears it.
+		await state.storage.put('dispatchFailures', 3);
+		await state.storage.setAlarm(Date.now() + 60_000);
+	});
+	expect(await runDurableObjectAlarm(dispatcher)).toBe(true);
+	expect(await runInDurableObject(dispatcher, (_instance, state) => state.storage.get('dispatchFailures'))).toBeUndefined();
 });

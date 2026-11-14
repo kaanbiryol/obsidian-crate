@@ -30,13 +30,8 @@ export async function handleRevokeCurrentToken(request: Request, db: D1Database)
 	return corsResponse({ success: true });
 }
 
-export async function handleListTokens(request: Request, db: D1Database): Promise<Response> {
-	const authHeader = request.headers.get('Authorization') || '';
-	const currentToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
-	const currentTokenHash = currentToken ? await sha256Hex(currentToken) : '';
-	const currentTokenRow = currentTokenHash
-		? await db.prepare('SELECT id FROM auth_tokens WHERE token_hash = ?').bind(currentTokenHash).first<{ id: string }>()
-		: null;
+/** `currentTokenId` is the authenticated principal's token. */
+export async function handleListTokens(db: D1Database, currentTokenId: string): Promise<Response> {
 	const rows = await queryRows<{
 		id: string;
 		device_id: string | null;
@@ -48,7 +43,7 @@ export async function handleListTokens(request: Request, db: D1Database): Promis
 		FROM auth_tokens ORDER BY COALESCE(last_seen_at, created_at) DESC, created_at DESC`));
 	const tokens = rows.map((row) => ({
 		...row,
-		is_current: row.id === currentTokenRow?.id,
+		is_current: row.id === currentTokenId,
 	}));
 	return corsResponse({ tokens });
 }

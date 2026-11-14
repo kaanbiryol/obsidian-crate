@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../markdown-files';
 import { getStoredFileRow } from '../storage';
-import { trackStagedUpload } from './staged-uploads';
+import { trackUploadLease } from './upload-leases';
 import { coordinatedUpload } from './staged-upload-dispatch';
 import { coordinatedNewFiles } from './bulk-upload-dispatch';
 import { handleNotificationPolicy } from '../../notifications/policy';
@@ -31,10 +31,10 @@ it.each([true, false])('tracks the current revision when another same-content sa
 	if (kept) await env.DB.prepare("UPDATE files SET modified = datetime('now', '-11 minutes')").run();
 	const hash = await sha256Hex('New');
 	const objectKey = createManagedObjectKey(hash);
-	await trackStagedUpload(env.DB, objectKey, path);
+	const { id: leaseId } = await trackUploadLease(env.DB, [{ storageKey: objectKey, path }]);
 	await env.BUCKET.put(objectKey, 'New');
 	const result = await coordinatedUpload(env)(env.BUCKET, env.DB, {
-		path, hash, size: 3, objectKey, content: 'New', expectedHash: first.hash,
+		path, hash, size: 3, objectKey, leaseId, content: 'New', expectedHash: first.hash,
 	});
 	expect(result.committed).toBe(true);
 	expect(await env.DB.prepare(`SELECT storage_key FROM ${kept ? 'file_versions' : 'object_cleanup_queue'} WHERE storage_key = ?`).bind(current!.storageKey).first())
@@ -54,10 +54,10 @@ it.each(['single', 'batch'] as const)('commits a plaintext %s reminder upload wi
 		if (kind === 'single') {
 			const hash = await sha256Hex(content);
 			const objectKey = createManagedObjectKey(hash);
-			await trackStagedUpload(env.DB, objectKey, path);
+			const { id: leaseId } = await trackUploadLease(env.DB, [{ storageKey: objectKey, path }]);
 			await env.BUCKET.put(objectKey, content);
 			const size = new TextEncoder().encode(content).byteLength;
-			expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: null })).committed).toBe(true);
+			expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, leaseId, content, expectedHash: null })).committed).toBe(true);
 		} else {
 			const response = await handleBatchUpload(new Request('https://test/sync/batch-upload', { method: 'POST', body: JSON.stringify({ bulkNewFiles: true, files: [
 				{ path, content: btoa(content), expectedHash: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) },
@@ -81,7 +81,7 @@ it('reads the reminder policy and previous file once while committing a reminder
 	const content = `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`;
 	const hash = await sha256Hex(content);
 	const objectKey = createManagedObjectKey(hash);
-	await trackStagedUpload(env.DB, objectKey, path);
+	const { id: leaseId } = await trackUploadLease(env.DB, [{ storageKey: objectKey, path }]);
 	await env.BUCKET.put(objectKey, content);
 	const prepare = env.DB.prepare.bind(env.DB);
 	const reads: string[] = [];
@@ -91,7 +91,7 @@ it('reads the reminder policy and previous file once while committing a reminder
 	};
 	try {
 		const size = new TextEncoder().encode(content).byteLength;
-		expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, content, expectedHash: first.hash })).committed).toBe(true);
+		expect((await coordinatedUpload(env)(env.BUCKET, env.DB, { path, hash, size, objectKey, leaseId, content, expectedHash: first.hash })).committed).toBe(true);
 	} finally { env.DB.prepare = prepare; }
 	// Framed bytes need no policy read to prepare; one combined read commits the upload.
 	expect(reads).toHaveLength(1);

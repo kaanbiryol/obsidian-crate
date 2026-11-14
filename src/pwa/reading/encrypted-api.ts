@@ -222,7 +222,7 @@ export class EncryptedReadingApi {
 		// The note's card is its public data, so the server lists the new revision in the same commit.
 		const bytes = new TextEncoder().encode(content);
 		const publicData = await readingUploadCard(this.options.folderPath, path, wire, bytes, this.cardKeys);
-		const sealed = await sealFile({ path, content: bytes, contentType: 'text/markdown', publicData }, this.options.authority);
+		const sealed = await sealFile({ path, content: bytes, publicData }, this.options.authority);
 		const file = { path: wire, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) };
 		return { attempt: await this.persistAttempt(id, requestHash, { saved: true, id: itemId }, [file], removed ? [removed] : []) };
 	}

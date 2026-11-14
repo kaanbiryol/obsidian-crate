@@ -45,7 +45,7 @@ beforeEach(async () => {
 	const fixture = await createEncryptionFixture('active'), { bundle, recovery } = fixture;
 	state = fixture.state;
 	storage.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle)); storage.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
-	await env.DB.prepare('INSERT INTO server_state(id, encryption) VALUES (1, ?)').bind(JSON.stringify(state)).run();
+	await env.DB.prepare('INSERT OR REPLACE INTO server_state(id, encryption) VALUES (1, ?)').bind(JSON.stringify(state)).run();
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('original', ?, 'vault')").bind(await sha256Hex('original')).run();
 	failSettings = false; disconnectedOrigin = undefined; loseBeginResponse = false; dropBeginRequest = false; revokeBeforeBegin = false;
 	bridge.mockImplementation(async (options: RequestUrlParam) => {
@@ -225,6 +225,9 @@ describe('turning encryption on', () => {
 		expect(disk.text('remote-only.md')).toBe('only on the server\n');
 		const files = { 'local-only.md': 'only on this device\n', 'note.md': 'current local version\n', 'remote-only.md': 'only on the server\n' };
 		await expectEncryptedServer(files, ['first plaintext version\n']);
+		// The vault went up through the initial import: no changelog entry or receipt per file.
+		expect(await env.DB.prepare("SELECT import_state AS state FROM server_state").first()).toEqual({ state: 'complete' });
+		for (const table of ['changelog', 'operations']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first(), table).toBeNull();
 		// Only the replacement credential of this device remains.
 		const tokens = (await env.DB.prepare('SELECT token_hash FROM auth_tokens').all<{ token_hash: string }>()).results;
 		expect(tokens).toEqual([{ token_hash: await sha256Hex(storage.get(SECRET_KEYS.AUTH_TOKEN)!) }]);
@@ -283,7 +286,7 @@ describe('turning encryption on', () => {
 	});
 
 	it('releases a setup the server refuses to start and leaves the plaintext server untouched', async () => {
-		await env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')").run();
+		await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-generation','revision')").run();
 		await env.DB.prepare("INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES ('capture','reading-generation','private url','private note',0)").run();
 		await expect(turnOn()).rejects.toThrow('Wait for saved links to finish downloading');
 		expect(loadEncryptionReset(storage)).toBeNull();

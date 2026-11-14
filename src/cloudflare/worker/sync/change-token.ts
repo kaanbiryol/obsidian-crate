@@ -1,5 +1,4 @@
 import { getChangelogBounds, LAST_SEQ_SQL, type ChangelogBounds } from './storage';
-import { serverStateValue } from '../d1/server-state';
 import { sha256Hex } from '../../../platform/sha256';
 
 export interface VaultChangeState { seq: number; importGeneration: number; resetGeneration: string }
@@ -9,9 +8,9 @@ export interface VaultChangeState { seq: number; importGeneration: number; reset
 export async function readVaultChangeState(db: D1Database): Promise<VaultChangeState & { bounds: ChangelogBounds }> {
 	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS seq,
 		(SELECT MIN(seq) FROM changelog) AS minSeq,
-		COALESCE((SELECT snapshot_seq FROM initial_import), 0) AS snapshotSeq,
-		COALESCE((SELECT generation FROM initial_import WHERE id = 1), 0) AS importGeneration,
-		COALESCE(${serverStateValue('reset_generation')}, '') AS resetGeneration`)
+		COALESCE(s.import_snapshot_seq, 0) AS snapshotSeq, COALESCE(s.import_generation, 0) AS importGeneration,
+		COALESCE(s.reset_generation, '') AS resetGeneration
+		FROM (SELECT 1) LEFT JOIN server_state s ON s.id = 1`)
 		.first<VaultChangeState & { minSeq: number | null; snapshotSeq: number }>();
 	const seq = row?.seq ?? 0;
 	return { seq, importGeneration: row?.importGeneration ?? 0, resetGeneration: row?.resetGeneration ?? '',

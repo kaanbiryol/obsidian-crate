@@ -50,7 +50,7 @@ class ArchiveTests(unittest.TestCase):
                    ('Reminders/Inbox.md', 'reminders/inbox.md', digest(data), len(data), key))
         db.execute("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES(1, 'Reminders', 'UTC', 'policy')")
         db.execute("INSERT INTO auth_tokens (id, token_hash) VALUES ('old-device', 'hash')")
-        db.execute("INSERT INTO reminder_operations (operation_id, request_hash, response_json) VALUES ('retry-me', 'hash', '{}')")
+        db.execute("INSERT INTO operations (kind, operation_id, request_hash, response_json) VALUES ('reminder', 'retry-me', 'hash', '{}')")
         db.execute("INSERT INTO reminder_sources (file_path, reminder_id, due_key, occurrences) VALUES ('Reminders/Inbox.md', 'reminder', '2026-09-07', 1)")
         db.execute("INSERT INTO reminder_occurrences (reminder_id, due_key, first_seen_at) VALUES ('reminder', '2026-09-07', 123)")
         db.execute("INSERT INTO maintenance_state (key, value) VALUES ('crate_deployment_fence', 'old deployment owner')")
@@ -62,10 +62,10 @@ class ArchiveTests(unittest.TestCase):
         self.temp.cleanup()
     def test_encrypted_configuration_descriptors_and_settings_survive_restore(self):
         state = '{"version":1,"mode":"active","recovery":{"envelope":"opaque"}}'
-        values = {'e2ee:file:retained-revision': '{"metadata":"encrypted descriptor"}',
-                  'e2ee:settings': '{"settings":{"envelope":"encrypted settings"}}'}
+        settings = '{"envelope":"encrypted settings"}'
+        values = {'e2ee:file:retained-revision': '{"metadata":"encrypted descriptor"}'}
         database = load_database(self.remote.sql)
-        database.execute('INSERT INTO server_state(id, encryption) VALUES (1, ?)', (state,))
+        database.execute("INSERT INTO server_state(id, encryption, settings, settings_version) VALUES (1, ?, ?, 'version')", (state, settings))
         for key, value in values.items():
             database.execute('INSERT INTO maintenance_state(key, value) VALUES (?, ?)', (key, value))
         database.commit()
@@ -77,12 +77,13 @@ class ArchiveTests(unittest.TestCase):
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT encryption FROM server_state WHERE id = 1').fetchone()[0], state)
+        self.assertEqual(tuple(restored.execute('SELECT encryption, settings, settings_version FROM server_state WHERE id = 1').fetchone()), (state, settings, 'version'))
         for key, value in values.items():
             self.assertEqual(restored.execute('SELECT value FROM maintenance_state WHERE key = ?', (key,)).fetchone()[0], value)
 
     def test_paired_restore_preserves_bytes_and_receipts_and_resets_derived_state(self):
         self.remote.sql += b"\nINSERT INTO maintenance_state (key, value) VALUES ('reminder_operation_floor', '20524');"
+        self.remote.sql += b"\nINSERT INTO reading_policy (id, enabled, folder_path, generation, revision, index_scope, index_cursor) VALUES (1, 1, 'Reading', 'g', 'r', 'built', NULL);"
         recovery.backup(self.remote, self.directory)
         manifest, original = verify(self.directory)
         self.addCleanup(original.close)
@@ -94,12 +95,14 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(references(original), references(restored))
         self.assertEqual(self.remote.objects, target.objects)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM auth_tokens').fetchone()[0], 0)
-        self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_operations').fetchone()[0], 1)
+        self.assertEqual(restored.execute("SELECT COUNT(*) FROM operations WHERE kind = 'reminder'").fetchone()[0], 1)
         for table in ('reminder_sources', 'reminder_occurrences'):
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM notification_projection_jobs').fetchone()[0], 1)
         self.assertEqual(restored.execute("SELECT COUNT(*) FROM maintenance_state WHERE key = 'crate_deployment_fence'").fetchone()[0], 0)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
+        # The Reading index is rebuilt: its items are discarded and its position with them.
+        self.assertEqual(tuple(restored.execute('SELECT folder_path, index_scope, index_cursor FROM reading_policy').fetchone()), ('Reading', None, None))
         self.assertEqual(restored.execute("SELECT value FROM maintenance_state WHERE key = 'reminder_operation_floor'").fetchone()[0], '20524')
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
         self.assertTrue({'reminder_sources_id_idx', 'reminder_occurrences_first_seen_idx'} <= indexes)
@@ -121,10 +124,14 @@ class ArchiveTests(unittest.TestCase):
             self.assertEqual(restored.execute('SELECT value FROM maintenance_state WHERE key = ?', (key,)).fetchone()[0], value)
         for table in expected['emptyTables']:
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), [])
-        for table, expected_row in expected['preservedRows'].items():
-            rows = restored.execute(f'SELECT * FROM {table}').fetchall()
-            self.assertEqual(len(rows), 1)
-            self.assertEqual({key: rows[0][key] for key in expected_row}, expected_row)
+        # Every preserved row, and nothing else, survives in each listed table. Receipts of
+        # kinds the fixture does not list come from the base database.
+        for table, expected_rows in expected['preservedRows'].items():
+            kinds = {row['kind'] for row in expected_rows if 'kind' in row}
+            rows = [row for row in restored.execute(f'SELECT * FROM {table}').fetchall() if not kinds or row['kind'] in kinds]
+            self.assertEqual(len(rows), len(expected_rows), table)
+            for row, expected_row in zip(rows, expected_rows):
+                self.assertEqual({key: row[key] for key in expected_row}, expected_row)
 
     def test_baseline_restore_preserves_its_source_archive(self):
         recovery.backup(self.remote, self.directory)
@@ -139,7 +146,7 @@ class ArchiveTests(unittest.TestCase):
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
         self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
-        for table in ('files', 'file_versions', 'reminder_operations', 'reminder_identities', 'reminder_sources', 'reminder_occurrences'):
+        for table in ('files', 'file_versions', 'operations', 'reminder_identities', 'reminder_sources', 'reminder_occurrences'):
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
         self.assertEqual(target.objects, self.remote.objects)
@@ -149,7 +156,7 @@ class ArchiveTests(unittest.TestCase):
         recovery.restore(target, self.directory)
         self.assertEqual((self.directory / 'database.sql').read_bytes(), source_sql)
     def test_current_schema_preserves_upload_receipts_without_storage_index(self):
-        self.remote.sql += b"\nINSERT INTO upload_operations(operation_id, request_hash, response_json) VALUES ('e1_00020524_1234567890123456', 'hash', '{\"success\":true}');"
+        self.remote.sql += b"\nINSERT INTO operations(kind, operation_id, request_hash, response_json) VALUES ('upload', 'e1_00020524_1234567890123456', 'hash', '{\"success\":true}');"
         recovery.backup(self.remote, self.directory)
         target = Remote(b'', {})
         target.database, target.bucket = 'restore', 'restore'
@@ -157,26 +164,24 @@ class ArchiveTests(unittest.TestCase):
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
         self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
-        self.assertEqual(restored.execute('SELECT request_hash FROM upload_operations').fetchone()[0], 'hash')
+        self.assertEqual(restored.execute("SELECT request_hash FROM operations WHERE kind = 'upload'").fetchone()[0], 'hash')
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
         self.assertNotIn('files_storage_key_idx', indexes)
 
     def test_restore_discards_incomplete_upload_leases(self):
-        self.remote.sql += b"\nINSERT INTO staged_uploads(storage_key, file_path, expires_at) VALUES ('unfinished', 'unfinished.md', 1);"
-        self.remote.sql += b"\nINSERT INTO staged_upload_batches(id, storage_keys, expires_at) VALUES ('batch', '[{\"storageKey\":\"unfinished-batch-key\",\"path\":\"unfinished.md\"}]', 1);"
+        self.remote.sql += b"\nINSERT INTO upload_leases(id, keys, expires_at) VALUES ('batch', '[{\"storageKey\":\"unfinished-batch-key\",\"path\":\"unfinished.md\"}]', 1);"
         recovery.backup(self.remote, self.directory)
         target = Remote(b'', {})
         target.database, target.bucket = 'restore', 'restore'
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
-        for table in ('staged_uploads', 'staged_upload_batches'):
-            self.assertEqual(restored.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0], 0)
+        self.assertEqual(restored.execute('SELECT COUNT(*) FROM upload_leases').fetchone()[0], 0)
         self.assertEqual(target.objects, self.remote.objects)
 
     def test_restore_limits_reminder_jobs_to_selected_folder_and_preserves_import_progress(self):
         self.remote.sql += b"\nINSERT INTO files(path, portable_path, storage_key, hash, size) SELECT 'Notes/Other.md', 'notes/other.md', storage_key, hash, size FROM files;"
-        self.remote.sql += b"\nINSERT INTO initial_import(id, token, state, generation) VALUES(1, 'resume-token', 'importing', 4);"
+        self.remote.sql += b"\nINSERT INTO server_state(id, import_token, import_state, import_generation) VALUES(1, 'resume-token', 'importing', 4);"
         self.remote.sql += b"\nINSERT INTO maintenance_state(key, value) VALUES('reminder_source_scan_v9:Reminders', '');"
         recovery.backup(self.remote, self.directory)
         target = Remote(b'', {})
@@ -185,7 +190,7 @@ class ArchiveTests(unittest.TestCase):
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
         self.assertEqual([row[0] for row in restored.execute('SELECT path FROM notification_projection_jobs')], ['Reminders/Inbox.md'])
-        self.assertEqual(tuple(restored.execute('SELECT token, state, generation FROM initial_import').fetchone()), ('resume-token', 'importing', 4))
+        self.assertEqual(tuple(restored.execute('SELECT import_token, import_state, import_generation FROM server_state').fetchone()), ('resume-token', 'importing', 4))
         self.assertEqual(restored.execute("SELECT COUNT(*) FROM maintenance_state WHERE key GLOB 'reminder_source_scan*'").fetchone()[0], 0)
 
     def test_unsupported_schema_stops_restore_before_remote_mutation(self):

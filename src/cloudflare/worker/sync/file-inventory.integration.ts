@@ -9,8 +9,8 @@ import { handleGetManifest, handleGetFileMetadata } from './metadata-handlers';
 import { meterD1Usage } from '../d1/d1-usage';
 import { findReferencedStorageKeys } from '../d1/storage-references';
 import { beginInitialImport } from './import/initial-import';
-import { trackStagedBatch } from './staging/staged-upload-batches';
-import { cleanStagedBatches } from '../maintenance/staged-batch-cleanup';
+import { trackUploadLease } from './staging/upload-leases';
+import { cleanUploadLeases } from '../maintenance/upload-lease-cleanup';
 
 afterEach(reset);
 
@@ -40,9 +40,9 @@ it('cleans owned batches using primary lookups among 10,000 files and protects r
 	expect(await findReferencedStorageKeys(meter.db, objects)).toEqual(new Set(['key-1', 'retained']));
 	expect(meter.usage.rowsRead).toBeLessThan(15);
 	for (const object of objects) await env.BUCKET.put(object.storageKey, 'x');
-	const id = await trackStagedBatch(env.DB, objects);
-	await env.DB.prepare('UPDATE staged_upload_batches SET expires_at = 1 WHERE id = ?').bind(id).run();
-	expect(await cleanStagedBatches(env.BUCKET, env.DB)).toBe(3);
+	const { id } = await trackUploadLease(env.DB, objects);
+	await env.DB.prepare('UPDATE upload_leases SET expires_at = 1 WHERE id = ?').bind(id).run();
+	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(3);
 	expect(await env.BUCKET.head('key-1')).not.toBeNull();
 	expect(await env.BUCKET.head('retained')).not.toBeNull();
 	expect(await env.BUCKET.head('obsolete')).toBeNull();
@@ -50,10 +50,10 @@ it('cleans owned batches using primary lookups among 10,000 files and protects r
 
 it.each([false, true])('preserves initial-import eligibility and any saved progress (open=%s)', async open => {
 	await applySchema(env.DB);
-	if (open) await env.DB.prepare("INSERT INTO initial_import(id, token, state, generation) VALUES (1, 'resume-token', 'importing', 7)").run();
-	if (open) expect(await env.DB.prepare('SELECT token, state, generation, snapshot_seq FROM initial_import').first()).toEqual({ token: 'resume-token', state: 'importing', generation: 7, snapshot_seq: 0 });
-	else expect(await env.DB.prepare('SELECT * FROM initial_import').first()).toBeNull();
-	const started = await (await beginInitialImport(env.DB)).json() as { import: { token: string; state: string } };
+	if (open) await env.DB.prepare("INSERT INTO server_state(id, import_token, import_state, import_generation) VALUES (1, 'resume-token', 'importing', 7) ON CONFLICT(id) DO UPDATE SET import_token = excluded.import_token, import_state = excluded.import_state, import_generation = excluded.import_generation").run();
+	if (open) expect(await env.DB.prepare('SELECT import_token AS token, import_state AS state, import_generation AS generation, import_snapshot_seq AS snapshot_seq FROM server_state').first()).toEqual({ token: 'resume-token', state: 'importing', generation: 7, snapshot_seq: 0 });
+	else expect(await env.DB.prepare('SELECT import_token FROM server_state WHERE import_token IS NOT NULL').first()).toBeNull();
+	const started = await (await beginInitialImport(env.DB, null)).json() as { import: { token: string; state: string } };
 	expect(started.import.state).toBe('importing');
 	if (open) expect(started.import.token).toBe('resume-token');
 });

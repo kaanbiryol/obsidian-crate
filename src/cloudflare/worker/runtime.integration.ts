@@ -282,11 +282,11 @@ describe('Cloudflare runtime integration', () => {
 		expect(await armReminderDispatcher(runtimeEnv)).toBe(true);
 		const stub = runtimeEnv.REMINDER_ALARMS.get(runtimeEnv.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
 		const read = () => runtimeEnv.DB.prepare(
-			'SELECT attempts, due_at, delivered_due, last_error FROM reminder_projections WHERE reminder_id = ?',
-		).bind(reminderId).first<{ attempts: number; due_at: number; delivered_due: string | null; last_error: string }>();
+			'SELECT attempts, due_at, delivered_due, delivery_failed_at FROM reminder_projections WHERE reminder_id = ?',
+		).bind(reminderId).first<{ attempts: number; due_at: number; delivered_due: string | null; delivery_failed_at: string | null }>();
 		await vi.waitFor(async () => expect(await read()).toMatchObject({ attempts: 1 }));
 		const pending = await read();
-		expect(pending).toMatchObject({ attempts: 1, delivered_due: null, last_error: expect.stringContaining('awaiting') as string });
+		expect(pending).toMatchObject({ attempts: 1, delivered_due: null, delivery_failed_at: null });
 		expect(pending!.due_at).toBeGreaterThan(Date.now());
 		// The dispatcher's one alarm now waits for that retry.
 		expect(await runInDurableObject(stub as never, (_instance, state) => state.storage.getAlarm())).toBe(pending!.due_at);

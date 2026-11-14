@@ -15,6 +15,19 @@ const READING_NAME = '__crate__/reading';
 /** Transfers spread over a fixed pool; reads use a separate pool of the same size. */
 const TRANSFER_SHARDS = 8;
 
+export type CoordinatorRole = 'coordinator' | 'dispatcher' | 'maintenance' | 'reading';
+const ROLES: Readonly<Record<string, CoordinatorRole>> = {
+	[COORDINATOR_NAME]: 'coordinator',
+	[NOTIFICATION_DISPATCHER_NAME]: 'dispatcher',
+	[MAINTENANCE_NAME]: 'maintenance',
+	[READING_NAME]: 'reading',
+};
+
+/** The role of the instance named `name`; transfer instances have none. */
+export function coordinatorRole(name: string): CoordinatorRole | null {
+	return Object.hasOwn(ROLES, name) ? ROLES[name]! : null;
+}
+
 /** Internal endpoints; `coordinator-requests.ts` dispatches on the same paths. */
 export const COORDINATOR_PATHS = {
 	ensure: '/ensure',

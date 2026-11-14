@@ -89,7 +89,7 @@ it.each([3000, 10001])('keeps a %i-reminder note convertible when notification m
 	expect(publicData).toEqual({ version: 1, reminders: [], issue: 'scheduling-capacity' });
 	validateEncryptedSchedules(publicData);
 	const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath(path);
-	const file = await sealFile({ path, content, contentType: 'text/markdown', publicData }, authority);
+	const file = await sealFile({ path, content, publicData }, authority);
 	const opened = await openFile(file.bytes, path, authority);
 	expect(opened.content).toEqual(content);
 	expect(opened.publicData).toEqual(publicData);

@@ -10,7 +10,7 @@ it('opens every vault note with the vault key and refuses unsafe paths or anothe
 	const pwa = FileKeyAuthority.fromKey(bundle.vaultId, await importEncryptionSecret(bundle.vault));
 	const path = 'Reminders/Work/Inbox.md';
 	const content = new TextEncoder().encode('A whole note, including non-reminder text');
-	const sealed = await sealFile({ path, content, contentType: 'text/markdown' }, vault.forPath(path));
+	const sealed = await sealFile({ path, content }, vault.forPath(path));
 	expect((await openFile(sealed.bytes, path, pwa.forPath(path))).content).toEqual(content);
 	expect(vault.forPath('Private/Secret.md')).toBe(vault.forVaultMetadata());
 	for (const denied of ['', 'Reminders/../Private/Secret.md', '/Reminders/Inbox.md', 'Reminders\\Inbox.md', 'Reminders//Inbox.md', './Inbox.md']) {

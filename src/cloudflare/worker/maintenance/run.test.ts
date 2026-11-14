@@ -21,7 +21,7 @@ function createStatement(sql: string) {
 }
 
 describe('scheduled Worker maintenance', () => {
-	it.each(['queue read', 'reference lookup', 'R2 deletion', 'staging cleanup', 'queue settlement'])('records %s failure without skipping other maintenance', async failure => {
+	it.each(['queue read', 'reference lookup', 'R2 deletion', 'queue settlement'])('records %s failure without skipping other maintenance', async failure => {
 		const statements: ReturnType<typeof createStatement>[] = [];
 		const error = new Error('Cleanup unavailable');
 		const db = {
@@ -29,8 +29,7 @@ describe('scheduled Worker maintenance', () => {
 				const statement = createStatement(sql);
 				if (failure === 'queue read' && sql.startsWith('SELECT storage_key, file_path FROM object_cleanup_queue')
 					|| failure === 'reference lookup' && sql.startsWith('WITH input AS')) statement.all.mockRejectedValue(error);
-				if (failure === 'staging cleanup' && sql.startsWith('DELETE FROM staged_uploads WHERE storage_key IN (SELECT value')
-					|| failure === 'queue settlement' && sql.startsWith('DELETE FROM object_cleanup_queue')) statement.run.mockRejectedValue(error);
+				if (failure === 'queue settlement' && sql.startsWith('DELETE FROM object_cleanup_queue')) statement.run.mockRejectedValue(error);
 				statements.push(statement);
 				return statement;
 			}),

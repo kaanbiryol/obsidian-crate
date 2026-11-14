@@ -11,7 +11,8 @@ import { policy } from '../reading/common';
 import { commitStagedFile } from '../sync/mutations';
 import { commitNewFiles } from '../sync/staging/bulk-new-file-commit';
 import type { AuthPrincipal } from '../auth/authenticate';
-import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
+import type { EncryptionServerState } from '../../../encryption/server-state';
+import { createEncryptionFixture } from '../test-support/encryption-test-harness';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
 
 beforeEach(async () => {
@@ -57,16 +58,19 @@ it('dispatches every declared API route to a handler', async () => {
 	expect(unhandled).toEqual([]);
 });
 
-it('serves shared settings from the store that matches the vault encryption', async () => {
-	const read = async () => (await handleAuthenticatedRoute(new Request('https://worker.test/settings'), env, {
+it('serves shared settings for the encryption state authentication loaded', async () => {
+	// The route uses the encryption state authentication loaded with the token.
+	const read = async (encryption: EncryptionServerState | null) => (await handleAuthenticatedRoute(new Request('https://worker.test/settings'), env, {
 		uploadCommitters: { commitUpload: commitStagedFile, commitNewFiles }, path: '/settings', method: 'GET',
-		principal: { tokenId: 'route-dispatch', scope: 'vault' }, resetGeneration: null, encryption: null,
+		principal: { tokenId: 'route-dispatch', scope: 'vault' }, resetGeneration: null, encryption,
 	}))!.json() as Promise<unknown>;
-	// An unreadable plaintext record still reports its R2 version.
-	const plaintext = (await env.BUCKET.put('__crate__/settings.json', 'unreadable'))!;
-	expect(await read()).toEqual({ settings: null, settingsVersion: plaintext.etag });
-	await storeEncryptionState(env.DB, (await createEncryptionFixture('active')).state);
-	expect(await read()).toEqual({ settings: null, settingsVersion: null });
+	expect(await read(null)).toEqual({ settings: null, settingsVersion: null });
+	const sealed = { version: 1, vaultId: 'vault', keyId: 'key', envelope: 'opaque' };
+	await env.DB.prepare('INSERT INTO server_state(id, settings, settings_version) VALUES (1, ?, ?)').bind(JSON.stringify(sealed), 'stored').run();
+	// A sealed record is returned as stored; a plaintext reader finds no valid settings in it.
+	const { state } = await createEncryptionFixture('active');
+	expect(await read(state)).toEqual({ settings: sealed, settingsVersion: 'stored' });
+	expect(await read(null)).toEqual({ settings: null, settingsVersion: 'stored' });
 });
 
 it('answers before authentication exactly the API routes declared public', async () => {

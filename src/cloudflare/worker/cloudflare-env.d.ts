@@ -91,6 +91,8 @@ interface DurableObjectStorage {
 
 interface DurableObjectState {
 	readonly storage: DurableObjectStorage;
+	/** Named objects know their name, alarm handlers included. */
+	readonly id?: DurableObjectId;
 }
 
 interface DurableObject {

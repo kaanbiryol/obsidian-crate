@@ -137,10 +137,10 @@ describe.each(clients)('recorded %s client against the current Worker', (_name, 
 			id, content: 'Water the plants', description: 'Synthetic note', project: 'Inbox', priority: 4, completed: false,
 			dueDatetime: '2099-01-02T08:30:00.000Z', filePath: 'Reminders/Inbox.md', revision: expect.stringMatching(sha256) as string,
 		} });
-		const receipts = await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first<{ count: number }>();
+		const receipts = await env.DB.prepare("SELECT COUNT(*) AS count FROM operations WHERE kind = 'reminder'").first<{ count: number }>();
 		const commits = await changelogRows();
 		expect(await json(request)).toEqual(created);
-		expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first()).toEqual(receipts);
+		expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM operations WHERE kind = 'reminder'").first()).toEqual(receipts);
 		expect(await changelogRows()).toBe(commits);
 
 		const list = await json(client.requests.reminderList);

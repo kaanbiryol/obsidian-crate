@@ -106,6 +106,27 @@ it('rejects an unrecognized invalid bearer at the edge instead of queuing it on 
 	expect(forwarded).toHaveLength(0);
 });
 
+it('authenticates a recently accepted upload bearer only inside the transfer queue, where revocation still applies', async () => {
+	vi.mocked(authenticatedAdmissionKey).mockResolvedValue('device-hint');
+	let release!: () => void;
+	const gate = new Promise<void>(resolve => { release = resolve; });
+	vi.mocked(forwardTransferRequest).mockImplementation((request, transferEnv, path) => {
+		const target = new URL(request.url);
+		target.pathname = path;
+		return handleCoordinatorRequest(new Request(target, request), {} as DurableObjectState, transferEnv,
+			async action => { await gate; return action(); });
+	});
+	const pending = fetchWorkerRequest(upload(), env);
+	await vi.waitFor(() => expect(forwardTransferRequest).toHaveBeenCalledOnce());
+	expect(authenticateWorkerRequest).not.toHaveBeenCalled();
+	// Revoked while queued: the inner authentication rejects it before any route runs.
+	vi.mocked(authenticateWorkerRequest).mockResolvedValue({ response: new Response(null, { status: 401 }) });
+	release();
+	expect((await pending).status).toBe(401);
+	expect(authenticateWorkerRequest).toHaveBeenCalledOnce();
+	expect(handleAuthenticatedRoute).not.toHaveBeenCalled();
+});
+
 it('forwards a recently authenticated bearer to authenticate once under the coordinator lock', async () => {
 	vi.mocked(authenticatedAdmissionKey).mockResolvedValue('device-hint');
 	const forwarded: Request[] = [];

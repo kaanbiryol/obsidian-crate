@@ -1,4 +1,3 @@
-import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { BatchUploadResponse } from '../../../../protocol/sync-types';
 import { corsResponse } from '../../http/cors';
 import { parseJsonObject, parseNonNegativeInteger, parseOptionalString, sanitizePath, UPLOAD_BATCH_JSON_BODY_BYTES } from '../../http/request-validation';
@@ -12,7 +11,7 @@ import { createManagedObjectKey } from '../../../../protocol/storage-keys';
 import { sha256Hex } from '../../../../platform/sha256';
 
 /** Validate and decode the complete request before receipts, staging or commits. */
-export async function prepareBatchUpload(request: Request, expectedEncryption?: EncryptionServerState | null) {
+export async function prepareBatchUpload(request: Request) {
 	const parsedBody = await parseJsonObject(request, UPLOAD_BATCH_JSON_BODY_BYTES);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -23,7 +22,6 @@ export async function prepareBatchUpload(request: Request, expectedEncryption?: 
 		return corsResponse({ error: 'files array required' }, 400);
 	}
 	const bulkNew = parsedBody.value.bulkNewFiles === true;
-	if (bulkNew && expectedEncryption) return corsResponse({ error: 'Bulk imports are unavailable for encrypted requests' }, 428);
 	if (bulkNew && !(files as BatchFile[]).every(file => parseExpectedFileHash(file?.expectedHash) === null)) {
 		return corsResponse({ error: 'Bulk new-file uploads require absent preconditions' }, 400);
 	}

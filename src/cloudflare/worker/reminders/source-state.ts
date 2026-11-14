@@ -1,6 +1,7 @@
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/types';
+import { sha256Hex } from '../../../platform/sha256';
 
 /** This durable authority is separate from the disposable, folder-specific UI cache.
  * `sourcesDigest` names the verified sources summary, so an unchanged one can skip
@@ -19,11 +20,22 @@ export function recordReminderSourceState(db: D1Database, path: string, storageK
 		.bind(REMINDER_CACHE_PARSER_VERSION, path, REMINDER_CACHE_PARSER_VERSION, ...revision.args)];
 }
 
+const IDENTITY_DIGEST_LENGTH = 32;
+
+/** Names a sources summary (`summarizeReminderSources`): a digest of its reminder IDs, then
+ * a digest of the whole summary, so a commit can tell an edit that keeps every ID apart. */
+export async function reminderSourcesDigest(sources: ReadonlyArray<{ id: string }>, summaryJson: string): Promise<string> {
+	const ids = JSON.stringify(sources.map(source => source.id).sort());
+	return (await sha256Hex(ids)).slice(0, IDENTITY_DIGEST_LENGTH) + (await sha256Hex(summaryJson)).slice(0, IDENTITY_DIGEST_LENGTH);
+}
+
 /** True, as SQL, unless the file's state already records `sourcesDigest` as verified by
- * this parser. Place it before `recordReminderSourceState` in the batch. */
-export function sourcesChangedSql(path: string, sourcesDigest: string): { sql: string; args: unknown[] } {
-	return { sql: `NOT EXISTS (SELECT 1 FROM reminder_source_state WHERE file_path = ? AND sources_digest = ?
-    AND verified = 1 AND parser_version = ?)`, args: [path, sourcesDigest, REMINDER_CACHE_PARSER_VERSION] };
+ * this parser. With `identitiesOnly`, compares only the reminder IDs it names. Place it
+ * before `recordReminderSourceState` in the batch. */
+export function sourcesChangedSql(path: string, sourcesDigest: string, identitiesOnly = false): { sql: string; args: unknown[] } {
+	const [column, value] = identitiesOnly ? [`substr(sources_digest, 1, ${IDENTITY_DIGEST_LENGTH})`, sourcesDigest.slice(0, IDENTITY_DIGEST_LENGTH)] : ['sources_digest', sourcesDigest];
+	return { sql: `NOT EXISTS (SELECT 1 FROM reminder_source_state WHERE file_path = ? AND ${column} = ?
+    AND verified = 1 AND parser_version = ?)`, args: [path, value, REMINDER_CACHE_PARSER_VERSION] };
 }
 
 /** Scheduled deliveries need current source and projection authority. Every commit that

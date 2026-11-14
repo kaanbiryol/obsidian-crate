@@ -12,9 +12,10 @@ import { sha256Hex } from '../../../../platform/sha256';
 beforeEach(async () => {
 	await applySchema(env.DB);
 	const hash = await sha256Hex('retained bytes');
+	const expiresAt = Date.now() + 300_000;
 	await env.DB.batch(Array.from({ length: 205 }, (_, i) => env.DB.prepare(`INSERT INTO file_versions
 		(storage_key, path, hash, size, reason, created_at, expires_at) VALUES (?, ?, ?, 14, 'deleted', '2026-09-09 12:00:00', ?)`)
-		.bind(`retained/${String(i).padStart(3, '0')}`, i === 0 ? 'archive/older%.md' : `notes/${i}.md`, hash, Date.now() + 300_000)));
+		.bind(`retained/${String(i).padStart(3, '0')}`, i === 0 ? 'archive/older%.md' : `notes/${i}.md`, hash, expiresAt)));
 });
 afterEach(async () => { await reset(); });
 const request = (params: Record<string, string> = {}) => new Request(`https://worker.test/sync/versions?${new URLSearchParams(params)}`);
@@ -23,8 +24,9 @@ const list = async (params?: Record<string, string>) => parseFileVersions(await 
 it('walks all equal-timestamp pages without duplicates and restores an entry beyond the first 100', async () => {
 	const first = await list();
 	expect(first.versions).toHaveLength(100);
-	// A newly retained row cannot shift the cursor and repeat older entries.
-	await env.DB.prepare(`INSERT INTO file_versions(storage_key, path, hash, size, reason, created_at, expires_at) SELECT 'retained/zzz', 'new.md', hash, size, reason, created_at, expires_at FROM file_versions LIMIT 1`).run();
+	// A newly retained row cannot shift the cursor and repeat older entries. Every version
+	// pages by its expiry, and a new one expires last.
+	await env.DB.prepare(`INSERT INTO file_versions(storage_key, path, hash, size, reason, created_at, expires_at) SELECT 'retained/zzz', 'new.md', hash, size, reason, created_at, expires_at + 1000 FROM file_versions LIMIT 1`).run();
 	const second = await list({ cursor: first.nextCursor! });
 	const third = await list({ cursor: second.nextCursor! });
 	expect(second.versions).toHaveLength(100);

@@ -28,10 +28,11 @@ export async function bulkFileProjection(db: D1Database, files: Array<{ path: st
       SELECT path, storage_key, ?, issue IS NULL FROM live WHERE 1
       ON CONFLICT(file_path) DO UPDATE SET file_revision = excluded.file_revision, parser_version = excluded.parser_version,
         verified = excluded.verified, sources_digest = NULL`, REMINDER_CACHE_PARSER_VERSION),
-		statement(`INSERT INTO notification_projection_jobs(path, job_token)
-      SELECT DISTINCT file_path, ? FROM reminder_sources WHERE reminder_id IN (
+		// Other owners of these identities check every identity again; see `enqueueFileProjection`.
+		statement(`INSERT INTO notification_projection_jobs(path, job_token, recheck)
+      SELECT DISTINCT file_path, ?, 1 FROM reminder_sources WHERE reminder_id IN (
         SELECT reminder_id FROM reminder_sources WHERE file_path IN (SELECT path FROM valid) UNION SELECT id FROM sources)
-      ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL, updated_at = datetime('now')`, token),
+      ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL, recheck = 1, updated_at = datetime('now')`, token),
 		statement(`DELETE FROM reminder_sources WHERE file_path IN (SELECT path FROM valid)
       AND NOT EXISTS (SELECT 1 FROM sources s WHERE s.path = reminder_sources.file_path AND s.id = reminder_sources.reminder_id)`),
 		statement(`INSERT INTO reminder_sources(file_path, reminder_id, due_key, occurrences)

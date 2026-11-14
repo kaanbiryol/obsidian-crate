@@ -3,14 +3,14 @@ import { publishedChangelogStatement, retainReplacedVersionStatements } from './
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { descriptorColumn, encryptionWriteGuard, prepareEncryptedFileCommit } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
-import { stagedUploadGuard, finishStagedUpload } from './staging/staged-uploads';
+import { finishUploadLeases, uploadLeaseGuard } from './staging/upload-leases';
 import { enqueueFileProjection } from '../notifications/projection-queue';
 import { readingIndexStatements } from '../reading/library-index';
 import type { CommitEffects } from './commit-effects';
 import type { CommitContext } from './mutations';
 import { changedRows } from '../d1/db';
 import { portablePathKey } from '../../../protocol/portable-path';
-import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-staging';
+import { stageMarkdownFiles, type StagedMarkdownFile } from './markdown-file-staging';
 import { FileVersionConflictError } from './markdown-files';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import {
@@ -32,8 +32,8 @@ function destinationMutation(
 ): D1PreparedStatement {
 	const destinationNamespace = fileNamespaceGuard(destination.path);
 	const sourceNamespace = fileNamespaceGuard(source.path);
-	const destinationLease = stagedUploadGuard(destination.objectKey);
-	const sourceLease = stagedUploadGuard(source.objectKey);
+	const destinationLease = uploadLeaseGuard(destination.leaseId, destination.objectKey);
+	const sourceLease = uploadLeaseGuard(source.leaseId, source.objectKey);
 	const encryption = encryptionWriteGuard(encryptionState);
 	let namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql} AND ${destinationLease.sql} AND ${sourceLease.sql} AND ${encryption.sql}`;
 	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args, ...destinationLease.args, ...sourceLease.args, ...encryption.args];
@@ -67,12 +67,11 @@ function destinationMutation(
 	}
 
 	return db.prepare(`/* atomic-destination-update */
-		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
+		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
 		WHERE ${FILE_PATH_MATCH} AND hash = ?
 		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
 		AND ${namespaceGuard}`)
 		.bind(
-			portablePathKey(destination.path),
 			destination.hash,
 			destination.size,
 			destination.objectKey,
@@ -92,11 +91,10 @@ function sourceMutation(
 ): D1PreparedStatement {
 	const destinationRevision = fileRevisionGuard(destination.path, destination.objectKey);
 	return db.prepare(`/* atomic-source-update */
-		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
+		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
 		WHERE ${FILE_PATH_MATCH} AND hash = ?
 		AND ${destinationRevision.sql}`)
 		.bind(
-			portablePathKey(source.path),
 			source.hash,
 			source.size,
 			source.objectKey,
@@ -132,28 +130,11 @@ export async function writeCommittedMarkdownFilePair(
 		getReplacedFileRow(db, params.source.path),
 		getReplacedFileRow(db, params.destination.path),
 	]);
-	const stagedFiles: StagedMarkdownFile[] = [];
-	try {
-		stagedFiles.push(await stageMarkdownFile(
-			bucket,
-			db,
-			params.destination.path,
-			params.destination.content,
-			params.destination.expectedHash,
-			Boolean(destinationEncryption.state),
-		));
-		stagedFiles.push(await stageMarkdownFile(
-			bucket,
-			db,
-			params.source.path,
-			params.source.content,
-			params.source.expectedHash,
-			Boolean(sourceEncryption.state),
-		));
-	} catch (error) {
-		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => ({ storageKey: file.objectKey, path: file.path })));
-		throw error;
-	}
+	// One lease names both objects. If a put fails, lease cleanup reclaims whatever was stored.
+	const stagedFiles = await stageMarkdownFiles(bucket, db, [
+		{ path: params.destination.path, content: params.destination.content, expectedHash: params.destination.expectedHash },
+		{ path: params.source.path, content: params.source.content, expectedHash: params.source.expectedHash },
+	], Boolean(sourceEncryption.state || destinationEncryption.state));
 
 	const [destination, source] = stagedFiles as [StagedMarkdownFile, StagedMarkdownFile];
 	source.expectedRevision = params.source.expectedRevision;
@@ -179,9 +160,8 @@ export async function writeCommittedMarkdownFilePair(
 				{ path: source.path, storageKey: source.objectKey, hash: source.hash, size: source.size, content: params.source.content },
 				{ path: destination.path, storageKey: destination.objectKey, hash: destination.hash, size: destination.size, content: params.destination.content },
 			], { policy: context?.readingPolicy, encrypted: Boolean(sourceEncryption.state || destinationEncryption.state) }),
-			finishStagedUpload(db, source.objectKey, source.path),
-			finishStagedUpload(db, destination.objectKey, destination.path),
 			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),
+			...finishUploadLeases(db, [source, destination]),
 	]);
 
 	const destinationCommitted = changedRows(results[0]) === 1;

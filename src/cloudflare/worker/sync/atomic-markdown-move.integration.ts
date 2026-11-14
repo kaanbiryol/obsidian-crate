@@ -27,7 +27,7 @@ it('publishes the destination and deletes the exact source revision in one trans
 		{ path: from.path, action: 'delete', revision: moved.deletion.revision }, { path: 'Reading/New.md', action: 'put', revision: moved.revision }]);
 	expect(await env.DB.prepare('SELECT storage_key AS consumed FROM file_versions WHERE path=? AND deletion_revision IS NOT NULL').bind(from.path).first()).toEqual({ consumed: from.expectedRevision });
 	expect(await env.DB.prepare("SELECT path FROM file_versions WHERE reason='deleted'").first()).toEqual({ path: from.path });
-	expect(await env.DB.prepare('SELECT 1 FROM staged_uploads').first()).toBeNull();
+	expect(await env.DB.prepare('SELECT 1 FROM upload_leases').first()).toBeNull();
 });
 
 it('writes nothing when the source changed or the destination is taken', async () => {
@@ -47,5 +47,5 @@ it('writes nothing when the source changed or the destination is taken', async (
 	expect(await files()).toEqual(['Reading/Old.md', 'Reading/Taken.md']);
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/Taken.md'))?.content).toBe('Keep me');
 	expect(await env.DB.prepare('SELECT 1 FROM file_versions WHERE deletion_revision IS NOT NULL').first()).toBeNull();
-	expect(await env.DB.prepare('SELECT 1 FROM staged_uploads').first()).toBeNull();
+	expect(await env.DB.prepare('SELECT 1 FROM upload_leases').first()).toBeNull();
 });

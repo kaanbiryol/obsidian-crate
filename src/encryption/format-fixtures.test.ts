@@ -85,6 +85,20 @@ const fixtures: Record<string, Fixture<unknown>> = {
 			expect(opened.metadata).toMatchObject({ version: 1, path: vaultFileInput.path, contentType: vaultFileInput.contentType });
 		},
 	}),
+	'file-v2-vault-key': fixture<{ bytes: string }>({
+		generate: async () => {
+			const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath(vaultFileInput.path);
+			return { bytes: new TextDecoder().decode((await sealFile({ ...vaultFileInput, content: text(vaultFileInput.content) }, authority)).bytes) };
+		},
+		verify: async ({ bytes }) => {
+			const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath(vaultFileInput.path);
+			const opened = await openFile(text(bytes), vaultFileInput.path, authority);
+			expect(new TextDecoder().decode(opened.content)).toBe(vaultFileInput.content);
+			expect(opened.publicData).toEqual(vaultFileInput.publicData);
+			expect(opened.metadata).toMatchObject({ version: 2, path: vaultFileInput.path, size: text(vaultFileInput.content).length });
+			expect(opened.metadata.contentType).toBeUndefined();
+		},
+	}),
 	'recovery-v1': fixture<{ code: string; envelope: RecoveryEnvelope }>({
 		generate: async () => ({ code: await recoveryCode(), envelope: await sealRecoveryBundle(bundle, await recoveryCode()) }),
 		verify: async ({ code, envelope }) => {

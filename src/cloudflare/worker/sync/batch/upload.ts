@@ -2,12 +2,11 @@ import type { UploadCommitters } from '../staging/upload-committers';
 import type { CommitResult } from '../mutations';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../../encryption/file-format';
-import { trackStagedUploads } from '../staging/staged-uploads';
-import { trackStagedBatch } from '../staging/staged-upload-batches';
+import { trackUploadLease } from '../staging/upload-leases';
 import { beginUploadOperations } from '../upload-operations';
 import { corsResponse } from '../../http/cors';
 import { FileNamespaceConflictError } from '../file-namespace';
-import { EncryptionStateError, validateUploadEncryption } from '../../encryption/state';
+import { descriptorColumn, EncryptionStateError, prepareEncryptedFileCommit, validateUploadEncryption } from '../../encryption/state';
 import {
 	formatMetadataCommitFailure,
 	formatMutationError,
@@ -23,7 +22,7 @@ export async function handleBatchUpload(
 	expectedEncryption?: EncryptionServerState | null,
 	resetGeneration?: string | null,
 ): Promise<Response> {
-	const prepared = await prepareBatchUpload(request, expectedEncryption);
+	const prepared = await prepareBatchUpload(request);
 	if (prepared instanceof Response) return prepared;
 	const { bulkNew, candidates, results } = prepared;
 
@@ -47,13 +46,16 @@ export async function handleBatchUpload(
 		return { ...file, operation };
 	}));
 	const uploads = checked.filter((file): file is NonNullable<typeof file> => file !== null);
+	if (!uploads.length) return corsResponse({ success: results.every(result => result.success), results });
 
-	let stagingBatchId: string | undefined;
-	let encryptionState: EncryptionServerState | null = null;
+	// One lease row names every object of the request, whichever path commits it.
+	let leaseId: string;
+	let encryptionState: EncryptionServerState | null;
 	try {
 		const validatedEncryption = await validateUploadEncryption(db, uploads.map(file => ({ path: file.safePath, content: file.bytes, contentType: file.contentType })), expectedEncryption);
-		if (bulkNew) stagingBatchId = await trackStagedBatch(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })), resetGeneration);
-		else encryptionState = await trackStagedUploads(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })), uploads.every(file => file.contentType === ENCRYPTED_FILE_CONTENT_TYPE), validatedEncryption, resetGeneration);
+		({ id: leaseId, encryptionState } = await trackUploadLease(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })), {
+			encrypted: uploads.every(file => file.contentType === ENCRYPTED_FILE_CONTENT_TYPE), expectedEncryption: validatedEncryption, resetGeneration,
+		}));
 	} catch (error) {
 		if (error instanceof EncryptionStateError) return error.toResponse();
 		return corsResponse({ success: false, results: results.concat(uploads.map(file => ({
@@ -79,10 +81,13 @@ export async function handleBatchUpload(
 			}));
 		}
 		try {
-			results.push(...await committers.commitNewFiles(bucket, db, staged.map(file => ({
+			// Descriptors come from the bytes here: the coordinator receives only Markdown bytes.
+			const commits = await Promise.all(staged.map(async file => ({
 				path: file.safePath, hash: file.hash, size: file.size, objectKey: file.objectKey,
-				operation: file.operation, content: file.bytes, stagingBatchId, resetGeneration,
-			}))));
+				operation: file.operation, content: file.bytes, leaseId, resetGeneration, encryptionState,
+				descriptor: descriptorColumn((await prepareEncryptedFileCommit(db, file.safePath, file.bytes, encryptionState)).descriptor),
+			})));
+			results.push(...await committers.commitNewFiles(bucket, db, commits));
 		} catch (error) {
 			failed = true;
 			// An uncertain transaction is replayed by operation identity, never cleaned up here.
@@ -102,6 +107,7 @@ export async function handleBatchUpload(
 		hash: file.hash,
 		size: file.size,
 		objectKey: file.objectKey,
+		leaseId,
 		content: file.bytes,
 		expectedHash: file.expectedHash,
 	});

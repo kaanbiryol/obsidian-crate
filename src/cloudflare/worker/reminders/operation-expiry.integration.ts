@@ -34,7 +34,7 @@ it('accepts the last valid day and refuses expired, future and missing legacy co
 	await payload(await handleCreateReminder(request({ id, operationId: id, content: 'Boundary task' }), env));
 	// Retention follows the retry window encoded in the ID.
 	await pruneOperationReceipts(db);
-	expect(await db.prepare('SELECT operation_id FROM reminder_operations').first()).toEqual({ operation_id: id });
+	expect(await db.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder'").first()).toEqual({ operation_id: id });
 	const put = vi.spyOn(bucket, 'put');
 	for (const expiredId of [createReminderOperationId(validDay - 1), createReminderOperationId(day + 1), crypto.randomUUID()]) {
 		const response = await handleCreateReminder(request({ id: expiredId, operationId: expiredId, content: 'Never append' }), env);
@@ -53,7 +53,7 @@ it('cannot recreate a pruned reminder identity through either an exact retry or 
 	await writeCommittedMarkdownFile(bucket, db, path, '# Inbox\n', file.hash);
 	await setFloor(issued + 1);
 	await pruneOperationReceipts(db);
-	expect(await db.prepare('SELECT * FROM reminder_operations').first()).toBeNull();
+	expect(await db.prepare("SELECT * FROM operations WHERE kind = 'reminder'").first()).toBeNull();
 	expect(await db.prepare('SELECT * FROM reminder_identities').first()).toBeNull();
 	expect((await handleCreateReminder(request(body), env)).status).toBe(410);
 	expect((await handleCreateReminder(request({ ...body, operationId: createReminderOperationId(day) }), env)).status).toBe(400);
@@ -93,7 +93,7 @@ it.each(['completion', 'move'] as const)('rolls back the entire %s publication i
 	await expect(mutate(request(body), env)).rejects.toThrow('NOT NULL');
 	expect(await readCommittedMarkdownFileVersion(bucket, db, path)).toEqual(before);
 	expect(await readCommittedMarkdownFileVersion(bucket, db, 'Reminders/Work.md')).toBeNull();
-	expect(await db.prepare('SELECT * FROM reminder_operations WHERE operation_id = ?').bind(operationId).first()).toBeNull();
+	expect(await db.prepare("SELECT * FROM operations WHERE kind = 'reminder' AND operation_id = ?").bind(operationId).first()).toBeNull();
 	expect((await mutate(request(body), env)).status).toBe(410);
 });
 
@@ -107,17 +107,17 @@ it('preserves identity reservations still owned by a reminder source', async () 
 
 it('bounds receipt cleanup, retains a monotonic floor and rolls back a failed pruning batch', async () => {
 	const ids = Array.from({ length: RECEIPT_BATCH + 1 }, () => createReminderOperationId(day - REMINDER_RETRY_DAYS));
-	await db.prepare("INSERT INTO reminder_operations (operation_id, request_hash, response_json) SELECT value, 'hash', '{}' FROM json_each(?)").bind(JSON.stringify(ids)).run();
+	await db.prepare("INSERT INTO operations (kind, operation_id, request_hash, response_json) SELECT 'reminder', value, 'hash', '{}' FROM json_each(?)").bind(JSON.stringify(ids)).run();
 	const batch = db.batch.bind(db);
-	vi.spyOn(db, 'batch').mockImplementationOnce(statements => batch([...statements, db.prepare("INSERT INTO reminder_operations (operation_id, request_hash, response_json) VALUES ('failure', 'hash', NULL)")]));
+	vi.spyOn(db, 'batch').mockImplementationOnce(statements => batch([...statements, db.prepare("INSERT INTO operations (kind, operation_id, request_hash, response_json) VALUES ('reminder', 'failure', 'hash', NULL)")]));
 	await expect(pruneOperationReceipts(db)).rejects.toThrow('NOT NULL');
-	expect(await db.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first()).toEqual({ count: RECEIPT_BATCH + 1 });
+	expect(await db.prepare("SELECT COUNT(*) AS count FROM operations WHERE kind = 'reminder'").first()).toEqual({ count: RECEIPT_BATCH + 1 });
 	expect(await db.prepare("SELECT * FROM maintenance_state WHERE key = 'reminder_operation_floor'").first()).toBeNull();
 	await pruneOperationReceipts(db);
-	expect(await db.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first()).toEqual({ count: 1 });
+	expect(await db.prepare("SELECT COUNT(*) AS count FROM operations WHERE kind = 'reminder'").first()).toEqual({ count: 1 });
 	await setFloor(day + 10);
 	await pruneOperationReceipts(db);
 	expect(await db.prepare("SELECT value FROM maintenance_state WHERE key = 'reminder_operation_floor'").first()).toEqual({ value: String(day + 10) });
-	expect(await db.prepare('SELECT COUNT(*) AS count FROM reminder_operations').first()).toEqual({ count: 0 });
+	expect(await db.prepare("SELECT COUNT(*) AS count FROM operations WHERE kind = 'reminder'").first()).toEqual({ count: 0 });
 	expect((await beginReminderOperation(db, { operationId: createReminderOperationId(day) }, 'create') as Response).status).toBe(410);
 });

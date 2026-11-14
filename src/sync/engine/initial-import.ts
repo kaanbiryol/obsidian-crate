@@ -80,7 +80,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	}
 	const localPaths = new Set(local.map(file => file.path));
 	const obsolete = Object.keys(remote.files).filter(path => !localPaths.has(path));
-	await context.api.initialImport.prune(session.token, obsolete.map(path => ({ path, hash: remote.files[path]!.hash })));
+	await context.api.initialImport.prune(session.token, obsolete.map(path => ({ path, hash: remote.files[path]!.hash, revision: remote.files[path]!.revision })));
 	for (const path of obsolete) transfer.localManifest.removeEntry(path);
 	const inventory = createPathRecord<FileEntry>();
 	// Skipped files are reported, not uploaded; a server row they already have stays as it is.
@@ -138,7 +138,8 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 		const uploadBatch = (batch: PreparedUpload[]) => withSyncFileContext(batch.map(file => file.path), async () => {
 			context.throwIfDestroyed();
 			context.report({ phase: 'uploading', current: completed, total: files.length });
-			const response = await context.api.initialImport.upload(session.token, batch);
+			// An encrypted import names the server copy an upload replaces by its revision.
+			const response = await context.api.initialImport.upload(session.token, batch.map(file => ({ ...file, expectedRevision: remote.files[file.path]?.revision })));
 			if (response.results.length !== batch.length || new Set(response.results.map(file => file.path)).size !== batch.length) throw new Error('Invalid initial upload results');
 			for (const upload of batch) {
 				const receipt = response.results.find(file => file.path === upload.path);

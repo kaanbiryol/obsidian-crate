@@ -113,11 +113,7 @@ describe('auth token management', () => {
 			last_seen_at: null,
 		});
 
-		const response = await handleListTokens(new Request('https://worker.test/auth/tokens', {
-			headers: {
-				Authorization: 'Bearer current-token',
-			},
-		}), db as never);
+		const response = await handleListTokens(db as never, 'current-id');
 		expect(await response.json()).toEqual({
 			tokens: [
 				expect.objectContaining({

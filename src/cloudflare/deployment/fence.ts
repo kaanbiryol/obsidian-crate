@@ -52,7 +52,8 @@ export interface DeploymentFenceRecord {
 	batchHash?: string;
 }
 
-const FENCE_TABLE_SQL = "CREATE TABLE IF NOT EXISTS maintenance_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));";
+// Runs before the schema, so it must declare the table exactly as `schema.sql` does.
+const FENCE_TABLE_SQL = 'CREATE TABLE IF NOT EXISTS maintenance_state (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;';
 
 export async function createFenceTable(api: FenceApi, accountId: string, databaseId: string): Promise<void> {
 	await api.queryD1(accountId, databaseId, FENCE_TABLE_SQL);
@@ -68,12 +69,11 @@ export async function readStoredFence(api: FenceApi, accountId: string, database
 	return rows.length === 1 && typeof rows[0]?.value === 'string' ? { state: 'held', value: rows[0].value } : { state: 'invalid' };
 }
 
-/** Compare-and-set of the held fence; true when `from` was replaced by `to`. Deletion
- * leaves `updated_at` alone, so it never depends on the shape of the database it removes. */
+/** Compare-and-set of the held fence; true when `from` was replaced by `to`. */
 export async function replaceFenceValue(api: FenceApi, accountId: string, databaseId: string,
-	{ kind, from, to }: { kind: DeploymentFenceRecord['kind']; from: string; to: string }): Promise<boolean> {
+	{ from, to }: { from: string; to: string }): Promise<boolean> {
 	const rows = await queryD1Rows(api, accountId, databaseId,
-		`UPDATE maintenance_state SET value = ?${kind === 'delete' ? '' : ", updated_at = datetime('now')"} WHERE key = ? AND value = ? RETURNING value;`,
+		'UPDATE maintenance_state SET value = ? WHERE key = ? AND value = ? RETURNING value;',
 		[to, DEPLOYMENT_FENCE_KEY, from]);
 	return rows.length === 1 && rows[0]?.value === to;
 }
@@ -168,7 +168,7 @@ export class DeploymentFence {
 		const record = JSON.parse(this.value) as DeploymentFenceRecord;
 		const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(uploadTag ? { uploadTag } : {}), ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
 		try {
-			if (!await replaceFenceValue(this.api, this.account, this.database, { kind: record.kind, from: this.value, to: next })) throw new Error('Deployment ownership changed');
+			if (!await replaceFenceValue(this.api, this.account, this.database, { from: this.value, to: next })) throw new Error('Deployment ownership changed');
 			this.value = next;
 		} catch (error) {
 			this.uncertain = true;
@@ -226,7 +226,7 @@ export async function withDeploymentFence<T>(input: {
 			const rows = await queryD1Rows(input.api, input.accountId, input.databaseId,
 				'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;', [DEPLOYMENT_FENCE_KEY, value]);
 			acquired = rows.length === 1 && rows[0]?.value === value;
-		} else acquired = await replaceFenceValue(input.api, input.accountId, input.databaseId, { kind: input.record.kind, from: recoveredValue, to: value });
+		} else acquired = await replaceFenceValue(input.api, input.accountId, input.databaseId, { from: recoveredValue, to: value });
 	} catch (error) {
 		// A definite rejection (quota, permissions, or invalid SQL) did not
 		// acquire ownership. Preserve the provider's actionable error instead

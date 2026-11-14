@@ -7,12 +7,12 @@ import { commitReminderCommand } from '../command';
 
 /** Update, deletion and completion edit one existing reminder in its source note.
  * They validate in the same order, so a request reports the same first error. */
-async function handleExistingReminder(request: Request, env: Env, operationAction: 'update' | 'delete' | 'complete',
+async function handleExistingReminder(request: Request, env: Env, arm: (() => Promise<void>) | undefined, operationAction: 'update' | 'delete' | 'complete',
 	command: 'update' | 'delete' | 'set-completed', input?: { valid: (body: Record<string, unknown>) => boolean; required: string }): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) return parsedBody.response;
 
-	const operation = await beginReminderOperation(env.DB, parsedBody.value, operationAction);
+	const operation = await beginReminderOperation(env.DB, parsedBody.value, operationAction, arm);
 	if (operation instanceof Response) return operation;
 
 	const workspaceResult = parseReminderMutationWorkspace(parsedBody.value);
@@ -29,15 +29,15 @@ async function handleExistingReminder(request: Request, env: Env, operationActio
 		workspaceResult.folderPath, parsedBody.value, [id]);
 }
 
-export function handleUpdateReminder(request: Request, env: Env): Promise<Response> {
-	return handleExistingReminder(request, env, 'update', 'update');
+export function handleUpdateReminder(request: Request, env: Env, arm?: () => Promise<void>): Promise<Response> {
+	return handleExistingReminder(request, env, arm, 'update', 'update');
 }
 
-export function handleDeleteReminder(request: Request, env: Env): Promise<Response> {
-	return handleExistingReminder(request, env, 'delete', 'delete');
+export function handleDeleteReminder(request: Request, env: Env, arm?: () => Promise<void>): Promise<Response> {
+	return handleExistingReminder(request, env, arm, 'delete', 'delete');
 }
 
-export function handleSetReminderCompleted(request: Request, env: Env): Promise<Response> {
-	return handleExistingReminder(request, env, 'complete', 'set-completed',
+export function handleSetReminderCompleted(request: Request, env: Env, arm?: () => Promise<void>): Promise<Response> {
+	return handleExistingReminder(request, env, arm, 'complete', 'set-completed',
 		{ valid: body => typeof body.completed === 'boolean', required: 'id and completed required' });
 }

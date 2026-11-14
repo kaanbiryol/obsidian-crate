@@ -1,0 +1,11 @@
+{
+	"stored": "{\"version\":2,\"vaultId\":\"263d20c2-de47-459a-b603-973181a5b6d4\",\"scopeId\":\"vault\",\"objectId\":\"88502a91-2adb-4c11-a68e-211faf5c6457\",\"keyId\":\"fixture-key\",\"metadata\":\"eObtV3d32Xl5bhG00c-cAFFd_bxhFIVOXW0d5dgDbIjT3Td9gzoPNQwq6zYiThSWQx4-u8jvDBZWVEnFj3ivIyyQ1eqBnj_mCIJlzTp3Ldg5_Vq3OjfyJIuKKgQ35TExgwnSNmnFNknR82FZzs4LCsUB15cWVDz_l4KUKptaB1ZdwmvhqzVS-xGo9s7l4RMKmmZ1awo2dNY\"}",
+	"decoded": {
+		"version": 2,
+		"vaultId": "263d20c2-de47-459a-b603-973181a5b6d4",
+		"scopeId": "vault",
+		"objectId": "88502a91-2adb-4c11-a68e-211faf5c6457",
+		"keyId": "fixture-key",
+		"metadata": "eObtV3d32Xl5bhG00c-cAFFd_bxhFIVOXW0d5dgDbIjT3Td9gzoPNQwq6zYiThSWQx4-u8jvDBZWVEnFj3ivIyyQ1eqBnj_mCIJlzTp3Ldg5_Vq3OjfyJIuKKgQ35TExgwnSNmnFNknR82FZzs4LCsUB15cWVDz_l4KUKptaB1ZdwmvhqzVS-xGo9s7l4RMKmmZ1awo2dNY"
+	}
+}

@@ -5,7 +5,7 @@ import unittest
 import urllib.error
 from unittest.mock import Mock, patch
 import test_archive
-from test_archive import Remote, recovery
+from test_archive import Remote, digest, recovery
 from recovery.cloudflare import Cloudflare
 
 
@@ -159,18 +159,23 @@ class ResumeTests(unittest.TestCase):
             recovery.restore(target, self.directory)
 
     def test_backup_resume_keeps_its_pinned_export_and_verified_objects(self):
-        original = self.remote.get_object
-        def interrupt_settings(key):
-            if key == '__crate__/settings.json':
+        data = b'second vault copy'
+        key = '__crate__/files/' + digest(data) + '/second'
+        self.remote.sql += f"\nINSERT INTO files (path, portable_path, hash, size, storage_key) VALUES ('Second.md', 'second.md', '{digest(data)}', {len(data)}, '{key}');".encode()
+        self.remote.objects[key] = data
+        original, fetched = self.remote.get_object, []
+        def interrupt_second(requested):
+            fetched.append(requested)
+            if len(fetched) == 2:
                 raise RuntimeError('offline')
-            return original(key)
-        self.remote.get_object = interrupt_settings
+            return original(requested)
+        self.remote.get_object = interrupt_second
         with self.assertRaisesRegex(RuntimeError, 'offline'):
             recovery.backup(self.remote, self.directory)
         self.remote.export = Mock(side_effect=AssertionError('Do not change the export bookmark'))
-        def only_settings(key):
-            self.assertEqual(key, '__crate__/settings.json')
-            return original(key)
-        self.remote.get_object = only_settings
+        def only_unverified(requested):
+            self.assertEqual(requested, fetched[1])
+            return original(requested)
+        self.remote.get_object = only_unverified
         manifest = recovery.backup(self.remote, self.directory)
-        self.assertEqual(len(manifest['objects']), 1)
+        self.assertEqual(len(manifest['objects']), 2)

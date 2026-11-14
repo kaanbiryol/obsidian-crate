@@ -54,7 +54,7 @@ describe('authenticated page titles in the Worker runtime', () => {
 		expect(response.headers.get('Cache-Control')).toBe('private, no-store');
 		expect(response.headers.get('X-Crate-Request-Id')).toBeTruthy();
 		expect(outbound).toHaveBeenCalledWith('https://example.com/article', expect.objectContaining({ headers: { Accept: 'text/html' } }));
-		for (const table of ['files', 'changelog', 'reminder_operations']) {
+		for (const table of ['files', 'changelog', 'operations']) {
 			expect(await env.DB.prepare(`SELECT COUNT(*) AS count FROM ${table}`).first()).toEqual({ count: 0 });
 		}
 	});
@@ -71,7 +71,7 @@ describe('authenticated page titles in the Worker runtime', () => {
 		const response = await worker.fetch(unlocked, env);
 		expect(response.status, await response.clone().text()).toBe(200);
 		expect(await response.json()).toEqual({ title: 'Public article' });
-		for (const table of ['files', 'changelog', 'reminder_operations']) {
+		for (const table of ['files', 'changelog', 'operations']) {
 			expect(await env.DB.prepare(`SELECT COUNT(*) AS count FROM ${table}`).first()).toEqual({ count: 0 });
 		}
 	});

@@ -18,7 +18,7 @@ it('decrypts large inventories in bounded, overlapping batches and keeps their o
 		active++; peak = Math.max(peak, active);
 		await new Promise(resolve => setTimeout(resolve, 1));
 		active--;
-		const { revisions } = JSON.parse(init.body) as { revisions: string[] };
+		const revisions = (JSON.parse(init.body) as { files: Array<{ path: string; revision: string }> }).files.map(file => file.revision);
 		expect(revisions.length).toBeLessThanOrEqual(ENCRYPTION_METADATA_BATCH);
 		return { descriptors: Object.fromEntries(revisions.map(revision => [revision, { path: `n/${revision}.md`, revision }])) };
 	});
@@ -34,7 +34,7 @@ it('decrypts large inventories in bounded, overlapping batches and keeps their o
 
 it('opens descriptors listed inline and asks the server only for revisions listed without one', async () => {
 	const requestJson = vi.fn(async (_path: string, init: { body: string }) => {
-		const { revisions } = JSON.parse(init.body) as { revisions: string[] };
+		const revisions = (JSON.parse(init.body) as { files: Array<{ path: string; revision: string }> }).files.map(file => file.revision);
 		return { descriptors: Object.fromEntries(revisions.map(revision => [revision, { path: `n/${revision}.md`, revision }])) };
 	});
 	const files = await EncryptedFiles.create({ requestJson } as unknown as WorkerApiHttpClient, {} as never, async () => null);
@@ -46,7 +46,8 @@ it('opens descriptors listed inline and asks the server only for revisions liste
 	// An older server or a shared checkpoint lists some revisions without descriptors.
 	const mixed = await files.metadata<{ hash: string; size: number; revision: string; descriptor?: unknown }>([inline('2'), { path: 'n/3.md', entry: { hash: 'cipher', size: 9, revision: '3' } }]);
 	expect(requestJson).toHaveBeenCalledTimes(1);
-	expect(JSON.parse(requestJson.mock.calls[0]![1].body)).toEqual({ revisions: ['3'] });
+	// Each revision travels with its server path, which the server looks it up by.
+	expect(JSON.parse(requestJson.mock.calls[0]![1].body)).toEqual({ files: [{ path: 'n/3.md', revision: '3' }] });
 	expect(mixed.map(({ entry }) => entry.hash)).toEqual(['plain-2', 'plain-3']);
 });
 
@@ -60,7 +61,7 @@ function precondition() {
 				return [p, { hash: cipher(i), size: 9, modified: '2026-10-01T12:00:00Z', revision: `rev-${i}` }];
 			})) };
 		}
-		const { revisions } = JSON.parse(init.body) as { revisions: string[] };
+		const revisions = (JSON.parse(init.body) as { files: Array<{ path: string; revision: string }> }).files.map(file => file.revision);
 		return { descriptors: Object.fromEntries(revisions.map(revision => [revision, { path: `n/${revision.slice(4)}.md`, revision }])) };
 	});
 	const requests = (path: string) => requestJson.mock.calls.filter(([called]) => called === path).length;

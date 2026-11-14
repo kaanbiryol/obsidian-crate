@@ -118,7 +118,7 @@ async function verifySharedQueue(browser, { api, origin, runtime, readingAppUrl 
 		assert.deepEqual(dispatches.slice(1, 3).map(dispatch => [dispatch.page, requestBody(dispatch).url]), [[other, urls[1]], [other, urls[2]]]);
 		assert.ok(dispatches.some((dispatch, index) => index < 3 && dispatch.page !== queuedBy[urls.indexOf(requestBody(dispatch).url)]));
 
-		const { results } = await runtime.db.prepare('SELECT operation_id FROM reading_operations').all();
+		const { results } = await runtime.db.prepare("SELECT operation_id FROM operations WHERE kind = 'reading'").all();
 		assert.deepEqual(results.map(row => row.operation_id).sort(), [...operationIds].sort(), 'Each operation ID has exactly one committed receipt');
 		const { items } = await api('/reading/items?section=inbox');
 		assert.deepEqual(items.map(item => item.source_url).sort(), [...urls].sort());

@@ -8,7 +8,7 @@ import { exchangeDevicePairing } from './device-pairing';
 import { issueDevicePairingCode } from '../../deployment/device-pairing';
 import type { CloudflareDeploymentMetadata } from '../../deployment/types';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
-import { DEVICE_PAIRING_END, DEVICE_PAIRING_LIFETIME, DEVICE_PAIRING_PAGE, DEVICE_PAIRING_PATH, DEVICE_PAIRING_PREFIX } from '../../../protocol/device-pairing';
+import { DEVICE_PAIRING_GRANT, DEVICE_PAIRING_LIFETIME, DEVICE_PAIRING_PAGE, DEVICE_PAIRING_PATH } from '../../../protocol/device-pairing';
 import { sha256Hex } from '../../../platform/sha256';
 
 beforeEach(async () => { await applySchema(env.DB); });
@@ -30,7 +30,8 @@ const vaultTokens = async () => (await env.DB.prepare("SELECT id, device_id FROM
 
 it('redeems a code once for a vault token and the server identity, and repeats the result for a lost response', async () => {
 	const issued = await issue();
-	const stored = JSON.stringify((await env.DB.prepare('SELECT key, value FROM maintenance_state').all()).results);
+	const stored = JSON.stringify((await env.DB.prepare('SELECT key, payload FROM grants').all()).results);
+	expect(stored).toContain(issued.tokenId);
 	expect(stored).not.toContain(issued.code);
 	const phone = await device('phone-token');
 	const first = await exchange(issued.code, phone);
@@ -53,12 +54,12 @@ it('allows only one of concurrent redemptions', async () => {
 	expect(await vaultTokens()).toHaveLength(1);
 });
 
-const storedPairing = () => env.DB.prepare('SELECT value FROM maintenance_state WHERE key >= ? AND key < ?').bind(DEVICE_PAIRING_PREFIX, DEVICE_PAIRING_END);
+const storedPairing = () => env.DB.prepare('SELECT payload AS value, expires_at FROM grants WHERE kind = ?').bind(DEVICE_PAIRING_GRANT);
 
 it.each(['expired', 'replaced', 'reset', 'malformed'])('rejects a %s code without creating a credential', async reason => {
 	const issued = await issue();
-	if (reason === 'expired') await env.DB.prepare("UPDATE maintenance_state SET value = json_set(value, '$.expiresAt', ?) WHERE key >= ? AND key < ?")
-		.bind(Date.now() - 1, DEVICE_PAIRING_PREFIX, DEVICE_PAIRING_END).run();
+	if (reason === 'expired') await env.DB.prepare("UPDATE grants SET payload = json_set(payload, '$.expiresAt', ?1), expires_at = ?1 WHERE kind = ?2")
+		.bind(Date.now() - 1, DEVICE_PAIRING_GRANT).run();
 	if (reason === 'replaced') await issue();
 	if (reason === 'reset') await env.DB.prepare("INSERT INTO server_state (id, reset_generation) VALUES (1, 'after-reset') ON CONFLICT(id) DO UPDATE SET reset_generation = excluded.reset_generation").run();
 	const response = await exchange(reason === 'malformed' ? 'not-a-code' : issued.code, await device('phone-token'));
@@ -68,8 +69,10 @@ it.each(['expired', 'replaced', 'reset', 'malformed'])('rejects a %s code withou
 
 it.each([['ahead', 24 * 60 * 60_000], ['behind', -11 * 60_000]])('times the code by the server clock when the desktop clock is %s', async (_label, skew) => {
 	const issued = await issue(Date.now() + skew);
-	const { expiresAt } = JSON.parse((await storedPairing().first<{ value: string }>())!.value) as { expiresAt: number };
+	const stored = (await storedPairing().first<{ value: string; expires_at: number }>())!;
+	const { expiresAt } = JSON.parse(stored.value) as { expiresAt: number };
 	expect(Math.abs(expiresAt - (Date.now() + DEVICE_PAIRING_LIFETIME))).toBeLessThan(5_000);
+	expect(stored.expires_at).toBe(expiresAt);
 	expect((await exchange(issued.code, await device('phone-token'))).status).toBe(200);
 });
 

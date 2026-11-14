@@ -73,7 +73,7 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
 		&& build?.version === record.version && build?.fingerprint === record.fingerprint
 		&& fingerprint === record.fingerprint) {
 		const confirmed = JSON.stringify({ ...record, stepState: 'confirmed' });
-		if (!await replaceFenceValue(api, account, database, { kind: 'update', from: value, to: confirmed })) {
+		if (!await replaceFenceValue(api, account, database, { from: value, to: confirmed })) {
 			return result('blocked', 'The operation changed during the check. Check again to read its latest status.');
 		}
 		value = confirmed;

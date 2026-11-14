@@ -35,7 +35,7 @@ beforeEach(async () => {
 afterEach(reset);
 
 async function upload(wire: string, text: string, expectedHash: string | null) {
-	const file = await sealFile({ path: 'Files/photo.bin', content: new TextEncoder().encode(text), contentType: 'application/octet-stream' }, keys.forPath(wire));
+	const file = await sealFile({ path: 'Files/photo.bin', content: new TextEncoder().encode(text) }, keys.forPath(wire));
 	const result = await json<{ revision: string }>(await call(`/sync/upload?path=${encodeURIComponent(wire)}`, { method: 'PUT', body: file.bytes,
 		headers: { 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-File-Hash': file.hash, 'X-File-Size': String(file.bytes.length),
 			'X-Crate-Expected-Hash': expectedHash ?? 'absent', 'X-Crate-Upload-Operation': operationId() } }));
@@ -72,17 +72,22 @@ it('lists each revision with the descriptor written in its own rows', async () =
 	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).toBeNull();
 });
 
-it('still answers older clients from /encryption/metadata until the last row of a revision is gone', async () => {
+it('answers /encryption/metadata by path and revision from the live file and retained versions', async () => {
 	const wire = await paths.wire('Files/photo.bin');
 	const first = await upload(wire, 'first', null);
 	const second = await upload(wire, 'second', first.hash);
-	const lookup = async (revisions: string[]) => (await json<{ descriptors: Record<string, unknown> }>(await call('/encryption/metadata', {
-		method: 'POST', body: JSON.stringify({ revisions }) }))).descriptors;
-	expect(await lookup([first.revision, second.revision, 'missing'])).toEqual({ [first.revision]: first.descriptor, [second.revision]: second.descriptor });
-	// Without its retained copy, the first revision is known only to its changelog put.
+	const lookup = async (files: Array<{ path: string; revision: string }>) => (await json<{ descriptors: Record<string, unknown> }>(await call('/encryption/metadata', {
+		method: 'POST', body: JSON.stringify({ files }) }))).descriptors;
+	expect(await lookup([{ path: wire, revision: first.revision }, { path: wire, revision: second.revision }, { path: wire, revision: 'missing' }]))
+		.toEqual({ [first.revision]: first.descriptor, [second.revision]: second.descriptor });
+	// The live revision is found only at its own path.
+	expect(await lookup([{ path: await paths.wire('Files/other.bin'), revision: second.revision }])).toEqual({});
+	// Without its retained copy the first revision has no bytes left to open, so its
+	// changelog put no longer answers for it.
 	await env.DB.prepare('DELETE FROM file_versions WHERE storage_key = ?').bind(first.revision).run();
-	expect(await lookup([first.revision])).toEqual({ [first.revision]: first.descriptor });
-	// Pruning that put releases the descriptor with it; nothing else holds one.
-	await env.DB.prepare('DELETE FROM changelog WHERE revision = ?').bind(first.revision).run();
-	expect(await lookup([first.revision, second.revision])).toEqual({ [second.revision]: second.descriptor });
+	expect(await lookup([{ path: wire, revision: first.revision }, { path: wire, revision: second.revision }])).toEqual({ [second.revision]: second.descriptor });
+	// Clients that send the previous request shape are told to update.
+	const old = await call('/encryption/metadata', { method: 'POST', body: JSON.stringify({ revisions: [second.revision] }) });
+	expect(old.status).toBe(428);
+	expect(await old.json()).toMatchObject({ code: 'protocol_incompatible' });
 });

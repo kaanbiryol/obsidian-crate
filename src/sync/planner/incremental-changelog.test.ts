@@ -58,7 +58,7 @@ it('keeps paging past an encrypted page made only of deletes this device never s
 	});
 	const http = { requestJson } as unknown as WorkerApiHttpClient;
 	const encryption = await EncryptedFiles.create(http, await createVaultKeyBundle(), async () => null);
-	const sealed = await sealFile({ path: 'new.md', content: new TextEncoder().encode('new'), contentType: 'text/markdown' }, encryption.keys.forPath('new.md'));
+	const sealed = await sealFile({ path: 'new.md', content: new TextEncoder().encode('new') }, encryption.keys.forPath('new.md'));
 	descriptor = sealed.descriptor;
 	put = { seq: 5011, path: await encryption.paths.wireFor('new.md'), action: 'put', hash: sealed.hash, size: sealed.bytes.byteLength, created_at, revision: 'rev-1' };
 	const api = new SyncWorkerApi(http);

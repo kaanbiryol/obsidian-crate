@@ -1,6 +1,8 @@
 import { compareCodePoints, portablePathKey } from './portable-path';
 import type { SyncIssueCode } from './sync-issues';
-export const INITIAL_IMPORT_CAPABILITY = 'resumable-initial-import-v1';
+/** The server accepts a resumable first upload, in a plaintext vault or in an encrypted one
+ * after the reset that turned encryption on. */
+export const INITIAL_IMPORT_CAPABILITY = 'resumable-initial-import-v2';
 // An import request costs six D1 queries whatever its size. Two requests per
 // 64-file upload pipeline chunk run in parallel on separate transfer objects.
 export const INITIAL_IMPORT_MAX_FILES = 32;

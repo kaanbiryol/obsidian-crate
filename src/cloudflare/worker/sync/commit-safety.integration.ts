@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { commitFileDelete, commitStagedFile } from './mutations';
-import { trackStagedUpload } from './staging/staged-uploads';
+import { trackUploadLease } from './staging/upload-leases';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
 import { sha256Hex } from '@/platform/sha256';
 import { commitNewFiles } from './staging/bulk-new-file-commit';
@@ -181,10 +181,10 @@ describe('replaced version retention', () => {
 		const content = new TextEncoder().encode('second').buffer;
 		const hash = await sha256Hex(content);
 		const objectKey = createManagedObjectKey(hash);
-		await trackStagedUpload(db, objectKey, path);
+		const { id: leaseId } = await trackUploadLease(db, [{ storageKey: objectKey, path }]);
 		await bucket.put(objectKey, content);
 		const result = await commitStagedFile(bucket, db, {
-			path, hash, size: content.byteLength, objectKey, content, expectedHash: snapshot.hash,
+			path, hash, size: content.byteLength, objectKey, leaseId, content, expectedHash: snapshot.hash,
 		});
 
 		expect(result.committed).toBe(true);

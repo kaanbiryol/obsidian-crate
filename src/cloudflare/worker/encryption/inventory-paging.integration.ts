@@ -49,8 +49,9 @@ it('pages a folder by reading only each page of rows', async () => {
 
 	expect(seen.sort()).toEqual([...paths].sort());
 	expect(reads).toHaveLength(Math.ceil(FILES / ENCRYPTED_INVENTORY_PAGE));
-	// Before: every page read the whole folder (about 2,500 rows) to sort it.
-	for (const rowsRead of reads) expect(rowsRead).toBeLessThanOrEqual(ENCRYPTED_INVENTORY_PAGE + 10);
+	// Before: every page read the whole folder (about 2,500 rows) to sort it. Each page
+	// also reads the vault change state before and after its rows.
+	for (const rowsRead of reads) expect(rowsRead).toBeLessThanOrEqual(ENCRYPTED_INVENTORY_PAGE + 20);
 });
 
 it('reuses the encryption state authentication already read', async () => {
@@ -62,7 +63,8 @@ it('reuses the encryption state authentication already read', async () => {
 		: Reflect.get(target, key, target) as unknown });
 	const response = await handleEncryptedFolderFiles(new Request('https://test/reminders/encrypted-files?folderPath=Reminders'), { ...env, DB: db }, '/reminders/encrypted-files', 'reminders', undefined, state);
 	expect(response!.status).toBe(200);
-	expect(statements.some(sql => sql.includes('server_state'))).toBe(false);
+	// The vault change state reads only the reset generation from `server_state`.
+	expect(statements.some(sql => sql.includes('SELECT encryption'))).toBe(false);
 });
 
 it('lists each file with the server time of its last write, without reading more rows', async () => {
@@ -72,5 +74,5 @@ it('lists each file with the server time of its last write, without reading more
 	const files = first.files as Array<{ path: string; modified?: string }>;
 	expect(files.find(file => file.path === 'Reminders/Note-0000.md')?.modified).toBe('2026-11-01 09:30:00');
 	expect(files.every(file => typeof file.modified === 'string')).toBe(true);
-	expect(first.rowsRead).toBeLessThanOrEqual(ENCRYPTED_INVENTORY_PAGE + 10);
+	expect(first.rowsRead).toBeLessThanOrEqual(ENCRYPTED_INVENTORY_PAGE + 20);
 });

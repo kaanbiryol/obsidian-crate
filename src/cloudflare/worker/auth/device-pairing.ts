@@ -1,10 +1,10 @@
 import { corsResponse } from '../http/cors';
-import { changedRows, readMaintenanceValue } from '../d1/db';
+import { changedRows } from '../d1/db';
 import { chargeRouteAction } from '../admission/rate-limit';
 import { parseJsonObject, parseOptionalString } from '../http/request-validation';
 import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
-import { DEVICE_PAIRING_END, DEVICE_PAIRING_PREFIX, parseDevicePairingRecord, type DevicePairingRecord } from '../../../protocol/device-pairing';
+import { DEVICE_PAIRING_GRANT, parseDevicePairingRecord, type DevicePairingRecord } from '../../../protocol/device-pairing';
 import { revokeCredentialStatements } from './revocation';
 
 const respond = (body: unknown, status = 200) => corsResponse(body, status, { 'Cache-Control': 'no-store' });
@@ -20,10 +20,8 @@ export async function exchangeDevicePairing(request: Request, db: D1Database): P
 	const body = parsed.value;
 	const deviceId = parseOptionalString(body.deviceId, 128), deviceName = parseOptionalString(body.deviceName, 128), platform = parseOptionalString(body.platform, 32);
 	if (!isSha256Hex(body.code) || !isSha256Hex(body.tokenHash) || !deviceId || !deviceName || !platform) return respond({ error: 'Invalid pairing request.' }, 400);
-	await db.prepare('DELETE FROM maintenance_state WHERE key >= ? AND key < ? AND json_extract(value, \'$.expiresAt\') <= ?')
-		.bind(DEVICE_PAIRING_PREFIX, DEVICE_PAIRING_END, Date.now()).run();
-	const key = DEVICE_PAIRING_PREFIX + await sha256Hex(body.code);
-	const stored = await readMaintenanceValue(db, key);
+	const key = await sha256Hex(body.code);
+	const stored = (await db.prepare('SELECT payload FROM grants WHERE kind = ? AND key = ?').bind(DEVICE_PAIRING_GRANT, key).first<{ payload: string }>())?.payload ?? null;
 	const record = stored !== null && parseDevicePairingRecord(stored);
 	if (stored === null || !record || record.expiresAt <= Date.now()) return invalid();
 	if (record.redeemed) {
@@ -34,8 +32,8 @@ export async function exchangeDevicePairing(request: Request, db: D1Database): P
 	if (limited) return limited;
 	// The exact unclaimed record and the current reset generation authorize one token.
 	// An encryption reset replaces every credential, so a code issued before it is void.
-	const grant = `EXISTS (SELECT 1 FROM maintenance_state WHERE key = ? AND value = ?
-		AND json_extract(value, '$.resetGeneration') = COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), ''))`;
+	const grant = `EXISTS (SELECT 1 FROM grants WHERE kind = '${DEVICE_PAIRING_GRANT}' AND key = ? AND payload = ?
+		AND json_extract(payload, '$.resetGeneration') = COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), ''))`;
 	const created = 'EXISTS (SELECT 1 FROM auth_tokens WHERE id = ? AND token_hash = ?)';
 	// Re-pairing a device replaces its previous credential and what that credential owned,
 	// only once this redemption has created its token.
@@ -45,7 +43,7 @@ export async function exchangeDevicePairing(request: Request, db: D1Database): P
 			SELECT ?, ?, ?, ?, ?, 'vault', datetime('now') WHERE ${grant}`)
 			.bind(record.id, body.tokenHash, deviceId, deviceName, platform, key, stored),
 		...revokeCredentialStatements(db, previous, deviceId, record.id, record.id, body.tokenHash),
-		db.prepare(`UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? AND ${created}`)
+		db.prepare(`UPDATE grants SET payload = ? WHERE kind = '${DEVICE_PAIRING_GRANT}' AND key = ? AND payload = ? AND ${created}`)
 			.bind(JSON.stringify({ ...record, redeemed: body.tokenHash }), key, stored, record.id, body.tokenHash),
 	]);
 	return changedRows(results[0]) === 1 ? redeemed(record) : invalid();

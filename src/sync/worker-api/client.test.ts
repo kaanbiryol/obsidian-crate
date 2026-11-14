@@ -1,5 +1,5 @@
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
-import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
+import { BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, SyncApiClient } from './client';
 import type { ApiHttpResponse, ApiHttpTransport } from './http';
@@ -393,7 +393,7 @@ it.each([true, 'bulk'] as const)('splits uploads at the batch limit and requests
 		let value: unknown;
 		if (request.url.endsWith('/.well-known/crate')) {
 			value = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL,
-				reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['sync-v1', 'bulk-new-file-uploads-v1'] : supported ? ['sync-v1'] : [] };
+				reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['sync-v1', BULK_NEW_UPLOAD_CAPABILITY] : supported ? ['sync-v1'] : [] };
 		} else {
 			const { files, bulkNewFiles } = JSON.parse(request.body as string) as { files: Array<{ path: string; operationId: string }>; bulkNewFiles?: boolean };
 			batches.push(files);

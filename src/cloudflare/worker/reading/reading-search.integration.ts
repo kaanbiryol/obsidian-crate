@@ -93,7 +93,7 @@ it('lists an encrypted note from the card its upload carries, and keeps that car
 		const content = createReadingNote({ id: '00000000-0000-4000-8000-000000000001', url: 'https://example.invalid/e', title, savedAt: '2026-01-01T00:00:00.000Z' });
 		const bytes = new TextEncoder().encode(content);
 		const publicData = card ? await readingUploadCard('Reading', 'Reading/plain name.md', 'Reading/tag.md', bytes, keys) : null;
-		const sealed = await sealFile({ path: 'Reading/plain name.md', content: bytes, contentType: 'text/markdown', publicData }, { vaultId: bundle.vaultId, scopeId: 'vault', key });
+		const sealed = await sealFile({ path: 'Reading/plain name.md', content: bytes, publicData }, { vaultId: bundle.vaultId, scopeId: 'vault', key });
 		const previous = await getStoredFileRow(env.DB, 'Reading/tag.md');
 		await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/tag.md', new TextDecoder().decode(sealed.bytes), previous?.hash ?? null);
 	};
@@ -112,12 +112,12 @@ it('lists an encrypted note from the card its upload carries, and keeps that car
 it('rebuilds an index of encrypted notes as rows waiting for cards', async () => {
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/one.md', 'CRATE-E2EE/1\n{}', null);
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/two.md', 'CRATE-E2EE/1\n{"b":1}', null);
-	await env.DB.prepare('DELETE FROM reading_index').run();
+	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
 	const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' };
 	expect((await ensureReadingIndex(env, policy, file => readStoredNote(env, file), undefined, true)).state).toBe('complete');
 	expect((await env.DB.prepare('SELECT path, stale FROM reading_items ORDER BY path').all()).results).toEqual([{ path: 'Reading/one.md', stale: 1 }, { path: 'Reading/two.md', stale: 1 }]);
 	// A plaintext rebuild recognises encrypted bytes too.
-	await env.DB.prepare('DELETE FROM reading_index').run();
+	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
 	expect((await ensureReadingIndex(env, policy, file => readStoredNote(env, file))).state).toBe('complete');
 	expect((await env.DB.prepare('SELECT count(*) AS n FROM reading_items WHERE stale = 1').first())).toEqual({ n: 2 });
 });
@@ -132,7 +132,7 @@ it('turns Save to Crate off in encrypted vaults', async () => {
 		expect(response.status).toBe(409);
 		expect(await response.json()).toMatchObject({ code: 'shortcut_encrypted_vault' });
 	}
-	expect(await env.DB.prepare('SELECT count(*) AS n FROM reading_enrollments').first()).toEqual({ n: 0 });
+	expect(await env.DB.prepare("SELECT count(*) AS n FROM grants WHERE kind = 'reading_enrollment'").first()).toEqual({ n: 0 });
 });
 
 it('checks a search\'s other words in the term index, so notes without them cost one row each', async () => {

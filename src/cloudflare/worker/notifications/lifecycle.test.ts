@@ -36,6 +36,18 @@ it('stops after eight coordinator failures instead of retrying forever', async (
 	expect(storage.deleteAlarm).toHaveBeenCalled();
 });
 
+it('keeps counting passes toward the limit after the object is evicted', async () => {
+	const { state, values } = fixture();
+	vi.spyOn(console, 'error').mockImplementation(() => {});
+	await armNotificationCoordinator(state);
+	for (let i = 0; i < 9_999; i++) await runBoundedNotificationCoordinator(state, {} as never);
+	expect(values.get('notificationRun')).toMatchObject({ passes: 9_500 });
+	// A new activation reads the stored count and stops at the limit, not 10,000 passes later.
+	const evicted = { storage: (state as { storage: object }).storage } as never;
+	for (let i = 0; i < 600; i++) await runBoundedNotificationCoordinator(evicted, {} as never);
+	expect(runNotificationCoordinator).toHaveBeenCalledTimes(9_999 + 500);
+});
+
 it.each([
 	{ startedAt: Date.now() - 86400_001, passes: 1, failures: 0 },
 	{ startedAt: Date.now(), passes: 10_000, failures: 0 },

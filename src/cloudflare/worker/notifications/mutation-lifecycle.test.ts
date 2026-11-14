@@ -26,31 +26,43 @@ function fixture() {
 	const object = new ReminderAlarm({ storage } as never, env as never);
 	return { object, storage, values };
 }
-function mutation() {
-	return new Request('https://worker.test/reminders/update', { method: 'POST', headers: {
+function mutation(path = '/reminders/update') {
+	return new Request(`https://worker.test${path}`, { method: 'POST', headers: {
 		'X-Crate-Internal-Mutation': '1',
 		'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current),
 	} });
 }
 beforeEach(() => { vi.clearAllMocks(); });
 
-it('has a persisted wake before the mutation and retains it if the request fails', async () => {
+// Most routes arm before routing; a reminder command arms once its receipt check finds a new
+// command, which this mocked route does before it commits.
+it.each([['/features', false], ['/reminders/update', true]])('has a persisted wake before %s commits and retains it if the request fails', async (path, deferred) => {
 	const { object, storage } = fixture();
-	vi.mocked(handleAuthenticatedRoute).mockImplementation(async request => {
-		expect(request.url).toBe('https://worker.test/reminders/update');
+	vi.mocked(handleAuthenticatedRoute).mockImplementation(async (request, _env, context) => {
+		expect(request.url).toBe(`https://worker.test${path}`);
 		expect(request.headers.has('X-Crate-Internal-Mutation')).toBe(false);
+		if (deferred) {
+			expect(await storage.getAlarm()).toBeNull();
+			await context.armNotifications!();
+		}
 		expect(await storage.getAlarm()).not.toBeNull();
 		throw new Error('request interrupted after commit');
 	});
-	expect((await object.fetch(mutation())).status).toBe(500);
+	expect((await object.fetch(mutation(path))).status).toBe(500);
 	expect(await storage.getAlarm()).not.toBeNull();
 });
 
-it('does not execute a mutation if persisting its alarm fails', async () => {
+it.each(['/features', '/reminders/update'])('does not commit %s if persisting its alarm fails', async path => {
 	const { object, storage } = fixture();
 	storage.setAlarm.mockRejectedValue(new Error('storage unavailable'));
-	expect((await object.fetch(mutation())).status).toBe(500);
-	expect(handleAuthenticatedRoute).not.toHaveBeenCalled();
+	const commit = vi.fn();
+	vi.mocked(handleAuthenticatedRoute).mockImplementation(async (_request, _env, context) => {
+		await context.armNotifications?.();
+		commit();
+		return new Response(null);
+	});
+	expect((await object.fetch(mutation(path))).status).toBe(500);
+	expect(commit).not.toHaveBeenCalled();
 });
 
 it('serializes concurrent mutations in the coordinator', async () => {

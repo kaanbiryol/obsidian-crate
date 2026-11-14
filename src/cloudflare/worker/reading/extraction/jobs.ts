@@ -80,7 +80,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 	if (!current) return;
 	try { await runCapture(env, state, Boolean(current.enabled)); } catch { /* The durable lease retries an uncertain publication. */ }
 	// File removals delete their jobs in the commit batch, and a new generation deletes the old one's.
-	const job = await env.DB.prepare('SELECT * FROM reading_jobs WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
+	const job = await env.DB.prepare('SELECT path, item_id, generation, source_revision, block_hash, url, attempts FROM reading_jobs WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
 	// A job that found its source changed leaves its capture for the queue below.
 	let requeue = !job;
 	if (job && current.enabled) {
@@ -112,7 +112,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 	// Queue a capture still pending after a stale source or publication, or one a full queue held
 	// back, unless this pass published a job. Waking the coordinator for this would reset
 	// notification processing's retry budget.
-	if (current.enabled && requeue && await env.DB.prepare('SELECT 1 FROM reading_index WHERE id=1 AND scope=? AND cursor IS NULL').bind(readingIndexScope(current)).first()) {
+	if (current.enabled && requeue && await env.DB.prepare('SELECT 1 FROM reading_policy WHERE id=1 AND index_scope=? AND index_cursor IS NULL').bind(readingIndexScope(current)).first()) {
 		await queueReadingArticles(env.DB).run();
 	}
 	// Each MIN reads one entry of its table's due index.

@@ -57,7 +57,7 @@ it('keeps a transient R2 failure retryable and blocks duplicate capture until re
 	expect((await capture()).status).toBe(503);
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM files').first()).toMatchObject({ n: 1 });
 	expect(await env.DB.prepare('SELECT * FROM reading_items').first()).toBeNull();
-	expect(await env.DB.prepare('SELECT * FROM reading_operations').first()).toBeNull();
+	expect(await env.DB.prepare("SELECT * FROM operations WHERE kind = 'reading'").first()).toBeNull();
 	read.mockRestore();
 	const response = await list();
 	expect(response.status).toBe(200);

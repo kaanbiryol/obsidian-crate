@@ -5,44 +5,60 @@ import { readingIndexStatements, type ReadingIndexPolicy } from '../../reading/l
 import { decodeReceipt, recordUploadReceipt, type UploadOperation } from '../upload-operations';
 import { deleteBucketObjectsOrQueue } from '../../maintenance/object-cleanup';
 import type { UploadResult } from '@/protocol/sync-types';
-import { finishStagedBatches } from './staged-upload-batches';
+import { finishUploadLeases } from './upload-leases';
 import { nextChangelogSeqSql } from '../storage';
+import { enqueueFileProjection } from '../../notifications/projection-queue';
+import { getReminderFolder } from '../../reminders/scope';
+import type { EncryptionServerState } from '../../../../encryption/server-state';
 
 export interface NewFileUpload {
 	reminderPolicyRevision?: string | null;
 	path: string; hash: string; size: number; objectKey: string; content: ArrayBuffer; operation: UploadOperation;
-	stagingBatchId?: string;
+	leaseId: string;
 	resetGeneration?: string | null;
+	/** The state the upload's lease was taken under: every file of an encrypted vault is encrypted. */
+	encryptionState?: EncryptionServerState | null;
+	/** The `descriptor` column of an encrypted file, read from its bytes before the commit. */
+	descriptor?: string | null;
+}
+
+/** Encrypted reminder notes are projected from their public data, one note at a time. */
+async function projectionStatements(db: D1Database, files: NewFileUpload[], encrypted: boolean, reminderFolder?: string | null): Promise<D1PreparedStatement[]> {
+	if (!encrypted) return bulkFileProjection(db, files, reminderFolder);
+	const folder = reminderFolder === undefined ? await getReminderFolder(db) : reminderFolder;
+	return (await Promise.all(files.map(file => enqueueFileProjection(db, file.path, file.objectKey, file.content,
+		{ encrypted: true, size: file.size, reminderFolder: folder })))).flat();
 }
 
 /** Inserts remain sequential inside one transaction: namespace guards see earlier inserts.
  * Everything derived from a file is conditional on this request's immutable revision. */
 export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: NewFileUpload[], reminderFolder?: string | null, readingPolicy?: ReadingIndexPolicy): Promise<UploadResult[]> {
 	if (!files.length) return [];
+	const encrypted = Boolean(files[0]!.encryptionState);
 	const json = JSON.stringify(files.map(file => ({ path: file.path, portable: portablePathKey(file.path), hash: file.hash, size: file.size, key: file.objectKey })));
 	const published = [
 		...files.map(file => uploadMutation(db, {
 			path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,
-			expectedHash: null, operation: file.operation, stagingBatchId: file.stagingBatchId,
-			encryptionState: null, resetGeneration: file.resetGeneration,
+			expectedHash: null, operation: file.operation, leaseId: file.leaseId,
+			encryptionState: file.encryptionState ?? null, descriptor: file.descriptor ?? null, resetGeneration: file.resetGeneration,
 		})),
-		db.prepare(`INSERT INTO changelog(seq, path, action, hash, size, revision)
-      SELECT ${nextChangelogSeqSql('i.key')}, f.path, 'put', f.hash, f.size, f.storage_key FROM json_each(?) i JOIN files f
+		db.prepare(`INSERT INTO changelog(seq, path, action, hash, size, revision, descriptor)
+      SELECT ${nextChangelogSeqSql('i.key')}, f.path, 'put', f.hash, f.size, f.storage_key, f.descriptor FROM json_each(?) i JOIN files f
       ON f.portable_path = json_extract(i.value, '$.portable') AND f.path = json_extract(i.value, '$.path') AND f.storage_key = json_extract(i.value, '$.key')`).bind(json),
-		...await bulkFileProjection(db, files, reminderFolder),
-		...await readingIndexStatements(db, files.map(file => ({ path: file.path, storageKey: file.objectKey, hash: file.hash, size: file.size, content: file.content })), { policy: readingPolicy }),
+		...await projectionStatements(db, files, encrypted, reminderFolder),
+		...await readingIndexStatements(db, files.map(file => ({ path: file.path, storageKey: file.objectKey, hash: file.hash, size: file.size, content: file.content })), { policy: readingPolicy, encrypted }),
 	];
 	const batch: unknown[] = await db.batch([
 		...published,
 		...files.map(file => recordUploadReceipt(db, file.operation, file)),
-		...finishStagedBatches(db, files),
+		...finishUploadLeases(db, files),
 	]);
 	// Each receipt this commit wrote comes back with it. A concurrent replay wrote its
 	// receipt first, so only those operations need a read.
 	const written = files.map((_, index) => (batch[published.length + index] as { results?: Array<{ response_json: string }> } | undefined)?.results?.[0]?.response_json);
 	const replayed = files.filter((_, index) => written[index] === undefined);
-	const rows = replayed.length ? (await db.prepare(`SELECT operation_id, request_hash, response_json FROM upload_operations
-    WHERE operation_id IN (SELECT value FROM json_each(?))`)
+	const rows = replayed.length ? (await db.prepare(`SELECT operation_id, request_hash, response_json FROM operations
+    WHERE kind = 'upload' AND operation_id IN (SELECT value FROM json_each(?))`)
 		.bind(JSON.stringify(replayed.map(file => file.operation.id)))
 		.all<{ operation_id: string; request_hash: string; response_json: string }>()).results : [];
 	const receipts = new Map(rows.map(row => [row.operation_id, row]));

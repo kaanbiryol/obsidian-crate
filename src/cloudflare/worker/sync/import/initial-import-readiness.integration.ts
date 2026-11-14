@@ -26,7 +26,7 @@ beforeEach(async () => {
 afterEach(async () => { for (const client of clients.splice(0)) client.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });
 
 async function pendingImport() {
-	await env.DB.prepare("INSERT INTO initial_import(id, token, state, snapshot_seq) VALUES (1, 'import', 'complete', 1)").run();
+	await env.DB.prepare("INSERT INTO server_state(id, import_token, import_state, import_snapshot_seq) VALUES (1, 'import', 'complete', 1) ON CONFLICT(id) DO UPDATE SET import_token = excluded.import_token, import_state = excluded.import_state, import_snapshot_seq = excluded.import_snapshot_seq").run();
 	await env.DB.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?)').bind(INITIAL_REMINDERS_PENDING, 'import').run();
 }
 const readiness = async (db = env.DB) => (await finishInitialReminderSetup(json({ token: 'import' }), db)).json() as Promise<ReminderSetupStatus>;
@@ -232,7 +232,7 @@ it('preserves initial uploads when reminder settings fail and resumes without up
 	device.engine.setReminderScopePreparation(async () => { throw new Error('reminder settings unavailable'); });
 	const interrupted = await device.engine.sync();
 	expect(interrupted).toMatchObject({ success: false, uploaded: 1, errors: ['reminder settings unavailable'] });
-	expect(await env.DB.prepare('SELECT state FROM initial_import').first()).toEqual({ state: 'importing' });
+	expect(await env.DB.prepare('SELECT import_state AS state FROM server_state').first()).toEqual({ state: 'importing' });
 	expect(await env.DB.prepare("SELECT 1 FROM files WHERE portable_path = 'reminders/task.md'").first()).not.toBeNull();
 
 	device.close(); await device.open();
@@ -306,8 +306,8 @@ it('finishes 400 newly imported overdue reminders without scheduling them', asyn
 	const dispatch = vi.spyOn(env.REMINDER_ALARMS, 'get');
 	await pass();
 	expect(await readiness()).toEqual({ ready: true });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections').first()).toEqual({ n: 400 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections WHERE due_at IS NOT NULL').first()).toEqual({ n: 0 });
+	// Reminders with nothing to deliver get no projection row.
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections').first()).toEqual({ n: 0 });
 	// Projection opens no Durable Object; only the coordinator alarm wakes the dispatcher.
 	expect(dispatch).not.toHaveBeenCalled();
 });

@@ -17,14 +17,14 @@ import { requireCompatibleServer } from '../connection/server-compatibility';
 import { responseError } from '../connection/response-error';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import type { ApiFetch } from '../types';
-import { encryptedInventoryPages, parseEncryptedInventoryPage, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '../../encryption/file-inventory';
+import { encryptedInventoryPages, parseEncryptedInventoryPage, parseEncryptedInventoryResponse, type EncryptedInventoryFile as RemoteFile, type EncryptedInventoryPage as FilePage, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '../../encryption/file-inventory';
 import { mapBounded } from '@/platform/map-bounded';
 import { isReminderOperationId } from '@/protocol/reminder-operation';
 import { isSyncPath } from '@/protocol/sync-validation';
 import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminders/private-storage';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
-import { encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
+import { downloadEncryptedNotes, encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
 import { compareCodePoints } from '@/protocol/portable-path';
 
 const NOTE_CONCURRENCY = 6;
@@ -67,6 +67,8 @@ export class EncryptedReminderApi {
 	private indexLoaded = false;
 	// The parsed notes the persisted index holds, so an unchanged list skips resealing it.
 	private persistedIndex?: Map<string, ScannedNote>;
+	// The last complete server inventory, by server path, and the token and delta base it was listed at.
+	private snapshot?: { files: Map<string, RemoteFile>; changeToken: string; deltaBase: string };
 	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch,
 		{ store = encryptedReminderStore, current = capturePwaSession() }: EncryptedReminderApiOptions = {}) {
 		this.store = store; this.current = current;
@@ -112,18 +114,37 @@ export class EncryptedReminderApi {
 		}
 	}
 
-	private async page(after?: string): Promise<FilePage> {
-		return parseEncryptedInventoryPage(await json<unknown>(await this.fetch(encryptedFilesPath('/reminders', this.keys.wireFolder, after))), this.keys.wireFolder, this.keys.generation);
+	private async page(after: string): Promise<FilePage> {
+		return parseEncryptedInventoryPage(await json<unknown>(await this.fetch(encryptedFilesPath('/reminders', this.keys.wireFolder, { after }))), this.keys.wireFolder, this.keys.generation);
 	}
 
-	private async inventory(first?: FilePage): Promise<{ files: RemoteFile[]; sequence: number }> {
-		const files: RemoteFile[] = [];
-		first ??= await this.page();
-		for await (const page of encryptedInventoryPages(after => this.page(after), {
-			maxFiles: MAX_ENCRYPTED_REMINDER_FILES, first,
-			changed: () => new ReminderCommandError('Reminder files changed while loading. Refresh again.'),
-		})) files.push(...page.files);
-		return { files, sequence: first.sequence };
+	/** The folder's current files. With a snapshot it asks only whether the folder changed,
+	 * and then only for the notes changed since. `knownToken` is the change token of a list
+	 * the app already holds; a 304 for it without a snapshot leaves `files` unset. */
+	private async inventory(knownToken?: string): Promise<{ files?: RemoteFile[]; changeToken: string }> {
+		const snapshot = this.snapshot;
+		const token = snapshot?.changeToken ?? knownToken;
+		const response = await this.fetch(encryptedFilesPath('/reminders', this.keys.wireFolder, { since: snapshot?.deltaBase }),
+			token ? { headers: { 'If-None-Match': `"${token}"` } } : {});
+		if (response.status === 304 && token) return { files: snapshot && [...snapshot.files.values()], changeToken: token };
+		const first = parseEncryptedInventoryResponse(await json<unknown>(response), this.keys.wireFolder, this.keys.generation);
+		const files = new Map<string, RemoteFile>();
+		if ('delta' in first) {
+			// The server answers a delta only for the base this snapshot sent.
+			if (!snapshot) throw new Error('Invalid encrypted file inventory');
+			for (const [path, file] of snapshot.files) files.set(path, file);
+			for (const path of first.removed) files.delete(path);
+			for (const file of first.files) files.set(file.path, file);
+			if (files.size > MAX_ENCRYPTED_REMINDER_FILES) throw new Error('Encrypted file inventory exceeds this device’s limit');
+		} else {
+			for await (const page of encryptedInventoryPages(after => this.page(after!), {
+				maxFiles: MAX_ENCRYPTED_REMINDER_FILES, first,
+				changed: () => new ReminderCommandError('Reminder files changed while loading. Refresh again.'),
+			})) for (const file of page.files) files.set(file.path, file);
+		}
+		// A complete server snapshot, whatever happens to the downloads that follow.
+		this.snapshot = { files, changeToken: first.changeToken, deltaBase: first.deltaBase };
+		return { files: [...files.values()], changeToken: first.changeToken };
 	}
 
 	private async read(file: RemoteFile, cache = this.cached): Promise<string> {
@@ -137,7 +158,47 @@ export class EncryptedReminderApi {
 		if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
 		const response = await this.fetch(encryptedFilePath('/reminders', this.keys.wireFolder, file));
 		if (!response.ok) await json(response);
-		const opened = await openEncryptedNote(response, file, { authority: this.authority(file.path),
+		return this.openNote(file, response, cache);
+	}
+
+	/** Parsed reminders of every listed note, in `files` order. Notes not parsed before are
+	 * downloaded in batches, each at its listed revision; one that changed since it was listed
+	 * fails the load so it lists again. */
+	private async scan(files: RemoteFile[], cache: typeof this.cached): Promise<Array<ScannedNote | { file: RemoteFile; error: unknown }>> {
+		const missing = files.filter(file => {
+			const known = this.scanned.get(file.revision) ?? cache.get(file.revision);
+			return !(known && sameInventoryFile(known.file, file)) && file.size <= MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES;
+		});
+		// Each batch is opened as it arrives, so only the batches in flight hold ciphertext.
+		const downloaded = new Map(await downloadEncryptedNotes((path, body) => this.fetch(path, { method: 'POST', body }), '/reminders', this.keys.wireFolder,
+			missing, response => json(response), async download => [download.file.path, await this.scanNote(download.file, async () => {
+				if (!('code' in download)) return this.openNote(download.file, download.bytes, cache);
+				if (download.code === 'file_too_large') throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
+				if (download.code === 'version_conflict' || download.code === 'not_found') throw new ReminderCommandError('Reminder files changed while loading. Refresh again.');
+				throw new ReminderCommandError(download.error, 503, 'storage');
+			})] as const));
+		// The rest are parsed already, cached, or over the size limit.
+		return mapBounded(files, NOTE_CONCURRENCY, async file => {
+			const known = this.scanned.get(file.revision);
+			if (known && sameInventoryFile(known.file, file)) return known;
+			return downloaded.get(file.path) ?? this.scanNote(file, () => this.readNote(file, cache));
+		});
+	}
+
+	/** One note's parsed reminders; a note that cannot be decoded or is too large becomes an issue. */
+	private async scanNote(file: RemoteFile, load: () => Promise<{ path: string; content: string; issue?: string }>): Promise<ScannedNote | { file: RemoteFile; error: unknown }> {
+		try {
+			const note = await load();
+			const scanned = scanReminderMarkdownContent(note.path, note.content, this.localFolder).reminders;
+			return { file, path: note.path, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: note.issue };
+		} catch (error) {
+			if (!(error instanceof MarkdownEncodingError) && !(error instanceof ReminderCommandError && error.status === 413)) throw error;
+			return { file, error };
+		}
+	}
+
+	private async openNote(file: RemoteFile, download: Response | Uint8Array<ArrayBuffer>, cache: typeof this.cached): Promise<{ path: string; content: string; issue?: string }> {
+		const opened = await openEncryptedNote(download, file, { authority: this.authority(file.path),
 			integrityError: 'Encrypted reminder transfer failed integrity validation', paths: this.keys.paths });
 		this.names.set(file.path, opened.metadata.path);
 		if (opened.content.byteLength > MAX_REMINDER_NOTE_BYTES) throw new ReminderCommandError(REMINDER_NOTE_SIZE_ISSUE, 413, 'file_too_large');
@@ -151,31 +212,25 @@ export class EncryptedReminderApi {
 		return { path, content, issue };
 	}
 
+	/** The app's list ETag names the server snapshot the list was built from. */
+	private get etagPrefix() { return `"e2ee-${this.keys.vaultId}-${this.keys.generation}-`; }
+
 	private async list(previousEtag: string | null): Promise<Response> {
+		const knownToken = previousEtag?.startsWith(this.etagPrefix) && previousEtag.endsWith('"') ? previousEtag.slice(this.etagPrefix.length, -1) : undefined;
 		for (let attempt = 0; attempt < 3; attempt++) {
 			try {
-				const first = await this.page();
+				const inventory = await this.inventory(knownToken);
 				this.assertCurrent();
 				this.cleanup();
-				const etag = `"e2ee-${this.keys.vaultId}-${this.keys.generation}-${first.sequence}"`;
-				if (etag === previousEtag) return new Response(null, { status: 304, headers: { ETag: etag } });
+				const etag = `${this.etagPrefix}${inventory.changeToken}"`;
+				if (etag === previousEtag || !inventory.files) return new Response(null, { status: 304, headers: { ETag: etag } });
 				await this.loadIndex();
-				const inventory = await this.inventory(first);
 				const nextCache = new Map(this.cached);
 				const sources: Array<{ path: string; project: string; reminders: ReminderPayload[]; issue?: string }> = [];
 				const nextScanned = new Map<string, ScannedNote>();
-				const loaded = await mapBounded(inventory.files, NOTE_CONCURRENCY, async (file): Promise<ScannedNote | { file: RemoteFile; error: unknown }> => {
-					try {
-						const known = this.scanned.get(file.revision);
-						if (known && sameInventoryFile(known.file, file)) return known;
-						const note = await this.readNote(file, nextCache);
-						const scanned = scanReminderMarkdownContent(note.path, note.content, this.localFolder).reminders;
-						return { file, path: note.path, reminders: await Promise.all(scanned.map(reminder => reminderCommandPayload(reminder))), issue: note.issue };
-					} catch (error) {
-						if (!(error instanceof MarkdownEncodingError) && !(error instanceof ReminderCommandError && error.status === 413)) throw error;
-						return { file, error };
-					}
-				});
+				// Each note is checked against its listed revision, and the listing is one server
+				// snapshot, so the result needs no second inventory read.
+				const loaded = await this.scan(inventory.files, nextCache);
 				for (const entry of loaded) {
 					const { file } = entry;
 					// A note that could not even be opened is reported by its server path.
@@ -188,7 +243,6 @@ export class EncryptedReminderApi {
 					nextScanned.set(file.revision, entry);
 					sources.push({ ...source, reminders: entry.reminders, issue: entry.issue });
 				}
-				if ((await this.page()).sequence !== inventory.sequence) throw new ReminderCommandError('Reminder files changed while loading. Refresh again.');
 				// The server lists tags; order notes by plaintext path, as an unencrypted server does.
 				sources.sort((a, b) => compareCodePoints(a.path, b.path));
 				const result = buildReminderList(sources);
@@ -241,9 +295,10 @@ export class EncryptedReminderApi {
 		}
 		for (let retry = 0; retry < 2; retry++) {
 			if (!attempt || attempt.rejected) {
+				// Without a token to send, the inventory always lists the files.
 				const inventory = await this.inventory();
 				// Reminder notes are always created by key holders, so each lives at its name's tag.
-				const files = new Map(inventory.files.map(file => [file.path, file]));
+				const files = new Map(inventory.files!.map(file => [file.path, file]));
 				const command = await applyReminderFileCommand(action, body, this.localFolder, async path => {
 					const file = files.get(await this.keys.paths.wire(path));
 					return file ? this.read(file) : null;
@@ -254,7 +309,7 @@ export class EncryptedReminderApi {
 					const content = new TextEncoder().encode(change.content);
 					const projection = await createReminderProjection({ vaultId: this.keys.vaultId, key: this.keys.notifications, fingerprint: this.keys.notificationFingerprint },
 						[this.keys.folderPath], path, content.buffer);
-					const sealed = await sealFile({ path, content, contentType: 'text/markdown; charset=utf-8', publicData: projection }, this.authority(wire));
+					const sealed = await sealFile({ path, content, publicData: projection }, this.authority(wire));
 					replacements.push({ path: wire, content: new TextDecoder().decode(sealed.bytes),
 						expectedHash: files.get(wire)?.hash ?? null, expectedRevision: files.get(wire)?.revision });
 				}

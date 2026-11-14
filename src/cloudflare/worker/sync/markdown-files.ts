@@ -109,6 +109,7 @@ export async function writeCommittedMarkdownFile(
 			hash: staged.hash,
 			size: staged.size,
 			objectKey: staged.objectKey,
+			leaseId: staged.leaseId,
 			content,
 			expectedHash,
 			effects,

@@ -1,5 +1,5 @@
 import { portablePathKey } from '../../../protocol/portable-path';
-import { MAX_SHARED_SETTINGS_BYTES } from '../../../encryption/settings-format';
+import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, MAX_SHARED_SETTINGS_BYTES, validateEncryptedSettings } from '../../../encryption/settings-format';
 import { normalizeSharedSettingsValue } from '../../../protocol/shared-settings';
 import { corsResponse } from '../http/cors';
 import { parseJsonObject, sanitizePath } from '../http/request-validation';
@@ -7,8 +7,9 @@ import { CHANGELOG_BOUNDS_SQL, getChangelogBounds, isChangelogCursorExpired, par
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import type { FileEntry } from '../../../protocol/sync-types';
 import { createPathRecord } from '../../../protocol/path-record';
-import { SHARED_SETTINGS_KEY } from '../../../protocol/storage-keys';
-import { descriptorField } from '../encryption/state';
+import { descriptorField, encryptionWriteGuard } from '../encryption/state';
+import type { EncryptionServerState } from '../../../encryption/server-state';
+import { changedRows } from '../d1/db';
 
 function batchRows<T>(result: unknown): T[] {
 	if (!result || typeof result !== 'object') return [];
@@ -128,44 +129,37 @@ export async function handleGetFileMetadata(request: Request, db: D1Database): P
 	return corsResponse({ files });
 }
 
-export async function handleGetSettings(bucket: R2Bucket): Promise<Response> {
-	const obj = await bucket.get(SHARED_SETTINGS_KEY);
-	if (!obj) return corsResponse({ settings: null, settingsVersion: null });
-	try {
-		const body = await obj.text();
-		return corsResponse({
-			settings: normalizeSharedSettingsValue(JSON.parse(body)),
-			settingsVersion: obj.etag,
-		});
-	} catch {
-		return corsResponse({ settings: null, settingsVersion: obj.etag });
+/** GET and PUT /settings. Shared settings live in `server_state`: plaintext JSON, or in an
+ * encrypted vault a record sealed under the vault key. A write replaces the version it was
+ * given and is guarded by the encryption state it was validated against. */
+export async function handleSharedSettings(request: Request, db: D1Database, state: EncryptionServerState | null): Promise<Response> {
+	if (request.method === 'GET') {
+		const row = await db.prepare('SELECT settings, settings_version FROM server_state WHERE id = 1')
+			.first<{ settings: string | null; settings_version: string | null }>();
+		if (row?.settings == null) return corsResponse({ settings: null, settingsVersion: null });
+		const stored: unknown = JSON.parse(row.settings);
+		return corsResponse({ settings: state ? stored : normalizeSharedSettingsValue(stored), settingsVersion: row.settings_version });
 	}
-}
-
-export async function handlePutSettings(request: Request, bucket: R2Bucket): Promise<Response> {
-	const parsedBody = await parseJsonObject(request, MAX_SHARED_SETTINGS_BYTES);
-	if (!parsedBody.ok) {
-		return parsedBody.response;
+	const parsed = await parseJsonObject(request, state ? MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES : MAX_SHARED_SETTINGS_BYTES);
+	if (!parsed.ok) return parsed.response;
+	const { settings, expectedVersion } = parsed.value;
+	let value: unknown;
+	if (state) {
+		try { validateEncryptedSettings(settings); }
+		catch { return corsResponse({ error: 'Encrypted shared settings are required' }, 400); }
+		if (settings.vaultId !== state.vaultId || settings.keyId !== state.keyId) return corsResponse({ error: 'Shared settings use the wrong encryption key' }, 409);
+		value = settings;
+	} else {
+		value = normalizeSharedSettingsValue(settings);
+		if (!value) return corsResponse({ error: 'Invalid shared settings payload' }, 400);
 	}
-
-	const settings = normalizeSharedSettingsValue(parsedBody.value.settings);
-	const expectedVersion = parsedBody.value.expectedVersion;
-	if (!settings) {
-		return corsResponse({ error: 'Invalid shared settings payload' }, 400);
-	}
-	if (expectedVersion !== null && typeof expectedVersion !== 'string') {
-		return corsResponse({ error: 'expectedVersion must be a string or null' }, 400);
-	}
-
-	const current = await bucket.head(SHARED_SETTINGS_KEY);
-	if ((current?.etag ?? null) !== expectedVersion) {
-		return corsResponse({ error: 'Shared settings changed on another device' }, 409);
-	}
-	const written = await bucket.put(SHARED_SETTINGS_KEY, JSON.stringify(settings), {
-		onlyIf: current
-			? { etagMatches: current.etag }
-			: { etagDoesNotMatch: '*' },
-	});
-	if (!written) return corsResponse({ error: 'Shared settings changed on another device' }, 409);
-	return corsResponse({ success: true, settingsVersion: written.etag });
+	if (expectedVersion !== null && (typeof expectedVersion !== 'string' || expectedVersion.length > 128)) return corsResponse({ error: 'expectedVersion must be a string or null' }, 400);
+	const guard = encryptionWriteGuard(state);
+	const settingsVersion = crypto.randomUUID();
+	const result = await db.prepare(`INSERT INTO server_state (id, settings, settings_version)
+		SELECT 1, ?, ? WHERE ${guard.sql} AND (SELECT settings_version FROM server_state WHERE id = 1) IS ?
+		ON CONFLICT(id) DO UPDATE SET settings = excluded.settings, settings_version = excluded.settings_version`)
+		.bind(JSON.stringify(value), settingsVersion, ...guard.args, expectedVersion).run();
+	return changedRows(result) === 1 ? corsResponse({ success: true, settingsVersion })
+		: corsResponse({ error: 'Shared settings changed on another device' }, 409);
 }

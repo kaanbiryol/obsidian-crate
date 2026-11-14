@@ -153,7 +153,7 @@ it('preserves user notes and metadata already present when extraction starts', a
 	const original = await capture(), source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, original.path))!;
 	const edited = updateReadingNote(source.content, original.item_id, { favorite: true, tags: ['kept'] }) + '\nPersonal thoughts.\n';
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, original.path, edited, source.hash);
-	await env.DB.prepare('DELETE FROM reading_jobs').run(); await env.DB.prepare('DELETE FROM reading_index').run();
+	await env.DB.prepare('DELETE FROM reading_jobs').run(); await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
 	await buildIndex();
 	const job = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
 	await publishExtraction(env, { job, result: { markdown: 'Saved article content, separate from the personal note.', title: undefined, author: undefined } });
@@ -164,7 +164,7 @@ it('keeps a failed publication leased so the article queue cannot restart its fe
 	const original = await capture(), source = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, original.path))!;
 	// Personal text plus a near-limit article cannot fit one Reading note.
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, original.path, `${source.content}\n${'Personal text. '.repeat(5000)}\n`, source.hash);
-	await env.DB.prepare('DELETE FROM reading_jobs').run(); await env.DB.prepare('DELETE FROM reading_index').run();
+	await env.DB.prepare('DELETE FROM reading_jobs').run(); await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
 	await buildIndex();
 	const job = (await env.DB.prepare('SELECT * FROM reading_jobs').first<Publication['job']>())!;
 	await env.DB.prepare('UPDATE reading_jobs SET attempts = 1').run();
@@ -398,7 +398,7 @@ it('rebuilds the index from native markers and observes subsequent vault edits',
 	await buildIndex();
 	await env.DB.prepare("UPDATE reading_items SET metadata_json=json_remove(metadata_json, '$.highlights') WHERE path=?").bind(path).run();
 	// Rows from an older format were recorded under a different index scope.
-	await env.DB.prepare('DELETE FROM reading_index').run();
+	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
 	const list = () => handleReadingRoute(new Request('https://test/reading/items?section=inbox'), env, principal);
 	const projected = await (await list()).json() as { items: { highlights: { text: string }[] }[] };
 	expect(projected.items[0]?.highlights.map(highlight => highlight.text)).toEqual(['this passage']);

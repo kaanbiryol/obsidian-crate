@@ -11,7 +11,6 @@ const device = {
 describe('registerCloudflareAuthorizedDevice', () => {
 	it('rotates the credential for a device that is reconnecting after a local reset', async () => {
 		const queryD1 = vi.fn()
-			.mockResolvedValueOnce([])
 			.mockResolvedValueOnce([{ results: [{ id: 'existing-token-id' }] }])
 			.mockResolvedValueOnce([]);
 
@@ -22,8 +21,8 @@ describe('registerCloudflareAuthorizedDevice', () => {
 			device,
 		});
 
-		expect(queryD1).toHaveBeenCalledTimes(3);
-		expect(queryD1.mock.calls[2]?.[3]).toEqual([
+		expect(queryD1).toHaveBeenCalledTimes(2);
+		expect(queryD1.mock.calls[1]?.[3]).toEqual([
 			'token-hash',
 			'MacBook',
 			'macos',
@@ -33,7 +32,6 @@ describe('registerCloudflareAuthorizedDevice', () => {
 
 	it('registers a fresh device when Cloudflare has no matching device ID', async () => {
 		const queryD1 = vi.fn()
-			.mockResolvedValueOnce([])
 			.mockResolvedValueOnce([{ results: [] }])
 			.mockResolvedValueOnce([]);
 
@@ -44,8 +42,8 @@ describe('registerCloudflareAuthorizedDevice', () => {
 			device,
 		});
 
-		expect(queryD1).toHaveBeenCalledTimes(3);
-		expect(queryD1.mock.calls[2]?.[3]).toEqual([
+		expect(queryD1).toHaveBeenCalledTimes(2);
+		expect(queryD1.mock.calls[1]?.[3]).toEqual([
 			expect.stringMatching(/^[a-f0-9]{32}$/),
 			'token-hash',
 			'device-id',

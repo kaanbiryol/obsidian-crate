@@ -8,13 +8,18 @@ import { commitCoordinatorNewFiles } from '../../coordinator/coordinator';
 import { isMarkdownPath } from '../../../../protocol/note-paths';
 import { MAX_REMINDER_NOTE_BYTES } from '../../../../reminders/core/constants';
 
+/** Small Markdown bytes, and every encrypted note, travel with the request: an encrypted
+ * reminder note is projected from its public data. */
+const framesContent = (file: Pick<NewFileUpload, 'path' | 'size' | 'encryptionState'>) =>
+	hasFramedMarkdown(file) || Boolean(file.encryptionState) && isMarkdownPath(file.path);
+
 export function coordinatedNewFiles(env: Env): typeof commitNewFiles {
 	return async (bucket, db, files) => {
 		if (!files.some(file => isMarkdownPath(file.path))) return commitNewFiles(bucket, db, files);
 		const metadata = files.map(({ content: _content, ...file }) => file);
-		// Small Markdown bytes follow the metadata in order, so the coordinator need
-		// not read them back from R2.
-		const body = frameUpload(metadata, files.filter(hasFramedMarkdown).map(file => file.content));
+		// Framed bytes follow the metadata in order, so the coordinator need not read
+		// them back from R2.
+		const body = frameUpload(metadata, files.filter(framesContent).map(file => file.content));
 		const response = await commitCoordinatorNewFiles(env, { body, headers: { [FRAMED_CONTENT_HEADER]: '1' } });
 		if (!response.ok) throw new Error('Bulk upload commit is uncertain; retry the same operations');
 		return response.json() as Promise<Awaited<ReturnType<typeof commitNewFiles>>>;
@@ -28,7 +33,7 @@ export async function prepareCoordinatedNewFiles(request: Request, env: Env): Pr
 	const metadata = framed ? framed.metadata : await request.json() as Metadata;
 	const attached = new Map<Metadata[number], ArrayBuffer>();
 	let position = 0;
-	for (const file of framed ? metadata.filter(hasFramedMarkdown) : []) {
+	for (const file of framed ? metadata.filter(framesContent) : []) {
 		attached.set(file, framed!.content.slice(position, position + file.size));
 		position += file.size;
 	}

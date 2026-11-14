@@ -53,10 +53,8 @@ class DownloadCheckpointTests(unittest.TestCase):
         db.commit()
         self.sql = '\n'.join(db.iterdump()).encode()
         db.close()
-        self.settings = b'{"setting":true}'
         self.remote = Remote('account', 'source', 'bucket')
         self.objects = [{'key': key, 'sha256': digest(data), 'size': len(data), 'contentType': 'application/octet-stream'} for key, data in sorted(self.files.items())]
-        self.objects.insert(0, {'key': '__crate__/settings.json', 'sha256': digest(self.settings), 'size': len(self.settings), 'contentType': 'application/json'})
     def tearDown(self):
         self.temp.cleanup()
 
@@ -70,7 +68,7 @@ class DownloadCheckpointTests(unittest.TestCase):
         parts = [self.sql[:middle], self.sql[middle:]]
         for part in parts:
             self.remote.objects[PREFIX + '/objects/' + digest(part)] = part
-        for data in [self.settings, *self.files.values()]:
+        for data in self.files.values():
             self.remote.objects[STORE + '/objects/' + digest(data)] = data
         self.remote.objects[PREFIX + '/archive.json'] = self.manifest(format=2, databaseParts=[{'sha256': digest(part), 'size': len(part)} for part in parts])
 
@@ -87,7 +85,6 @@ class DownloadCheckpointTests(unittest.TestCase):
         self.addCleanup(restored.close)
         self.assertEqual(references(restored), references(archived))
         self.assertEqual({key: data for key, data in target.objects.items() if key in self.files}, self.files)
-        self.assertEqual(target.objects['__crate__/settings.json'], self.settings)
         self.assertIsNone(restored.execute("SELECT value FROM maintenance_state WHERE key = 'crate_upgrade_backup'").fetchone())
 
     def test_downloads_parted_checkpoints_with_shared_file_copies(self):

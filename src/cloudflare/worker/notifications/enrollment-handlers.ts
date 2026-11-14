@@ -25,10 +25,11 @@ export async function handleCreateRemindersEnrollmentToken(db: D1Database, reque
 	const encryption = await readEncryptionState(db);
 	const labelIssue = folderLabelIssue(encryption, folderPath, parsed.value.folderLabel);
 	if (labelIssue) return corsResponse({ error: labelIssue }, 428);
-	// The web app recovers the folder's plaintext name from this label.
-	if (encryption && await readFolderLabel(db, folderPath) !== parsed.value.folderLabel) await saveFolderLabel(db, folderPath, parsed.value.folderLabel as string).run();
 	const installEnrollment = await issueWebEnrollmentToken(db, folderPath);
 	const browserEnrollment = await issueWebEnrollmentToken(db, folderPath);
+	// The web app recovers the folder's plaintext name from this label. Saved once the links
+	// name the folder, so maintenance cannot prune it in between.
+	if (encryption && await readFolderLabel(db, folderPath) !== parsed.value.folderLabel) await saveFolderLabel(db, folderPath, parsed.value.folderLabel as string).run();
 	return corsResponse({
 		token: installEnrollment.token,
 		browserToken: browserEnrollment.token,
@@ -54,7 +55,7 @@ export async function handleExchangeRemindersEnrollmentToken(
 	const authToken = createRandomHexToken();
 	const tokenHash = await sha256Hex(authToken);
 	const enrollmentHash = await sha256Hex(token);
-	const grant = await db.prepare('SELECT token_hash FROM web_enrollment_tokens WHERE token_hash = ? AND expires_at > ?').bind(enrollmentHash, Date.now()).first();
+	const grant = await db.prepare("SELECT 1 FROM grants WHERE kind = 'web_enrollment' AND key = ? AND expires_at > ?").bind(enrollmentHash, Date.now()).first();
 	if (!grant) return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);
 	const limited = await chargeRouteAction(request, db, `enrollment:${enrollmentHash}`);
 	if (limited) return limited;
@@ -66,10 +67,10 @@ export async function handleExchangeRemindersEnrollmentToken(
 	const createdGuard = 'EXISTS (SELECT 1 FROM auth_tokens WHERE id = ? AND token_hash = ?)';
 	const results = await db.batch([db.prepare(`INSERT INTO auth_tokens
 		(id, token_hash, device_id, device_name, platform, last_seen_at, scope, expires_at, folder_path)
-		SELECT ?, ?, NULL, ?, 'pwa', datetime('now'), 'reminders', ?, folder_path
-		FROM web_enrollment_tokens WHERE token_hash = ? AND expires_at > ?`)
+		SELECT ?, ?, NULL, ?, 'pwa', datetime('now'), 'reminders', ?, json_extract(payload, '$.folderPath')
+		FROM grants WHERE kind = 'web_enrollment' AND key = ? AND expires_at > ?`)
 		.bind(id, tokenHash, deviceName, expiresAt, enrollmentHash, Date.now()),
-		db.prepare(`DELETE FROM web_enrollment_tokens WHERE token_hash = ? AND ${createdGuard}`)
+		db.prepare(`DELETE FROM grants WHERE kind = 'web_enrollment' AND key = ? AND ${createdGuard}`)
 			.bind(enrollmentHash, id, tokenHash),
 		// Possession of the replaced reminder credential permits revocation even
 		// after expiry. Remove its subscriptions so this browser can enroll again.

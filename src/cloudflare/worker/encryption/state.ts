@@ -7,6 +7,7 @@ import { isMarkdownPath } from '../../../protocol/note-paths';
 import { corsResponse } from '../http/cors';
 import type { SqlGuard } from '../d1/db';
 import { isReadingCardKind, validateReadingCardData } from '@/reading/core/reading-card';
+import { packDescriptor, unpackDescriptor } from './descriptor-column';
 
 /** The stored state JSON, or NULL for a plaintext vault. */
 export const ENCRYPTION_STATE_SQL = serverStateValue('encryption');
@@ -105,10 +106,10 @@ function validateEncryptedContent(state: EncryptionServerState, path: string, co
 	return descriptor;
 }
 
-/** The `descriptor` column value: an encrypted file's descriptor JSON, or NULL. It is
+/** The `descriptor` column value: an encrypted file's packed descriptor, or NULL. It is
  * written with the file's own rows, so it lives and dies with them. */
-export const descriptorColumn = (descriptor?: EncryptedFileDescriptor): string | null => descriptor ? JSON.stringify(descriptor) : null;
+export const descriptorColumn = (descriptor?: EncryptedFileDescriptor): string | null => descriptor ? packDescriptor(descriptor) : null;
 
 /** The response field for a stored `descriptor` column: absent in a plaintext vault. */
 export const descriptorField = (value: string | null | undefined): { descriptor?: EncryptedFileDescriptor } =>
-	value ? { descriptor: JSON.parse(value) as EncryptedFileDescriptor } : {};
+	value ? { descriptor: unpackDescriptor(value) } : {};

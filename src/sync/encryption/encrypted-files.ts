@@ -88,15 +88,16 @@ export class EncryptedFiles {
 	private async metadataChunk<T extends WireMetadata>(chunk: Array<{ path: string; entry: T }>, options: OpenOptions): Promise<Array<PlainEntry<T>>> {
 		const result: Array<PlainEntry<T>> = [];
 		const cached = new Map<string, VerifiedRevision>();
-		const missing = new Set<string>();
-		for (const { entry } of chunk) {
+		// The server path of each revision listed without its descriptor, such as a shared
+		// checkpoint entry. The server looks each one up by path and revision.
+		const missing = new Map<string, string>();
+		for (const { path, entry } of chunk) {
 			if (!entry.revision) throw new Error('Encrypted file metadata is missing its immutable revision');
 			const verified = this.verifiedMetadata.get(entry.revision);
-			// Older servers and shared checkpoints list revisions without their descriptors.
-			if (verified) cached.set(entry.revision, verified); else if (entry.descriptor === undefined) missing.add(entry.revision);
+			if (verified) cached.set(entry.revision, verified); else if (entry.descriptor === undefined) missing.set(entry.revision, path);
 		}
 		const response = missing.size ? await this.http.requestJson<{ descriptors: Record<string, unknown> }>('/encryption/metadata', {
-			method: 'POST', body: JSON.stringify({ revisions: [...missing] }),
+			method: 'POST', body: JSON.stringify({ files: [...missing].map(([revision, path]) => ({ path, revision })) }),
 		}) : null;
 		// The small snapshot remains usable if concurrent reads evict entries.
 		for (const { path, entry } of chunk) {
@@ -188,13 +189,23 @@ export class EncryptedFiles {
 		const expectedHash = resolved !== undefined ? resolved : await this.expectedHash(file.path, file.expectedHash);
 		const path = await this.paths.wireFor(file.path);
 		const content = base64ToArrayBuffer(file.content);
-		const sealed = await sealFile({ path: file.path, content: new Uint8Array(content), contentType: file.contentType,
+		const sealed = await sealFile({ path: file.path, content: new Uint8Array(content),
 			publicData: await this.publicData(file.path, content, path) }, this.keys.forPath(path));
 		if (sealed.metadata.hash !== file.hash || sealed.metadata.size !== file.size) throw new Error('File changed before encryption');
 		const wire: EncryptedUploadWire = { format: 'crate-e2ee-v1', generation: this.generation, path, content: arrayBufferToBase64(sealed.bytes.buffer),
 			hash: sealed.hash, size: sealed.bytes.byteLength, contentType: ENCRYPTED_FILE_CONTENT_TYPE, expectedHash };
 		this.sealed.add(wire);
 		return wire;
+	}
+
+	/** Seal a file of a first upload, which carries no ciphertext precondition of its own.
+	 * Returns its server path and the exact bytes to send. */
+	async sealImport(path: string, content: ArrayBuffer, plain: { hash: string; size: number }): Promise<{ wire: string; content: ArrayBuffer; hash: string; size: number }> {
+		const wire = await this.paths.wireFor(path);
+		const sealed = await sealFile({ path, content: new Uint8Array(content),
+			publicData: await this.publicData(path, content, wire) }, this.keys.forPath(wire));
+		if (sealed.metadata.hash !== plain.hash || sealed.metadata.size !== plain.size) throw new Error('File changed before encryption');
+		return { wire, content: sealed.bytes.buffer, hash: sealed.hash, size: sealed.bytes.byteLength };
 	}
 
 	async verifyPrepared(file: JournalUpload): Promise<void> {

@@ -4,26 +4,21 @@ import type { EncryptionServerState } from '../../../encryption/server-state';
 import { ENCRYPTION_STATE_SQL } from './state';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../http/cors';
-import { readMaintenanceValue } from '../d1/db';
 import { parseJsonObject, SMALL_JSON_BODY_BYTES } from '../http/request-validation';
 import { ReadingError } from '../reading/common';
 
-const PREFIX = 'crate_web_pairing:', END = 'crate_web_pairing;';
+/** Pairings are `grants` rows of this kind, keyed by pairing ID. */
+const KIND = 'web_pairing';
 interface Stored extends PairingRecord { owner: string; approver?: string }
 const response = (body: unknown, status = 200) => corsResponse(body, status, { 'Cache-Control': 'no-store' });
 const failure = (message: string, status = 409) => response({ error: message }, status);
 const visible = (r: Stored): PairingRecord => ({ context: r.context, commitment: r.commitment, expiresAt: r.expiresAt,
 	...(r.responderKey ? { responderKey: r.responderKey } : {}), ...(r.requesterKey ? { requesterKey: r.requesterKey } : {}),
 	...(r.payload ? { payload: r.payload } : {}), ...(r.closed ? { closed: true } : {}) });
-const ownerValid = `EXISTS (SELECT 1 FROM auth_tokens a WHERE a.id = json_extract(maintenance_state.value, '$.owner')
+const ownerValid = `EXISTS (SELECT 1 FROM auth_tokens a WHERE a.id = json_extract(grants.payload, '$.owner')
   AND a.scope IN ('reminders','vault') AND (a.expires_at IS NULL OR a.expires_at > ?))`;
 const stateValid = `(json_extract(${ENCRYPTION_STATE_SQL},'$.mode')='active' AND json_extract(${ENCRYPTION_STATE_SQL},'$.vaultId')=?
   AND json_extract(${ENCRYPTION_STATE_SQL},'$.generation')=?)`;
-
-/** Expired relay packets are bounded (32 slots) and can never be redeemed. */
-export async function pruneEncryptionPairings(db: D1Database): Promise<void> {
-	await db.prepare('DELETE FROM maintenance_state WHERE key >= ? AND key < ? AND json_extract(value,\'$.expiresAt\') <= ?').bind(PREFIX, END, Date.now()).run();
-}
 
 export async function handleEncryptionPairing(request: Request, db: D1Database, principal: AuthPrincipal, state: EncryptionServerState | null): Promise<Response> {
 	if (!state || state.mode !== 'active') return failure('Finish encryption setup in Obsidian before connecting an app.');
@@ -32,12 +27,12 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
 	if (request.method === 'GET') {
 		const id = new URL(request.url).searchParams.get('id');
 		if ((!id && !vault) || id && !isEncryptionId(id)) return failure('Choose a pairing request.', 400);
-		const rows = await db.prepare(`SELECT value FROM maintenance_state WHERE key >= ? AND key < ?
-      AND json_extract(value,'$.expiresAt') > ? AND json_extract(value,'$.context.vaultId')=? AND json_extract(value,'$.context.generation')=?
-      AND ${ownerValid} AND (? IS NULL OR key=?) AND (? OR json_extract(value,'$.owner')=?) ORDER BY key LIMIT 32`)
-			.bind(PREFIX, END, Date.now(), state.vaultId, state.generation, Date.now(), id, id ? PREFIX + id : '', vault ? 1 : 0, principal.tokenId).all<{ value: string }>();
+		const rows = await db.prepare(`SELECT payload FROM grants WHERE kind = '${KIND}'
+      AND expires_at > ? AND json_extract(payload,'$.context.vaultId')=? AND json_extract(payload,'$.context.generation')=?
+      AND ${ownerValid} AND (? IS NULL OR key=?) AND (? OR json_extract(payload,'$.owner')=?) ORDER BY key LIMIT 32`)
+			.bind(Date.now(), state.vaultId, state.generation, Date.now(), id, id ?? '', vault ? 1 : 0, principal.tokenId).all<{ payload: string }>();
 		// A device never lists its own request for approval.
-		const records = rows.results.map(row => JSON.parse(row.value) as Stored)
+		const records = rows.results.map(row => JSON.parse(row.payload) as Stored)
 			.filter(row => id || row.owner !== principal.tokenId && !row.closed && !row.payload && (!row.approver || row.approver === principal.tokenId));
 		return response({ requests: records.map(visible) });
 	}
@@ -50,28 +45,27 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
 			const c = body.context;
 			if (c.vaultId !== state.vaultId || c.generation !== state.generation) return failure('This app connection changed. Start again.');
 			if (typeof body.commitment !== 'string' || decodeBase64Url(body.commitment, 32).length !== 32) return failure('Invalid pairing commitment.', 400);
-			const existing = await readMaintenanceValue(db, PREFIX + c.id);
-			if (existing !== null) {
-				const row = JSON.parse(existing) as Stored;
+			const existing = await db.prepare(`SELECT payload FROM grants WHERE kind = '${KIND}' AND key = ?`).bind(c.id).first<{ payload: string }>();
+			if (existing) {
+				const row = JSON.parse(existing.payload) as Stored;
 				return row.owner === principal.tokenId && samePairingContext(row.context, c) && row.commitment === body.commitment && row.expiresAt > Date.now() && !row.closed
 					? response({ request: visible(row) }) : failure('Start a new pairing request.');
 			}
-			await pruneEncryptionPairings(db);
 			const row: Stored = { context: c, commitment: body.commitment, owner: principal.tokenId, expiresAt: Date.now() + PAIRING_LIFETIME };
 			// At most three attempts per app in five minutes, and 32 server-wide.
 			// Closed attempts retain their slot until expiry; polling performs no writes.
-			const inserted = await db.prepare(`INSERT INTO maintenance_state(key,value) SELECT ?,?
-        WHERE (SELECT COUNT(*) FROM maintenance_state WHERE key>=? AND key<?) < 32
-        AND (SELECT COUNT(*) FROM maintenance_state WHERE key>=? AND key<? AND json_extract(value,'$.owner')=?) < 3
+			const inserted = await db.prepare(`INSERT INTO grants(kind,key,payload,expires_at) SELECT '${KIND}',?,?,?
+        WHERE (SELECT COUNT(*) FROM grants WHERE kind='${KIND}' AND expires_at>?) < 32
+        AND (SELECT COUNT(*) FROM grants WHERE kind='${KIND}' AND expires_at>? AND json_extract(payload,'$.owner')=?) < 3
         AND ${stateValid} AND EXISTS (SELECT 1 FROM auth_tokens WHERE id=? AND (expires_at IS NULL OR expires_at>?))
-        ON CONFLICT(key) DO NOTHING RETURNING key`)
-				.bind(PREFIX + c.id, JSON.stringify(row), PREFIX, END, PREFIX, END, principal.tokenId, c.vaultId, c.generation, principal.tokenId, Date.now()).first();
+        ON CONFLICT(kind,key) DO NOTHING RETURNING key`)
+				.bind(c.id, JSON.stringify(row), row.expiresAt, Date.now(), Date.now(), principal.tokenId, c.vaultId, c.generation, principal.tokenId, Date.now()).first();
 			return inserted ? response({ request: visible(row) }) : failure('Pairing is busy. Wait five minutes before trying again.', 429);
 		}
 		if (!isEncryptionId(body.id)) return failure('Invalid pairing request.', 400);
-		const stored = await db.prepare(`SELECT value FROM maintenance_state WHERE key=? AND ${ownerValid}`).bind(PREFIX + body.id, Date.now()).first<{ value: string }>();
+		const stored = await db.prepare(`SELECT payload FROM grants WHERE kind='${KIND}' AND key=? AND ${ownerValid}`).bind(body.id, Date.now()).first<{ payload: string }>();
 		if (!stored) return failure('This pairing expired or was revoked.', 410);
-		const previous = JSON.parse(stored.value) as Stored;
+		const previous = JSON.parse(stored.payload) as Stored;
 		if (previous.expiresAt <= Date.now() || previous.context.vaultId !== state.vaultId || previous.context.generation !== state.generation) return failure('This pairing expired or changed.', 410);
 		const owner = previous.owner === principal.tokenId;
 		if (!owner && (!vault || previous.approver && previous.approver !== principal.tokenId)) return failure('This request belongs to another device.', 403);
@@ -97,9 +91,9 @@ export async function handleEncryptionPairing(request: Request, db: D1Database, 
 		}
 		validatePairingRecord(next);
 		if (JSON.stringify(previous) === JSON.stringify(next)) return response({ request: visible(next) });
-		const updated = await db.prepare(`UPDATE maintenance_state SET value=?, updated_at=datetime('now') WHERE key=? AND value=? AND ${ownerValid}
+		const updated = await db.prepare(`UPDATE grants SET payload=? WHERE kind='${KIND}' AND key=? AND payload=? AND ${ownerValid}
       AND ${stateValid} AND EXISTS (SELECT 1 FROM auth_tokens WHERE id=? AND (expires_at IS NULL OR expires_at>?)) RETURNING key`)
-			.bind(JSON.stringify(next), PREFIX + body.id, stored.value, Date.now(), state.vaultId, state.generation, principal.tokenId, Date.now()).first();
+			.bind(JSON.stringify(next), body.id, stored.payload, Date.now(), state.vaultId, state.generation, principal.tokenId, Date.now()).first();
 		return updated ? response({ request: visible(next) }) : failure('Pairing changed. Retry the current step.');
 	} catch (error) {
 		if (error instanceof ReadingError) return failure(error.message, error.status);

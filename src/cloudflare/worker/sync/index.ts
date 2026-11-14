@@ -10,6 +10,5 @@ export {
 	handleGetChanges,
 	handleGetFileMetadata,
 	handleGetManifest,
-	handleGetSettings,
-	handlePutSettings,
+	handleSharedSettings,
 } from './metadata-handlers';

@@ -31,8 +31,6 @@ async function deleteQueuedBucketObjects(
 	if (unused.length > 0) await bucket.delete(unused.length === 1 ? unused[0]! : unused);
 	// Referenced keys must leave this queue as well; their eventual expiry
 	// creates a new cleanup intent after the reference is removed.
-	await db.prepare('DELETE FROM staged_uploads WHERE storage_key IN (SELECT value FROM json_each(?))')
-		.bind(JSON.stringify(uniqueKeys)).run();
 	return removeQueuedObjectCleanup(db, uniqueKeys);
 }
 
@@ -75,5 +73,5 @@ export async function deleteBucketObjectsOrQueue(
 	try { await queueObjectCleanup(db, objects); }
 	catch { /* Still attempt reference-aware deletion if queueing is unavailable. */ }
 	try { await deleteQueuedBucketObjects(bucket, db, objects); }
-	catch { /* Queued cleanup and staged-upload maintenance retain retry ownership. */ }
+	catch { /* Queued cleanup and upload-lease maintenance retain retry ownership. */ }
 }

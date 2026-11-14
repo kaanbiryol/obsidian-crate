@@ -252,8 +252,8 @@ describe('CloudflareDeploymentService', () => {
 			workerName: 'crate-fedcba9876543210',
 			d1DatabaseId: 'existing-database-id',
 		}));
-		expect(apiMocks.queryD1).toHaveBeenCalledTimes(3);
-		expect(apiMocks.queryD1.mock.calls[2]?.[3]).toEqual([
+		expect(apiMocks.queryD1).toHaveBeenCalledTimes(2);
+		expect(apiMocks.queryD1.mock.calls[1]?.[3]).toEqual([
 			expect.stringMatching(/^[a-f0-9]{32}$/),
 			'device-token-hash',
 			'device-id',

@@ -12,7 +12,7 @@ it('decrypts a batch with bounded overlap and returns verified bytes in order', 
 	const paths = Array.from({ length: 10 }, (_, index) => `n/${index}.md`);
 	// The server lists files by their tagged paths.
 	const files = await Promise.all(paths.map(async path => {
-		const sealed = await sealFile({ path, content: new TextEncoder().encode(`body ${path}`), contentType: 'text/markdown' }, encryption.keys.forPath(path));
+		const sealed = await sealFile({ path, content: new TextEncoder().encode(`body ${path}`) }, encryption.keys.forPath(path));
 		return { path: await encryption.paths.wireFor(path), content: arrayBufferToBase64(sealed.bytes.buffer), hash: sealed.hash, size: sealed.bytes.byteLength, contentType: 'application/octet-stream' };
 	}));
 	const api = new SyncWorkerApi({ requestJson: vi.fn(async () => ({ files })) } as unknown as WorkerApiHttpClient);

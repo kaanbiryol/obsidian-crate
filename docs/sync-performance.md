@@ -6,7 +6,7 @@ completes its initial sync, and then additional devices download that vault.
 
 Initial imports store file contents in R2 and current file metadata in D1. They
 skip per-file upload receipts, changelog entries, retained versions, and reminder
-processing. A shared staging lease covers up to 32 immutable object keys;
+processing. One upload lease per request covers up to 32 immutable object keys;
 publication and cleanup remain transactional. Three client requests stay in flight:
 each starts the next prepared batch as soon as its previous one finishes, rather
 than waiting for a group of three. Preparation stays within the byte budget, and the
@@ -28,8 +28,17 @@ marker resumes this phase after a restart without uploading unchanged files.
 Reminder errors keep setup incomplete and are surfaced to the user; reminders
 already overdue when first indexed do not receive catch-up notifications. Later
 syncs use the normal change history and recovery receipts. Late import requests
-cannot change a completed vault. Existing vaults and encrypted servers, which do
-not offer the import, use the normal upload path.
+cannot change a completed vault. Existing vaults use the normal upload path.
+
+An encrypted vault uses the import too: for its first sync, and right after the
+reset that turns encryption on, which leaves the server empty. The device sends
+ciphertext under server paths, and the Worker validates each batch as it validates
+a normal encrypted upload, stores each file's descriptor in its `files` row, and
+publishes only while the vault keys the request was made with are active and no
+reset has started since. Resuming compares the plaintext of the descriptors the
+manifest lists, and completion verifies the server's ciphertext hashes and sizes.
+Reminder readiness parses schedules from each encrypted reminder note's public data,
+and the Reading index takes each note's card from it.
 
 Reminder settings retry in the background during established file syncs and periodic
 checks; a failed or slow settings request does not block file transfers. First-time
@@ -43,20 +52,50 @@ the plugin require a fresh confirmation; failed requests remain eligible for ret
 
 ## Initial upload write budget
 
-The local workerd/D1 billing-metadata regression measures **10,947 row writes for
+The local workerd/D1 billing-metadata regression measures **10,946 row writes for
 10,000 ordinary notes**, including import setup and paged completion with 32-file batches.
-The same fixture used 31,256 writes before the pre-release inventory redesign: a
-20,309-write (65%) reduction. Eight-file batches now cost 13,758 writes, down from
-45,004 before these optimizations. Replaying a committed batch writes zero rows
-and uploads no R2 objects.
+Eight-file batches cost 13,757 writes. An import of about 50,000 files therefore fits
+one day of the Free plan's 100,000 row writes. Replaying a committed batch writes zero rows
+and uploads no R2 objects. The same statements serve an encrypted import.
 
 | Component, for 10,000 ordinary notes | Measured row writes | Purpose |
 | --- | ---: | --- |
-| Current file records | 10,000 | Remote identity, original spelling, content hash, size and object pointer |
-| Shared staging leases | 626 | 313 batches, each with an insert and lease removal |
+| Current file records | 10,000 | One row each: identity, original spelling, content hash, size and object pointer |
+| Upload leases | 626 | 313 requests, each with an insert and lease removal |
 | Import generation checkpoints | 313 | Fence completion against batches still in flight |
-| Session and completion | 8 | Open the import (1) and publish its sync baseline (7) |
-| Total | 10,947 | No per-note history, upload receipts or reminder indexing |
+| Session and completion | 7 | Open the import and publish its sync baseline |
+| Total | 10,946 | No per-note history, upload receipts or reminder indexing |
+
+### Whole first sync, reads and writes
+
+A first sync through the production sync engine and the local Worker, summing each
+response's `X-Crate-D1-Usage`, measures these costs. The runs covered 2,000 and 4,000
+notes of about 1.6 KB and 30 files of 2 MiB, in plaintext and encrypted vaults, with no
+reminder folder. Encrypted runs measured within 1% of plaintext ones.
+
+| Per item | Rows read | Rows written | Requests |
+| --- | ---: | ---: | ---: |
+| Note, in 32-file batches | 55 | 1.09 | 1 per 32 notes |
+| File of 1 MiB or more, sent alone | 34 | 4 | 1 |
+| Fixed per first sync | about 80 | 7 | 8 |
+
+Each batch request reads about 1,730 rows, the same at 2,000 and 4,000 notes, so reads
+grow linearly with the vault. The largest parts are the lease removal in
+`finishUploadLeases`, about 560 rows from its nested `json_each` match, and each file's
+insert with its namespace guard, 30 to 46 rows. The existing-file lookup and the cleanup
+queue insert read 64 each.
+
+For a vault of 50,000 notes and 5 GB of PDFs (2,500 of 2 MB) this projects to about
+65,000 row writes, 2.85 million row reads and 4,100 Worker requests, plus as many
+transfer Durable Object requests. That is about 65% of the Free plan's daily writes and
+57% of its reads. The most expensive 5 GB, about 5,000 to 6,500 files just over the
+batch limit, projects to about 82,000 writes and 3.05 million reads. An encrypted file
+is sent alone from about 750 KB of plaintext, since its ciphertext is larger.
+
+Storage for that vault: D1 holds about 30 MB in plaintext and about 60 MB encrypted. R2
+holds about the vault's size in plaintext. Encrypted objects are base64url JWE with a
+JSON header, about a third larger plus about 1 KB per file, so 5.2 GB becomes about
+7 GB of R2's 10 GB monthly allowance. Retained versions add to both.
 
 When a reminder policy is configured, tracking and acknowledging initial reminder
 readiness adds **two row writes per vault**, independent of note count, in addition
@@ -65,21 +104,33 @@ probes write zero rows and use bounded indexed reads. Schedule dispatch handles
 up to five commands in a separate invocation of the existing Durable Object class;
 it adds one internal request per coordinator pass and no extra D1 records.
 
-The schema uses the normalized portable path as the `WITHOUT ROWID` primary key.
-The original path remains metadata and is checked on exact-path reads and writes.
-This preserves spelling, case/Unicode collision protection and file/folder guards
-without a separate portable-path index. Manifest pages follow portable-key order
+`files` is a `WITHOUT ROWID` table keyed by the normalized portable path. The
+original path remains metadata and is checked on exact-path reads and writes.
+This preserves spelling, case/Unicode collision protection and file/folder guards.
+Each new file writes one row. A page keeps at most about 1 KB of such a row, and a
+larger row takes an overflow page of its own, which measures 4,691 bytes per row. Two
+choices keep an encrypted file's row small. Devices write version 2 descriptors, whose
+private metadata is one binary envelope: about 400 to 530 characters of JSON for a
+note, against about 950 for version 1. The Worker stores each descriptor packed, with
+its IDs as 16 bytes each, about 280 to 410 characters, and rebuilds the exact JSON on
+read; a descriptor that would not rebuild exactly is stored as its JSON. Measured on
+disk, an encrypted note's row takes 692 to 1,207 bytes up to seven folders deep, and a
+deeper note's row still takes an overflow page. A rowid table with a unique portable-path key would avoid overflow
+pages but write a second row for every new file, which would push a 50,000-file first
+sync past one day's row writes. `file_versions` (unique
+`storage_key`) and `reading_items` (unique `portable_path`) are rowid tables, since
+an import writes neither and an edit's kept version is written once. Manifest pages follow portable-key order
 and still return original names and original-name continuation cursors. An empty, never-imported vault remains eligible for the cheap initial-import path.
 
-Staging and cleanup records carry the owning file path. Current-object checks use
-that primary key and immutable object revision; retained-object checks use the
-existing version primary key. There is no current-file storage-key index.
+Lease and cleanup records carry the owning file path. Current-object checks use
+the portable-path key and immutable object revision; retained-object checks use the
+version's unique storage key. There is no current-file storage-key index.
 Immutable keys are never
 transferred to another file or reused by a restore.
 
-The per-file inventory write is now the main cost. Cutting the remaining 1,256
-writes would require larger batches or replacing durable batch leases and
-completion fencing; these protect interrupted uploads and late requests.
+The per-file inventory writes are the main cost. Cutting the remaining 947
+writes would require larger batches or replacing durable leases and completion
+fencing, which protect interrupted uploads and late requests.
 
 Larger batches retain the 10 MiB decoded payload limit, bounded R2 concurrency,
 conditional file writes, and resumable cleanup. Regression tests include byte-based
@@ -89,9 +140,9 @@ the Markdown index means attachments inside the selected folder also participate
 its metadata scan; file content is still read only for Markdown. Files outside that
 folder are skipped by the portable primary key.
 
-This measurement uses the new database layout: `WITHOUT ROWID` for file metadata,
-upload receipts, staging records, reminder verification, and projection jobs.
-This layout is the schema-1 baseline. These
+This measurement uses the schema-1 baseline: `WITHOUT ROWID` for `files`, upload
+receipts, upload leases, reminder verification and projection jobs, and rowid
+`file_versions` and `reading_items` tables with unique keys. These
 figures exclude device setup, actual reminder indexing, failures and cleanup, and
 other activity sharing the account's daily quota. They do not guarantee that every
 10,000-file vault consumes the same allowance.
@@ -109,7 +160,7 @@ npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/i
 
 The normal 32-file upload path retains per-file receipts and changelog entries.
 Its separate 8,000-note benchmark, with notes inside the selected reminder folder,
-measures 40,500 row writes on a new database. This is a regression check for normal
+measures 48,500 row writes on a new database. This is a regression check for normal
 uploads, not the cost of an initial import.
 
 ## Normal upload benchmark
@@ -176,6 +227,6 @@ Durable Object state. This adds one internal Durable Object request per batch,
 without new D1 records or queries. Parsing, hashing,
 R2 writes and publication use the object's default 30-second CPU allowance; the
 public Worker's Free CPU allowance is 10 ms. The import's existing conditional writes,
-staging leases and completion checks remain in use. See
+upload leases and completion checks remain in use. See
 [Durable Object limits](https://developers.cloudflare.com/durable-objects/platform/limits/)
 and [Worker limits](https://developers.cloudflare.com/workers/platform/limits/).

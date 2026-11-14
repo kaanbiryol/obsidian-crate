@@ -56,23 +56,24 @@ it('requires vault authority, the current encryption identity and explicit destr
 });
 
 it('resumes bounded deletion, revokes old devices and grants, and never repeats a completed wipe', async () => {
-	const readingTables = ['reading_policy', 'reading_items', 'note_terms', 'reading_index', 'reading_jobs', 'reading_operations', 'reading_enrollments', 'reading_handoffs', 'reading_captures'];
+	const readingTables = ['reading_policy', 'reading_items', 'note_terms', 'reading_jobs', 'operations', 'grants', 'reading_captures'];
 	await env.DB.batch([
-		env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')"),
+		env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-generation','revision')"),
 		env.DB.prepare("INSERT INTO reading_items(portable_path,path,storage_key,hash,size,metadata_json) VALUES ('reading/private.md','Reading/private.md','r','hash',1,'private metadata')"),
-		env.DB.prepare("INSERT INTO reading_index(id,scope) VALUES (1,'scope')"),
 		env.DB.prepare("INSERT INTO reading_jobs(path,item_id,generation,source_revision,block_hash,url,available_at) VALUES ('Reading/private.md','article','reading-generation','r','hash','https://private.example',0)"),
-		env.DB.prepare("INSERT INTO reading_operations VALUES ('operation','original','reading-generation','hash','{}')"),
-		env.DB.prepare("INSERT INTO reading_enrollments VALUES (?,'reading-generation','reading',9999999999999)").bind(await sha256Hex('old-reading-grant')),
-		env.DB.prepare("INSERT INTO reading_handoffs VALUES ('handoff','original','reading-generation','private url',9999999999999)"),
+		env.DB.prepare("UPDATE reading_policy SET index_scope = 'scope' WHERE id = 1"),
+		env.DB.prepare("INSERT INTO operations(kind,operation_id,principal_id,generation,request_hash,response_json) VALUES ('reading','operation','original','reading-generation','hash','{}')"),
+		env.DB.prepare(`INSERT INTO grants VALUES ('reading_enrollment',?,'{"generation":"reading-generation","scope":"reading"}',9999999999999)`).bind(await sha256Hex('old-reading-grant')),
+		env.DB.prepare(`INSERT INTO grants VALUES ('reading_handoff','handoff','{"principal":"original","generation":"reading-generation","body":"private url"}',9999999999999)`),
 		env.DB.prepare("INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES ('capture','reading-generation','private url','private note',0)"),
 	]);
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_deployment_fence', 'infrastructure'), ('e2ee:settings', 'private'), ('reminder_source_scan_cursor', 'old')").run();
+	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_deployment_fence', 'infrastructure'), ('reminder_source_scan_cursor', 'old')").run();
+	await env.DB.prepare("UPDATE server_state SET settings = 'private', settings_version = 'version' WHERE id = 1").run();
 	await env.DB.prepare("INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES ('remote-only.md', 'remote-only.md', 'hash', 1, 'current')").run();
 	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('old', 'remote-only.md', 'hash', 1, 'replaced', 9999999999999)").run();
-	await env.DB.prepare("INSERT INTO web_enrollment_tokens(token_hash, expires_at) VALUES ('grant', 9999999999999)").run();
+	await env.DB.prepare(`INSERT INTO grants VALUES ('web_enrollment', 'grant', '{"folderPath":"Reminders"}', 9999999999999)`).run();
 	await env.DB.prepare("INSERT INTO push_subscriptions(id, owner_token_id, endpoint, p256dh, auth) VALUES ('push', 'web', 'https://push.test', 'key', 'auth')").run();
-	await env.DB.prepare("INSERT INTO staged_uploads(storage_key, file_path, expires_at) VALUES ('late-object', 'late.md', 9999999999999)").run();
+	await env.DB.prepare(`INSERT INTO upload_leases(id, keys, expires_at) VALUES ('late', '[{"storageKey":"late-object","path":"late.md"}]', 9999999999999)`).run();
 	for (let index = 0; index < 14; index++) await env.DB.prepare(`INSERT INTO reminder_projections(reminder_id, file_path, notification_token, due_datetime, content, due_at)
     VALUES (?, 'Reminders/Inbox.md', 'schedule', '2099-01-01T00:00:00.000Z', 'encrypted', 4070908800000)`).bind(`alarm-${index}`).run();
 	for (let index = 0; index < 205; index++) await env.BUCKET.put(`object-${index}`, 'old encrypted bytes');
@@ -86,14 +87,14 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	for (const token of ['original', 'other', 'web']) expect((await request('/health', token)).status).toBe(401);
 	for (const path of ['/sync/manifest', '/encryption/pairing', '/auth/tokens']) expect((await request(path, nextToken)).status).toBe(423);
 	expect((await request(`/encryption/reset?id=${id}`, nextToken)).status).toBe(200);
-	expect(await env.DB.prepare('SELECT 1 FROM web_enrollment_tokens UNION SELECT 1 FROM push_subscriptions').first()).toBeNull();
+	expect(await env.DB.prepare('SELECT 1 FROM grants UNION SELECT 1 FROM push_subscriptions UNION SELECT 1 FROM server_state WHERE settings IS NOT NULL').first()).toBeNull();
 	await finish();
 	for (const table of readingTables) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 	expect(await readEncryptionState(env.DB)).toBeNull();
 	expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 	expect((await env.BUCKET.list()).objects).toHaveLength(0);
 	for (const table of ['files', 'file_versions', 'reminder_projections']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
-	expect(await env.DB.prepare("SELECT state FROM staged_uploads WHERE storage_key = 'late-object'").first()).toEqual({ state: 'deleting' });
+	expect(await env.DB.prepare("SELECT state FROM upload_leases WHERE id = 'late'").first()).toEqual({ state: 'deleting' });
 	expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'crate_deployment_fence'").first()).toEqual({ value: 'infrastructure' });
 	await env.BUCKET.put('new-plaintext', 'new note');
 	await finish();
@@ -119,7 +120,7 @@ it('rejects an encrypted upload authorized before reset, even if staging starts 
 	state = fixture.state;
 	await env.DB.prepare('UPDATE server_state SET encryption = ? WHERE id = 1').bind(JSON.stringify(state)).run();
 	const { keys } = fixture, wire = await fixture.paths.wire('late.md');
-	const content = await sealFile({ path: 'late.md', content: new TextEncoder().encode('old secret'), contentType: 'text/markdown', publicData: null }, keys.forPath(wire));
+	const content = await sealFile({ path: 'late.md', content: new TextEncoder().encode('old secret'), publicData: null }, keys.forPath(wire));
 	const upload = () => new Request(`https://test/sync/upload?path=${wire}`, { method: 'PUT', body: content.bytes, headers: {
 		'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE, 'X-Crate-Expected-Hash': 'absent',
 		'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)),
@@ -163,10 +164,11 @@ describe('turning encryption on', () => {
 
 	it('wipes the plaintext copy, its history and devices, then activates the given encryption', async () => {
 		await env.BUCKET.put('plain-old', 'old plaintext note');
-		await env.BUCKET.put('__crate__/settings.json', '{"ignorePatterns":["private/"]}');
+		await env.DB.prepare(`INSERT INTO server_state(id, settings, settings_version) VALUES (1, '{"ignorePatterns":["private/"]}', 'version')
+      ON CONFLICT(id) DO UPDATE SET settings = excluded.settings, settings_version = excluded.settings_version`).run();
 		await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('plain-old', 'plain.md', 'hash', 18, 'replaced', 9999999999999)").run();
 		await env.DB.prepare("INSERT INTO changelog(path, action, revision, hash, size) VALUES ('plain.md', 'put', 'plain-current', 'hash', 14)").run();
-		await env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')").run();
+		await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-generation','revision')").run();
 		await env.DB.prepare("INSERT INTO push_subscriptions(id, owner_token_id, endpoint, p256dh, auth) VALUES ('push', 'web', 'https://push.test', 'key', 'auth')").run();
 		const started = await begin({ encryption: target });
 		expect(started.status, await started.clone().text()).toBe(200);
@@ -179,6 +181,7 @@ describe('turning encryption on', () => {
 		expect(await readEncryptionState(env.DB)).toEqual(target);
 		expect((await env.BUCKET.list()).objects).toHaveLength(0);
 		for (const table of ['files', 'file_versions', 'changelog', 'reading_policy', 'push_subscriptions']) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
+		expect(await env.DB.prepare('SELECT settings FROM server_state WHERE id = 1').first()).toEqual({ settings: null });
 		expect((await env.DB.prepare('SELECT id FROM auth_tokens').all<{ id: string }>()).results).toEqual([{ id }]);
 		expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 		// The replacement credential now syncs only with the new encryption identity.
@@ -205,13 +208,14 @@ describe('turning encryption on', () => {
 	it.each(['a saved link still downloading', 'an unfinished initial sync'])('refuses while the server has %s, without changing anything', async pending => {
 		const queuedLink = pending === 'a saved link still downloading';
 		if (queuedLink) {
-			await env.DB.prepare("INSERT INTO reading_policy VALUES (1,1,'Reading','reading-generation','revision')").run();
+			await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-generation','revision')").run();
 			await env.DB.prepare("INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES ('capture','reading-generation','private url','private note',0)").run();
-		} else await env.DB.prepare("INSERT INTO initial_import(id, token, state) VALUES (1, 'import-token', 'importing')").run();
+		} else await env.DB.prepare(`INSERT INTO server_state(id, import_token, import_state) VALUES (1, 'import-token', 'importing')
+      ON CONFLICT(id) DO UPDATE SET import_token = excluded.import_token, import_state = excluded.import_state`).run();
 		const response = await begin({ encryption: target });
 		expect(response.status, await response.clone().text()).toBe(409);
 		await expectUnchanged();
-		expect(await env.DB.prepare(queuedLink ? 'SELECT 1 FROM reading_captures' : 'SELECT 1 FROM initial_import').first()).not.toBeNull();
+		expect(await env.DB.prepare(queuedLink ? 'SELECT 1 FROM reading_captures' : 'SELECT 1 FROM server_state WHERE import_token IS NOT NULL').first()).not.toBeNull();
 	});
 
 	it('refuses a new encryption configuration for a vault that is already encrypted', async () => {

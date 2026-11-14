@@ -100,5 +100,5 @@ it('never dispatches restore before its local checkpoint is durable and retries 
  expect(client.requests.some(path => path.includes('restore-version'))).toBe(false);
  expect(await live()).toBeNull();
  await client.engine.restoreFileVersion(version); expect((await live())?.hash).toBe(version.hash);
- expect(await env.DB.prepare('SELECT count(*) AS n FROM upload_operations').first()).toEqual({ n: 1 });
+ expect(await env.DB.prepare("SELECT count(*) AS n FROM operations WHERE kind = 'upload'").first()).toEqual({ n: 1 });
 });

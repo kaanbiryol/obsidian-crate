@@ -60,6 +60,7 @@ export class SyncApiClient {
 		cardKeys = { vaultId: bundle.vaultId, key: folderKey, keyGeneration: bundle.generation, searchKey: await deriveReadingSearchKey(bundle.vaultId, bundle.vault) };
 		// Assign only after every key imports, so a failure leaves no request encrypted.
 		this.syncApi.setEncryption(encryption);
+		this.initialImport.setEncryption(encryption);
 		this.sharedHistory.setEncryption(encryption);
 		this.sharedSettingsApi.setEncryption(encryption);
 		this.http.setEncryptionAuthority(bundle.vaultId, bundle.generation);

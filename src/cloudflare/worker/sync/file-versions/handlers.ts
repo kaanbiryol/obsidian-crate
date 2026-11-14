@@ -1,4 +1,4 @@
-import { trackStagedUpload } from '../staging/staged-uploads';
+import { trackUploadLease } from '../staging/upload-leases';
 import { beginUploadOperation } from '../upload-operations';
 import { isSyncRevision } from '@/protocol/sync-validation';
 import { corsResponse } from '../../http/cors';
@@ -19,9 +19,6 @@ interface FileVersionRow {
 	path: string;
 	hash: string;
 	size: number;
-	reason: 'replaced' | 'deleted';
-	created_at: string;
-	expires_at: number;
 }
 
 export async function handleRestoreFileVersion(
@@ -49,7 +46,7 @@ export async function handleRestoreFileVersion(
 		{ kind: 'restore', path, storageKey, expectedHash, expectedRevision });
 	if (operation instanceof Response) return operation;
 
-	const version = await db.prepare(`SELECT storage_key, path, hash, size, reason, created_at, expires_at
+	const version = await db.prepare(`SELECT storage_key, path, hash, size
 		FROM file_versions WHERE storage_key = ? AND expires_at > ?`).bind(storageKey, Date.now()).first<FileVersionRow>();
 	if (!version) return corsResponse({ error: 'File version not found or expired' }, 404);
 	if (version.path !== path) return corsResponse({ error: 'Retained version does not belong to the requested path' }, 409);
@@ -70,8 +67,8 @@ export async function handleRestoreFileVersion(
 	// Expiry cleanup may already own the retained key. Never make it live again.
 	const objectKey = createManagedObjectKey(version.hash);
 	try {
-		await trackStagedUpload(db, objectKey, path, object.httpMetadata?.contentType === ENCRYPTED_FILE_CONTENT_TYPE);
-	await bucket.put(objectKey, content, {
+		const { id: leaseId } = await trackUploadLease(db, [{ storageKey: objectKey, path }], { encrypted: object.httpMetadata?.contentType === ENCRYPTED_FILE_CONTENT_TYPE });
+		await bucket.put(objectKey, content, {
 			httpMetadata: object.httpMetadata,
 			customMetadata: { hash: version.hash },
 		});
@@ -80,6 +77,7 @@ export async function handleRestoreFileVersion(
 			hash: version.hash,
 			size: content.byteLength,
 			objectKey,
+			leaseId,
 			content,
 			expectedHash,
 			expectedRevision: expectedRevision ?? undefined,

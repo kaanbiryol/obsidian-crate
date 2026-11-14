@@ -515,9 +515,11 @@ preserves the confirmed cache, offline articles and pending commands in Chromium
 and WebKit.
 
 `encryption/file-inventory.test.ts`, `pwa/reading/encrypted-api.test.ts` and
-`pwa/reminders/encrypted-reminder-api.test.ts` cover encrypted page validation, advancing
-empty-page limits, duplicate paths, cursor/sequence changes and retention of the
-previous decrypted cache after rejected loads.
+`pwa/reminders/encrypted-reminder-api.test.ts` cover encrypted page and delta validation, advancing
+empty-page limits, duplicate paths, cursor and snapshot changes, 304 polls, deltas, batch downloads
+of notes that change or disappear after listing, and retention of the previous decrypted cache
+after rejected loads. `encryption/encrypted-folder-lists.integration.ts` meters the rows of an
+unchanged poll at 100 and 1,000 notes, deltas, and the requests and queries of a cold list.
 
 `manifest.test.ts`, `manifest-checkpoint.test.ts` and `checkpoint-validation.test.ts`
 retain entry-identity checks, checkpoint round trips, conflicting recovery metadata,

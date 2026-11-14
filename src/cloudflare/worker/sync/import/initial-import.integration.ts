@@ -27,7 +27,7 @@ beforeEach(async () => {
 });
 afterEach(async () => { for (const client of clients.splice(0)) client.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });
 const jsonRequest = (value: unknown) => new Request('https://test', { method: 'POST', body: JSON.stringify(value) });
-async function start(db = env.DB): Promise<string> { return ((await (await beginInitialImport(db)).json()) as { import: { token: string } }).import.token; }
+async function start(db = env.DB): Promise<string> { return ((await (await beginInitialImport(db, null)).json()) as { import: { token: string } }).import.token; }
 async function file(path: string, content = '# Note', expectedHash: string | null = null) {
 	return { path, hash: await sha256Hex(content), content: btoa(content), expectedHash };
 }
@@ -57,7 +57,7 @@ it('uses committed metadata to resume after a lost transaction response without 
 	const put = vi.spyOn(env.BUCKET, 'put'); const meter = meterD1Writes(env.DB);
 	expect((await send(token, files, meter.db)).success).toBe(true);
 	expect(put).not.toHaveBeenCalled(); expect(meter.writes()).toBe(0);
-	for (const table of ['changelog', 'file_versions', 'upload_operations', 'reminder_source_state', 'notification_projection_jobs']) {
+	for (const table of ['changelog', 'file_versions', 'operations', 'reminder_source_state', 'notification_projection_jobs']) {
 		expect(await env.DB.prepare(`SELECT 1 FROM ${table} LIMIT 1`).first()).toBeNull();
 	}
 	expect(await start()).toBe(token);
@@ -93,14 +93,14 @@ it('publishes one baseline, rejects incomplete completion, and fences closed imp
 	expect(await (await handleGetChanges(new Request('https://test?since=1'), env.DB)).json()).toMatchObject({ changes: [], lastSeq: 1 });
 	await env.DB.prepare("DELETE FROM files WHERE path = 'note.md'").run();
 	expect(await send(token, [await file('note.md')])).toMatchObject({ error: 'Initial import is closed or unavailable' });
-	expect(await (await beginInitialImport(env.DB)).json()).toEqual({ import: null });
+	expect(await (await beginInitialImport(env.DB, null)).json()).toEqual({ import: null });
 	await env.DB.prepare(`INSERT INTO changelog(seq, path, action) SELECT ${LAST_SEQ_SQL} + 1, 'next.md', 'put'`).run();
 	expect(await env.DB.prepare('SELECT seq FROM changelog').first()).toEqual({ seq: 2 });
 });
 
 it('does not enter import mode for an existing or previously emptied vault', async () => {
 	await env.DB.prepare("INSERT INTO changelog(path, action) VALUES ('old.md', 'delete')").run();
-	expect(await (await beginInitialImport(env.DB)).json()).toEqual({ import: null });
+	expect(await (await beginInitialImport(env.DB, null)).json()).toEqual({ import: null });
 });
 
 it('scans only the selected folder after import, and changing folders never parses old or unrelated notes', async () => {
@@ -131,7 +131,7 @@ it('finishes on the first device, then downloads the vault onto a new device', a
 	const put = vi.spyOn(env.BUCKET, 'put');
 	expect((await first.engine.sync()).errors).toEqual([]);
 	expect(first.requests).toContain('POST /sync/import/upload');
-	expect(await env.DB.prepare('SELECT 1 FROM upload_operations').first()).toBeNull();
+	expect(await env.DB.prepare("SELECT 1 FROM operations WHERE kind = 'upload'").first()).toBeNull();
 	const second = new SyncTestDevice('second-import', env); clients.push(second); await second.authorize(); await second.open();
 	put.mockClear(); expect((await second.engine.sync()).errors).toEqual([]);
 	expect(second.disk.text('Notes/note.md')).toBe('My note'); expect(second.disk.text('Assets/data.bin')).toBe('data');
@@ -160,7 +160,7 @@ it('rechecks completion when a batch commits during inventory verification', asy
 		return batch(statements);
 	});
 	expect((await finish(token)).status).toBe(409);
-	expect(await env.DB.prepare('SELECT state FROM initial_import').first()).toEqual({ state: 'importing' });
+	expect(await env.DB.prepare('SELECT import_state AS state FROM server_state').first()).toEqual({ state: 'importing' });
 	expect((await finish(token)).status).toBe(200);
 });
 
@@ -256,8 +256,9 @@ it.each([8, INITIAL_IMPORT_MAX_FILES])('measures 10,000-note import writes with 
 	}
 	expect((await finish(token, meter.db)).status).toBe(200);
 	await revalidateReminderSources({ ...env, DB: meter.db }, 4);
+	// One `files` row per note: 50,000 notes stay under one day of the Free plan's 100,000 row writes.
 	expect(meter.writes()).toBeLessThan(16000);
-	expect(meter.writes()).toBe(batchSize === 8 ? 13758 : 10947);
+	expect(meter.writes()).toBe(batchSize === 8 ? 13757 : 10946);
 	console.info('Initial import D1 writes:', meter.writes());
 }, 120000);
 
@@ -272,7 +273,7 @@ it('verifies a large inventory in bounded primary-key pages and restarts after a
 	const first = await finishInitialImport(jsonRequest({ token, after: '', entries: pages[0], final: false }), env.DB);
 	const { cursor } = await first.json() as { cursor: string };
 	// A prune or upload between pages advances the generation and invalidates progress.
-	await env.DB.prepare('UPDATE initial_import SET generation = generation + 1').run();
+	await env.DB.prepare('UPDATE server_state SET import_generation = import_generation + 1').run();
 	expect((await finishInitialImport(jsonRequest({ token, after: cursor, entries: pages[1], final: false }), env.DB)).status).toBe(409);
 	const { [`Notes/N${count}.md`]: _omitted, ...missingOne } = inventory;
 	expect((await finishInventory(token, missingOne)).status).toBe(409);
