@@ -1,0 +1,43 @@
+/* A reminder's stored date in a note, shown as a short readable chip until the cursor reaches its line. */
+.crate-reminder-date {
+	padding: 0 var(--size-4-1);
+	border-radius: var(--radius-s);
+	background-color: var(--background-modifier-hover);
+	color: var(--text-muted);
+	font-size: var(--font-smaller);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.crate-reminder-date.is-overdue {
+	color: var(--text-error);
+}
+
+/* A typed date or repeat phrase the next save turns into a date, and that date after the line. */
+.crate-reminder-date-phrase {
+	text-decoration: underline dotted var(--text-accent);
+	text-underline-offset: 3px;
+}
+
+.crate-reminder-date-hint {
+	margin-inline-start: var(--size-4-2);
+	color: var(--text-faint);
+	font-size: var(--font-smaller);
+	white-space: nowrap;
+	pointer-events: none;
+	user-select: none;
+}
+
+.crate-reminder-date-hint::before {
+	content: '→ ';
+}
+
+.crate-reminder-date:not(.is-overdue):hover {
+	color: var(--text-normal);
+}
+
+/* A typed phrase that cannot become a date; its title holds the parser's error. */
+.crate-reminder-date-error {
+	text-decoration: underline wavy var(--text-error);
+	text-underline-offset: 3px;
+}

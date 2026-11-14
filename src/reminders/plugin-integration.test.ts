@@ -36,6 +36,7 @@ type MockPlugin = {
 	registerView: ReturnType<typeof vi.fn>;
 	addRibbonIcon: ReturnType<typeof vi.fn>;
 	registerEditorExtension: ReturnType<typeof vi.fn>;
+	registerMarkdownPostProcessor: ReturnType<typeof vi.fn>;
 	addCommand: ReturnType<typeof vi.fn>;
 	reminders?: {
 		index?: unknown;
@@ -177,6 +178,7 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 		registerView: vi.fn(),
 		addRibbonIcon: vi.fn(),
 		registerEditorExtension: vi.fn(),
+		registerMarkdownPostProcessor: vi.fn(),
 		addCommand: vi.fn(),
 		...overrides,
 		getLayoutReadyHandler: () => layoutReadyHandler,

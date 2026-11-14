@@ -1,5 +1,5 @@
 import { setReminderRibbon } from './visibility';
-import { addIcon, editorInfoField } from 'obsidian';
+import { addIcon, editorInfoField, editorLivePreviewField } from 'obsidian';
 import type { EditorState } from '@codemirror/state';
 import type CratePlugin from '../plugin/CratePlugin';
 import { registerReminderCommands } from './commands';
@@ -9,6 +9,8 @@ import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { CRATE_ICON_ID, CRATE_ICON_SVG } from '../ui/crate-icon';
 import { createReminderMarkerHiding, createReminderLineLeaveExtension } from './data/editor-line-leave';
+import { createReminderDateChips } from './data/editor-date-chips';
+import { createReadingDateChips } from './data/reading-date-chips';
 import { openReminderEditModal } from './ui/plugin/reminder-modal/reminderEditorModals';
 
 const remindersLogger = createLogger('Reminders');
@@ -37,6 +39,10 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 
 	setReminderRibbon(plugin, ribbon);
 	const editorPath = (state: EditorState) => state.field(editorInfoField, false)?.file?.path;
+	const openReminder = (reminderId: string) => {
+		const reminder = plugin.reminders?.index.getById(reminderId);
+		if (reminder) openReminderEditModal(plugin, reminder, () => undefined);
+	};
 	plugin.registerEditorExtension([
 		createReminderLineLeaveExtension(state => {
 			const path = editorPath(state);
@@ -45,11 +51,14 @@ export async function registerReminderIntegrations(plugin: CratePlugin, openView
 		createReminderMarkerHiding(state => {
 			const path = editorPath(state);
 			return Boolean(path && plugin.reminders?.index.isReminderFile(path));
-		}, reminderId => {
-			const reminder = plugin.reminders?.index.getById(reminderId);
-			if (reminder) openReminderEditModal(plugin, reminder, () => undefined);
-		}),
+		}, openReminder),
+		// Source mode shows the stored text, as it does for links.
+		createReminderDateChips(state => {
+			const path = editorPath(state);
+			return Boolean(path && state.field(editorLivePreviewField, false) && plugin.reminders?.index.isReminderFile(path));
+		}, openReminder),
 	]);
+	plugin.registerMarkdownPostProcessor(createReadingDateChips(path => Boolean(plugin.reminders?.index.isReminderFile(path)), openReminder));
 	registerReminderCommands(plugin);
 
 	plugin.addCommand({
