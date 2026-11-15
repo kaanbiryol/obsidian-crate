@@ -7,7 +7,7 @@ import { quoteName } from '../d1-sql';
 export interface BackupSource { account: string; database: string; bucket: string }
 interface BackupObject { key: string; sha256: string; size: number; contentType?: string }
 export interface BackupPart { sha256: string; size: number }
-/** Format 2 stores the database in ordered parts under the backup, named by
+/** An upgrade backup stores the database in ordered parts under the backup, named by
  * checksum, and shares checksum-named file copies through the backup store. */
 export interface UpgradeBackup { format: 1; complete: true; createdAt: string; source: BackupSource; objects: BackupObject[]; databaseParts: BackupPart[] }
 export interface BackupChoice { prefix: string; manifest: UpgradeBackup; hash: string }

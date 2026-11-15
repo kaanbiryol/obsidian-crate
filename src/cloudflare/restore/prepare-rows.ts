@@ -10,9 +10,9 @@ function discardMaintenanceKey(key: string): boolean {
 const record = (row: BackupRow): Record<string, Cell> => Object.fromEntries(row.columns.map((column, index) => [column, row.values[index]!]));
 const RESET = new Set(['crate_schema', 'crate_release', 'crate_migrations', ...policy.resetTables]);
 export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentSchema: string, restoredAt: number): BackupRow[] {
-	// Preserve queued captures and Reading policy from the launch schema.
-	// Future schema changes require an explicit recovery adapter.
-	if (SERVER_RELEASE.schemaVersion > 1) throw new Error('This schema needs a newer in-app restore adapter');
+	// Preserve queued captures and Reading policy from the launch schema (version 2; version 1 was
+	// the 0.12.0 beta's). Future schema changes require an explicit recovery adapter.
+	if (SERVER_RELEASE.schemaVersion > 2) throw new Error('This schema needs a newer in-app restore adapter');
 	const allowed = new Set([...currentSchema.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/g)].map(match => match[1]));
 	if (rows.some(row => !allowed.has(row.table))) throw new Error('Unknown backup table');
 	const schemaRows = rows.filter(row => row.table === 'crate_schema').map(record);

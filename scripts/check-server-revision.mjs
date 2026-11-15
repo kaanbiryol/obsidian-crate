@@ -14,20 +14,12 @@ export function revisionBase(root, env = process.env, explicit) {
   const event = env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8')) : {};
   const releaseRun = Boolean(env.RELEASE_TAG) || event.ref?.startsWith('refs/tags/');
   const head = commit(root, 'HEAD');
-  let baseline;
-  try {
-    const policy = JSON.parse(readFileSync(resolve(root, 'scripts/server-release-policy.json'), 'utf8'));
-    if (!/^[a-f0-9]{40}$/.test(policy.baselineCommit)) throw new Error('Invalid server release baseline');
-    baseline = commit(root, policy.baselineCommit);
-    if (git(root, 'merge-base', head, baseline) !== baseline) throw new Error('Server release baseline is not an ancestor of HEAD');
-  } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const releases = env.CRATE_PUBLISHED_RELEASES !== undefined ? JSON.parse(env.CRATE_PUBLISHED_RELEASES)
     : JSON.parse(execFileSync('gh', ['release', 'list', '--limit', '1000', '--json', 'tagName,isDraft'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
   const published = new Set(releases.filter(release => !release.isDraft).map(release => release.tagName));
-  const tags = git(root, 'tag', '--merged', 'HEAD', '--sort=-version:refname').split('\n').filter(tag => published.has(tag) && (!baseline || commit(root, tag) !== baseline && git(root, 'merge-base', baseline, commit(root, tag)) === baseline));
+  const tags = git(root, 'tag', '--merged', 'HEAD', '--sort=-version:refname').split('\n').filter(tag => published.has(tag));
   const previous = tags.find(tag => /^\d+\.\d+\.\d+$/.test(tag) && (!releaseRun || commit(root, tag) !== head));
   if (previous) return commit(root, previous);
-  if (baseline) return baseline;
   // Before the first release, freeze the earliest manifest as the development baseline.
   const introductions = git(root, 'log', '--reverse', '--format=%H', '--diff-filter=A', 'HEAD', '--', releasePath).split('\n').filter(Boolean);
   return introductions[0] ?? head;
@@ -70,21 +62,8 @@ export function checkServerRevision(root, base, inputs) {
 	const current = manifest(read(releasePath));
 	if (!previousFiles.has(releasePath)) return { baseline: base, revision: current.revision, bootstrap: true, changed: [] };
 	const before = manifest(git(root, 'show', `${base}:${releasePath}`));
-  // The pinned pre-launch commit is a source/schema baseline, not a published release.
-  let initialRevision;
-  try {
-    const policy = JSON.parse(readFileSync(resolve(root, 'scripts/server-release-policy.json'), 'utf8'));
-    if (policy.baselineCommit === base && policy.initialRevision !== undefined) {
-      if (!Number.isSafeInteger(policy.initialRevision) || policy.initialRevision < 1) throw new Error('The initial public server revision must be a positive integer.');
-      initialRevision = policy.initialRevision;
-    }
-  } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  if (initialRevision !== undefined) {
-    if (current.revision !== initialRevision) throw new Error(`The first public server release must use revision ${initialRevision}.`);
-    before.revision = initialRevision - 1;
-  }
 	if (current.revision < before.revision) throw new Error('Server revision cannot decrease.');
-	if (initialRevision === undefined && current.schemaVersion < before.schemaVersion) throw new Error('Database schema version cannot decrease.');
+	if (current.schemaVersion < before.schemaVersion) throw new Error('Database schema version cannot decrease.');
 	const algorithm = git(root, 'rev-parse', '--show-object-format');
 	const changed = path => {
 		let contents;
@@ -93,10 +72,10 @@ export function checkServerRevision(root, base, inputs) {
 		const hash = createHash(algorithm).update(`blob ${contents.length}\0`).update(contents).digest('hex');
 		return hash !== previousFiles.get(path);
 	};
-	if (initialRevision === undefined && changed(schemaPath) && current.schemaVersion <= before.schemaVersion) {
+	if (changed(schemaPath) && current.schemaVersion <= before.schemaVersion) {
 		throw new Error('schema.sql changed without a schemaVersion increase and migration plan.');
 	}
-	for (const migration of initialRevision === undefined ? before.migrations : []) {
+	for (const migration of before.migrations) {
 		const sqlPath = `src/cloudflare/migrations/${migration.file}`;
 		// Entries are permanent; only SQL entirely below the support floor may be deleted.
 		const retired = migration.to <= current.minimumSchemaVersion && !existsSync(resolve(root, sqlPath));

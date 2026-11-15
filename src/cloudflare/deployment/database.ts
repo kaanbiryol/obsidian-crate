@@ -71,15 +71,15 @@ export async function inspectDeploymentDatabase(input: DeploymentDatabase): Prom
 	if (releases.length > 1 || deployed && (!Number.isSafeInteger(deployed.revision) || Number(deployed.revision) < 1
 		|| !Number.isSafeInteger(deployed.schema_version) || Number(deployed.schema_version) < 1
 		|| typeof deployed.fingerprint !== 'string' || typeof deployed.schema_hash !== 'string')) throw new Error('Invalid saved server release');
+	if (deployed && deployed.schema_version === SERVER_RELEASE.schemaVersion && deployed.schema_hash !== input.artifacts.d1SchemaSha256) {
+		// Released schemas only change with a version increase, so this database comes
+		// from a pre-release beta that has no upgrade path, whatever revision it reports.
+		throw new UnupgradableServerError('The server database has a different schema at the same schema version, so this build cannot update it.');
+	}
 	const development = deployed ? await readDeploymentBuild(input, String(deployed.fingerprint)) : undefined;
 	if (deployed && !canReplaceServerBuild({ revision: Number(deployed.revision), fingerprint: String(deployed.fingerprint), development },
 		{ revision: SERVER_RELEASE.revision, fingerprint: input.artifacts.fingerprint, development: input.artifacts.development })) {
 		throw new Error('This server uses a newer or different build of this server revision. Install its matching plugin or a newer server revision; server downgrades are not supported.');
-	}
-	if (deployed && deployed.schema_version === SERVER_RELEASE.schemaVersion && deployed.schema_hash !== input.artifacts.d1SchemaSha256) {
-		// Released schemas only change with a version increase, so this database comes
-		// from a pre-release beta that has no upgrade path.
-		throw new UnupgradableServerError('The server database has a different schema at the same schema version, so this build cannot update it.');
 	}
 	const receipts = await query('SELECT id, checksum FROM crate_migrations;');
 	validateMigrationHistory(version, createdVersion, receipts);

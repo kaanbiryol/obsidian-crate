@@ -5,7 +5,7 @@ from pathlib import Path
 from .archive import digest, object_path, verify
 from .checkpoint import atomic_write, identity, save
 
-# Format 2 backups share content-addressed file copies under this reserved prefix.
+# Upgrade backups share content-addressed file copies under this reserved prefix.
 STORE = '__crate__/backups/schema-upgrade-ffffffff-ffff-ffff-ffff-ffffffffffff'
 SHA256 = re.compile(r'[a-f0-9]{64}')
 
