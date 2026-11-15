@@ -14,7 +14,6 @@ import { markRole } from '../coordinator/role-flags';
 /** Dispatcher role storage flag, for runtimes without instance names: its alarm delivers due reminders. */
 export const DISPATCHER_KEY = 'reminderDispatcher';
 const FAILURES_KEY = 'dispatchFailures';
-const MAX_PASS_FAILURES = 8;
 const MAX_DELIVERY_ATTEMPTS = 10;
 /** Due reminders per pass. A pass makes one feature read, one due read, one authority
  * read, one recipient read, one VAPID key read (three on first use), at most one write per
@@ -71,7 +70,8 @@ export async function runReminderDispatch(state: DurableObjectState, env: Env, w
 		} else {
 			const failures = await state.storage.get<number>(FAILURES_KEY) ?? 0;
 			await state.storage.put(FAILURES_KEY, failures + 1);
-			if (failures + 1 < MAX_PASS_FAILURES) next = Date.now() + notificationRetryDelayMs(failures);
+			// Never stops: outstanding schedules have no other wake, and the backoff caps at six hours.
+			next = Date.now() + notificationRetryDelayMs(failures);
 			console.error('Reminder delivery pass failed:', error);
 		}
 	}

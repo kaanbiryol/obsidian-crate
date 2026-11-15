@@ -29,7 +29,7 @@ it('pauses an invalid file immediately despite unrelated edits, then recovers af
 	expect(await failure()).toBeNull();
 });
 
-it('stops retrying a failing dispatcher pass after eight failures', async () => {
+it('keeps retrying a failing dispatcher pass with capped backoff, so outstanding schedules resume', async () => {
 	const values = new Map<string, unknown>();
 	let alarm: number | null = null, alarms = 0;
 	const state = { storage: {
@@ -43,8 +43,10 @@ it('stops retrying a failing dispatcher pass after eight failures', async () => 
 	for (let i = 0; i < 11; i++) { alarm = null; await runReminderDispatch(state, failing, action => action()); }
 	logged.mockRestore();
 	expect(reads).toBe(11);
-	// Seven retries with backoff; the eighth failure leaves no alarm until the next wake.
-	expect(alarms).toBe(7);
+	// Before: the eighth failure left no alarm, so already-scheduled reminders stopped until the
+	// next dated edit. Every failure now retries, at most every six hours.
+	expect(alarms).toBe(11);
+	expect(alarm! - Date.now()).toBeLessThanOrEqual(6 * 60 * 60 * 1000);
 	expect(values.get('dispatchFailures')).toBe(11);
 });
 
