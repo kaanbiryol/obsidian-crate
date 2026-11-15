@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  version INTEGER NOT NULL,
  created_version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 2, 2);
+INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 1, 1);
 
 -- Each insert sets `seq` above `LAST_SEQ_SQL` (sync/storage.ts), so cursors never repeat.
 CREATE TABLE IF NOT EXISTS changelog (

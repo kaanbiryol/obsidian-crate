@@ -188,3 +188,74 @@ test('ignores draft release tags when selecting the published baseline', () => {
 });
 
 
+test('pins an explicit post-reset baseline until a new release is published', () => {
+  const h = fixture();
+  h.git('tag', '0.1.0');
+  h.release({ revision: 2 });
+  const baseline = h.commit();
+  h.write('scripts/server-release-policy.json', { baselineCommit: baseline });
+  h.release({ revision: 3 });
+  h.commit();
+  assert.equal(h.ci('push', {}), baseline);
+  h.git('tag', '0.2.0');
+  assert.equal(h.ci('push', {}), h.git('rev-parse', 'HEAD'));
+  h.write('scripts/server-release-policy.json', { baselineCommit: 'missing' });
+  assert.throws(() => h.ci('push', {}), /Invalid server release baseline/);
+});
+
+
+test('starts an explicit pre-launch reset at one and enforces increments after publication', () => {
+  const h = fixture();
+  h.release({ revision: 3 });
+  const baseline = h.commit();
+  h.write('scripts/server-release-policy.json', { baselineCommit: baseline, initialRevision: 1 });
+  h.release({ revision: 1 });
+  h.write('src/shared.ts', 'new launch implementation');
+  assert.doesNotThrow(() => checkServerRevision(h.root, baseline, h.inputs));
+  h.release({ revision: 2 });
+  assert.throws(() => checkServerRevision(h.root, baseline, h.inputs), /first public server release/);
+  h.release({ revision: 1 });
+  const published = h.commit();
+  h.write('src/shared.ts', 'next release implementation');
+  assert.throws(() => checkServerRevision(h.root, published, h.inputs), /without increasing revision/);
+  h.release({ revision: 2 });
+  assert.doesNotThrow(() => checkServerRevision(h.root, published, h.inputs));
+});
+
+
+test('reserves deployed pre-launch revisions before the first public candidate', () => {
+  const h = fixture();
+  const baseline = h.git('rev-parse', 'HEAD');
+  h.write('scripts/server-release-policy.json', { baselineCommit: baseline, initialRevision: 2 });
+  h.write('src/shared.ts', 'next implementation');
+  h.release({ revision: 1 });
+  assert.throws(() => checkServerRevision(h.root, baseline, h.inputs), /must use revision 2/);
+  h.release({ revision: 2 });
+  assert.doesNotThrow(() => checkServerRevision(h.root, baseline, h.inputs));
+  h.release({ revision: 3 });
+  assert.throws(() => checkServerRevision(h.root, baseline, h.inputs), /must use revision 2/);
+  h.release({ revision: 2 });
+  const published = h.commit();
+  h.write('src/shared.ts', 'subsequent implementation');
+  assert.throws(() => checkServerRevision(h.root, published, h.inputs), /without increasing revision/);
+  h.release({ revision: 3 });
+  assert.doesNotThrow(() => checkServerRevision(h.root, published, h.inputs));
+});
+
+
+test('retires development migration history only at the explicit unpublished baseline', () => {
+  const h = fixture();
+  const step = { id: 'development-step', from: 1, to: 2, file: 'development-step.sql', checksum: 'a'.repeat(64) };
+  h.release({ revision: 8, schemaVersion: 2, migrations: [step] });
+  h.write('src/cloudflare/migrations/development-step.sql', 'CREATE TABLE development(id TEXT);');
+  const baseline = h.commit();
+  h.git('tag', '0.5.0');
+  h.write('scripts/server-release-policy.json', { baselineCommit: baseline, initialRevision: 8 });
+  h.release({ revision: 8, schemaVersion: 2, minimumSchemaVersion: 2 });
+  assert.equal(h.ci('push', {}), baseline);
+  assert.doesNotThrow(() => checkServerRevision(h.root, baseline, h.inputs));
+  const published = h.commit();
+  h.write('src/cloudflare/schema.sql', 'CREATE TABLE changed(id TEXT);');
+  h.release({ revision: 9, schemaVersion: 2, minimumSchemaVersion: 2 });
+  assert.throws(() => checkServerRevision(h.root, published, h.inputs), /schemaVersion increase/);
+});

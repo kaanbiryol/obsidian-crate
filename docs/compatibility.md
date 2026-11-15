@@ -30,7 +30,7 @@ Encrypted vaults additionally require matching vault/generation headers. Their c
 
 Read responses list an encrypted file's `descriptor` beside its revision as an optional field. A client that finds none, as in a shared checkpoint, asks `POST /encryption/metadata` with each revision's server path.
 
-File descriptors are version 1, with their metadata sealed in a compact envelope. The server stores each packed. Release 0.12.0 also wrote `version: 1` descriptors, with JWE metadata and an optional seal; the two layouts refuse each other by shape (see the retired samples in `src/encryption/__fixtures__/encrypted-formats.json`), and 0.12.0 servers (schema 1) are below the support floor, so they are replaced rather than updated.
+File descriptors are version 1, with their metadata sealed in a compact envelope. The server stores each packed. Release 0.12.0 also wrote `version: 1` descriptors, with JWE metadata and an optional seal; the two layouts refuse each other by shape (see the retired samples in `src/encryption/__fixtures__/encrypted-formats.json`), and a 0.12.0 server has another schema at the same schema version, so it is replaced rather than updated.
 
 File and folder moves use existing encrypted sync; every file uses the vault key. Encrypted upload journals and saved encrypted attempts always record their key generation and server path, so a retry reaches the same server path with the same bytes.
 

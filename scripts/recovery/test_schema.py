@@ -62,7 +62,7 @@ class LaunchSchemaTests(unittest.TestCase):
         db.commit()
         schema.upgrade_schema(db)
         schema.upgrade_schema(db)
-        self.assertEqual(schema.validate_schema(db), 2)
+        self.assertEqual(schema.validate_schema(db), 1)
         self.assertEqual(db.execute('SELECT hash,storage_key FROM files').fetchone(), ('original-hash', 'original-key'))
         self.assertEqual(db.execute('SELECT count(*) FROM reading_captures').fetchone()[0], 0)
         self.assertEqual(db.execute('SELECT count(*) FROM crate_migrations').fetchone()[0], 0)

@@ -89,7 +89,7 @@ const fixtures: Record<string, Fixture<unknown>> = {
 	}),
 	// Retired: release 0.12.0 also wrote `version: 1` descriptors, with JWE metadata, and its
 	// servers sealed Shortcut saves to the vault seal key. Current clients refuse both by shape
-	// rather than misread them; 0.12.0 servers are below the schema floor and are replaced.
+	// rather than misread them; 0.12.0 servers have another schema at the same version and are replaced.
 	'file-jwe-metadata-0.12': fixture<{ bytes: string }>({
 		generate: async () => { throw new Error('Retired format: keep the stored sample'); },
 		verify: async ({ bytes }) => {
