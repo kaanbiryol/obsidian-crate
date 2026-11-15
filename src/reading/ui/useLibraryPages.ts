@@ -19,34 +19,45 @@ const SEARCH_DELAY_MS = 250;
 // A filtered Highlights page scans a bounded run of notes, so it can come back empty with a
 // cursor. Each request follows up to this many more before the list asks again on scroll.
 const MAX_EMPTY_FOLLOWS = 3;
+// A refresh reads at most this many pages to keep the user's place.
+const MAX_RELOAD_PAGES = 20;
+
+const appendNew = (items: ReadingItem[], more: ReadingItem[]) => [...items, ...more.filter(item => !items.some(other => other.crate_reading_id === item.crate_reading_id))];
 
 /** The loaded pages for one section, search and tag; a change starts again from the first page. */
 export function useLibraryPages(source: ReadingLibrarySource | undefined, section: ReadingSection, q: string, tag: string | null) {
 	const query = q.trim(), key = JSON.stringify([section, query, tag]);
 	const [pages, setPages] = useState<Pages>({ key: '', items: [], cursor: null, loading: !!source, error: null });
-	const current = useRef(key), latest = useRef(source);
-	current.current = key; latest.current = source;
+	const current = useRef(key), latest = useRef(source), shown = useRef(pages), requests = useRef(0);
+	current.current = key; latest.current = source; shown.current = pages;
 	const enabled = !!source, revision = source?.revision;
 	const fetchPage = useCallback(async (cursor: string | null, replace: boolean) => {
 		const source = latest.current;
 		if (!source) return;
-		const requested = key;
+		// Only the latest request applies, so a page answered after a refresh cannot leave a gap.
+		const requested = key, request = ++requests.current, stale = () => current.current !== requested || requests.current !== request;
+		// A refresh of the shown query reads as many items as it shows, so the list keeps its place.
+		const keep = replace && shown.current.key === requested ? shown.current.items.length : 0;
 		// A new search or tag keeps the previous items listed until its first page answers.
 		setPages(state => ({ ...state, key: requested, loading: true, error: null, ...replace && state.key !== requested ? { cursor: null } : {} }));
 		try {
-			let page = await source.load({ section, q: query, tag, cursor });
-			for (let follows = 0; !page.items.length && page.cursor && follows < MAX_EMPTY_FOLLOWS && current.current === requested; follows++) {
+			let page = await source.load({ section, q: query, tag, cursor }), items = page.items;
+			for (let follows = 0; !page.items.length && page.cursor && follows < MAX_EMPTY_FOLLOWS && !stale(); follows++) {
 				page = await source.load({ section, q: query, tag, cursor: page.cursor });
+				items = page.items;
 			}
-			if (current.current !== requested) return;
-			setPages(state => ({ key: requested, items: replace ? page.items : [...state.items, ...page.items.filter(item => !state.items.some(other => other.crate_reading_id === item.crate_reading_id))],
-				cursor: page.cursor, loading: false, error: null }));
+			for (let read = 1; replace && page.cursor && items.length < keep && read < MAX_RELOAD_PAGES && !stale(); read++) {
+				page = await source.load({ section, q: query, tag, cursor: page.cursor });
+				items = appendNew(items, page.items);
+			}
+			if (stale()) return;
+			setPages(state => ({ key: requested, items: replace ? items : appendNew(state.items, items), cursor: page.cursor, loading: false, error: null }));
 		} catch (cause) {
-			if (current.current !== requested) return;
+			if (stale()) return;
 			setPages(state => ({ ...state, loading: false, error: cause instanceof Error ? cause.message : 'Your library is unavailable. Retry when connected.' }));
 		}
 	}, [key, section, query, tag]);
-	// A new revision reloads the first page.
+	// A new revision reloads the pages shown.
 	useEffect(() => {
 		if (!enabled) return;
 		const timer = window.setTimeout(() => { void fetchPage(null, true); }, query ? SEARCH_DELAY_MS : 0);
