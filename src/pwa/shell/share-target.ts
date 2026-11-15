@@ -1,4 +1,7 @@
-/** This self-contained function also runs inside the service worker, including offline. */
+/** This self-contained function also runs inside the service worker, including offline. It opens the
+ * Reading database at whatever version it is (see `reading/storage/database.ts`): it is stringified
+ * into the fallback page, so it cannot import that module's version list, and a fixed version would
+ * fail once the database is upgraded. Only a missing database is created here, at version 1. */
 export async function receiveReadingShare(request: Request): Promise<Response> {
 	try {
 		if (!request.headers.get('Content-Type')?.startsWith('application/x-www-form-urlencoded')) throw new Error('Unsupported share format.');
@@ -18,11 +21,12 @@ export async function receiveReadingShare(request: Request): Promise<Response> {
 		const shareKey = await new Promise<{ key: CryptoKey; id: string }>((resolve, reject) => {
 			let expired = false;
 			const timer = setTimeout(() => { expired = true; reject(new Error('Reading storage is unavailable. Open Crate, then share again.')); }, 4000);
-			const opening = indexedDB.open('crate-reading-v1', 1);
+			const opening = indexedDB.open('crate-reading-v1');
 			opening.onupgradeneeded = () => { if (expired) opening.transaction?.abort(); else opening.result.createObjectStore('values'); };
 			opening.onerror = () => { clearTimeout(timer); reject(new Error('Reading storage is unavailable.')); };
 			opening.onsuccess = () => {
 				const db = opening.result; if (expired) { db.close(); return; }
+				if (!db.objectStoreNames.contains('values')) { clearTimeout(timer); db.close(); reject(new Error('Reading storage is unavailable. Open Crate, then share again.')); return; }
 				const tx = db.transaction('values', 'readwrite'), store = tx.objectStore('values');
 				const get = store.get('share-key'), getId = store.get('share-key-id'); let key: CryptoKey, keyId: string;
 				getId.onsuccess = () => { keyId = typeof getId.result === 'string' ? getId.result : crypto.randomUUID(); if (!getId.result) store.put(keyId, 'share-key-id'); };
@@ -37,12 +41,13 @@ export async function receiveReadingShare(request: Request): Promise<Response> {
 		const protectedShare = { encryptedShare: 1, iv: Array.from(iv), ciphertext: Array.from(new Uint8Array(ciphertext)) };
 		await new Promise<void>((resolve, reject) => {
 			let expired = false;
-			const opening = indexedDB.open('crate-reading-v1', 1);
+			const opening = indexedDB.open('crate-reading-v1');
 			const timer = setTimeout(() => { expired = true; reject(new Error('Reading storage is unavailable. Open Crate, then share again.')); }, 4000);
 			opening.onupgradeneeded = () => { if (expired) opening.transaction?.abort(); else opening.result.createObjectStore('values'); };
 			opening.onerror = () => { clearTimeout(timer); reject(new Error('Reading storage is unavailable.')); };
 			opening.onsuccess = () => {
 				const db = opening.result; if (expired) { db.close(); return; }
+				if (!db.objectStoreNames.contains('values')) { clearTimeout(timer); db.close(); reject(new Error('Reading storage is unavailable. Open Crate, then share again.')); return; }
 				const tx = db.transaction('values', 'readwrite');
 				const store = tx.objectStore('values');
 				const count = store.count(IDBKeyRange.bound('share:', 'share;'));

@@ -6,7 +6,8 @@ import { chromium, webkit } from '@playwright/test';
 // Native IndexedDB upgrade path for browser databases: ordered steps run in one upgrade
 // transaction, a failed step keeps the previous version's data, and layouts this build
 // cannot vouch for are preserved instead of upgraded.
-const { outputFiles } = await build({ stdin: { contents: `export { openVersionedDatabase } from './src/pwa/storage/single-store-database';`, resolveDir: process.cwd() },
+const { outputFiles } = await build({ stdin: { contents: `export { openVersionedDatabase } from './src/pwa/storage/single-store-database';
+export { receiveReadingShare } from './src/pwa/shell/share-target';`, resolveDir: process.cwd() },
 	bundle: true, format: 'iife', globalName: 'versionedDatabase', write: false });
 
 for (const browserType of [chromium, webkit]) {
@@ -19,7 +20,7 @@ for (const browserType of [chromium, webkit]) {
 		await page.goto('https://pwa-storage-upgrade.test');
 		await page.addScriptTag({ content: outputFiles[0].text });
 		const results = await page.evaluate(async () => {
-			const { openVersionedDatabase } = versionedDatabase;
+			const { openVersionedDatabase, receiveReadingShare } = versionedDatabase;
 			const done = request => new Promise((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
 			const remove = name => done(indexedDB.deleteDatabase(name));
 			const rawOpen = (name, version, upgrade) => new Promise((resolve, reject) => {
@@ -114,6 +115,17 @@ for (const browserType of [chromium, webkit]) {
 			out.newer = await open('newer', [v1, v2]);
 			out.newerVersion = (await inspect('newer')).version;
 			out.failures = failures;
+
+			// A share must reach a Reading database a later release upgraded.
+			await remove('crate-reading-v1');
+			(await rawOpen('crate-reading-v1', 2, db => db.createObjectStore('values'))).close();
+			const shared = await receiveReadingShare(new Request(`${location.origin}/notifications/share/reading`, {
+				method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'url=https%3A%2F%2Fexample.com%2Fshared' }));
+			out.shareStatus = shared.status;
+			const reading = await inspect('crate-reading-v1');
+			out.shareVersion = reading.version;
+			out.shareStored = reading.records.values.filter(value => value && value.encryptedShare === 1).length;
+			await remove('crate-reading-v1');
 			return out;
 		});
 
@@ -138,6 +150,10 @@ for (const browserType of [chromium, webkit]) {
 		assert.equal(results.newer, 'unsupported');
 		assert.equal(results.newerVersion, 5);
 		assert.deepEqual(results.failures, ['unavailable', 'unavailable', 'unsupported', 'unsupported', 'unsupported']);
+		// Before: the share opened version 1 and failed with "Reading storage is unavailable."
+		assert.equal(results.shareStatus, 303);
+		assert.equal(results.shareVersion, 2);
+		assert.equal(results.shareStored, 1);
 		assert.deepEqual(errors, []);
 		console.log(`${browserType.name()}: native IndexedDB ordered upgrades, failed-step rollback and unsupported-layout preservation passed`);
 	} finally {
