@@ -101,7 +101,14 @@ export class PendingSet {
 		let released = false;
 		return {
 			paths,
-			requeue: keys => { for (const key of keys) this.queued.add(key); },
+			requeue: keys => {
+				for (const key of keys) {
+					this.queued.add(key);
+					// An event for the opposite operation removed this key's revision; without a new one,
+					// any snapshot would settle the requeued work.
+					if (!this.revisions.has(key)) this.revisions.set(key, ++this.nextRevision);
+				}
+			},
 			release: () => {
 				// Reporting can outlive this batch and overlap a later flush of the
 				// same path. Its finalizer must release this ownership only once.

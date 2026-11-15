@@ -63,6 +63,19 @@ it('never settles a key an event changed after the snapshot or batch that tried 
 	}));
 });
 
+it('keeps a requeued key whose revision a newer event for its path removed', () => {
+	// fast-check counterexample: add upload b.md; take; add delete b.md; release(requeue: true); settle upload b.md.
+	const pending = new PendingSet();
+	const upload = pendingChangeKey('upload', 'b.md');
+	pending.add({ kind: 'upload', path: 'b.md' }, 0);
+	const batch = pending.takeBatch(() => true);
+	pending.add({ kind: 'delete', path: 'b.md' }, 1);
+	batch.requeue(batch.paths); batch.release();
+	// Before: the requeued upload had no revision, so any snapshot settled it.
+	pending.settleIfUnchanged(upload, new Map());
+	expect(pending.queuedKeys().has(upload)).toBe(true);
+});
+
 it('restores a saved key only when no live event queued its path', () => {
 	const pending = new PendingSet();
 	pending.add({ kind: 'delete', path: 'a.md' }, 0);
