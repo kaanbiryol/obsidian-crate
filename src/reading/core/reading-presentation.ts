@@ -1,6 +1,6 @@
 import type { ReadingItem } from './model';
 import { youtubeVideoId } from './youtube';
-import { highlightMatches } from './search-terms';
+import { highlightedAt, highlightMatches } from './search-terms';
 
 export type ReadingSection = 'inbox' | 'favorites' | 'archived' | 'highlights';
 export const readingSections = [
@@ -52,4 +52,15 @@ export function filterReadingHighlights(items: ReadingItem[], query: string, byW
 	})
 		.sort((a, b) => (b.highlight.createdAt ?? b.item.saved_at).localeCompare(a.highlight.createdAt ?? a.item.saved_at)
 			|| a.item.crate_reading_id.localeCompare(b.item.crate_reading_id) || a.highlight.start - b.highlight.start);
+}
+
+/** A server library pages notes by their newest highlight, so a later page can hold highlights
+ * older than ones already shown. While pages remain, only rows from the oldest loaded note's
+ * newest highlight onward are final, so later pages append below them instead of between them. */
+export function settledHighlights<Row extends { item: ReadingItem; highlight: { createdAt?: string } }>(rows: Row[], loaded: ReadingItem[]): Row[] {
+	const frontier = loaded.reduce<string | null>((oldest, item) => {
+		const at = highlightedAt(item);
+		return at !== null && (oldest === null || at.localeCompare(oldest) < 0) ? at : oldest;
+	}, null);
+	return frontier === null ? rows : rows.filter(({ item, highlight }) => (highlight.createdAt ?? item.saved_at).localeCompare(frontier) >= 0);
 }

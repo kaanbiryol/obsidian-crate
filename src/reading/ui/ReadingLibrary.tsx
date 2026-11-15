@@ -12,7 +12,7 @@ import { FloatingActionButton } from '../../ui/shared/FloatingActionButton';
 import { EmptyState } from '../../ui/shared/EmptyState';
 import type { ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
-import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
+import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, readingTitle, settledHighlights, type ReadingSection } from '../core/reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { HighlightList } from './HighlightList';
 import type { ReadingHighlight } from '../core/highlights';
@@ -111,7 +111,11 @@ export function ReadingLibraryPanel({
 		? filterReadingItems(loaded, section, '', null).filter(item => (!listQuery.trim() || (section === 'highlights' ? highlightsMatch(item, listQuery) : titleMatches(item.title, listQuery)))
 			&& (!tag || item.tags.some(value => normalizedTag(value) === normalizedTag(tag))))
 		: filterReadingItems(snapshot.items, section, listQuery, tag), [present, loaded, snapshot.items, section, listQuery, tag]);
-	const excerpts = useMemo(() => filterReadingHighlights(items, listQuery, !!present), [items, listQuery, present]);
+	const morePages = !!pages.cursor;
+	const excerpts = useMemo(() => {
+		const rows = filterReadingHighlights(items, listQuery, !!present);
+		return present && section === 'highlights' && morePages ? settledHighlights(rows, pages.items) : rows;
+	}, [items, listQuery, present, section, morePages, pages.items]);
 	const count = section === 'highlights' ? excerpts.length : items.length;
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	// A server library lists every tag; a local one holds them all already.

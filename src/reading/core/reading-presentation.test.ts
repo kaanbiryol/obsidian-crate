@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ReadingItem } from './model';
-import { filterReadingItems, groupReadingItems, filterReadingHighlights } from './reading-presentation';
+import { filterReadingItems, groupReadingItems, filterReadingHighlights, settledHighlights } from './reading-presentation';
 
 const item = (id: string, savedAt: string, overrides: Partial<ReadingItem> = {}): ReadingItem => ({
 	crate_reading_id: id, crate_reading_version: 1, title: 'A thoughtful essay', source_url: 'https://journal.example.com/read',
@@ -63,5 +63,23 @@ describe('highlights of a server library', () => {
 		// Words in different highlights show all of the note's highlights.
 		expect(texts('fox dog')).toEqual(['The quick brown fox at the café', 'A lazy dog']);
 		expect(texts('notes lazy')).toEqual(['A lazy dog']);
+	});
+});
+
+describe('highlights feed across server pages', () => {
+	const note = (id: string, dates: string[]): ReadingItem => ({ crate_reading_version: 1, crate_reading_id: `12345678-1234-4123-8123-${id.padStart(12, '0')}`, title: id,
+		path: `Reading/${id}.md`, source_url: 'https://example.test/', saved_at: '2026-01-01T00:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready',
+		highlights: dates.map((createdAt, index) => ({ start: index, end: index + 1, text: `${id} ${createdAt.slice(0, 10)}`, createdAt })) });
+	const rows = (items: ReadingItem[], loaded = items) => settledHighlights(filterReadingHighlights(items, '', true), loaded).map(entry => entry.highlight.text);
+
+	it('holds back rows a later page could still place above', () => {
+		// Pages are ordered by each note's newest highlight: A (Nov 15), then B (Nov 1) on page two.
+		const a = note('1', ['2026-11-15T00:00:00Z', '2026-01-01T00:00:00Z']), b = note('2', ['2026-11-01T00:00:00Z']);
+		// Before: A's January row showed at the end of page one, then B's November row was inserted above it.
+		const first = rows([a]);
+		expect(first).toEqual(['1 2026-11-15']);
+		const both = rows([a, b]);
+		expect(both.slice(0, first.length)).toEqual(first);
+		expect(both).toEqual(['1 2026-11-15', '2 2026-11-01']);
 	});
 });
