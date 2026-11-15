@@ -5,7 +5,7 @@ import type { ReadingSection } from '../core/reading-presentation';
 /** A host whose library stays on a server: each section, search and tag reads its own pages. */
 export interface ReadingLibrarySource {
 	load: (query: { section: ReadingSection; q: string; tag: string | null; cursor: string | null }) => Promise<{ items: ReadingItem[]; cursor: string | null }>;
-	/** Every tag in the library, for the tags view. */
+	/** Every tag in the library, for the tag filter. */
 	loadTags: () => Promise<string[]>;
 	/** Changes whenever the library may have changed, so the loaded pages reload. */
 	revision: unknown;

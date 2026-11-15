@@ -32,7 +32,6 @@
 	}
 	&__empty { @include empty-state.primary; }
 	&__reader-pane { min-width: 0; min-height: 0; overflow: hidden; }
-	&__tag-filter { margin: 0 12px 12px; }
 }
 @mixin compact-layout {
 	&__layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }

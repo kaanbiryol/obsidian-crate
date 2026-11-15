@@ -6,14 +6,13 @@ import type { resolvePwaOpeningDestination } from '../navigation/opening-destina
 const loadingIndicator = (label: string) => `<div class="crate-content-loading" role="status" aria-label="${label}"><svg class="crate-content-loading__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">${SPINNER_SPOKES_HTML}</svg></div>`;
 
 const settings = openingIconSvg('settings', '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>');
-const tags = openingIconSvg('hash', '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>');
 const iconButton = (icon: string, className = '') => `<span class="crate-icon-button ${className}" data-size="large" data-variant="ghost" aria-hidden="true">${icon}</span>`;
 const sync = `<span class="pwa-sync-indicator" aria-hidden="true"><span class="pwa-sync-indicator__button"><svg class="crate-sync-indicator" viewBox="0 0 16 16" data-sync-state="syncing" data-visual-state="syncing" aria-hidden="true" focusable="false"><circle class="crate-sync-indicator__halo" cx="8" cy="8" r="8"/><circle class="crate-sync-indicator__glow" cx="8" cy="8" r="7"/><circle class="crate-sync-indicator__dot" cx="8" cy="8" r="4"/><circle class="crate-sync-indicator__ripple" cx="8" cy="8" r="5.5"/></svg></span></span>`;
 
 function header(reading = false) {
 	return `<div class="view-header${reading ? ' crate-reading__header pwa-reading-opening__header' : ''}">
 		<div class="view-header-copy"><div class="view-header-title-row"><h1 class="view-header-title" data-pwa-launch-title>Reminders</h1></div><div class="view-header-meta is-reserved" aria-hidden="true"></div></div>
-		<div class="view-header-actions"><div class="crate-view-header-actions">${reading ? `<span class="pwa-reading-opening__sync" aria-hidden="true"></span>${iconButton(tags, 'crate-reading__tags')}` : sync}${iconButton(settings, reading ? '' : 'pwa-header-settings-button')}${reading ? iconButton(openingIconSvg('list-todo', '<rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4M13 6h8M13 10h8M13 16h8M13 20h8"/>'), 'pwa-feature-switch-button') : ''}</div></div>
+		<div class="view-header-actions"><div class="crate-view-header-actions">${reading ? `<span class="pwa-reading-opening__sync" aria-hidden="true"></span>` : sync}${iconButton(settings, reading ? '' : 'pwa-header-settings-button')}${reading ? iconButton(openingIconSvg('list-todo', '<rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4M13 6h8M13 10h8M13 16h8M13 20h8"/>'), 'pwa-feature-switch-button') : ''}</div></div>
 	</div>`;
 }
 

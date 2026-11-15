@@ -46,15 +46,20 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-reader-${host}-${width}.png` });
 		await article.getByRole('button', { name: 'Back to reading' }).click();
 		await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
-		await page.getByRole('button', { name: 'Tags', exact: true }).click();
-		const tagList = page.getByRole('dialog', { name: 'Tags', exact: true });
-		await tagList.getByRole('searchbox', { name: 'Search tags' }).fill('LAT');
-		const later = tagList.getByRole('button', { name: 'later', exact: true });
+		const tagFilter = page.getByRole('group', { name: 'Filter by tag' });
+		const all = tagFilter.getByRole('button', { name: 'All', exact: true });
+		const later = tagFilter.getByRole('button', { name: 'later', exact: true });
+		await expect(all).toHaveAttribute('aria-pressed', 'true');
 		expect((await later.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-		await expect(tagList.getByRole('button', { name: 'design', exact: true })).toHaveCount(0);
-		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-list-${browserName}-${host}-${width}.png` });
 		await later.click();
-		await expect(tagList).toBeHidden();
+		await expect(later).toHaveAttribute('aria-pressed', 'true');
+		await expect(all).toHaveAttribute('aria-pressed', 'false');
+		await expect(page.locator('.crate-reading__open')).toHaveCount(1);
+		// Choosing the selected tag again clears the filter.
+		await later.click();
+		await expect(all).toHaveAttribute('aria-pressed', 'true');
+		await expect(page.locator('.crate-reading__open')).toHaveCount(6);
+		await later.click();
 		await expect(page.locator('.crate-reading__open')).toHaveCount(1);
 		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-filter-${host}-${width}.png` });
 		await page.getByRole('button', { name: /The pleasure of reading slowly/ }).click();
@@ -67,7 +72,8 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
 		// Removing the final use of a selected tag must not leave an empty, stuck filter.
 		await expect(page.locator('.crate-reading__open')).toHaveCount(6);
-		await expect(page.locator('.crate-reading__tag-filter')).toHaveCount(0);
+		await expect(tagFilter.getByRole('button', { name: 'later', exact: true })).toHaveCount(0);
+		await expect(all).toHaveAttribute('aria-pressed', 'true');
 		} finally { await browser.close(); }
 	});
 }

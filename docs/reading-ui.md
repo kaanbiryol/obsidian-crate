@@ -355,6 +355,11 @@ there are no footer actions. Saving includes unfinished input and removes
 duplicate tags. Chip colors match the rich-text editor's accent treatment; the
 compound field owns its focus outline and retains 44px touch targets.
 
+The library filters by tag from a single scrolling chip row under search, in every
+section and both hosts. **All** clears the filter, as does selecting the active tag
+again. The row lists every library tag and is hidden when there are none; the
+header has no tags button.
+
 All PWA sheet header buttons use the flat chrome surface through
 `_rounded-sheet-control.scss`, applied in `_sheet-headers.scss` to close/back
 controls, destructive actions, and secondary icon actions. Plain text actions

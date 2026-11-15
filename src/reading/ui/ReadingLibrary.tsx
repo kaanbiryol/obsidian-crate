@@ -19,7 +19,7 @@ import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
 import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
 import { highlightsMatch, titleMatches, normalizedTag, searchableQuery } from '../core/search-terms';
-import { ReadingTagList } from './ReadingTagList';
+import { ReadingTagFilter } from './ReadingTagFilter';
 
 export interface ReadingLibraryProps {
 	listStyle?: ListStyle;
@@ -65,7 +65,7 @@ export function ReadingLibraryPanel({
 	notice, beforeListContent, listContent,
 }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
-	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null), [tagsOpen, setTagsOpen] = useState(false);
+	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [visible, setVisible] = useState(PAGE_SIZE);
 	const [busy, setBusy] = useState<ReadonlySet<string>>(new Set()), [error, setError] = useState<string | null>(null);
 	const [exitingReader, setExitingReader] = useState<React.ReactNode>(null);
@@ -165,7 +165,6 @@ export function ReadingLibraryPanel({
 				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} count={count}
 					countUnit={section === 'highlights' ? 'highlight' : 'saved link'} showMeta={!loading && !more} reserveMetaSpace rightContent={<div className="crate-view-header-actions">
 						{headerStatus}
-						<IconButton size="large" iconSize="l" className="crate-reading__tags" icon="hash" label="Tags" onClick={() => setTagsOpen(true)} />
 						{onSettings && <IconButton size="large" iconSize="l" icon="settings" label={settingsLabel} onClick={onSettings} />}
 						<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" onClick={onAdd} />
 						{headerActions}
@@ -174,7 +173,7 @@ export function ReadingLibraryPanel({
 					placeholder={section === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />}
 					value={query} onChange={event => { setQuery(event.target.value); resetList(); }}
 					trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
-				{tagsOpen && <ReadingTagList load={loadTags} onClose={() => setTagsOpen(false)} onSelect={value => { setTag(value); resetList(); }} />}
+				<ReadingTagFilter load={loadTags} selected={tag} onChange={value => { if (value === tag) return; setTag(value); resetList(); }} />
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1} onScroll={loadNearEnd}>
 					{notice}
@@ -183,9 +182,6 @@ export function ReadingLibraryPanel({
 					{(error || snapshot.error || pages.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error || pages.error}{' '}
 						<Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <ReadingIssues issues={snapshot.issues} />}
-					{tag && <Button variant="outline" className="crate-reading__tag-filter" onClick={() => { setTag(null); resetList(); }}>
-						<ThemeIcon id="hash" size="xs" aria-hidden="true" />{tag}<ThemeIcon id="x" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">Clear tag filter</span>
-					</Button>}
 					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" /> : <>
 						{section === 'highlights' && (count > 0
 							? <HighlightList entries={excerpts.slice(0, visible)} disabled={busy.has('open')}

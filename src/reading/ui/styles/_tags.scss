@@ -24,14 +24,23 @@
 	}
 }
 
-.crate-reminders-ui .crate-reading-tag-list {
-	display: flex; flex-direction: column; gap: 12px; min-height: 0;
-	&__tags { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-	button.crate-reading-tag-list__tag {
-		display: flex; align-items: center; justify-content: flex-start; gap: var(--crate-space-8); width: 100%; min-height: 44px;
-		padding: 8px 12px; border: 0; box-shadow: none; background: transparent; color: var(--text-normal);
-		font: inherit; text-align: left;
-		svg { flex: none; color: var(--text-muted); }
-		span { min-width: 0; overflow-wrap: anywhere; }
+// One scrolling row of tags under the library search. Pills are 32px inside 44px targets.
+.crate-reminders-ui .crate-reading-tag-filter {
+	display: flex; flex-shrink: 0; gap: 6px; margin: -6px 0 6px; padding: 0 18px;
+	overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+	&::-webkit-scrollbar { display: none; }
+	button.crate-reading-tag-filter__chip {
+		position: relative; isolation: isolate; flex: none; min-height: 44px; margin: 0; padding: 0 12px;
+		border: 0; box-shadow: none; background: transparent; color: var(--text-muted);
+		font: inherit; font-size: 13px; font-weight: var(--crate-font-weight-medium); white-space: nowrap;
+		&::before {
+			content: ''; position: absolute; inset: 6px 0; z-index: -1; border-radius: 999px;
+			border: 1px solid var(--crate-divider); background: transparent;
+		}
+		&[aria-pressed="true"] { color: var(--crate-app-bg); }
+		&[aria-pressed="true"]::before { border-color: transparent; background: var(--text-normal); }
+		@media (hover: hover) and (pointer: fine) { &:hover:not([aria-pressed="true"]) { color: var(--text-normal); } }
+		&[data-press-active] { opacity: .65; }
+		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -4px; border-radius: 999px; }
 	}
 }
