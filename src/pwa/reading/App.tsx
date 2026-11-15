@@ -58,10 +58,13 @@ function ReadingAppContent() {
 		try { readingUrl(url); return !saving; } catch { return false; }
 	})();
 	// Offline, the library is the articles saved on this device; online, the server lists it page by page.
-	const offlineItems = useOfflineReadingItems(session, isOffline, reader?.availableOffline);
-	const confirmedItems = isOffline ? offlineItems : cache?.items;
+	// Read-only mode (an unanswered encryption check) loads no library page either, nor does a
+	// request that failed on a network the browser still reports as online.
+	const savedOnly = isOffline || readOnly || (!!session && !cache && !!error);
+	const offlineItems = useOfflineReadingItems(session, savedOnly, reader?.availableOffline);
+	const confirmedItems = savedOnly ? offlineItems : cache?.items;
 	const visibleItems = useMemo(() => presentReadingItems(confirmedItems ?? [], pending), [confirmedItems, pending]);
-	const source = useMemo<ReadingLibrarySource | undefined>(() => session && !isOffline && !readOnly && cache ? {
+	const source = useMemo<ReadingLibrarySource | undefined>(() => session && !savedOnly && cache ? {
 		load: async ({ section, q, tag, cursor }) => {
 			// The sync just read the first inbox page; the library shows it without asking again.
 			if (section === 'inbox' && !q.trim() && !tag && !cursor) return { items: cache.items, cursor: cache.cursor ?? null };
@@ -70,7 +73,7 @@ function ReadingAppContent() {
 		},
 		loadTags: () => queryReadingTags(session),
 		revision: cache, present: items => presentReadingItems(items, pending),
-	} : undefined, [session, isOffline, readOnly, cache, pending]);
+	} : undefined, [session, savedOnly, cache, pending]);
 	// A shared link saves at once, like the iPhone shortcut. Its draft keeps it until
 	// the save succeeds, and a failure opens the form with the error beside the link.
 	useEffect(() => {
