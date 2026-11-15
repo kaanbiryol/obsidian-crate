@@ -69,7 +69,13 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const sync = page.locator('.pwa-reading-root .pwa-tab-panel:not([data-leaving]) .pwa-sync-indicator');
     const toast = page.locator('.toast');
     // The article text is shown once its offline action is available.
-    const articleShown = () => expect(page.locator('button[aria-label="Save for offline"], button[aria-label="Remove offline copy"]')).toBeEnabled();
+    // The offline action sits in the reader's More menu and is enabled once the article has loaded.
+    const articleShown = async () => {
+      await page.getByRole('button', { name: /^More (article|video) actions$/ }).click();
+      await expect(page.getByRole('menuitem', { name: /^(Save for offline|Remove offline copy)$/ })).toBeEnabled();
+      await page.getByRole('button', { name: /^More (article|video) actions$/ }).click();
+      await expect(page.getByRole('menu')).toHaveCount(0);
+    };
     await expect(sync).toHaveAttribute('data-sync-state', 'synced');
     const saveLink = async (url, offline = false) => {
       await page.getByRole('button', { name: 'Save a link', exact: true }).click();
@@ -189,7 +195,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await articleShown();
     // Opening keeps the article in memory only; saving it is a choice.
     await expect(page.getByText('Available offline', { exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Save for offline', exact: true }).click();
+    await page.getByRole('button', { name: /^More (article|video) actions$/ }).click();
+    await page.getByRole('menuitem', { name: 'Save for offline', exact: true }).click();
     await expect(page.getByText('Available offline', { exact: true })).toBeVisible();
     await expect(toast).toHaveCount(0);
     // One delayed request must not block further edits to any article field.

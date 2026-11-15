@@ -366,7 +366,19 @@ async function openReadingBrowserFixture(t, name, engine, contextOptions = {}) {
 }
 
 /** The article text is shown once its offline action is available. */
-const articleShown = page => expect(page.locator('button[aria-label="Save for offline"], button[aria-label="Remove offline copy"]')).toBeEnabled();
+// The offline action sits in the reader's More menu and is enabled once the article has loaded.
+const readerMore = page => page.getByRole('button', { name: /^More (article|video) actions$/ });
+const articleShown = async page => {
+  await readerMore(page).click();
+  await expect(page.getByRole('menuitem', { name: /^(Save for offline|Remove offline copy)$/ })).toBeEnabled();
+  // A second tap closes it without leaving keyboard focus in the auto-hiding top bar.
+  await readerMore(page).click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+};
+const saveForOffline = async page => {
+  await readerMore(page).click();
+  await page.getByRole('menuitem', { name: 'Save for offline', exact: true }).click();
+};
 
 for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: opening shell, settings and input geometry`, { timeout: 90000 }, async t => {
   const fixture = await openReadingBrowserFixture(t, name, engine);
@@ -551,7 +563,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   firstArticle.release();
   await articleShown(page);
   // Reopening below shows this saved copy while the download is held.
-  await page.getByRole('button', { name: 'Save for offline', exact: true }).click();
+  await saveForOffline(page);
   await page.getByText('Available offline', { exact: true }).waitFor();
   assert.equal(await originalArticle.evaluate(el => el === document.querySelector('.crate-reading__reader-pane article')), true, 'Loading must resolve in the same article screen');
   await originalArticle.dispose();
@@ -729,7 +741,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();
   await articleShown(page);
   // Only an article saved for offline opens without a connection.
-  await page.getByRole('button', { name: 'Save for offline', exact: true }).click();
+  await saveForOffline(page);
   await page.getByText('Available offline', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Back to reading', exact: true }).click();
   await page.waitForFunction(() => history.state?.readingLibrary === true);
