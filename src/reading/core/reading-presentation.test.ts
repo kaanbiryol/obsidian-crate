@@ -49,3 +49,19 @@ describe('highlight feed', () => {
 		expect(filterReadingHighlights([], '')).toEqual([]);
 	});
 });
+
+describe('highlights of a server library', () => {
+	const note: ReadingItem = { crate_reading_version: 1, crate_reading_id: '12345678-1234-4123-8123-123456789abc', title: 'Notes', path: 'Reading/notes.md',
+		source_url: 'https://example.test/notes', saved_at: '2026-10-01T12:00:00Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready',
+		highlights: [{ start: 0, end: 10, text: 'The quick brown fox at the café', createdAt: '2026-10-03T12:00:00Z' }, { start: 20, end: 30, text: 'A lazy dog', createdAt: '2026-10-02T12:00:00Z' }] };
+	const texts = (query: string) => filterReadingHighlights([note], query, true).map(entry => entry.highlight.text);
+
+	it('shows the highlights a word search matched, as the server matched the note', () => {
+		// Before: the rows needed the whole query as one substring, so these showed nothing.
+		expect(texts('quick fox')).toEqual(['The quick brown fox at the café']);
+		expect(texts('cafe')).toEqual(['The quick brown fox at the café']);
+		// Words in different highlights show all of the note's highlights.
+		expect(texts('fox dog')).toEqual(['The quick brown fox at the café', 'A lazy dog']);
+		expect(texts('notes lazy')).toEqual(['A lazy dog']);
+	});
+});

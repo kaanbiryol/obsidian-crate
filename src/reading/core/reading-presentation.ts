@@ -1,5 +1,6 @@
 import type { ReadingItem } from './model';
 import { youtubeVideoId } from './youtube';
+import { highlightMatches } from './search-terms';
 
 export type ReadingSection = 'inbox' | 'favorites' | 'archived' | 'highlights';
 export const readingSections = [
@@ -37,11 +38,18 @@ export function groupReadingItems(items: ReadingItem[], now = new Date()): { lab
 	return Array.from(groups, ([label, items]) => ({ label, items }));
 }
 
-export function filterReadingHighlights(items: ReadingItem[], query: string) {
+/** Each highlight of `items` that matches `query`, newest first. `byWords` matches the way a
+ * server library does: `items` already matched, so a highlight matches when every query word
+ * starts a word of it or its title, and a note whose words span its highlights shows them all. */
+export function filterReadingHighlights(items: ReadingItem[], query: string, byWords = false) {
 	const search = query.trim().toLocaleLowerCase();
-	return items.flatMap(item => (item.highlights ?? [])
-			.filter(highlight => `${item.title} ${item.author ?? ''} ${item.source_url} ${item.tags.join(' ')} ${highlight.text} ${highlight.note ?? ''}`.toLocaleLowerCase().includes(search))
-			.map(highlight => ({ item, highlight })))
+	return items.flatMap(item => {
+		const highlights = item.highlights ?? [];
+		if (!byWords) return highlights.filter(highlight => `${item.title} ${item.author ?? ''} ${item.source_url} ${item.tags.join(' ')} ${highlight.text} ${highlight.note ?? ''}`.toLocaleLowerCase().includes(search))
+			.map(highlight => ({ item, highlight }));
+		const matching = search ? highlights.filter(highlight => highlightMatches(item.title, highlight, query)) : highlights;
+		return (matching.length ? matching : highlights).map(highlight => ({ item, highlight }));
+	})
 		.sort((a, b) => (b.highlight.createdAt ?? b.item.saved_at).localeCompare(a.highlight.createdAt ?? a.item.saved_at)
 			|| a.item.crate_reading_id.localeCompare(b.item.crate_reading_id) || a.highlight.start - b.highlight.start);
 }

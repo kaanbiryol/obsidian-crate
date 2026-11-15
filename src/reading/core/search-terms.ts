@@ -74,6 +74,10 @@ export function titleMatches(title: string, query: string): boolean {
 /** Whether a note matches a highlight search: every query word starts a word of its title or highlights. */
 export const highlightsMatch = (item: Pick<ReadingMetadata, 'title' | 'highlights'>, query: string) => wordsMatch(highlightSearchWords(item), query);
 
+/** Whether one highlight matches a highlight search by the same rule, with its note's title. */
+export const highlightMatches = (title: string, highlight: { text: string; note?: string }, query: string) =>
+	wordsMatch(searchWords(`${title} ${highlight.text} ${highlight.note ?? ''}`, MAX_HIGHLIGHT_WORDS), query);
+
 function wordsMatch(words: string[], query: string): boolean {
 	return searchWords(query, MAX_QUERY_WORDS).every(part => words.some(word => word.startsWith(part)));
 }

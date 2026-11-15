@@ -111,7 +111,7 @@ export function ReadingLibraryPanel({
 		? filterReadingItems(loaded, section, '', null).filter(item => (!listQuery.trim() || (section === 'highlights' ? highlightsMatch(item, listQuery) : titleMatches(item.title, listQuery)))
 			&& (!tag || item.tags.some(value => normalizedTag(value) === normalizedTag(tag))))
 		: filterReadingItems(snapshot.items, section, listQuery, tag), [present, loaded, snapshot.items, section, listQuery, tag]);
-	const excerpts = useMemo(() => filterReadingHighlights(items, listQuery), [items, listQuery]);
+	const excerpts = useMemo(() => filterReadingHighlights(items, listQuery, !!present), [items, listQuery, present]);
 	const count = section === 'highlights' ? excerpts.length : items.length;
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	// A server library lists every tag; a local one holds them all already.
