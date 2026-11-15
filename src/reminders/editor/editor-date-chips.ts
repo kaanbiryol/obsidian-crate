@@ -279,8 +279,10 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 			// Deleting the line break below a reminder, as Backspace on the empty line after it does, brings the cursor next to its chip too.
 			const joined = update.docChanged && update.state.doc.lines < update.startState.doc.lines
 				&& update.transactions.some(transaction => transaction.isUserEvent('delete'));
+			// Obsidian's line start and end keys, Home, End and Cmd+arrows, move the cursor without a user event.
+			const keyed = (transaction: Transaction) => transaction.isUserEvent('select') || !transaction.annotation(Transaction.userEvent);
 			const moved = update.selectionSet && update.view.hasFocus && isReminderEditor(update.state)
-				&& (joined || (!update.docChanged && update.transactions.some(transaction => transaction.isUserEvent('select'))));
+				&& (joined || (!update.docChanged && update.transactions.some(keyed)));
 			if (!phrase) {
 				const open = moved ? openDateChip(update.state, update.startState.selection) : null;
 				// A click can send more updates that change nothing; skip only if the text or cursor moved on.

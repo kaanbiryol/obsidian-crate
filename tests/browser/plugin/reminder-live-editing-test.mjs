@@ -268,6 +268,13 @@ for (const engine of [chromium, webkit]) {
 			'- [ ] Call Mia 2026-11-15T11:00:00.000Z <!-- crate-id:b -->',
 		], `${name}: phrase to phrase`);
 		assert.equal(await page.evaluate(() => window.head()), '# Errands\n- [ ] Buy milk Nov 20'.length, `${name}: cursor at the next phrase's end`);
+		// Obsidian's End and Cmd+Right move to the line's end with no user event, which opens the date too.
+		await mount();
+		await page.evaluate(() => window.place(window.view.state.doc.line(2).from + 6));
+		await page.evaluate(() => window.view.dispatch({ selection: { anchor: window.view.state.doc.line(2).to }, scrollIntoView: true }));
+		await settle(page);
+		assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Buy milk Nov 20 <!-- crate-id:a -->', `${name}: phrase after Obsidian's line end key`);
+		assert.equal(await page.evaluate(() => window.head()), '# Errands\n- [ ] Buy milk Nov 20'.length, `${name}: cursor at the phrase's end after the line end key`);
 		// Enter saves a new reminder; Backspace back onto its line opens the date with the cursor at its end.
 		await mount('# Errands\n', 10);
 		await page.keyboard.type('- [ ] Pay rent tomorrow 12:00');
