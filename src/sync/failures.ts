@@ -62,10 +62,12 @@ export function isQueueTerminalFailure(status: number | undefined, code?: string
 		&& !isVersionConflict(status, code);
 }
 
-/** Upload and restore journals: the server refused the conditional write, so the operation
- * can never commit and its journal entry is settled. */
+/** Upload and restore journals: the server refused the conditional write, or the operation is
+ * older than its retry window, so it can never commit under this ID and its journal entry is
+ * settled. The baseline is unchanged: the next sync compares the local file with the server. */
 export function isRefusedWrite(status: number | undefined, code?: string): boolean {
-	return status === 409 && (code === 'version_conflict' || code === 'namespace_conflict');
+	return status === 409 && (code === 'version_conflict' || code === 'namespace_conflict')
+		|| status === 410 && code === 'operation_expired';
 }
 
 /** Upload preparation: only a stale precondition lets one undispatched file reconcile apart

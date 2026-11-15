@@ -161,3 +161,27 @@ it('recovers an uncertain merge before queued edits can upload a stale local sna
 	await sync(a);
 	expect(a.disk.text('note.md')).toBe(expected + '\nQueued offline edit\n');
 });
+
+it('reconciles a journaled upload outside the retry window instead of stopping every sync', async () => {
+	const a = new SyncTestDevice('audit-expired', env);
+	devices.push(a);
+	await a.authorize(3_600_000); await a.open();
+	a.disk.write('note.md', original); await sync(a);
+	const edited = original.replace('Alpha original', 'Alpha edited');
+	a.disk.write('note.md', edited);
+	// The upload commits but its response is lost, and the device then stays unused past the
+	// window: maintenance prunes the receipt and raises the floor above the operation's day.
+	const paused = a.pauseNextUploadResponse();
+	const pending = a.engine.sync();
+	await paused.committed;
+	a.close(); await pending; await a.engine.waitForIdle(); paused.release();
+	const { day } = (await env.DB.prepare('SELECT CAST(unixepoch(\'now\') / 86400 AS INTEGER) AS day').first<{ day: number }>())!;
+	await env.DB.batch([env.DB.prepare("DELETE FROM operations WHERE kind = 'upload'"),
+		env.DB.prepare("INSERT OR REPLACE INTO maintenance_state(key, value) VALUES ('upload_operation_floor', ?)").bind(String(day + 1))]);
+	await a.open();
+	// Before: recovery stopped every sync on the expired receipt until the device reconnected.
+	await sync(a);
+	expect(a.engine.getRequestDiagnostics().uploads.some(row => row.phase === 'rejected')).toBe(true);
+	expect({ local: a.disk.text('note.md'), remote: new TextDecoder().decode((await a.api.downloadFile('note.md')).content) }).toEqual({ local: edited, remote: edited });
+	expect((await sync(a)).uploaded).toBe(0);
+});

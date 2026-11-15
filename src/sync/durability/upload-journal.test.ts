@@ -212,6 +212,24 @@ it('checkpoints healthy batch members while retaining only the unresolved upload
 	expect(restarted.uploadJournal.pending().map(f => f.path)).toEqual(['b.md']); await restarted.close();
 });
 
+it('settles uploads outside the retry window without changing their baseline, so sync reconciles them', async () => {
+	const { create, file } = fixture(); const manifest = create();
+	manifest.setEntry('a.md', { hash: 'baseline', size: 1, revision: 'old', modified: '2026-09-09T00:00:00Z' });
+	await manifest.uploadJournal.prepare(['a', 'b'].map(path => ({ ...file, path: `${path}.md` })), 20000);
+	const expired = { success: false as const, status: 410, code: 'operation_expired' as const, error: 'This upload is outside the 30-day retry window.' };
+	const recovery = new DurableUploads(manifest, {
+		assertPreparedUpload: async () => {}, getServerInfo: vi.fn(), uploadFile: vi.fn(),
+		batchUpload: async files => ({ success: false, results: files.map(f => ({ ...expired, path: f.path })) }),
+	}, { putBase: async () => {} } as never, crypto.randomUUID());
+	// Before: every sync stopped here, and the device could only reconnect.
+	await recovery.recover(vi.fn());
+	expect(manifest.uploadJournal.pending()).toEqual([]);
+	// The upload's outcome is unknown, so its baseline stays: the next sync compares local and server.
+	expect(manifest.getEntry('a.md')).toMatchObject({ hash: 'baseline', revision: 'old' });
+	expect(manifest.getEntry('b.md')).toBeUndefined();
+	await manifest.close();
+});
+
 it('keeps the whole batch when its receipt list is invalid', async () => {
 	const { create, file } = fixture(); const manifest = create();
 	await manifest.uploadJournal.prepare(['a', 'b'].map(path => ({ ...file, path: `${path}.md` })), 20000);
