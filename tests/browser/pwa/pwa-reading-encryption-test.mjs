@@ -19,7 +19,7 @@ let runtime, server, browser, loseReply = false, injectShell = false;
 const commits = [], extracts = [];
 try {
   const modulePath = join(dataDir, 'crypto.mjs');
-  const compiled = await build({ stdin: { contents: `export * from './src/encryption/key-bundle'; export * from './src/encryption/server-state'; export * from './src/encryption/file-authority'; export * from './src/encryption/file-codec';  export * from './src/reading/core/notes'; export * from './src/sync/encryption/reset'; export * from './src/sync/worker-api/http'; export { PathTags } from './src/encryption/path-tags'; export { sealFolderLabel } from './src/encryption/folder-label'; export { importEncryptionSecret } from './src/encryption/envelope';`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', alias: { obsidian: join(process.cwd(), 'src/test/mocks/obsidian.ts') } });
+  const compiled = await build({ stdin: { contents: `export * from './src/encryption/key-bundle'; export * from './src/encryption/server-state'; export * from './src/encryption/file-authority'; export * from './src/encryption/file-codec';  export * from './src/reading/core/notes'; export * from './src/sync/encryption/reset'; export * from './src/sync/worker-api/http'; export { PathTags } from './src/encryption/path-tags'; export { sealFolderLabel } from './src/encryption/folder-label'; export { importEncryptionSecret } from './src/encryption/envelope'; export { deriveReadingSearchKey } from './src/encryption/reading-search'; export { readingUploadCard } from './src/reading/core/reading-card-upload';`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', alias: { obsidian: join(process.cwd(), 'src/test/mocks/obsidian.ts') } });
   await writeFile(modulePath, compiled.outputFiles[0].contents);
   const t = await import(pathToFileURL(modulePath).href);
   runtime = await openLocalRuntime({ dataDir: join(dataDir, 'server') });
@@ -71,7 +71,12 @@ try {
   const note = t.createReadingNote({ id: '3eecb772-ac6a-4890-9dea-1e989849c920', url: 'https://example.invalid/private-reading', title: 'Encrypted Reading article', savedAt: new Date().toISOString() })
     .replace('extraction_status: "pending"', 'extraction_status: "ready"')
     .replace('<!-- crate:article:end -->', 'Safe encrypted article.\n\n<img src=x onerror="window.articleAttack=true"><svg onload="window.articleAttack=true"></svg><script>window.articleAttack=true</script><a href="javascript:window.articleAttack=true">Unsafe link</a>\n<!-- crate:article:end -->');
-  const sealed = await t.sealFile({ path, content: new TextEncoder().encode(note), contentType: 'text/markdown', publicData: null }, keys.forPath(wire));
+  // Like the plugin, attach the Reading card the server lists the encrypted note by.
+  const content = new TextEncoder().encode(note);
+  const publicData = await t.readingUploadCard('Reading', path, wire, content, { vaultId: bundle.vaultId, key: vaultKey, keyGeneration: bundle.generation,
+    searchKey: await t.deriveReadingSearchKey(bundle.vaultId, bundle.vault) });
+  assert.ok(publicData, 'The seeded note is a valid Reading note');
+  const sealed = await t.sealFile({ path, content, contentType: 'text/markdown', publicData }, keys.forPath(wire));
   const upload = await fetch(`${origin}/sync/upload?path=${encodeURIComponent(wire)}`, { method: 'PUT', body: sealed.bytes, headers: { ...headers, 'Content-Type': 'application/vnd.crate.encrypted-file', 'X-File-Hash': sealed.hash, 'X-File-Size': String(sealed.bytes.length), 'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(Math.floor(Date.now() / 86400000)).padStart(8, '0')}_${crypto.randomUUID()}` } });
   assert.equal(upload.status, 200, await upload.text());
   const enroll = async () => {
