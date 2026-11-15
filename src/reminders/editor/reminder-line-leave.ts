@@ -4,6 +4,7 @@ import { normalizeReminderIds } from '../core/normalizeReminderIds';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { extractReminderId } from '../core/reminderIdentity';
 import { inlineDescriptionChanges } from '../data/inline-description';
+import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { TASK_WITH_TEXT } from './reminder-hidden-ranges';
 
 /** The part of a view update that decides which lines a cursor left. */
@@ -78,10 +79,23 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 		const isFocused = update.view.hasFocus;
 		const wasFocused = update.focusChanged ? !isFocused : isFocused;
 		if (!canAssign(update.state)) return;
-		const left = leftTaskLines({ ...update, wasFocused, isFocused });
+		let left = leftTaskLines({ ...update, wasFocused, isFocused });
 		if (!left.length) return;
-		const { view } = update, descriptions = inlineDescriptionChanges(update.state.doc, left);
-		const dates = descriptions.length ? null : scheduleChanges(update.state.doc, left);
+		const { view } = update, { doc } = update.state;
+		let descriptions = inlineDescriptionChanges(doc, left);
+		let dates = descriptions.length ? null : scheduleChanges(doc, left);
+		// Only a line the scan reads as a task is rewritten, not one inside a code block, frontmatter
+		// or a comment. Checked only when a leave would write, since it reads the whole note.
+		if (descriptions.length || dates?.length) {
+			const tasks = markdownTaskContexts(doc.toString().split('\n'));
+			const kept = left.filter(number => tasks.has(number - 1));
+			if (kept.length !== left.length) {
+				left = kept;
+				if (!left.length) return;
+				descriptions = inlineDescriptionChanges(doc, left);
+				dates = descriptions.length ? null : scheduleChanges(doc, left);
+			}
+		}
 		// Without a description or date to save the IDs are known now; otherwise they follow the edited lines.
 		const known = descriptions.length || dates?.length ? null : reminderIdChanges(update.state.doc, left);
 		if (known && !known.length) return;

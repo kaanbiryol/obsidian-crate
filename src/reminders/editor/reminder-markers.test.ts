@@ -510,8 +510,8 @@ describe('reminder ID marker protection', () => {
 
 describe('inline descriptions on line leave', () => {
 	/** Leaves the reminder on line 1 through the extension, with a view that applies what it dispatches. */
-	async function leaveLine(text: string) {
-		const startState = EditorState.create({ doc: text, selection: EditorSelection.cursor(5), extensions: createReminderLineLeaveExtension(() => true) });
+	async function leaveLine(text: string, cursor = 5) {
+		const startState = EditorState.create({ doc: text, selection: EditorSelection.cursor(cursor), extensions: createReminderLineLeaveExtension(() => true) });
 		const transaction = startState.update({ selection: { anchor: text.length } });
 		const dispatched: Transaction[] = [];
 		const view = {
@@ -535,6 +535,15 @@ describe('inline descriptions on line leave', () => {
 		expect(lines.slice(1)).toEqual(['<!-- crate-desc:bring receipts -->', 'Next']);
 		expect(dispatched.map(transaction => transaction.annotation(Transaction.addToHistory))).toEqual([undefined, false]);
 		expect(dispatched[0]!.isUserEvent('input.description')).toBe(true);
+	});
+
+	it('leaves a task-like line alone inside a code block, frontmatter or comment', async () => {
+		for (const [open, close] of [['```', '```'], ['---', '---'], ['<!--', '-->']] as const) {
+			const text = `${open}\n- [ ] ship release tomorrow // after QA\n${close}`;
+			const { lines, dispatched } = await leaveLine(text, open.length + 6);
+			expect(lines.join('\n')).toBe(text);
+			expect(dispatched).toEqual([]);
+		}
 	});
 
 	it('schedules from the title, not dates in the description', async () => {
