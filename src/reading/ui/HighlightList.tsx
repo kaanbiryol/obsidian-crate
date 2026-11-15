@@ -9,10 +9,13 @@ import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { readingTitle } from '../core/reading-presentation';
 import { ReadingSourceIcon } from './ReadingSourceIcon';
 
+// Built once: creating a formatter per row costs more than the row itself.
+const SHORT_DATE = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+const LONG_DATE = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
 function highlightDate(value: string): string {
 	const date = new Date(value);
-	return date.toLocaleDateString(undefined, date.getFullYear() === new Date().getFullYear()
-		? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+	return (date.getFullYear() === new Date().getFullYear() ? SHORT_DATE : LONG_DATE).format(date);
 }
 
 /**

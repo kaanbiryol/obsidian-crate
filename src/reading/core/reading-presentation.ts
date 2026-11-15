@@ -29,10 +29,12 @@ export function groupReadingItems(items: ReadingItem[], now = new Date()): { lab
 	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 	const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
 	const groups = new Map<string, ReadingItem[]>();
+	// Formatting a date costs about 30 µs, so each month's label is formatted once, not per row.
+	const months = new Map<number, string>();
 	for (const item of items) {
-		const saved = new Date(item.saved_at);
+		const saved = new Date(item.saved_at), month = saved.getFullYear() * 12 + saved.getMonth();
 		const label = saved >= today ? 'Today' : saved >= yesterday ? 'Yesterday'
-			: saved.toLocaleDateString(undefined, { month: 'long', ...(saved.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }) });
+			: months.get(month) ?? months.set(month, saved.toLocaleDateString(undefined, { month: 'long', ...(saved.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }) })).get(month)!;
 		const group = groups.get(label) ?? []; group.push(item); groups.set(label, group);
 	}
 	return Array.from(groups, ([label, items]) => ({ label, items }));

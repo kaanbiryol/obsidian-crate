@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ReadingItem } from './model';
 import { filterReadingItems, groupReadingItems, filterReadingHighlights, settledHighlights } from './reading-presentation';
 
@@ -81,5 +81,21 @@ describe('highlights feed across server pages', () => {
 		const both = rows([a, b]);
 		expect(both.slice(0, first.length)).toEqual(first);
 		expect(both).toEqual(['1 2026-11-15', '2 2026-11-01']);
+	});
+});
+
+describe('grouping a long library', () => {
+	it('formats each month once, so grouping 5,000 rows stays fast', () => {
+		const now = new Date('2026-11-15T12:00:00Z');
+		const items = Array.from({ length: 5000 }, (_, n): ReadingItem => ({ crate_reading_version: 1, crate_reading_id: `12345678-1234-4123-8123-${String(n).padStart(12, '0')}`,
+			title: `Note ${n}`, path: `Reading/${n}.md`, source_url: 'https://example.test/', saved_at: new Date(Date.UTC(2026, 9, 31) - n * 3_600_000 * 7).toISOString(),
+			reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' }));
+		const format = vi.spyOn(Date.prototype, 'toLocaleDateString');
+		try {
+			const groups = groupReadingItems(items, now);
+			// Before: one call per row, 5,000 here (about 160 ms).
+			expect(format.mock.calls.length).toBe(groups.length);
+			expect(groups.reduce((total, group) => total + group.items.length, 0)).toBe(5000);
+		} finally { format.mockRestore(); }
 	});
 });
