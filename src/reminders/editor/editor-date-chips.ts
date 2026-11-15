@@ -276,12 +276,12 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 		datePhraseField,
 		EditorView.updateListener.of(update => {
 			const phrase = update.state.field(datePhraseField, false), { doc } = update.state;
+			// Deleting the line break below a reminder, as Backspace on the empty line after it does, brings the cursor next to its chip too.
+			const joined = update.docChanged && update.state.doc.lines < update.startState.doc.lines
+				&& update.transactions.some(transaction => transaction.isUserEvent('delete'));
+			const moved = update.selectionSet && update.view.hasFocus && isReminderEditor(update.state)
+				&& (joined || (!update.docChanged && update.transactions.some(transaction => transaction.isUserEvent('select'))));
 			if (!phrase) {
-				// Deleting the line break below a reminder, as Backspace on the empty line after it does, brings the cursor next to its chip too.
-				const joined = update.docChanged && update.state.doc.lines < update.startState.doc.lines
-					&& update.transactions.some(transaction => transaction.isUserEvent('delete'));
-				const moved = update.selectionSet && update.view.hasFocus && isReminderEditor(update.state)
-					&& (joined || (!update.docChanged && update.transactions.some(transaction => transaction.isUserEvent('select'))));
 				const open = moved ? openDateChip(update.state, update.startState.selection) : null;
 				// A click can send more updates that change nothing; skip only if the text or cursor moved on.
 				if (open) queueMicrotask(() => {
@@ -298,7 +298,11 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 				if (update.view.state.doc !== update.state.doc) return;
 				// Restoring undoes the phrase, which undo never saw; a saved edit is undone like the typing before it.
 				// Typing rules would treat a save as typing at the line's end; it is not.
-				update.view.dispatch({ changes, effects: setDatePhrase.of(null), filter: false, ...restored ? { annotations: Transaction.addToHistory.of(false) } : { userEvent: 'input.date' } });
+				const left = update.view.state.update({ changes, effects: setDatePhrase.of(null), filter: false, ...restored ? { annotations: Transaction.addToHistory.of(false) } : { userEvent: 'input.date' } });
+				update.view.dispatch(left);
+				// Moving from one date's phrase straight next to another date's chip opens that one.
+				const open = moved ? openDateChip(update.view.state, update.startState.selection.map(update.changes).map(left.changes)) : null;
+				if (open) update.view.dispatch(open);
 			});
 		}),
 	];

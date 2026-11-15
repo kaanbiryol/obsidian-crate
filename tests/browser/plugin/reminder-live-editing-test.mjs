@@ -257,6 +257,17 @@ for (const engine of [chromium, webkit]) {
 		await outro(page);
 		await settle(page);
 		assert.match(await doc(), /Call Mia 2026-11-15T11:00:00\.000Z <!-- crate-id:b -->/, `${name}: unchanged time restored`);
+		// Moving from one date's phrase straight to the end of another date's line opens that one and restores the first.
+		await mount();
+		await page.mouse.click(call.x, call.y);
+		await settle(page);
+		await page.keyboard.press('ArrowUp');
+		await settle(page);
+		assert.deepEqual(await page.evaluate(() => [2, 3].map(number => window.view.state.doc.line(number).text)), [
+			'- [ ] Buy milk Nov 20 <!-- crate-id:a -->',
+			'- [ ] Call Mia 2026-11-15T11:00:00.000Z <!-- crate-id:b -->',
+		], `${name}: phrase to phrase`);
+		assert.equal(await page.evaluate(() => window.head()), '# Errands\n- [ ] Buy milk Nov 20'.length, `${name}: cursor at the next phrase's end`);
 		// Enter saves a new reminder; Backspace back onto its line opens the date with the cursor at its end.
 		await mount('# Errands\n', 10);
 		await page.keyboard.type('- [ ] Pay rent tomorrow 12:00');
