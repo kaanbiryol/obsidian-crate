@@ -41,6 +41,8 @@ async function contextFor(browser, { installed = false, reading = false, mobile 
   await context.route('**/encryption', route => route.fulfill({ json: remindersEncryption }));
   await context.route('**/reading/encryption', route => route.fulfill({ json: readingEncryption }));
   await context.route('**/*/encrypted-files?*', route => route.fulfill({ json: { files: [], nextCursor: null, generation: bundle.generation, changeToken: '1'.repeat(32), deltaBase: `1.${'1'.repeat(32)}` } }));
+  // Reading lists its encrypted library as sealed cards, a page at a time.
+  await context.route('**/reading/items?*', route => route.fulfill({ json: { cards: [], cursor: null } }));
   context.on('request', request => assert.ok(!(request.url() + (request.postData() ?? '')).includes(recovery), 'Recovery key must not reach the server'));
   return context;
 }
@@ -230,7 +232,7 @@ try {
           offline = false;
           await page.evaluate(() => localStorage.removeItem('test-offline'));
           // Encryption verification can succeed while the actual data API expires.
-          await context.route('**/reading/encrypted-files?*', route => route.fulfill({ status: 401, json: { error: 'Session expired' } }));
+          await context.route('**/reading/items?*', route => route.fulfill({ status: 401, json: { error: 'Session expired' } }));
           await page.reload();
           await expect(page.getByRole('heading', { name: 'Reconnect to Crate', exact: true })).toBeVisible();
           assert.equal(await page.evaluate(() => localStorage.getItem('crate-reminders-auth-token')), null);
@@ -240,7 +242,7 @@ try {
           await expect(page.getByRole('heading', { name: 'Reconnect to Crate', exact: true })).toBeVisible();
           await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
           assert.equal((await savedDraft())?.encryptedReading, 1, 'Reload after expiry retains recovery controls and the encrypted draft');
-          await context.route('**/reading/encrypted-files?*', route => route.fulfill({ json: { files: [], nextCursor: null, generation: bundle.generation, sequence: 1 } }));
+          await context.route('**/reading/items?*', route => route.fulfill({ json: { cards: [], cursor: null } }));
           await page.goto(`${origin}/notifications?token=reconnected-${initial}&section=reading`);
           await expect(page.getByRole('textbox', { name: 'Link', exact: true })).toHaveValue('https://example.com/private-draft');
           await expect(page.locator('.crate-feature-panel[data-active="true"] .pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'synced');
