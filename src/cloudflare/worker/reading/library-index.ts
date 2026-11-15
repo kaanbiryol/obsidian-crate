@@ -179,9 +179,11 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
         WHERE c.keep = 1 AND c.stale = 0 AND c.tag_names IS NOT NULL`)] : []),
 		// A note's highlight row is keyed by when it was last highlighted, so a new highlight
 		// moves it; other highlight edits update its terms in place.
-		...(removes || plain.length ? [statement(`DELETE FROM highlight_index WHERE (highlighted_at, portable_path) IN (
-        SELECT highlighted_at, portable_path FROM reading_items WHERE highlighted_at IS NOT NULL AND (${removed})
-        UNION ALL SELECT i.highlighted_at, i.portable_path FROM committed c JOIN reading_items i ON i.portable_path = c.portable
+		// One subquery per statement: a row-value IN over a compound select scans the whole table.
+		...(removes ? [statement(`DELETE FROM highlight_index WHERE (highlighted_at, portable_path) IN (
+        SELECT highlighted_at, portable_path FROM reading_items WHERE highlighted_at IS NOT NULL AND (${removed}))`)] : []),
+		...(plain.length ? [statement(`DELETE FROM highlight_index WHERE (highlighted_at, portable_path) IN (
+        SELECT i.highlighted_at, i.portable_path FROM committed c JOIN reading_items i ON i.portable_path = c.portable
           WHERE c.keep = 1 AND c.stale = 0 AND i.highlighted_at IS NOT NULL AND i.highlighted_at IS NOT c.highlighted_at)`)] : []),
 		...(plain.some(row => row.highlighted_at) ? [statement(`INSERT INTO highlight_index(highlighted_at, portable_path, terms, words)
         SELECT highlighted_at, portable, highlight_terms, highlight_words FROM committed WHERE keep = 1 AND stale = 0 AND highlighted_at IS NOT NULL

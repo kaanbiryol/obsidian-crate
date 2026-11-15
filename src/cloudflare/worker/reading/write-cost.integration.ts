@@ -53,3 +53,18 @@ it('keeps the rows a web app favorite or archive writes to the file edit and its
 	expect(highlightNote.written).toBeLessThanOrEqual(9);
 	await context.annotate(JSON.stringify({ favorite, archive, firstHighlight, newerHighlight, highlightNote }), 'writes');
 });
+
+it('reads about the same rows for a web app edit however many notes are highlighted', { timeout: 120_000 }, async () => {
+	// Runs after the test above, in the same database, with its token and policy.
+	const id = crypto.randomUUID();
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Second.md', createReadingNote({ id, url: 'https://example.invalid/second', title: 'Second', savedAt: new Date().toISOString() }), null);
+	// Other highlighted notes' rows, which an edit to this note must not read.
+	await env.DB.prepare(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2000)
+    INSERT INTO highlight_index(highlighted_at, portable_path, terms, words) SELECT printf('2026-01-01T00:00:%04dZ', i), printf('reading/other-%d.md', i), '[]', NULL FROM n`).run();
+	const meter = meterD1Usage(env.DB);
+	const response = await mutateReading({ ...env, DB: meter.db }, { tokenId: 'vault', scope: 'vault' }, policy,
+		{ id, before: { favorite: false }, changes: { favorite: true }, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)) }, 'update');
+	expect(response.status, await response.clone().text()).toBe(200);
+	// Before: the highlight_index delete scanned the whole table, about 2,100 rows here.
+	expect(meter.usage.rowsRead).toBeLessThan(400);
+});
