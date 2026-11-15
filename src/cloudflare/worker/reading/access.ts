@@ -9,6 +9,8 @@ import { readEncryptionState } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
 import { MAX_JOB_ATTEMPTS } from './extraction/jobs';
+import { readingIndexScope } from './library-index';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
 
 export async function updatePolicy(db: D1Database, body: Record<string, unknown>) {
 	const existing = await policy(db);
@@ -32,6 +34,10 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
 		.bind(current.enabled, folder, current.generation, current.revision),
 		// Jobs extract into the folder of their generation, so a new one drops the old one's.
 		db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
+		// A new folder with no files has a complete index from the start: every commit maintains
+		// it, so the first read neither wipes the rows those commits wrote nor rebuilds them.
+		...(existing?.generation === current.generation ? [] : [db.prepare(`UPDATE reading_policy SET index_scope = ?, index_cursor = NULL
+      WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_FOLDER_MATCH})`).bind(readingIndexScope(current), ...fileFolderArgs(folder))]),
 		...(encryption ? [saveFolderLabel(db, folder, body.folderLabel as string)] : [])]);
 	return readingResponse({ policy: await labelledPolicy(db, current, encryption) });
 }

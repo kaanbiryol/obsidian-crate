@@ -14,6 +14,8 @@ import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { getStoredFileRow } from '../sync/storage';
 import { runNotificationCoordinator } from '../notifications/coordinator';
 import { sha256Hex } from '@/platform/sha256';
+import { updatePolicy } from './access';
+import { createEncryptionFixture } from '../test-support/encryption-test-harness';
 
 const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' };
 const principal = { tokenId: 'vault', scope: 'vault' as const };
@@ -160,3 +162,27 @@ it('keeps a byte order mark when the Worker updates the note', async () => {
 	expect(new TextDecoder('utf-8', { ignoreBOM: true }).decode(stored)).toBe(`\uFEFF${updateReadingNote(note, id, { favorite: true })}`);
 });
 
+
+it('starts a new policy for an empty folder with a complete index that commits keep current', async () => {
+	await env.DB.prepare('DELETE FROM reading_policy').run();
+	await updatePolicy(env.DB, { enabled: false, folderPath: 'Reading', revision: null });
+	await seed('Reading/A.md'); await seed('Reading/B.md');
+	const read = vi.spyOn(env.BUCKET, 'get');
+	const response = await list();
+	expect(response.status).toBe(200);
+	expect((await response.json() as { items: unknown[] }).items).toHaveLength(2);
+	expect(read).not.toHaveBeenCalled();
+});
+
+it('rebuilds an encrypted vault\'s index in notification passes, not in web app reads', async () => {
+	for (let n = 0; n < 30; n++) await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reading/${n}.md`, `CRATE-E2EE/1\n{"n":${n}}`, null);
+	const { state: encryption } = await createEncryptionFixture('active');
+	await env.DB.prepare('INSERT OR REPLACE INTO server_state(id, encryption) VALUES (1, ?)').bind(JSON.stringify(encryption)).run();
+	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
+	const setAlarm = vi.fn();
+	const state = { storage: { setAlarm, get: vi.fn(), put: vi.fn(), delete: vi.fn() } } as unknown as DurableObjectState;
+	for (let pass = 0; pass < 3; pass++) await runNotificationCoordinator(state, env);
+	// Complete: the web app's next read is answered instead of a 503 for each step.
+	expect(await env.DB.prepare('SELECT index_scope IS NOT NULL AS scoped, index_cursor AS cursor FROM reading_policy').first()).toEqual({ scoped: 1, cursor: null });
+	expect(await env.DB.prepare('SELECT count(*) AS n FROM reading_items').first()).toEqual({ n: 30 });
+});

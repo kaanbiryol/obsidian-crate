@@ -134,6 +134,17 @@ it('rebuilds an encrypted index past a note larger than the plaintext limit', as
 	expect((await env.DB.prepare('SELECT path FROM reading_items ORDER BY path').all()).results.map(row => row.path)).toEqual(['Reading/a.md', 'Reading/b.md', 'Reading/c.md']);
 });
 
+it('splits an encrypted rebuild into steps that each read at most 16 MB', async () => {
+	for (let n = 0; n < 12; n++) await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reading/${String(n).padStart(2, '0')}.md`, `CRATE-E2EE/1\n${'x'.repeat(1_500_000)}`, null);
+	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
+	const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' };
+	const read = (file: Parameters<typeof readStoredNote>[1]) => readStoredNote(env, file, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES);
+	expect((await ensureReadingIndex(env, policy, read, undefined, true)).state).toBe('pending');
+	expect(await env.DB.prepare('SELECT count(*) AS n FROM reading_items').first()).toEqual({ n: 11 });
+	expect((await ensureReadingIndex(env, policy, read, undefined, true)).state).toBe('complete');
+	expect(await env.DB.prepare('SELECT count(*) AS n FROM reading_items').first()).toEqual({ n: 12 });
+});
+
 it('turns Save to Crate off in encrypted vaults', async () => {
 	const encrypted = { encryption: { mode: 'active' } as unknown as EncryptionServerState };
 	const post = (path: string, body: object, headers: Record<string, string> = {}) => handleReadingRoute(new Request(`https://test${path}`,

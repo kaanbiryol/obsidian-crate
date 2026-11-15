@@ -75,8 +75,9 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
 	const policy = notificationPolicyFromRow(loaded);
 	const reading = loaded?.reading_folder != null ? { enabled: loaded.reading_enabled ?? 0, folder_path: loaded.reading_folder,
 		generation: loaded.reading_generation ?? '', revision: loaded.reading_revision ?? '' } : null;
-	const readingIdle = encryption !== null || !features.reading || !reading
-		|| (completeReadingIndex(reading, loaded?.reading_scope == null ? null : { scope: loaded.reading_scope, cursor: loaded.reading_cursor }) !== null && !loaded?.reading_work);
+	// An encrypted vault has no Reading jobs, but an incomplete index is rebuilt here too.
+	const readingIdle = !features.reading || !reading
+		|| (completeReadingIndex(reading, loaded?.reading_scope == null ? null : { scope: loaded.reading_scope, cursor: loaded.reading_cursor }) !== null && (encryption !== null || !loaded?.reading_work));
 	const retryAt = loaded?.retry_at ?? null;
 	const retryDue = retryAt !== null && retryAt <= Date.now();
 	const sourcesIdle = !loaded?.source_work && !retryDue;

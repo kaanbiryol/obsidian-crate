@@ -85,9 +85,10 @@ it('serves pages and unchanged items at the edge and rebuilds under the coordina
 			headers: { Authorization: 'Bearer vault-credential', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current), ...headers } }), counted);
 		return { response, forwarded: forwarded - before };
 	};
-	// No index yet: building it writes, so the coordinator builds it.
+	// The policy was made for an empty folder, so its index started complete and the note's commit
+	// kept it current: even the first page is answered at the edge.
 	const built = await read('items?section=inbox');
-	expect(built).toMatchObject({ response: { status: 200 }, forwarded: 1 });
+	expect(built).toMatchObject({ response: { status: 200 }, forwarded: 0 });
 	expect(await built.response.json()).toMatchObject({ items: [{ crate_reading_id: note.crate_reading_id }] });
 	// A complete index answers a page at the edge.
 	expect(await read('items?section=inbox')).toMatchObject({ response: { status: 200 }, forwarded: 0 });

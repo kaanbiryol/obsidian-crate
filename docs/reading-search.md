@@ -12,7 +12,10 @@ stay.
 
 - Reading notes stay ordinary synced notes and the only source of truth.
 - `reading_items` holds one row per note: what the web app lists. Rows are derived and can be
-  rebuilt.
+  rebuilt. Every commit keeps them current, so a policy created for an empty folder starts with a
+  complete index. Otherwise notification passes rebuild it in steps of 25 notes and at most 16 MB,
+  in encrypted vaults too (from each note's card); a web app read that finds it incomplete takes
+  one step and answers 503 until it is done.
 - `note_terms` holds each listed note's search terms, keyed by saved
   date: one per title word (`p:` and its first three letters, or `w:` and the whole word when
   shorter), `t:` for a tag and `u:` for the link identity (`src/reading/core/search-terms.ts`).

@@ -20,6 +20,8 @@ const INDEX_FORMAT = 1;
 const UNINDEXED = `storage_key = c.storage_key, hash = c.hash, size = c.size, metadata_json = c.metadata_json,
         error = c.error, words = c.words, terms = c.terms, card = c.card, highlighted = c.highlighted, highlighted_at = c.highlighted_at`;
 const REBUILD_PAGE = 25;
+/** Bytes one rebuild step reads, so up to 25 notes of up to 4 MB stay within Worker memory. */
+const REBUILD_BYTES = 16 * 1024 * 1024;
 const MAX_READING_JOBS = 1000;
 export const readingIndexScope = (current: Pick<ReadingPolicy, 'folder_path' | 'generation'>) => `${current.folder_path}\n${current.generation}\n${INDEX_FORMAT}`;
 
@@ -285,12 +287,15 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
     ORDER BY portable_path LIMIT ${REBUILD_PAGE}`).bind(...fileFolderArgs(current.folder_path), index.cursor ?? '')
 		.all<{ path: string; portable_path: string; hash: string; size: number; storage_key: string }>();
 	const changes: ReadingFileChange[] = [];
-	let cursor = index.cursor ?? '', unavailable = false;
+	let cursor = index.cursor ?? '', unavailable = false, stopped = false, read = 0;
 	for (const file of results) {
 		if (isReadingNotePath(file.path, current.folder_path)) {
 			const change: ReadingFileChange = { path: file.path, storageKey: file.storage_key, hash: file.hash, size: file.size };
 			// An encrypted note is read for the card its upload carried.
 			if (file.size <= (encrypted ? MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES : MAX_READING_BYTES)) {
+				// The next step continues from here once this one's bytes are released.
+				if (changes.length && read + file.size > REBUILD_BYTES) { stopped = true; break; }
+				read += file.size;
 				try { change.content = await readBytes({ path: file.path, storageKey: file.storage_key, hash: file.hash, size: file.size }); }
 				catch { unavailable = true; break; }
 			}
@@ -298,7 +303,7 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 		}
 		cursor = file.portable_path;
 	}
-	const next = !unavailable && results.length < REBUILD_PAGE ? null : cursor;
+	const next = !unavailable && !stopped && results.length < REBUILD_PAGE ? null : cursor;
 	await db.batch([
 		...await readingIndexStatements(db, changes, { policy: current, encrypted }),
 		db.prepare('UPDATE reading_policy SET index_cursor = ? WHERE id = 1 AND index_scope = ?').bind(next, scope),

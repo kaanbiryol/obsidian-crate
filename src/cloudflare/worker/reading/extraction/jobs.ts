@@ -5,6 +5,7 @@ import type { FeaturePolicy } from '../../../../protocol/feature-policy';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { Env } from '../../types';
 import { policy, readSource, readStoredNote } from '../common';
+import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
 import { parseReadingNote } from '@/reading/core/notes';
 import { assembleReadingArticle, managedArticle } from '@/reading/core/article';
 import { ensureReadingIndex, queueReadingArticles, readingIndexScope } from '../library-index';
@@ -123,14 +124,19 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 
 /** Return the next projection deadline, distinguishing a backlog from an outage. */
 export async function scheduleReading(env: Env, loaded?: { encryption: EncryptionServerState | null; features: FeaturePolicy }): Promise<number | null> {
-	if (loaded ? loaded.encryption : await readEncryptionState(env.DB)) return null;
+	const encrypted = !!(loaded ? loaded.encryption : await readEncryptionState(env.DB));
 	if (!(loaded ? loaded.features.reading : await featureEnabled(env.DB, 'reading'))) return null;
 	const current = await policy(env.DB);
 	if (!current) return null;
-	const index = await ensureReadingIndex(env, current, file => readStoredNote(env, file));
-	if (index.state === 'complete' && current.enabled) await queueReadingArticles(env.DB).run();
-	if (await env.DB.prepare('SELECT 1 FROM reading_captures UNION ALL SELECT 1 FROM reading_jobs WHERE ?=1 LIMIT 1').bind(current.enabled).first()) {
-		if (!await wakeReading(env)) throw new Error('Could not schedule Reading');
+	// An encrypted vault's index is rebuilt here too, so web app reads are not each a 503 step;
+	// its notes are read for the card their upload carried.
+	const index = await ensureReadingIndex(env, current, file => readStoredNote(env, file, encrypted ? MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES : undefined), undefined, encrypted);
+	// The server never captures or extracts for an encrypted vault.
+	if (!encrypted) {
+		if (index.state === 'complete' && current.enabled) await queueReadingArticles(env.DB).run();
+		if (await env.DB.prepare('SELECT 1 FROM reading_captures UNION ALL SELECT 1 FROM reading_jobs WHERE ?=1 LIMIT 1').bind(current.enabled).first()) {
+			if (!await wakeReading(env)) throw new Error('Could not schedule Reading');
+		}
 	}
 	return index.state === 'complete' ? null : Date.now() + (index.state === 'unavailable' ? 30_000 : 1);
 }
