@@ -4,7 +4,6 @@ import { isStandaloneApp } from '../shell/device';
 import { useAppConnection, useConnectionReset } from '../connection/AppConnection';
 import { usePushNotifications } from './usePushNotifications';
 import { usePwaColorScheme } from '../hooks/usePwaColorScheme';
-import { usePwaPreferences } from '../settings/usePwaPreferences';
 import { usePwaRefreshLifecycle } from './usePwaRefreshLifecycle';
 import { usePwaStatus } from './usePwaStatus';
 import { useReminderEditorActions } from './editor/useReminderEditorActions';
@@ -31,15 +30,13 @@ function exportPendingChanges(changes: PendingReminderChange[]): void {
 function useRemindersController() {
 	const enabled = useSharedFeatures().reminders;
 	const connection = useAppConnection();
-	const { authority, authToken, apiFetch, config: storedConfig, logOut, loggingOut, encryption,
+	const { authority, authToken, apiFetch, config, logOut, loggingOut, encryption,
 		selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId, registerPushCleanup } = connection;
 	// An unanswered check on a device without encryption evidence shows the plaintext
 	// offline copy read-only. The outbox stays locked, so it cannot hold back the list.
 	const unavailableMessage = encryption.status === 'locked' && encryption.offlineCopy ? encryption.message : null;
 	const { colorScheme } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
-	const { preferences } = usePwaPreferences();
-	const config = useMemo(() => ({ ...storedConfig, upcomingDays: preferences.upcomingDays ?? storedConfig.upcomingDays }), [storedConfig, preferences.upcomingDays]);
 	const [settingsOpen, setSettingsOpen] = useSettingsOpen();
 	const editor = useReminderEditor(setSettingsOpen);
 	const { modal, saving, resetEditor } = editor;

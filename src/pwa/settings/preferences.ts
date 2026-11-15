@@ -9,7 +9,6 @@ export const PWA_PREFERENCES_KEY = 'crate-reminders-preferences';
 export interface PwaPreferences {
 	defaultScreen: PwaStartScreen;
 	dockTabs: DockTab[];
-	upcomingDays: number | null;
 	/** Shared by reminders and Reading; retain the existing storage key. */
 	reminderListStyle: ListStyle;
 }
@@ -23,11 +22,9 @@ export function loadPwaPreferences(): PwaPreferences {
 			defaultScreen: value?.defaultScreen === 'inbox' || value?.defaultScreen === 'upcoming' || value?.defaultScreen === 'browse'
 				|| value?.defaultScreen === 'reading' || value?.defaultScreen === 'favorites' || value?.defaultScreen === 'archive'
 				? value.defaultScreen : 'today',
-			upcomingDays: typeof value?.upcomingDays === 'number' && Number.isSafeInteger(value.upcomingDays) && value.upcomingDays >= 1
-				? value.upcomingDays : null,
 		};
 	} catch {
-		return { defaultScreen: 'today', upcomingDays: null, dockTabs: normalizeDockTabs(null), reminderListStyle: DEFAULT_LIST_STYLE };
+		return { defaultScreen: 'today', dockTabs: normalizeDockTabs(null), reminderListStyle: DEFAULT_LIST_STYLE };
 	}
 }
 

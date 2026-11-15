@@ -115,7 +115,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 					<PwaUpdateNotice disabled={busy || unsynced} />
 					<PwaUpdateFeedback />
 					<GeneralSettings preferences={preferences} onPreferencesChange={changePreferences} />
-					<TabSettings preferences={preferences} upcomingDays={reminders?.ready && reminders.connected ? reminders.config.upcomingDays : undefined} onChange={changePreferences} />
+					<TabSettings preferences={preferences} onChange={changePreferences} />
 					<ReminderSettings model={reminders} homeScreenPlatform={homeScreen.platform} />
 					<SettingsSection title="Install">
 						{homeScreen.platform && <Button className="settings-navigation-row" onClick={() => navigate('install')}>

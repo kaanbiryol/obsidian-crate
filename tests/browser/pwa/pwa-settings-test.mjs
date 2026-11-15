@@ -97,8 +97,6 @@ try {
 			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
 			await expect(page.getByRole('dialog')).toHaveCount(1);
 			await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('inert', '');
-			const days = sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' });
-			await days.fill('17'); await days.press('Tab');
 			await expectTheme(page, 'dark', 'system');
 			// Retained features and the settings consumer must share one document owner.
 			await page.evaluate(() => {
@@ -122,7 +120,7 @@ try {
 			await sheet.getByRole('button', { name: 'Light', exact: true }).click();
 			await sheet.getByRole('combobox', { name: 'Open app to' }).selectOption('favorites');
 			await checkSettingsFocus(page, sheet);
-			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', upcomingDays: 17, dockTabs: ['inbox', 'today', 'browse', 'reading'], reminderListStyle: 'flat' });
+			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', dockTabs: ['inbox', 'today', 'browse', 'reading'], reminderListStyle: 'flat' });
 			await page.screenshot({ path: 'test-results/settings/' + name + '-light.png' });
 			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 			await expect(sheet).toHaveCount(0);
@@ -139,7 +137,7 @@ try {
 			await expect(page.getByRole('searchbox', { name: 'Search reading' })).toHaveValue('retained query');
 			await gear.click();
 			await checkSettingsFocus(page, sheet);
-			await expect(sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' })).toHaveValue('17');
+			await expect(sheet.getByRole('spinbutton', { name: 'Upcoming range (days)' })).toHaveCount(0);
 			await listStyle.selectOption('cards');
 			await expect(readingLibrary).toHaveAttribute('data-list-style', 'cards');
 			await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'cards');

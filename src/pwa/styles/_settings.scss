@@ -127,9 +127,6 @@
 	.settings-preference-control--select { justify-content: flex-end; background: transparent; }
 	.settings-preference-control--select .settings-preference-input { padding: 0 22px 0 0; text-align: right; text-align-last: right; color: var(--text-normal); font-size: var(--crate-font-base); }
 	.settings-preference-control--select svg { right: 0; color: var(--text-faint); }
-	.settings-preference-control--days { flex-basis: 100px; width: 100px; }
-	.settings-preference-control--days input { width: 60px; }
-	.settings-preference-unit { padding-right: 12px; }
 	.settings-help { margin: 0 0 8px; }
 	.settings-panel__section .settings-help { margin-bottom: 0; padding-bottom: 12px; }
 	.settings-main { display: flex; flex-direction: column; }

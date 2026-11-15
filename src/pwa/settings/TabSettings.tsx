@@ -8,7 +8,6 @@ import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { PwaButton as Button } from '../components/PwaButton';
 import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';
-import { UpcomingRangeSetting } from './UpcomingRangeSetting';
 
 const HOLD_DELAY_MS = 380;
 const HOLD_MOVE_TOLERANCE = 9;
@@ -64,10 +63,8 @@ function TabRow({ tab, tabs, onChange, onDrop, description }: {
 	</Reorder.Item>;
 }
 
-export function TabSettings({ preferences, upcomingDays, onChange }: {
+export function TabSettings({ preferences, onChange }: {
 	preferences: PwaPreferences;
-	/** Present once Reminders is connected; its range comes from the vault configuration. */
-	upcomingDays?: number;
 	onChange: (patch: Partial<PwaPreferences>) => void;
 }) {
 	const tabs = preferences.dockTabs;
@@ -100,7 +97,6 @@ export function TabSettings({ preferences, upcomingDays, onChange }: {
 				<ChevronsUpDown size={14} aria-hidden="true" />
 			</span>
 		</SettingsRow>
-		{upcomingDays !== undefined && <UpcomingRangeSetting days={upcomingDays} onChange={onChange} />}
 		<Reorder.Group axis="y" values={shownTabs} onReorder={setDragOrder} className="settings-tab-list" aria-label="Your tabs">
 			{shownTabs.map(tab => <TabRow key={tab} tab={tab} tabs={shownTabs} onChange={changeTabs} onDrop={dropTabs} description={description} />)}
 		</Reorder.Group>

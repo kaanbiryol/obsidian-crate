@@ -76,7 +76,4 @@ html.pwa-sheet-scroll-held .pwa-modal-sheet{height:var(--pwa-sheet-layout-height
 .settings-preference-control .settings-preference-input{appearance:none;-webkit-appearance:none;box-sizing:border-box;width:100%;min-width:0;height:100%;margin:0;padding:0 12px;border:0;border-radius:inherit;outline:none;background:transparent;box-shadow:none;color:inherit;font:inherit;font-size:16px;font-weight:500;line-height:normal}
 .settings-preference-control--select .settings-preference-input{padding-right:28px;cursor:pointer}
 .settings-preference-control--select svg{position:absolute;right:10px;pointer-events:none;color:var(--text-faint)}
-.settings-preference-control--days .settings-preference-input{padding-right:5px;text-align:right;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield}
-.settings-preference-input::-webkit-inner-spin-button,.settings-preference-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-.settings-preference-unit{padding-right:12px;color:var(--text-faint);font-size:var(--crate-font-xxs);pointer-events:none}
 @media(max-width:360px){.settings-row--preference{gap:8px}.settings-preference-control{flex-basis:108px;width:108px}}

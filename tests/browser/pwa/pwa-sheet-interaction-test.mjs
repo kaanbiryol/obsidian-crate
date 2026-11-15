@@ -182,22 +182,12 @@ try {
 			await expect(darkTheme).toHaveAttribute('aria-pressed', 'true');
 			await expectNoTouchRing(darkTheme);
 			await expect(settings).toBeVisible();
-			const days = settings.getByRole('spinbutton', { name: 'Upcoming range (days)', exact: true });
-			const wrapperBorder = await days.locator('..').evaluate(element => getComputedStyle(element).borderColor);
-			await days.tap();
-			await days.fill('12');
-			await expectNoTouchRing(days);
-			await expect(days).toHaveCSS('border-width', '0px');
-			await expect(days.locator('..')).not.toHaveCSS('border-color', wrapperBorder);
 			const select = settings.getByRole('combobox', { name: 'Open app to', exact: true });
 			await select.tap();
 			await expectNoTouchRing(select);
 			await select.selectOption('inbox');
 			await expect(settings).toBeVisible();
 
-			await tabTo(page, days);
-			await expect(days.locator('..')).toHaveCSS('outline-style', 'none');
-			await expect(days.locator('..')).not.toHaveCSS('border-color', wrapperBorder);
 			await tabTo(page, settings.getByRole('button', { name: 'Close settings', exact: true }));
 			await expectNeutralKeyboardRing(settings.getByRole('button', { name: 'Close settings', exact: true }));
 			await darkTheme.tap();

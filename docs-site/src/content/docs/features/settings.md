@@ -59,7 +59,7 @@ Crate labels settings **This device** or **All devices** where it matters.
 | Reading and Reminders on/off switches | All devices on the server |
 | Push notifications, notification folder, timezone, and all-day alert time | The server's alert schedule for all subscribed devices |
 | List style, default reminders tab, default due date, startup view, and upcoming range | This Obsidian device |
-| Web app theme, tabs, list style, and upcoming range | That browser or installed web app |
+| Web app theme, tabs, and list style | That browser or installed web app |
 
 Shared changes reach other devices the next time they contact or sync with the server. On a phone, the browser and the Home Screen app can have their own preferences and connections.
 
