@@ -101,6 +101,11 @@ describe('reminder dates in the editor', () => {
 		expect(spec && state.update(spec).state.doc.toString()).toBe('- [ ] Pay rent  <!-- crate-id:a -->');
 	});
 
+	it('marks a title’s important marker, not other exclamation marks or one in its description', () => {
+		const doc = '- [ ] Wow! Publish ! 2026-12-01 <!-- crate-id:a -->\n- [ ] Pay rent // urgent !\n- [ ] [Hi ! there](https://example.com)\n! Not a task';
+		expect(shown(doc, EditorSelection.single(0))).toEqual(['important:!', 'chip:2026-12-01', 'description: // urgent !']);
+	});
+
 	it('keeps typed and invalid phrases visible on the line being typed', () => {
 		const doc = '- [ ] Call Mia 2026-12-24\n- [ ] Water plants every 0 days';
 		expect(shown(doc, EditorSelection.single(doc.length))).toEqual(['chip:2026-12-24', 'error:every 0 days']);

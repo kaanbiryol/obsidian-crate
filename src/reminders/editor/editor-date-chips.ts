@@ -156,6 +156,8 @@ class DateHintWidget extends WidgetType {
 }
 
 const phraseMark = Decoration.mark({ class: 'crate-reminder-date-phrase' });
+// Styled, not replaced: the `!` reads as itself, so the cursor and deletes stay native.
+const importantMark = Decoration.mark({ class: 'crate-reminder-important' });
 const descriptionMarker = Decoration.replace({ widget: new DescriptionMarkerWidget() });
 const SEPARATOR_LENGTH = ' //'.length;
 const descriptionMark = Decoration.mark({ class: 'crate-reminder-description-phrase' });
@@ -217,6 +219,7 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 					...breaks.map(position => descriptionBreak.range(position, position + SEPARATOR_LENGTH)),
 				];
 			}
+			if (display.kind === 'important') return [importantMark.range(from, to)];
 			if (display.kind === 'error') {
 				return [Decoration.mark({ class: 'crate-reminder-date-error', attributes: { title: display.message, 'aria-invalid': 'true' } }).range(from, to)];
 			}

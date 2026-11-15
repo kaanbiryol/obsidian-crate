@@ -16,7 +16,8 @@ export type ReminderDateDisplay =
 	| { kind: 'chip'; from: number; to: number; label: string; overdue: boolean; typed?: true }
 	| { kind: 'phrase'; from: number; to: number; label: string; overdue: boolean }
 	| { kind: 'error'; from: number; to: number; message: string }
-	| { kind: 'description'; from: number; start: number; to: number; breaks: number[] };
+	| { kind: 'description'; from: number; start: number; to: number; breaks: number[] }
+	| { kind: 'important'; from: number; to: number };
 
 const TASK_WITH_TEXT = /^\s*-\s*\[[ xX]\]\s*\S/;
 
@@ -108,10 +109,32 @@ export function editableDatePhrase(text: string, now = new Date()): { from: numb
 	return null;
 }
 
-/** A reminder line's schedule display and typed description, in line order. */
+/**
+ * Where a task line's important marker sits: the last standalone `!` in its
+ * title, the one the parser reads, found by the same matcher. Null without one.
+ */
+export function importantMarker(line: string): { from: number; to: number } | null {
+	const task = TASK_WITH_TEXT.exec(line);
+	if (!task) return null;
+	const start = task[0].length - 1, end = inlineDescription(line)?.from ?? line.length;
+	const match = findAllMatches(line.slice(start, end)).filter(found => found.type === 'priority').at(-1);
+	return match ? { from: start + match.index, to: start + match.index + match.length } : null;
+}
+
+/** A reminder line's schedule display, important marker and typed description, in line order. */
 export function reminderLineDisplays(text: string, now = new Date()): ReminderDateDisplay[] {
 	const schedule = reminderDateDisplay(text, now), description = TASK_WITH_TEXT.test(text) ? inlineDescription(text) : null;
-	return [...schedule ? [schedule] : [], ...description ? [{ kind: 'description' as const, from: description.from, start: description.start, to: description.to, breaks: description.breaks }] : []];
+	const important = importantMarker(text);
+	return [
+		...schedule ? [schedule] : [],
+		...important ? [{ kind: 'important' as const, ...important }] : [],
+		...description ? [{ kind: 'description' as const, from: description.from, start: description.start, to: description.to, breaks: description.breaks }] : [],
+	].sort((a, b) => a.from - b.from);
+}
+
+/** An important marker shown as a chip, keeping its `!` as the text. */
+export function createImportantChip(): HTMLElement {
+	return createSpan({ cls: ['crate-reminder-important'], text: '!' });
 }
 
 /** A saved date chip that runs `activate` when selected. */

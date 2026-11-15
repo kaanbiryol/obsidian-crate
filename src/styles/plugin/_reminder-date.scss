@@ -41,3 +41,14 @@
 	text-decoration: underline wavy var(--text-error);
 	text-underline-offset: 3px;
 }
+
+/* A reminder's important marker in a note, styled like the date chip; its `!` stays editable text. */
+.crate-reminder-important {
+	padding: 0 var(--size-4-1);
+	border-radius: var(--radius-s);
+	/* The same tint as the reminder editor's important chip. */
+	background-color: color-mix(in srgb, var(--text-error) 10%, transparent);
+	color: var(--text-error);
+	font-size: var(--font-smaller);
+	font-weight: var(--font-bold);
+}
