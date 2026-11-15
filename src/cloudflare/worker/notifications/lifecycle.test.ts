@@ -82,3 +82,15 @@ it('waits for the D1 daily reset without spending its failure budget', async () 
 	expect(values.get('notificationRun')).toEqual({ startedAt: resume, passes: 0, failures: 0 });
 	expect(storage.deleteAlarm).not.toHaveBeenCalled();
 });
+
+it('wakes the dispatcher after a pass that failed once it may have committed a schedule', async () => {
+	const { state } = fixture();
+	vi.spyOn(console, 'error').mockImplementation(() => {});
+	await armNotificationCoordinator(state);
+	// The pass committed a schedule, then a later query failed: its `wrote` is lost.
+	vi.mocked(runNotificationCoordinator).mockRejectedValueOnce(new Error('database unavailable'));
+	expect(await runBoundedNotificationCoordinator(state, {} as never)).toBeNull();
+	// The retry finds no job for the committed file, so it writes nothing, but reports the due time.
+	vi.mocked(runNotificationCoordinator).mockResolvedValueOnce({ wrote: false, dispatchAt: 1_000 });
+	expect(await runBoundedNotificationCoordinator(state, {} as never)).toMatchObject({ dispatchAt: 1_000 });
+});

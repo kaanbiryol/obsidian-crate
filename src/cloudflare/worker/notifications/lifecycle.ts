@@ -72,6 +72,10 @@ export async function runBoundedNotificationCoordinator(state: DurableObjectStat
 		}
 		return { episode, dispatchAt: scheduled.dispatchAt };
 	} catch (error) {
+		// A pass can commit a schedule and then fail; its retry then finds no job for that file,
+		// so it would write nothing and never wake the dispatcher. A spurious wake costs one
+		// dispatcher request and no D1 query.
+		await state.storage.put(DISPATCH_PENDING_KEY, true);
 		await recordFailure(state, episode, error);
 		return null;
 	}
