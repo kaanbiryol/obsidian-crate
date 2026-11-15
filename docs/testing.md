@@ -510,9 +510,8 @@ library queries. `reading/reading-search.integration.ts` checks title, tag and l
 sections, paging and encrypted cards through D1, and `reading/encryption.integration.ts` checks
 hashed search, upload cards and Shortcut saves end to end. `reading/capacity.integration.ts`
 pages and searches 10,000- and 50,000-note libraries and bounds the rows each reads.
-`tests/browser/reading/reading-cache-recovery-test.mjs` verifies that rejected pagination
-preserves the confirmed cache, offline articles and pending commands in Chromium
-and WebKit.
+`tests/browser/reading/reading-cache-recovery-test.mjs` verifies that a rejected list page
+preserves offline articles, pending commands and drafts in Chromium and WebKit.
 
 `encryption/file-inventory.test.ts`, `pwa/reading/encrypted-api.test.ts` and
 `pwa/reminders/encrypted-reminder-api.test.ts` cover encrypted page and delta validation, advancing
@@ -676,5 +675,5 @@ through the Worker, with 10,000 Reading notes and 10,000 other files.
 
 `node --test tests/browser/reading/reading-cache-recovery-test.mjs` exercises the production
 Reading loader and native IndexedDB in Chromium/WebKit. It covers old-server source
-issues, retained offline articles/list entries, definitive deletion, quota rollback
+issues, offline articles retained through failed, incomplete and rejected list pages,
 and malformed-record preservation. It is included in `npm run test:reading-browser`.

@@ -104,13 +104,13 @@ an earlier sign-in to the same Reading folder never sent: hydration moves those 
 the current queue under the queue lock, in one transaction. They have no operation ID
 or receipt yet, so sending them cannot repeat a write. Removing an
 earlier sign-in's reviewed changes also removes its saved request attempts.
-A failed list write leaves the previous list and articles intact. A source issue
-does not authorize removing that source's cached article or its last verified list
-entry; the issue remains visible while the saved copy is retained. Unknown article
-records remain available for export. A complete response without that source or
-an issue still removes its derived offline copy. HTTP failures preserve the prior
-snapshot. `tests/browser/reading/reading-cache-recovery-test.mjs` tests these boundaries
-in native Chromium and WebKit storage, including a quota failure after pruning.
+The library list stays on the server and in memory; only articles saved for
+offline are stored. A list response never removes an offline copy: a source issue
+remains visible while the saved copy is retained, and a page without the article
+does not prove it was deleted. Unknown article records remain available for export.
+HTTP failures and rejected pages leave stored copies, pending changes and drafts
+unchanged. `tests/browser/reading/reading-cache-recovery-test.mjs` tests these boundaries
+in native Chromium and WebKit storage.
 
 Reading enrollment captures the current credentials and logout marker before
 exchanging a setup grant. A delayed response cannot replace a newer session or
