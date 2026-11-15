@@ -8,8 +8,8 @@ import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/c
 import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } from '../../reading/core/model';
 import { readingCapturePath, retitledCapturePath } from '../../reading/core/filename';
 import { READING_DUPLICATE_ID_ISSUE } from '../../reading/core/inventory';
-import { normalizedTag, titleMatches } from '../../reading/core/search-terms';
-import { openReadingCard, sameReadingCardFields, type ReadingCardFields } from '../../reading/core/reading-card';
+import { highlightsMatch, normalizedTag, titleMatches } from '../../reading/core/search-terms';
+import { openReadingCard, openReadingTagName, sameReadingCardFields, type ReadingCardFields, type ReadingTagName } from '../../reading/core/reading-card';
 import { readingUploadCard } from '../../reading/core/reading-card-upload';
 import { hashedQueryTerms } from '@/encryption/reading-search';
 import { type EncryptedInventoryFile as WireFile, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES, sameInventoryFile } from '@/encryption/file-inventory';
@@ -46,7 +46,7 @@ interface EncryptedReadingOptions {
 class NoteUnavailableError extends Error {}
 
 /** Reading routes this client answers; an encrypted session never sends them in plaintext. */
-export const ENCRYPTED_READING_ACTIONS: readonly string[] = ['items', 'item', 'capture', 'update', 'retry', 'delete'];
+export const ENCRYPTED_READING_ACTIONS: readonly string[] = ['items', 'item', 'tags', 'capture', 'update', 'retry', 'delete'];
 
 interface ItemsPage { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: string | null }
 
@@ -98,6 +98,7 @@ export class EncryptedReadingApi {
 	 * rechecked here, so a page can hold fewer items than the server listed. */
 	private async items(params: URLSearchParams): Promise<ItemsPage> {
 		const q = params.get('q') ?? '', tag = params.get('tag') ?? '', url = params.get('url') ?? '', cursor = params.get('cursor') ?? '', id = params.get('id');
+		const highlights = params.get('section') === 'highlights';
 		const query = new URLSearchParams({ section: params.get('section') ?? 'inbox', ...cursor ? { cursor } : {}, ...id ? { id } : {} });
 		for (const term of await hashedQueryTerms(this.options.searchKey, { q, tag, url })) query.append('term', term);
 		type ListedCard = WireFile & { card: string; stale: boolean; fields: Partial<ReadingCardFields> };
@@ -112,7 +113,8 @@ export class EncryptedReadingApi {
 				// The server sorts by the listed fields; one that disagrees with its card is not trusted.
 				if (!sameReadingCardFields(item, fields ?? {})) throw new Error();
 			} catch { issues.push({ path: file.path, message: 'This Reading card is unreadable. Open the note in Obsidian.' }); continue; }
-			if (q && !titleMatches(item.title, q)) continue;
+			// The Highlights tab matches highlight text and notes as well as the title.
+			if (q && !(highlights ? highlightsMatch(item, q) : titleMatches(item.title, q))) continue;
 			if (tag && !item.tags.some(value => normalizedTag(value) === normalizedTag(tag))) continue;
 			if (url) { try { if (!item.source_url || readingUrlIdentity(item.source_url) !== readingUrlIdentity(url)) continue; } catch { continue; } }
 			if (id && item.crate_reading_id !== id) continue;
@@ -127,6 +129,12 @@ export class EncryptedReadingApi {
 		});
 		return { items: unique, issues, cursor: page.cursor };
 	}
+	/** Every tag name the server lists, opened here. A name sealed for another term is dropped. */
+	private async tags(): Promise<{ tags: string[] }> {
+		const { sealed } = await this.json<{ sealed: ReadingTagName[] }>('/reading/tags');
+		const names = await Promise.all(sealed.map(tag => openReadingTagName(tag, this.cardKeys)));
+		return { tags: [...new Set(names.filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b)) };
+	}
 	/** The listed note with this Reading ID, read from the server when this client has not listed it. */
 	private async find(id: string): Promise<Listed | undefined> {
 		await this.items(new URLSearchParams({ section: 'all', id }));
@@ -137,6 +145,7 @@ export class EncryptedReadingApi {
 		const url = new URL(path, 'https://crate.invalid'), action = url.pathname.slice('/reading/'.length);
 		if (action === 'items') return this.items(url.searchParams);
 		if (action === 'item') return (await this.item(url.searchParams.get('id') ?? ''))!.article;
+		if (action === 'tags') return await this.tags();
 		if (!rawBody || !ENCRYPTED_READING_ACTIONS.includes(action)) throw new Error('Unsupported encrypted Reading request.');
 		const body = JSON.parse(rawBody) as Record<string, unknown>, id = body.operationId;
 		if (typeof id !== 'string') throw new Error('A saved Reading operation ID is required.');

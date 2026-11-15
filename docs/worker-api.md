@@ -128,8 +128,20 @@ title word, tag and link, keyed by saved date: a search walks its rarest term (b
 at 50, then 500) newest first and stops after a page. It checks the other terms by key lookups in
 `note_terms` and, unencrypted, the title words on the notes that have every term. See [Reading search](reading-search.md).
 
+`section=highlights` pages `highlight_index` instead: highlighted notes, newest highlight first.
+There `q` (or the hashed `term` values) and `tag` match each note's highlight terms: the words of
+its title, highlight text and highlight notes, and its tags. A filtered page scans at most 2,000
+rows, so a page can come back short or empty with a `cursor` that continues the scan. A Highlights
+page also ends before its notes or cards pass 512 KB.
+
+`GET /reading/tags` (library credential) lists every tag for the tags view, up to 5,000. An
+unencrypted vault answers `{ tags }`, lowercased, stepping through the distinct `t:` terms with
+one index seek each. An encrypted vault answers `{ sealed: [{ term, name }] }` from `reading_tags`,
+each name sealed by a device for its hashed term; the device opens them.
+
 In an encrypted vault, each Reading note's upload carries its card as the file's public data
-(`{ kind: 'reading-card', version: 1, card, terms, fields }`), from Obsidian's sync and the web
+(`{ kind: 'reading-card', version: 2, card, terms, fields, highlighted_at, highlight_terms, tag_names }`;
+version 1 has no highlight or tag fields and is still accepted), from Obsidian's sync and the web
 app's encrypted commits alike; the server validates it and lists the note from it in the commit's
 batch. An upload without a card keeps the row's last card, marked `stale`. `GET /reading/taken?path=…`
 (up to 20 server paths) tells a device which names are stored, for naming new notes.

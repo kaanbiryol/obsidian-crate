@@ -94,6 +94,14 @@ export async function queryReadingItems(session: ReadingSession, query: ReadingI
 	return { items: page.items, issues: page.issues, cursor: page.cursor };
 }
 
+/** Every tag in the library, for the tags view. */
+export async function queryReadingTags(session: ReadingSession): Promise<string[]> {
+	const value = await readingRequest<unknown>('/reading/tags', session);
+	const tags = (value as { tags?: unknown } | null)?.tags;
+	if (!Array.isArray(tags) || !tags.every(tag => typeof tag === 'string')) throw new Error('Reading tags response is unreadable.');
+	return tags;
+}
+
 /** The library's first inbox page and its issues, kept in memory. The library stays on the
  * server; sections and searches read their own pages. A confirmed page also lets earlier
  * sign-ins' offline copies go. */

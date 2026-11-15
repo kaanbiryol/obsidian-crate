@@ -13,8 +13,8 @@ import { PathTags } from './path-tags';
 import { importNotificationKeys, openNotification } from './notification-keys';
 import { createReminderProjection } from '../reminders/core/encrypted-schedule-projection';
 import type { EncryptedSchedules } from './notification-format';
-import { openReadingCard, sealReadingCard } from '../reading/core/reading-card';
-import { deriveReadingSearchKey, hashedReadingTerms } from './reading-search';
+import { openReadingCard, openReadingTagName, readingCardData, sealReadingCard, validateReadingCardData, type ReadingCardData } from '../reading/core/reading-card';
+import { deriveReadingSearchKey, hashedHighlightTerms, hashedReadingTerms } from './reading-search';
 
 /**
  * Frozen samples of every encrypted format that released clients have written.
@@ -65,6 +65,7 @@ const pairingContext: PairingContext = { version: 1, id: 'fixture-pairing', orig
 const reminderMarkdown = '- [ ] Dentist 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->\n- [x] Groceries 2099-01-01 <!-- crate-id:r2 -->\n';
 const readingCard = { crate_reading_version: 1 as const, crate_reading_id: '00000000-0000-4000-8000-000000000001', title: 'Saved article', source_url: 'https://example.test/article',
 	saved_at: '2026-01-01T00:00:00.000Z', reading_status: 'inbox' as const, favorite: false, tags: ['fixture'], extraction_status: 'ready' as const, path: 'Reading/Saved article.md' };
+const highlightedCard = { ...readingCard, tags: ['Fixture', 'second'], highlights: [{ start: 0, end: 5, text: 'Saved', createdAt: '2026-02-01T00:00:00.000Z', note: 'Ünïcødé note' }] };
 const withoutEnvelopes = (value: EncryptedSchedules) => ({ ...value, reminders: value.reminders.map(item => ({ ...item, notification: { ...item.notification, envelope: '' } })) });
 
 const fixtures: Record<string, Fixture<unknown>> = {
@@ -156,6 +157,24 @@ const fixtures: Record<string, Fixture<unknown>> = {
 			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1 };
 			expect(await openReadingCard(card, wire, keys)).toEqual({ item: readingCard, hash: 'a'.repeat(64) });
 			expect(await hashedReadingTerms(await deriveReadingSearchKey(bundle.vaultId, bundle.vault), readingCard)).toEqual(terms);
+		},
+	}),
+	// Version 2 adds when the note was last highlighted, hashed highlight terms and sealed tag names.
+	'reading-card-v2': fixture<{ wire: string; data: ReadingCardData }>({
+		generate: async () => {
+			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1, searchKey: await deriveReadingSearchKey(bundle.vaultId, bundle.vault) };
+			const wire = 'tagtagtagtagtagtagtagtagta/cardcardcardcardcardcardca.md';
+			return { wire, data: await readingCardData(highlightedCard, wire, 'a'.repeat(64), keys) };
+		},
+		verify: async ({ wire, data }) => {
+			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1 }, searchKey = await deriveReadingSearchKey(bundle.vaultId, bundle.vault);
+			validateReadingCardData(data);
+			if (data.version !== 2) throw new Error('Expected a version 2 card');
+			expect(await openReadingCard(data.card, wire, keys)).toEqual({ item: highlightedCard, hash: 'a'.repeat(64) });
+			expect(await hashedReadingTerms(searchKey, highlightedCard)).toEqual(data.terms);
+			expect(await hashedHighlightTerms(searchKey, highlightedCard)).toEqual(data.highlight_terms);
+			expect(data.highlighted_at).toBe('2026-02-01T00:00:00.000Z');
+			expect(await Promise.all(data.tag_names.map(tag => openReadingTagName(tag, keys)))).toEqual(['fixture', 'second']);
 		},
 	}),
 	'pairing-commitment-v1': fixture<{ commitment: string }>({

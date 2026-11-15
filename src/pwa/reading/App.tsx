@@ -31,7 +31,7 @@ import { pendingReadingHighlights, readerStatus, readingItemSyncStatus } from '.
 import { useReaderSyncFeedback } from './useReaderSyncFeedback';
 import type { PendingReading } from './outbox';
 import type { ReadingLibrarySource } from '@/reading/ui/useLibraryPages';
-import { queryReadingItems } from './api';
+import { queryReadingItems, queryReadingTags } from './api';
 import { readOfflineReadingItems } from './storage/storage';
 import type { ReadingItem } from '@/reading/core/model';
 import type { ReadingSession } from './session/session';
@@ -67,6 +67,7 @@ function ReadingAppContent() {
 			const page = await queryReadingItems(session, { section, q, tag: tag ?? undefined, cursor: cursor ?? undefined });
 			return { items: page.items, cursor: page.cursor };
 		},
+		loadTags: () => queryReadingTags(session),
 		revision: cache, present: items => presentReadingItems(items, pending),
 	} : undefined, [session, isOffline, readOnly, cache, pending]);
 	// A shared link saves at once, like the iPhone shortcut. Its draft keeps it until

@@ -10,9 +10,6 @@
 	&__header.view-header { @include view-header.primary-screen; }
 	&__mobile-nav, button.crate-reading__mobile-add { display: none; }
 	&__search { margin: 12px 18px 12px; }
-	&__tag-picker { position: relative; display: none; align-items: center; gap: 12px; margin: 0 18px 12px; color: var(--text-muted); font-size: 13px; }
-	&__tag-picker select { appearance: none; -webkit-appearance: none; flex: 1; min-width: 0; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid var(--crate-divider); border-radius: 8px; background: var(--crate-panel-bg); color: var(--text-normal); font: inherit; font-size: 16px; }
-	&__tag-picker > svg { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 	&__list-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 28px; scrollbar-width: thin; }
 	&__group { margin: 0 0 var(--crate-space-16); }
 	&__group h3 { color: var(--text-muted); margin: 0; padding: 4px 12px var(--crate-space-4); font-size: 12px; font-weight: 450; }
@@ -41,7 +38,6 @@
 @mixin compact-layout {
 	&__layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
 	&__sidebar { grid-column: 1; grid-row: 2; padding: 0; background: var(--crate-app-bg); }
-	&__tag-picker { display: flex; }
 	&__mobile-nav { display: block; padding-bottom: env(safe-area-inset-bottom); }
 	&__library { grid-column: 1; grid-row: 1; }
 	&__reader-pane { grid-column: 1; grid-row: 1 / 3; }

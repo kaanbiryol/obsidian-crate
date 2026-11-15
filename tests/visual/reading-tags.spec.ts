@@ -46,12 +46,15 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-reader-${host}-${width}.png` });
 		await article.getByRole('button', { name: 'Back to reading' }).click();
 		await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
-		const filter = page.getByRole('combobox', { name: 'Filter by tag' });
-		if (await filter.isVisible()) {
-			expect((await filter.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-			await filter.selectOption('later');
-		}
-		else await page.locator('.crate-reading__tag-nav').getByRole('button', { name: 'later', exact: true }).click();
+		await page.getByRole('button', { name: 'Tags', exact: true }).click();
+		const tagList = page.getByRole('dialog', { name: 'Tags', exact: true });
+		await tagList.getByRole('searchbox', { name: 'Search tags' }).fill('LAT');
+		const later = tagList.getByRole('button', { name: 'later', exact: true });
+		expect((await later.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+		await expect(tagList.getByRole('button', { name: 'design', exact: true })).toHaveCount(0);
+		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-list-${browserName}-${host}-${width}.png` });
+		await later.click();
+		await expect(tagList).toBeHidden();
 		await expect(page.locator('.crate-reading__open')).toHaveCount(1);
 		await page.screenshot({ animations: 'disabled', path: `/tmp/crate-tags-filter-${host}-${width}.png` });
 		await page.getByRole('button', { name: /The pleasure of reading slowly/ }).click();
@@ -65,7 +68,6 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		// Removing the final use of a selected tag must not leave an empty, stuck filter.
 		await expect(page.locator('.crate-reading__open')).toHaveCount(6);
 		await expect(page.locator('.crate-reading__tag-filter')).toHaveCount(0);
-		await expect(page.getByRole('combobox', { name: 'Filter by tag' })).toHaveValue('');
 		} finally { await browser.close(); }
 	});
 }

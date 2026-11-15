@@ -1,7 +1,7 @@
 import { managedArticle } from '@/reading/core/article';
 import { parseReadingNote } from '@/reading/core/notes';
 import { MAX_READING_BYTES } from '@/reading/core/model';
-import { readingTerms, searchWords } from '@/reading/core/search-terms';
+import { highlightedAt, highlightSearchWords, highlightTerms, readingTerms, searchWords } from '@/reading/core/search-terms';
 import { isReadingCardKind, validateReadingCardData, type ReadingCardData } from '@/reading/core/reading-card';
 import { parseEncryptedFile } from '@/encryption/file-format';
 import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
@@ -15,10 +15,10 @@ import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-p
 /** `reading_items` holds one row per Reading note in the Reading folder, written in the
  * same D1 batch as the file commit, so reads never re-check `files`. Only a new scope
  * (folder, generation or format), a restore or an initial import rebuilds it from R2. */
-const INDEX_FORMAT = 2;
+const INDEX_FORMAT = 3;
 /** The upsert's unindexed columns for a note with a current card or metadata, from `committed c`. */
 const UNINDEXED = `storage_key = c.storage_key, hash = c.hash, size = c.size, metadata_json = c.metadata_json,
-        error = c.error, words = c.words, terms = c.terms, card = c.card`;
+        error = c.error, words = c.words, terms = c.terms, card = c.card, highlighted = c.highlighted, highlighted_at = c.highlighted_at`;
 const REBUILD_PAGE = 25;
 const MAX_READING_JOBS = 1000;
 export const readingIndexScope = (current: Pick<ReadingPolicy, 'folder_path' | 'generation'>) => `${current.folder_path}\n${current.generation}\n${INDEX_FORMAT}`;
@@ -50,6 +50,11 @@ interface IndexRow {
 	card?: string | null;
 	/** An encrypted note whose upload carried no card: the row keeps its last one. */
 	stale?: 0 | 1;
+	/** A highlighted note's key in `highlight_index`, with the JSON terms and, unencrypted, the
+	 * words a highlight search matches. */
+	highlighted_at?: string | null; highlight_terms?: string | null; highlight_words?: string | null;
+	/** An encrypted note's sealed tag names, as JSON. */
+	tag_names?: string | null;
 }
 
 /** The Reading card an encrypted upload carries as its public data, or null. */
@@ -83,8 +88,12 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 		const data = encryptedCard(content);
 		if (!data) return { ...row, stale: 1 };
 		const { fields } = data;
+		// A version 1 card, from an older client, lists a highlighted note by its saved date and
+		// matches no highlight search.
+		const highlights = data.version === 2 ? { highlighted_at: data.highlighted_at, highlight_terms: JSON.stringify(data.highlight_terms), tag_names: JSON.stringify(data.tag_names) }
+			: { highlighted_at: fields.highlighted ? fields.saved_at : null, highlight_terms: '[]' };
 		return { ...row, item_id: fields.item_id, saved_at: fields.saved_at, status: fields.status, favorite: fields.favorite ? 1 : 0, highlighted: fields.highlighted ? 1 : 0,
-			terms: JSON.stringify(data.terms), card: JSON.stringify({ card: data.card }) };
+			terms: JSON.stringify(data.terms), card: JSON.stringify({ card: data.card }), ...highlights };
 	}
 	if (size > MAX_READING_BYTES) return { ...row, error: READING_SIZE_ERROR };
 	if (content == null || typeof content !== 'string' && content.byteLength !== size) return 'unknown';
@@ -102,7 +111,8 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 	return { ...row, item_id: metadata.crate_reading_id, url: metadata.source_url || null,
 		metadata_json: JSON.stringify(metadata), article_hash, article_edited, saved_at: metadata.saved_at,
 		status: metadata.reading_status, favorite: metadata.favorite ? 1 : 0, highlighted: metadata.highlights?.length ? 1 : 0,
-		terms: JSON.stringify(readingTerms(metadata)), words: JSON.stringify(searchWords(metadata.title)) };
+		terms: JSON.stringify(readingTerms(metadata)), words: JSON.stringify(searchWords(metadata.title)),
+		highlighted_at: highlightedAt(metadata), highlight_terms: JSON.stringify(highlightTerms(metadata)), highlight_words: JSON.stringify(highlightSearchWords(metadata)) };
 }
 
 /** Statements to place after the file writes in the same batch. Each row change applies
@@ -131,7 +141,9 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
       COALESCE(json_extract(value, '$.saved_at'), '') AS saved_at, json_extract(value, '$.status') AS status,
       COALESCE(json_extract(value, '$.favorite'), 0) AS favorite, COALESCE(json_extract(value, '$.highlighted'), 0) AS highlighted,
       json_extract(value, '$.terms') AS terms, json_extract(value, '$.words') AS words, json_extract(value, '$.card') AS card,
-      COALESCE(json_extract(value, '$.stale'), 0) AS stale FROM json_each(?1)),
+      COALESCE(json_extract(value, '$.stale'), 0) AS stale, json_extract(value, '$.highlighted_at') AS highlighted_at,
+      json_extract(value, '$.highlight_terms') AS highlight_terms, json_extract(value, '$.highlight_words') AS highlight_words,
+      json_extract(value, '$.tag_names') AS tag_names FROM json_each(?1)),
     committed AS (SELECT i.* FROM input i WHERE EXISTS (SELECT 1 FROM reading_policy WHERE id = 1 AND folder_path = ?2)
       AND CASE WHEN i.storage_key IS NULL THEN NOT EXISTS (SELECT 1 FROM files f WHERE f.portable_path = i.portable AND f.path = i.path)
         ELSE EXISTS (SELECT 1 FROM files f WHERE f.portable_path = i.portable AND f.path = i.path AND f.storage_key = i.storage_key) END) `;
@@ -143,6 +155,8 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 	// terms or saved date differ; a status edit keeps them. The row's own term list names every
 	// key to delete, so no second index on the terms is needed.
 	const termKeys = (rows: string) => `(term, saved_at, portable_path) IN (SELECT t.value, r.saved_at, r.portable_path FROM (${rows}) r, json_each(r.terms) t)`;
+	// The rows whose terms this batch may remove, read before `reading_items` changes.
+	const lostTerms = (rows: string) => `SELECT t.value FROM (${rows}) r, json_each(r.terms) t`;
 	return [
 		...(removes ? [statement(`DELETE FROM note_terms WHERE ${termKeys(`SELECT terms, saved_at, portable_path FROM reading_items WHERE ${removed}`)}`)] : []),
 		// A changed saved date moves every key; otherwise only the terms the note lost leave,
@@ -154,6 +168,26 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(term, saved_at, portable_path)
         SELECT t.value, r.saved_at, r.portable FROM (SELECT c.terms, c.saved_at, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable
           WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)) r, json_each(r.terms) t`)] : []),
+		// An encrypted vault lists a tag's name while any note has its term. A name leaves only
+		// once its term left note_terms above; a note that keeps or gains the tag adds it back.
+		// Only encrypted notes carry tag names, so an unencrypted edit skips this read.
+		...(removes || plain.some(row => row.card) ? [statement(`DELETE FROM reading_tags WHERE term IN (
+        ${lostTerms(`SELECT terms FROM reading_items WHERE ${removed}`)}
+        UNION ALL ${lostTerms('SELECT i.terms FROM committed c JOIN reading_items i ON i.portable_path = c.portable WHERE c.keep = 1 AND c.stale = 0 AND i.terms IS NOT c.terms')})
+        AND NOT EXISTS (SELECT 1 FROM note_terms n WHERE n.term = reading_tags.term)`)] : []),
+		...(plain.some(row => row.tag_names) ? [statement(`INSERT OR IGNORE INTO reading_tags(term, name)
+        SELECT json_extract(t.value, '$.term'), json_extract(t.value, '$.name') FROM committed c, json_each(c.tag_names) t
+        WHERE c.keep = 1 AND c.stale = 0 AND c.tag_names IS NOT NULL`)] : []),
+		// A note's highlight row is keyed by when it was last highlighted, so a new highlight
+		// moves it; other highlight edits update its terms in place.
+		...(removes || plain.length ? [statement(`DELETE FROM highlight_index WHERE (highlighted_at, portable_path) IN (
+        SELECT highlighted_at, portable_path FROM reading_items WHERE highlighted_at IS NOT NULL AND (${removed})
+        UNION ALL SELECT i.highlighted_at, i.portable_path FROM committed c JOIN reading_items i ON i.portable_path = c.portable
+          WHERE c.keep = 1 AND c.stale = 0 AND i.highlighted_at IS NOT NULL AND i.highlighted_at IS NOT c.highlighted_at)`)] : []),
+		...(plain.some(row => row.highlighted_at) ? [statement(`INSERT INTO highlight_index(highlighted_at, portable_path, terms, words)
+        SELECT highlighted_at, portable, highlight_terms, highlight_words FROM committed WHERE keep = 1 AND stale = 0 AND highlighted_at IS NOT NULL
+        ON CONFLICT(highlighted_at, portable_path) DO UPDATE SET terms = excluded.terms, words = excluded.words
+        WHERE (highlight_index.terms, highlight_index.words) IS NOT (excluded.terms, excluded.words)`)] : []),
 		...(removes ? [
 			statement(`DELETE FROM reading_items WHERE ${removed}`),
 			statement('DELETE FROM reading_jobs WHERE path IN (SELECT path FROM committed WHERE keep = 0)'),
@@ -176,7 +210,7 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
         AND (reading_items.path, reading_items.item_id, reading_items.saved_at, reading_items.article_hash, reading_items.article_edited, reading_items.stale)
           IS NOT (c.path, c.item_id, c.saved_at, c.article_hash, c.article_edited, 0)`),
 			// Each section column has its own index, so each changes only where it differs.
-			...(['status', 'favorite', 'highlighted'] as const).map(column => statement(`UPDATE reading_items SET ${column} = c.${column}, ${UNINDEXED}
+			...(['status', 'favorite'] as const).map(column => statement(`UPDATE reading_items SET ${column} = c.${column}, ${UNINDEXED}
         FROM committed c WHERE c.keep = 1 AND c.stale = 0 AND reading_items.portable_path = c.portable AND reading_items.${column} IS NOT c.${column}`)),
 		] : []),
 		// An encrypted note keeps its last card, list fields and terms until a device posts new ones.
@@ -184,13 +218,15 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
         FROM committed c WHERE c.keep = 1 AND c.stale = 1 AND reading_items.portable_path = c.portable AND (reading_items.path, reading_items.stale) IS NOT (c.path, 1)`)] : []),
 		...(keeps.length ? [
 			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, error, article_hash, article_edited, saved_at,
-          status, favorite, highlighted, stale, terms, words, card)
+          status, favorite, highlighted, stale, terms, words, card, highlighted_at)
         SELECT portable, path, storage_key, hash, size, item_id, metadata_json, error, article_hash, article_edited, saved_at,
-          status, favorite, highlighted, stale, terms, words, card FROM committed WHERE keep = 1
+          status, favorite, highlighted, stale, terms, words, card, highlighted_at FROM committed WHERE keep = 1
         ON CONFLICT(portable_path) DO UPDATE SET storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
           metadata_json = excluded.metadata_json, error = excluded.error, words = excluded.words,
           terms = CASE WHEN excluded.stale = 1 THEN reading_items.terms ELSE excluded.terms END,
-          card = CASE WHEN excluded.stale = 1 THEN reading_items.card ELSE excluded.card END
+          card = CASE WHEN excluded.stale = 1 THEN reading_items.card ELSE excluded.card END,
+          highlighted = CASE WHEN excluded.stale = 1 THEN reading_items.highlighted ELSE excluded.highlighted END,
+          highlighted_at = CASE WHEN excluded.stale = 1 THEN reading_items.highlighted_at ELSE excluded.highlighted_at END
         WHERE reading_items.storage_key IS NOT excluded.storage_key OR excluded.stale = 1`),
 		] : []),
 
@@ -242,6 +278,8 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 		await db.batch([
 			db.prepare('DELETE FROM reading_items'),
 			db.prepare('DELETE FROM note_terms'),
+			db.prepare('DELETE FROM highlight_index'),
+			db.prepare('DELETE FROM reading_tags'),
 			db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
 			db.prepare("UPDATE reading_policy SET index_scope = ?, index_cursor = '' WHERE id = 1").bind(scope),
 		]);

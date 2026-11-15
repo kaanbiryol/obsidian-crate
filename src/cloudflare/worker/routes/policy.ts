@@ -120,6 +120,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	// The library a page at a time, in either vault mode. In an encrypted vault, each note's
 	// upload carries the card the server lists (`reading/library-index.ts`).
 	'GET /reading/items': { scopes: LIBRARY },
+	'GET /reading/tags': { scopes: LIBRARY },
 	'GET /reading/taken': { scopes: LIBRARY },
 	'GET /reading/session': { scopes: LIBRARY, keylessEncryptedRead: true },
 	// Library reads authenticate here and answer a complete index from one D1 snapshot. An index

@@ -5,6 +5,8 @@ import type { ReadingSection } from '../core/reading-presentation';
 /** A host whose library stays on a server: each section, search and tag reads its own pages. */
 export interface ReadingLibrarySource {
 	load: (query: { section: ReadingSection; q: string; tag: string | null; cursor: string | null }) => Promise<{ items: ReadingItem[]; cursor: string | null }>;
+	/** Every tag in the library, for the tags view. */
+	loadTags: () => Promise<string[]>;
 	/** Changes whenever the library may have changed, so the loaded pages reload. */
 	revision: unknown;
 	/** Local changes shown over the server's pages. */
@@ -14,6 +16,9 @@ export interface ReadingLibrarySource {
 interface Pages { key: string; items: ReadingItem[]; cursor: string | null; loading: boolean; error: string | null }
 // Typing waits this long before a search reaches the server.
 const SEARCH_DELAY_MS = 250;
+// A filtered Highlights page scans a bounded run of notes, so it can come back empty with a
+// cursor. The first request follows up to this many more before the list offers Show more.
+const MAX_EMPTY_FOLLOWS = 3;
 
 /** The loaded pages for one section, search and tag; a change starts again from the first page. */
 export function useLibraryPages(source: ReadingLibrarySource | undefined, section: ReadingSection, q: string, tag: string | null) {
@@ -28,7 +33,10 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		const requested = key;
 		setPages(state => ({ ...state, key: requested, loading: true, error: null, ...replace && state.key !== requested ? { items: [], cursor: null } : {} }));
 		try {
-			const page = await source.load({ section, q: query, tag, cursor });
+			let page = await source.load({ section, q: query, tag, cursor });
+			for (let follows = 0; !page.items.length && page.cursor && follows < MAX_EMPTY_FOLLOWS && current.current === requested; follows++) {
+				page = await source.load({ section, q: query, tag, cursor: page.cursor });
+			}
 			if (current.current !== requested) return;
 			setPages(state => ({ key: requested, items: replace ? page.items : [...state.items, ...page.items.filter(item => !state.items.some(other => other.crate_reading_id === item.crate_reading_id))],
 				cursor: page.cursor, loading: false, error: null }));

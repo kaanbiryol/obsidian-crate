@@ -69,8 +69,8 @@ function parseListCursor(cursor: string): [string, string] | null {
 const READING_ITEMS_PAGE = 50;
 const MAX_READING_QUERY_TERMS = 10;
 /** `all` lists every section, for a link or ID lookup. */
-const SECTION_FILTERS: Record<ReadingSection | 'all', string> = {
-	inbox: "status = 'inbox'", archived: "status = 'archived'", favorites: 'favorite = 1', highlights: 'highlighted = 1', all: 'status IS NOT NULL',
+const SECTION_FILTERS: Record<Exclude<ReadingSection, 'highlights'> | 'all', string> = {
+	inbox: "status = 'inbox'", archived: "status = 'archived'", favorites: 'favorite = 1', all: 'status IS NOT NULL',
 };
 /** An encrypted page sends each card with the fields it was sorted and filtered by; a plaintext
  * page reads `ROW_COLUMNS`. */
@@ -80,12 +80,12 @@ const CARD_COLUMNS = 'portable_path, path, saved_at, card, storage_key, stale, h
 const TERM_PROBES = [50, 500];
 /** Usually small sections, each with its own index ordered newest first. When one holds fewer
  * notes than the first cap and than every term, a search walks it instead of a term. */
-const WALKABLE_SECTIONS = new Set<ReadingSection | 'all'>(['favorites', 'highlights']);
+const WALKABLE_SECTIONS = new Set<ReadingSection | 'all'>(['favorites']);
 
 /** The term with the fewest notes, or null to walk the section, by capped counts. Each count
  * reads at most its cap; a single term outside a walkable section needs none. When every term
  * is common at both caps, the first term is kept. */
-async function searchDriver(env: Env, terms: string[], section: ReadingSection | 'all'): Promise<string | null> {
+async function searchDriver(env: Env, terms: string[], section: keyof typeof SECTION_FILTERS): Promise<string | null> {
 	const walkable = WALKABLE_SECTIONS.has(section);
 	if (terms.length === 1 && !walkable) return terms[0]!;
 	for (const [stage, cap] of TERM_PROBES.entries()) {
@@ -116,7 +116,7 @@ export interface ReadingItemsQuery {
 
 export function parseReadingItemsQuery(params: URLSearchParams, encrypted: boolean): ReadingItemsQuery {
 	const section = params.get('section') ?? 'inbox';
-	if (!(section in SECTION_FILTERS)) throw new ReadingError('Unknown Reading section.');
+	if (!(section in SECTION_FILTERS) && section !== 'highlights') throw new ReadingError('Unknown Reading section.');
 	const text = (name: string, max: number) => { const value = params.get(name) ?? ''; if (value.length > max) throw new ReadingError('Search is too long.'); return value || undefined; };
 	const id = params.get('id');
 	const common = { section: section as ReadingSection | 'all', cursor: params.get('cursor') ?? '', ...id !== null ? { id: readingItemId(id) } : {} };
@@ -128,18 +128,26 @@ export function parseReadingItemsQuery(params: URLSearchParams, encrypted: boole
 
 interface CardRow extends Pick<ReadingRow, 'portable_path' | 'path' | 'saved_at'> { card: string | null; storage_key: string; stale: number; hash: string; size: number; item_id: string; status: string; favorite: number; highlighted: number }
 
+type PageRows = [Array<ReadingRow | CardRow>, string | null];
+
 /** Newest first. Each term narrows the page through `note_terms`, so a search reads the
  * notes it matches, not the library. The first unfiltered inbox page carries the capture queue
- * and the issues; an encrypted page carries each card for the device to open. */
+ * and the issues; an encrypted page carries each card for the device to open. The Highlights
+ * tab pages `highlight_index` instead (`highlightPage`). */
 export async function readingItems(env: Env, current: ReadingPolicy, encrypted: boolean, query: ReadingItemsQuery) {
 	const after = parseListCursor(query.cursor);
+	if (query.section === 'highlights') {
+		const [results, cursor] = await highlightPage(env, encrypted, query, after);
+		return listedResponse(current, encrypted, results, cursor);
+	}
+	const section = query.section;
 	const visible = encrypted ? 'card IS NOT NULL' : 'metadata_json IS NOT NULL AND duplicate = 0';
 	// A query word matches by its term (its first three letters); an unencrypted title then
 	// confirms the whole word.
 	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS);
 	let identity: string | undefined;
 	if (!encrypted && query.url) { try { identity = readingUrlIdentity(query.url); } catch { throw new ReadingError('Enter a valid web link.'); } }
-	const terms = [...new Set(encrypted ? query.terms ?? [] : [...identity ? [`u:${identity}`] : [], ...query.tag ? [`t:${normalizedTag(query.tag)}`] : [], ...words.map(wordTerm)])];
+	const terms = queryTerms(encrypted, query, words, identity);
 	const itemColumns = encrypted ? CARD_COLUMNS : ROW_COLUMNS;
 	let page: D1PreparedStatement;
 	if (terms.length) {
@@ -147,12 +155,12 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 		// page. The walk checks every other term with an exact key lookup in note_terms, where a
 		// miss reads no row, so only entries with every term go on to read their note. It is a
 		// subquery that LIMIT -1 keeps SQLite from merging: merged, SQLite reads the note first.
-		const driver = await searchDriver(env, terms, query.section);
-		const where = [SECTION_FILTERS[query.section], visible].map(clause => clause.replace(/\b(status|favorite|highlighted|card|metadata_json|duplicate)\b/g, 'i.$1')), args: unknown[] = [];
+		const driver = await searchDriver(env, terms, section);
+		const where = [SECTION_FILTERS[section], visible].map(clause => clause.replace(/\b(status|favorite|card|metadata_json|duplicate)\b/g, 'i.$1')), args: unknown[] = [];
 		if (query.id) { where.push('i.item_id = ?'); args.push(query.id); }
 		// The row's word list is JSON text: a quote followed by a word's start confirms the title
 		// without reading rows.
-		for (const word of words) { where.push('instr(i.words, ?) > 0'); args.push(JSON.stringify(word).slice(0, -1)); }
+		for (const word of words) { where.push('instr(i.words, ?) > 0'); args.push(wordStart(word)); }
 		const columns = itemColumns.split(', ').map(column => `i.${column}`).join(', ');
 		// Every other term is an exact key lookup in note_terms, where a miss reads no row.
 		const has = (alias: string) => `EXISTS (SELECT 1 FROM note_terms o WHERE o.term = ? AND o.saved_at = ${alias}.saved_at AND o.portable_path = ${alias}.portable_path)`;
@@ -174,21 +182,99 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
       WHERE ${where.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...walkArgs, ...args);
 		}
 	} else {
-		const where = [SECTION_FILTERS[query.section], visible], args: unknown[] = [];
+		const where = [SECTION_FILTERS[section], visible], args: unknown[] = [];
 		if (after) { where.push('(saved_at, portable_path) < (?, ?)'); args.push(...after); }
 		if (query.id) { where.push('item_id = ?'); args.push(query.id); }
 		page = env.DB.prepare(`SELECT ${itemColumns} FROM reading_items WHERE ${where.join(' AND ')}
       ORDER BY saved_at DESC, portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args);
 	}
-	const first = !after && query.section === 'inbox' && !terms.length && !query.id && !encrypted;
+	const first = !after && section === 'inbox' && !terms.length && !query.id && !encrypted;
 	const [{ results }, queuedRows, issueRows] = await env.DB.batch(first ? [page, queuedStatement(env, current),
 		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1 LIMIT 1000`)] : [page]) as [Rows<ReadingRow | CardRow>, Rows<{ note: string }>?, Rows<ReadingRow>?];
 	const last = results.at(-1);
 	const cursor = results.length === READING_ITEMS_PAGE && last ? JSON.stringify([last.saved_at, last.portable_path]) : null;
+	return listedResponse(current, encrypted, results, cursor, queuedRows?.results, issueRows?.results);
+}
+
+/** The terms a query must match: hashed by the device in an encrypted vault, otherwise its
+ * link, tag and query words. */
+function queryTerms(encrypted: boolean, query: ReadingItemsQuery, words: string[], identity?: string): string[] {
+	return [...new Set(encrypted ? query.terms ?? [] : [...identity ? [`u:${identity}`] : [], ...query.tag ? [`t:${normalizedTag(query.tag)}`] : [], ...words.map(wordTerm)])];
+}
+
+/** A word's start in a JSON word list: its opening quote and letters, without the closing quote. */
+const wordStart = (word: string) => JSON.stringify(word).slice(0, -1);
+
+function listedResponse(current: ReadingPolicy, encrypted: boolean, results: Array<ReadingRow | CardRow>, cursor: string | null, queued: Array<{ note: string }> = [], issues?: ReadingRow[]) {
 	// The device checks the fields the page was sorted and filtered by against each card.
 	const card = (row: CardRow) => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, ...JSON.parse(row.card!) as { card: string }, stale: row.stale === 1,
 		fields: { item_id: row.item_id, saved_at: row.saved_at, status: row.status, favorite: row.favorite === 1, highlighted: row.highlighted === 1 } });
 	if (encrypted) return { cards: (results as CardRow[]).map(card), cursor };
-	const listed = listedPage(current, results as ReadingRow[], queuedRows?.results ?? []);
-	return { items: listed.items, issues: issueRows ? listedPage(current, issueRows.results, []).issues : [], cursor };
+	const listed = listedPage(current, results as ReadingRow[], queued);
+	return { items: listed.items, issues: issues ? listedPage(current, issues, []).issues : [], cursor };
+}
+
+/** Rows a filtered Highlights page reads at most. A highlight search checks each note's terms
+ * in its row, so a search that matches few notes stops here and its cursor continues the scan. */
+const HIGHLIGHT_SCAN = 2000;
+/** A Highlights page ends before its listed notes pass this size: each note carries every
+ * highlight it holds, up to 48 KB, and an encrypted card up to 256 KB. */
+const HIGHLIGHT_PAGE_BYTES = 512 * 1024;
+
+/** One Highlights page, newest highlighted first. Every term must appear in the note's
+ * highlight terms (its title, highlight and note words, and tags); an unencrypted note's whole
+ * words confirm each query word. The device or the web app then shows the matching highlights. */
+async function highlightPage(env: Env, encrypted: boolean, query: ReadingItemsQuery, after: [string, string] | null): Promise<PageRows> {
+	const visible = encrypted ? 'i.card IS NOT NULL' : 'i.metadata_json IS NOT NULL AND i.duplicate = 0';
+	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS), terms = queryTerms(encrypted, query, words);
+	const columns = [...(encrypted ? CARD_COLUMNS : ROW_COLUMNS).split(', '), 'highlighted_at'];
+	const range = after ? 'WHERE (highlighted_at, portable_path) < (?, ?)' : '', rangeArgs = after ?? [];
+	type HighlightRow = Partial<ReadingRow & CardRow> & Pick<ReadingRow, 'portable_path'> & { highlighted_at: string };
+	const listed = columns.map(column => column === 'highlighted_at' ? 'h.highlighted_at' : `i.${column}`).join(', ');
+	// The walk is a subquery that LIMIT keeps SQLite from merging, so it reads its index rows
+	// first and each note only once it matches.
+	const page = async (scan: string, where: string[], args: unknown[]) => (await env.DB.prepare(`SELECT ${listed}
+      FROM (SELECT highlighted_at, portable_path, terms, words FROM highlight_index ${range} ORDER BY highlighted_at DESC, portable_path DESC LIMIT ${scan}) h
+      CROSS JOIN reading_items i ON i.portable_path = h.portable_path WHERE ${[...where, visible].join(' AND ')}
+      ORDER BY h.highlighted_at DESC, h.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...rangeArgs, ...args).all<HighlightRow>()).results;
+	let hits: HighlightRow[], end: { highlighted_at: string; portable_path: string } | null = null;
+	if (!terms.length) hits = await page('-1', [], []);
+	else {
+		hits = await page(String(HIGHLIGHT_SCAN), [...terms.map(() => 'instr(h.terms, ?) > 0'), ...words.map(() => 'instr(h.words, ?) > 0')],
+			[...terms.map(term => JSON.stringify(term)), ...words.map(wordStart)]);
+		// A short page either reached the end or the scan's cap; at the cap the next page
+		// continues after the last scanned row. D1 counts temporary tables as rows read, so the
+		// end is a second seek, needed only for a short page, rather than a window over the scan.
+		if (hits.length < READING_ITEMS_PAGE) end = await env.DB.prepare(`SELECT highlighted_at, portable_path FROM highlight_index ${range}
+      ORDER BY highlighted_at DESC, portable_path DESC LIMIT 1 OFFSET ${HIGHLIGHT_SCAN - 1}`).bind(...rangeArgs).first();
+	}
+	const listedRows: HighlightRow[] = [];
+	let bytes = 0;
+	for (const row of hits) {
+		bytes += (row.metadata_json?.length ?? 0) + (row.card?.length ?? 0);
+		if (listedRows.length && bytes > HIGHLIGHT_PAGE_BYTES) break;
+		listedRows.push(row);
+	}
+	const last = listedRows.at(-1);
+	const key = listedRows.length < hits.length || hits.length === READING_ITEMS_PAGE ? last : end;
+	return [listedRows as Array<ReadingRow | CardRow>, key ? JSON.stringify([key.highlighted_at, key.portable_path]) : null];
+}
+
+/** Most tags the tag list returns. */
+const MAX_READING_TAGS = 5000;
+
+/** Every tag in the library, for the tags view. An unencrypted vault steps through the distinct
+ * `t:` terms in note_terms, one index seek per tag, so the list reads about one row per tag, not
+ * one per tagged note. An encrypted vault lists the sealed names devices posted; the device
+ * opens them. */
+export async function readingTags(env: Env, encrypted: boolean): Promise<{ tags: string[] } | { sealed: Array<{ term: string; name: string }> }> {
+	if (encrypted) {
+		const { results } = await env.DB.prepare(`SELECT term, name FROM reading_tags LIMIT ${MAX_READING_TAGS}`).all<{ term: string; name: string }>();
+		return { sealed: results };
+	}
+	const { results } = await env.DB.prepare(`WITH RECURSIVE tags(term) AS (
+      SELECT (SELECT term FROM note_terms WHERE term > 't:' AND term < 't;' ORDER BY term LIMIT 1)
+      UNION ALL SELECT (SELECT term FROM note_terms WHERE term > tags.term AND term < 't;' ORDER BY term LIMIT 1) FROM tags WHERE tags.term IS NOT NULL)
+    SELECT term FROM tags WHERE term IS NOT NULL LIMIT ${MAX_READING_TAGS}`).all<{ term: string }>();
+	return { tags: results.map(row => row.term.slice(2)) };
 }

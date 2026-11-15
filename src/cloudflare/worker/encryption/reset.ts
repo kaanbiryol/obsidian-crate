@@ -16,7 +16,7 @@ import { R2_KEYS_PER_CALL } from '../d1/platform-limits';
 const PREFIX = 'encryption-reset:';
 // Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
 const SETUP_SUFFIX = ':setup';
-const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 'reading_jobs', 'reading_captures'] as const;
+const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 'highlight_index', 'reading_tags', 'reading_jobs', 'reading_captures'] as const;
 const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValue(db, key, JSON.stringify(value));
 
 /** Runs under the projection coordinator lock. The replacement credential and

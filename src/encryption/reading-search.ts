@@ -1,7 +1,7 @@
 import { decodeBase64Url } from './encoding';
 import type { EncryptionSecret } from './envelope';
 import { encodeBase32 } from '../protocol/encrypted-path';
-import { MAX_QUERY_WORDS, normalizedTag, readingTerms, searchWords, wordTerm } from '../reading/core/search-terms';
+import { highlightTerms, MAX_QUERY_WORDS, normalizedTag, readingTerms, searchWords, wordTerm } from '../reading/core/search-terms';
 import { readingUrlIdentity } from '../reading/core/model';
 
 /** Derives the key that hashes Reading search terms. Only clients holding the vault key can. */
@@ -26,6 +26,14 @@ export const isHashedReadingTerm = (value: unknown): value is string => typeof v
 export async function hashedReadingTerms(key: CryptoKey, item: Parameters<typeof readingTerms>[0]): Promise<string[]> {
 	return [...new Set(await Promise.all(readingTerms(item).map(term => hashReadingTerm(key, term))))];
 }
+
+/** The hashed terms a highlight search matches a note by; empty without highlights. */
+export async function hashedHighlightTerms(key: CryptoKey, item: Parameters<typeof highlightTerms>[0]): Promise<string[]> {
+	return [...new Set(await Promise.all(highlightTerms(item).map(term => hashReadingTerm(key, term))))];
+}
+
+/** A tag's hashed term, as `hashedReadingTerms` stores it. */
+export const hashedTagTerm = (key: CryptoKey, tag: string) => hashReadingTerm(key, `t:${normalizedTag(tag)}`);
 
 /** The hashed terms a query sends: a word of 3 or more letters matches by its first 3, a
  * shorter one exactly, so the device rechecks the titles it decrypts. The server starts from

@@ -17,8 +17,23 @@ stay.
   date: one per title word (`p:` and its first three letters, or `w:` and the whole word when
   shorter), `t:` for a tag and `u:` for the link identity (`src/reading/core/search-terms.ts`).
   The scope lets other note indexes, such as a future vault-wide one, share the table.
+- `highlight_index` holds one row per highlighted note, keyed by when it was last highlighted
+  (its newest highlight's date): the Highlights tab's pages. Its `terms` are the note's title,
+  highlight and highlight-note words and its tags, in the same format.
 - The web app never holds the library. It asks the server for one page at a time:
-  `GET /reading/items?section=&q=&tag=&cursor=`, newest first.
+  `GET /reading/items?section=&q=&tag=&cursor=`, newest first, and lists every tag with
+  `GET /reading/tags`.
+
+## What each search matches
+
+- **Inbox, Archived, Favorites:** title words, through `note_terms`.
+- **Highlights:** highlight text, highlight notes and the title, through `highlight_index`. Each
+  row's terms are checked in the row (`instr`), so a filtered page scans at most 2,000 rows, newest
+  highlight first, and a short or empty page carries a cursor that continues the scan. The web app
+  asks for up to four such pages before it shows **Show more**. A page also ends before its notes
+  pass 512 KB. Article text is not searched; Obsidian searches it.
+- **Tags:** the tags view lists every tag and searches the list on the device. Selecting a tag
+  filters the current section by its `t:` term.
 
 ## Unencrypted vaults
 
@@ -54,12 +69,21 @@ way a reminder note carries its notification schedules:
   each word, the hash of its first three letters (or of the whole word when it is shorter), so the
   server matches tokens it cannot read; the device rechecks the titles it decrypts.
 
+- **Highlights and tags (card version 2).** The card also carries when the note was last
+  highlighted, the hashed highlight terms, and each tag's name sealed with the vault key and bound
+  to its hashed term. The server keeps one sealed name per tag in `reading_tags` while any note has
+  the term. A version 1 card, from an older client, lists a highlighted note by its saved date,
+  matches no highlight search and adds no tag name, until a device saves the note again.
+
 ### What the server learns
 
 Beyond what it already sees (sizes, write times, folder structure):
 
-- each note's saved date, status, favorite and whether it has highlights;
-- which notes share a title word or prefix, a tag or a link, and the number of terms per note;
+- each note's saved date, status, favorite, whether it has highlights and when it was last
+  highlighted;
+- which notes share a title word or prefix, a highlight word or prefix, a tag or a link, and the
+  number of terms per note;
+- how many distinct tags the library has;
 - when a search repeats, and which notes it matches.
 
 It never sees words, titles, tags, links, highlights or article text. This belongs in the
@@ -92,6 +116,10 @@ integration tests keep the bounds):
 | First page, read | about 56, at any library size |
 | One-word search, read | about 104 for a full page; a rare word about 2 per match |
 | Two-word search, read | at most about 1,600 when both words are common and never share a note; about 80 when one is rare |
+| Add a highlight, written | about as many as a favorite: the note's `highlight_index` row adds 1 or 2 (a newer highlight moves the row) |
+| Highlights page, read | about one page |
+| Highlight search, read | about one page when matches are common; at most about 4,000 for a page with none (2,000 scanned, then a seek to where the scan ended) |
+| Tag list, read | about one row per tag |
 
 - Each title word is one term, and terms are keyed by saved date with no second index, so a
   search never scans the library and a term costs one written row.

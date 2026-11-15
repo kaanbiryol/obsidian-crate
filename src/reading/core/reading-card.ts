@@ -1,7 +1,8 @@
 import { decryptJson, encryptJson, type EncryptionKey } from '@/encryption/envelope';
-import { hashedReadingTerms, isHashedReadingTerm } from '@/encryption/reading-search';
+import { hashedHighlightTerms, hashedReadingTerms, hashedTagTerm, isHashedReadingTerm } from '@/encryption/reading-search';
 import { sha256Hex } from '@/platform/sha256';
 import { validateReadingMetadata, type ReadingItem } from './model';
+import { highlightedAt, MAX_HIGHLIGHT_TERMS, normalizedTag } from './search-terms';
 
 /**
  * An encrypted vault's listed item for one note revision. The device that encrypts a Reading
@@ -16,10 +17,16 @@ export interface ReadingCardKeys { vaultId: string; key: EncryptionKey; keyGener
 interface CardBody { format: 1; wire: string; hash: string; item: ReadingItem }
 /** What the server sorts and filters by. A device that reads a card checks them. */
 export interface ReadingCardFields { item_id: string; saved_at: string; status: ReadingItem['reading_status']; favorite: boolean; highlighted: boolean }
-/** A Reading note's public data. */
-export interface ReadingCardData { kind: 'reading-card'; version: 1; card: string; terms: string[]; fields: ReadingCardFields }
+/** A tag's sealed name, keyed by its hashed term, so a device can list every tag. */
+export interface ReadingTagName { term: string; name: string }
+/** A Reading note's public data. Version 2 adds what the Highlights tab and the tag list need:
+ * when the note was last highlighted, its hashed highlight search terms and its sealed tag names. */
+export type ReadingCardData = { kind: 'reading-card'; version: 1; card: string; terms: string[]; fields: ReadingCardFields }
+	| { kind: 'reading-card'; version: 2; card: string; terms: string[]; fields: ReadingCardFields; highlighted_at: string | null; highlight_terms: string[]; tag_names: ReadingTagName[] };
 
 const MAX_CARD_TERMS = 400;
+const MAX_CARD_TAGS = 50;
+const MAX_TAG_NAME_CHARACTERS = 1024;
 const MAX_CARD_CHARACTERS = 256 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -35,9 +42,31 @@ export async function sealReadingCard(item: ReadingItem, wire: string, hash: str
 	return encryptJson({ format: 1, wire, hash, item } satisfies CardBody, keys.key, await context(keys, wire));
 }
 
+// A tag name is bound to its term, so the server cannot list one tag's name under another.
+const tagContext = (keys: ReadingCardKeys, term: string) => ({ vaultId: keys.vaultId, scopeId: 'vault', purpose: 'reading-card' as const,
+	objectId: `reading-tag-${keys.keyGeneration}-${term}` });
+
+/** The sealed name of each of the item's tags, lowercased as the tag filter matches them. */
+async function sealReadingTagNames(item: Pick<ReadingItem, 'tags'>, keys: ReadingCardKeys & { searchKey: CryptoKey }): Promise<ReadingTagName[]> {
+	const names = [...new Set(item.tags.map(normalizedTag))];
+	return await Promise.all(names.map(async name => {
+		const term = await hashedTagTerm(keys.searchKey, name);
+		return { term, name: await encryptJson({ format: 1, name }, keys.key, tagContext(keys, term)) };
+	}));
+}
+
+/** A tag name the server listed under `term`, or null when it was not sealed for that term. */
+export async function openReadingTagName(tag: ReadingTagName, keys: ReadingCardKeys): Promise<string | null> {
+	try {
+		const body = await decryptJson(tag.name, keys.key, tagContext(keys, tag.term)) as { format?: unknown; name?: unknown } | null;
+		return body?.format === 1 && typeof body.name === 'string' && body.name ? body.name : null;
+	} catch { return null; }
+}
+
 /** The public data a device attaches when it encrypts a Reading note for `wire`. */
 export async function readingCardData(item: ReadingItem, wire: string, hash: string, keys: ReadingCardKeys & { searchKey: CryptoKey }): Promise<ReadingCardData> {
-	return { kind: 'reading-card', version: 1, card: await sealReadingCard(item, wire, hash, keys), terms: await hashedReadingTerms(keys.searchKey, item), fields: readingCardFields(item) };
+	return { kind: 'reading-card', version: 2, card: await sealReadingCard(item, wire, hash, keys), terms: await hashedReadingTerms(keys.searchKey, item), fields: readingCardFields(item),
+		highlighted_at: highlightedAt(item), highlight_terms: await hashedHighlightTerms(keys.searchKey, item), tag_names: await sealReadingTagNames(item, keys) };
 }
 
 /** The item a card lists, checked against its server path. */
@@ -55,15 +84,28 @@ export function sameReadingCardFields(item: ReadingItem, fields: Partial<Reading
 
 export const isReadingCardKind = (value: unknown) => !!value && typeof value === 'object' && (value as { kind?: unknown }).kind === 'reading-card';
 
+const isEnvelope = (value: unknown, max: number) => typeof value === 'string' && value.length <= max && value.split('.').length === 5 && /^[A-Za-z0-9_.-]+$/.test(value);
+const uniqueTerms = (value: unknown, max: number): value is string[] => Array.isArray(value) && value.length <= max && value.every(isHashedReadingTerm) && new Set(value).size === value.length;
+const isTagName = (value: unknown): value is ReadingTagName => !!value && typeof value === 'object' && Object.keys(value).length === 2
+	&& isHashedReadingTerm((value as ReadingTagName).term) && isEnvelope((value as ReadingTagName).name, MAX_TAG_NAME_CHARACTERS);
+const CARD_KEYS = { 1: ['kind', 'version', 'card', 'terms', 'fields'], 2: ['kind', 'version', 'card', 'terms', 'fields', 'highlighted_at', 'highlight_terms', 'tag_names'] };
+
 /** Validates Reading public data, as the server does before listing a note from it. */
 export function validateReadingCardData(value: unknown): asserts value is ReadingCardData {
-	const data = value as Partial<ReadingCardData> | null, fields = data?.fields as Partial<ReadingCardFields> | undefined;
-	const valid = !!data && typeof data === 'object' && Object.keys(data).every(key => ['kind', 'version', 'card', 'terms', 'fields'].includes(key))
-		&& data.kind === 'reading-card' && data.version === 1 && typeof data.card === 'string' && data.card.length <= MAX_CARD_CHARACTERS
-		&& data.card.split('.').length === 5 && /^[A-Za-z0-9_.-]+$/.test(data.card)
-		&& Array.isArray(data.terms) && data.terms.length <= MAX_CARD_TERMS && data.terms.every(isHashedReadingTerm) && new Set(data.terms).size === data.terms.length
+	const data = value as Partial<Record<string, unknown>> | null, fields = data?.fields as Partial<ReadingCardFields> | undefined;
+	const keys = data && typeof data === 'object' && (data.version === 1 || data.version === 2) ? CARD_KEYS[data.version] : null;
+	let valid = !!keys && Object.keys(data!).length === keys.length && keys.every(key => key in data!)
+		&& data!.kind === 'reading-card' && isEnvelope(data!.card, MAX_CARD_CHARACTERS) && uniqueTerms(data!.terms, MAX_CARD_TERMS)
 		&& !!fields && typeof fields === 'object' && Object.keys(fields).length === 5 && typeof fields.item_id === 'string' && UUID.test(fields.item_id)
 		&& typeof fields.saved_at === 'string' && fields.saved_at.length <= 40 && Number.isFinite(Date.parse(fields.saved_at))
 		&& (fields.status === 'inbox' || fields.status === 'archived') && typeof fields.favorite === 'boolean' && typeof fields.highlighted === 'boolean';
+	if (valid && data!.version === 2) {
+		const { highlighted_at: at, highlight_terms: highlightTerms, tag_names: tags } = data as Record<string, unknown>;
+		const terms = new Set(data!.terms as string[]);
+		valid = (fields!.highlighted ? typeof at === 'string' && at.length <= 40 && Number.isFinite(Date.parse(at)) : at === null)
+			&& uniqueTerms(highlightTerms, MAX_HIGHLIGHT_TERMS) && (fields!.highlighted || highlightTerms.length === 0)
+			&& Array.isArray(tags) && tags.length <= MAX_CARD_TAGS && (tags as unknown[]).every(isTagName)
+			&& new Set((tags as ReadingTagName[]).map(tag => tag.term)).size === tags.length && (tags as ReadingTagName[]).every(tag => terms.has(tag.term));
+	}
 	if (!valid) throw new Error('Invalid Reading card');
 }

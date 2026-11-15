@@ -4,7 +4,8 @@ import { env } from 'cloudflare:workers';
 import { applySchema } from '../test-support/schema-test-harness';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { createReadingNote } from '@/reading/core/notes';
-import { patchReadingFrontmatter } from '@/reading/core/frontmatter';
+import { patchReadingFrontmatter, readReadingFrontmatter } from '@/reading/core/frontmatter';
+import { readingDocument } from '@/reading/core/markdown';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingIndexScope } from './library-index';
 import { mutateReading } from './mutations';
@@ -21,12 +22,16 @@ it('keeps the rows a web app favorite or archive writes to the file edit and its
 	const id = crypto.randomUUID();
 	// An extracted article, as most saved notes are.
 	const note = patchReadingFrontmatter(createReadingNote({ id, url: 'https://example.invalid/target', title: 'Target', savedAt: new Date().toISOString() }), { tags: ['research'], extraction_status: 'ready' });
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Target.md', note.replace('<!-- crate:article:start -->\n', '<!-- crate:article:start -->\nArticle text.\n'), null);
+	const content = note.replace('<!-- crate:article:start -->\n', '<!-- crate:article:start -->\nArticle text.\n');
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Target.md', content, null);
+	// The highlights the last edit saved, which the next edit names as its starting point.
+	let saved: unknown;
 	const measure = async (changes: Record<string, unknown>, before: Record<string, unknown>) => {
 		const meter = meterD1Usage(env.DB);
 		const response = await mutateReading({ ...env, DB: meter.db }, { tokenId: 'vault', scope: 'vault' }, policy,
 			{ id, before, changes, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)) }, 'update');
 		expect(response.status, await response.clone().text()).toBe(200);
+		saved = ((await response.json()) as { article: { item: { highlights?: unknown } } }).article.item.highlights;
 		return { written: meter.usage.rowsWritten, read: meter.usage.rowsRead };
 	};
 	const favorite = await measure({ favorite: true }, { favorite: false });
@@ -35,5 +40,16 @@ it('keeps the rows a web app favorite or archive writes to the file edit and its
 	// moves the note between section indexes (two rows); its search terms are unchanged.
 	expect(favorite.written).toBeLessThanOrEqual(20);
 	expect(archive.written).toBeLessThanOrEqual(17);
-	await context.annotate(JSON.stringify({ favorite, archive }), 'writes');
+	// A first highlight adds the note's highlight_index row; a later one moves it to its new
+	// date (a delete and an insert), and a highlight note only rewrites its terms.
+	const start = readingDocument(readReadingFrontmatter(content)!.body).text.indexOf('Article');
+	const passage = (createdAt: string, note?: string) => ({ start, end: start + 7, text: 'Article', createdAt, ...note ? { note } : {} });
+	const firstHighlight = await measure({ highlights: [passage('2026-02-01T00:00:00.000Z')] }, {});
+	const newerHighlight = await measure({ highlights: [passage('2026-02-02T00:00:00.000Z')] }, { highlights: saved });
+	const highlightNote = await measure({ highlights: [passage('2026-02-02T00:00:00.000Z', 'Revisit')] }, { highlights: saved });
+	// Measured 8, 9 and 8; the same edits wrote 7 rows before highlight_index.
+	expect(firstHighlight.written).toBeLessThanOrEqual(9);
+	expect(newerHighlight.written).toBeLessThanOrEqual(10);
+	expect(highlightNote.written).toBeLessThanOrEqual(9);
+	await context.annotate(JSON.stringify({ favorite, archive, firstHighlight, newerHighlight, highlightNote }), 'writes');
 });
