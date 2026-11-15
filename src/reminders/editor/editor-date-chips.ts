@@ -277,8 +277,11 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 		EditorView.updateListener.of(update => {
 			const phrase = update.state.field(datePhraseField, false), { doc } = update.state;
 			if (!phrase) {
-				const moved = update.selectionSet && !update.docChanged && update.view.hasFocus && isReminderEditor(update.state)
-					&& update.transactions.some(transaction => transaction.isUserEvent('select'));
+				// Deleting the line break below a reminder, as Backspace on the empty line after it does, brings the cursor next to its chip too.
+				const joined = update.docChanged && update.state.doc.lines < update.startState.doc.lines
+					&& update.transactions.some(transaction => transaction.isUserEvent('delete'));
+				const moved = update.selectionSet && update.view.hasFocus && isReminderEditor(update.state)
+					&& (joined || (!update.docChanged && update.transactions.some(transaction => transaction.isUserEvent('select'))));
 				const open = moved ? openDateChip(update.state, update.startState.selection) : null;
 				// A click can send more updates that change nothing; skip only if the text or cursor moved on.
 				if (open) queueMicrotask(() => {

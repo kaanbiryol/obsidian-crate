@@ -257,6 +257,15 @@ for (const engine of [chromium, webkit]) {
 		await outro(page);
 		await settle(page);
 		assert.match(await doc(), /Call Mia 2026-11-15T11:00:00\.000Z <!-- crate-id:b -->/, `${name}: unchanged time restored`);
+		// Enter saves a new reminder; Backspace back onto its line opens the date with the cursor at its end.
+		await mount('# Errands\n', 10);
+		await page.keyboard.type('- [ ] Pay rent tomorrow 12:00');
+		await page.keyboard.press('Enter');
+		await settle(page);
+		await page.keyboard.press('Backspace');
+		await settle(page);
+		assert.match(await page.evaluate(() => window.view.state.doc.line(2).text), /^- \[ \] Pay rent tomorrow 12:00 <!-- crate-id:[0-9a-f-]{36} -->$/, `${name}: phrase after joining back`);
+		assert.equal(await page.evaluate(() => window.head()), '# Errands\n- [ ] Pay rent tomorrow 12:00'.length, `${name}: cursor at the phrase's end`);
 
 		// Writing a new reminder with a date and a description in one line.
 		await mount();
