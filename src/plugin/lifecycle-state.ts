@@ -37,3 +37,9 @@ export function setSyncReady(plugin: CratePlugin, ready: Promise<void>): void {
 export function waitForSyncReady(plugin: CratePlugin): Promise<void> {
 	return syncReadiness.get(plugin) ?? Promise.resolve();
 }
+
+const settledStartupSyncs = new WeakSet<object>();
+/** Records that the startup sync reached an outcome (or never ran), so local reminder state now
+ * includes what other devices changed while this one was closed. */
+export function markStartupSyncSettled(plugin: object): void { settledStartupSyncs.add(plugin); }
+export function startupSyncSettled(plugin: object): boolean { return settledStartupSyncs.has(plugin); }

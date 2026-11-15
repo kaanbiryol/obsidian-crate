@@ -19,7 +19,7 @@ import type CratePlugin from "./CratePlugin";
 import { handleCloudflareOAuthProtocol } from "./cloudflare/operations";
 import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";
 import { showGetStartedNotice } from "../ui/settings/get-started-notice";
-import { beginPluginLifecycle, endPluginLifecycle, getPluginLifecycleSignal, setSyncReady } from './lifecycle-state';
+import { beginPluginLifecycle, endPluginLifecycle, getPluginLifecycleSignal, markStartupSyncSettled, setSyncReady, startupSyncSettled } from './lifecycle-state';
 import { CloudflareSavedLogin } from '../cloudflare/oauth/saved-login';
 import { CloudflareDeploymentService } from '../cloudflare/deployment/service';
 import { loadEmbeddedCloudflareArtifacts } from '../cloudflare/deployment/embedded-artifacts';
@@ -188,6 +188,9 @@ async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signa
 		if (signal.aborted) return;
 		const startupSyncRan = await plugin.syncRuntime.waitForStartupSync();
 		if (signal.aborted) return;
+		// Desktop notifications waited for this sync, so they see reminders other devices completed or moved.
+		markStartupSyncSettled(plugin);
+		plugin.reminders?.notifications.refresh();
 		if (!plugin.remindersSettings.enabled || !plugin.reminders) return;
 		// Sync writes visible notes through the vault, so the watcher saw each
 		// change; scans deferred while syncing are flushed instead of a full reload.
@@ -199,6 +202,7 @@ async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signa
 	} catch (error) {
 		if (signal.aborted) return;
 		logger.warn("Failed to refresh reminders after startup sync:", errorMessage(error));
+		if (!startupSyncSettled(plugin)) { markStartupSyncSettled(plugin); plugin.reminders?.notifications.refresh(); }
 	}
 }
 

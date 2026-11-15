@@ -118,9 +118,11 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
 	noticeMessages.length = 0;
 	initializeReminders.mockReset().mockImplementation(async (target: {
-		reminders?: { index: { load: () => Promise<void> }; watcher: { unregister: () => void } };
+		reminders?: { index: { load: () => Promise<void> }; watcher: { unregister: () => void }; notifications?: { refresh: () => void } };
 	}) => {
 		target.reminders ??= { index: { load: vi.fn(async () => undefined) }, watcher: { unregister: vi.fn() } };
+		// Every backend starts local notifications; the startup sync releases them.
+		target.reminders.notifications ??= { refresh: vi.fn() };
 	});
 	ensureReminderNotificationPolicy.mockReset();
 	initializeSyncManagers.mockReset();
@@ -261,13 +263,15 @@ describe('bootstrapPlugin', () => {
 
 	it('flushes deferred reminder scans and initializes policy only after startup sync finishes', async () => {
 		const { bootstrapPlugin } = await loadLifecycleModule();
+		const { startupSyncSettled } = await import('./lifecycle-state');
 		let finishStartupSync!: (ran: boolean) => void;
 		const startupSync = new Promise<boolean>((resolve) => {
 			finishStartupSync = resolve;
 		});
 		const reminderIndexLoad = vi.fn(async () => undefined);
+		const refreshNotifications = vi.fn();
 		const plugin = createPlugin({
-			reminders: { index: { flushDeferredScans: reminderIndexLoad } },
+			reminders: { index: { flushDeferredScans: reminderIndexLoad }, notifications: { refresh: refreshNotifications } },
 		});
 
 		initializeSyncManagers.mockImplementation((target) => {
@@ -282,12 +286,17 @@ describe('bootstrapPlugin', () => {
 
 		expect(reminderIndexLoad).not.toHaveBeenCalled();
 		expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
+		// Desktop notifications wait too: another device may have completed or moved a reminder.
+		expect(startupSyncSettled(plugin as never)).toBe(false);
+		expect(refreshNotifications).not.toHaveBeenCalled();
 
 		finishStartupSync(true);
 		await vi.waitFor(() => {
 			expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
 			expect(ensureReminderNotificationPolicy).toHaveBeenCalledWith(plugin);
+			expect(refreshNotifications).toHaveBeenCalledOnce();
 		});
+		expect(startupSyncSettled(plugin as never)).toBe(true);
 		expect(reminderIndexLoad.mock.invocationCallOrder[0]).toBeLessThan(
 			ensureReminderNotificationPolicy.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
 		);

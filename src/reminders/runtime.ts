@@ -4,7 +4,7 @@ import { createMarkdownWriter } from './data/markdown-writer';
 import { createReminderRepository, type ReminderRepository } from './data/reminder-repository';
 import { VaultWatcher } from './data/vault-watcher';
 import { createLogger } from './logger';
-import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
+import { getPluginLifecycleSignal, startupSyncSettled } from '../plugin/lifecycle-state';
 import { Notice, Platform } from 'obsidian';
 import { validateReadingFolder } from '../reading/settings';
 import { createReminderMoveJournal } from './data/reminder-move-journal';
@@ -165,7 +165,9 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 	}
 	if (controller.signal.aborted) return undefined;
 	const notifications = startLocalReminderNotifications({
-		reminders: () => index.isInitialLoadComplete ? index.getActive() : null,
+		// After the startup sync too: a reminder completed or moved on another device while this one
+		// was closed must not notify here. The startup work releases it on any outcome, offline too.
+		reminders: () => index.isInitialLoadComplete && startupSyncSettled(plugin) ? index.getActive() : null,
 		schedule: () => ({ allDayTime: plugin.remindersSettings.allDayNotificationTime, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
 		isActive: () => desktopNotificationsActive(plugin),
 		show: showDesktopNotification,

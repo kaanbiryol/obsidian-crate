@@ -44,7 +44,7 @@ On desktop, Obsidian can show reminder alerts itself, so reminders work even whe
 2. Check that **Desktop notifications** is on.
 3. For reminders with a date but no time, set **All-day notification time**. It's under **Reminders** without a server, and under **Notifications** with one, where it applies to every device even with **Push notifications** off.
 
-When Obsidian opens, reminders that fell due while it was closed alert once, up to a day late. If more than three fall due together, you get one summary instead. Reminders that were already past due when the device first saw them don't alert.
+When Obsidian opens, reminders that fell due while it was closed alert once, up to a day late. With sync on, this waits for the first sync, so a reminder completed on another device doesn't alert. If more than three fall due together, you get one summary instead. Reminders that were already past due when the device first saw them don't alert.
 
 Desktop notifications also work with a server connected. To get alerts on your computer with Obsidian closed, open the web app in your browser and turn on notifications there. If you do, turn off **Desktop notifications** on that computer so you don't get each reminder twice. Each device with Obsidian open checks its own copy of the vault, so two open computers both alert.
 
