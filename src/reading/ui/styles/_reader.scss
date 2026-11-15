@@ -53,6 +53,27 @@
 	&__body mark { transition: background-color 240ms ease; }
 	@media (prefers-reduced-motion: reduce) { &__body mark { transition: none; } }
 	&__quick-actions { display: flex; justify-content: flex-end; }
+	// Overflow actions open below the top bar like an iOS context menu.
+	.crate-reading-menu { position: relative; display: inline-flex; }
+	.crate-reading-menu__popup {
+		position: absolute; top: calc(100% + 10px); right: -2px; z-index: tokens.$layer-popover;
+		box-sizing: border-box; min-width: 220px; padding: 6px;
+		border: 1px solid var(--crate-divider); border-radius: 14px; background: var(--crate-panel-bg, var(--crate-app-bg));
+		box-shadow: 0 2px 6px rgba(0, 0, 0, .08), 0 12px 32px rgba(0, 0, 0, .24);
+		transform-origin: top right; animation: crate-reading-menu-in 180ms cubic-bezier(.2, .9, .3, 1.15);
+		@media (prefers-reduced-motion: reduce) { animation: none; }
+	}
+	.crate-reading-menu__item {
+		display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 44px; padding: 0 12px;
+		border: 0; border-radius: 8px; background: transparent; box-shadow: none; color: var(--text-normal); font: inherit; font-size: 15px; text-align: left;
+		cursor: pointer; user-select: none; -webkit-user-select: none;
+		@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: color-mix(in srgb, var(--text-normal) 10%, transparent); } }
+		&:active:not(:disabled) { background: color-mix(in srgb, var(--text-normal) 10%, transparent); }
+		&:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
+		&:disabled { opacity: .45; cursor: default; }
+		&[data-tone="danger"] { color: var(--text-error, #e5484d); }
+	}
+	.crate-reading-menu__separator { height: 1px; margin: 4px 6px; background: var(--crate-divider); }
 	&__page { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; max-width: 748px; margin: 0 auto; padding: 52px clamp(24px, 5%, 64px) 60px; }
 	&__header { overflow-wrap: anywhere; margin-bottom: 32px; }
 	&__source { display: inline-flex; align-items: center; gap: 9px; color: var(--text-muted); font-size: 12px; text-decoration: none; margin-bottom: 23px; }
@@ -148,3 +169,5 @@
     &:has(:focus-visible) { opacity: 1; }
   }
 }
+
+@keyframes crate-reading-menu-in { from { opacity: 0; transform: scale(.92); } }

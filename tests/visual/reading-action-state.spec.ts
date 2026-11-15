@@ -54,6 +54,37 @@ for (const browserName of ['chromium', 'webkit'] as const) {
 					} finally { await browser.close(); }
 				});
 
+			test(`${host} keeps less frequent article actions in the More menu`, async ({ baseURL }) => {
+				const browser = await ({ chromium, webkit })[browserName].launch();
+				try {
+					const page = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+					await page.route(/^https:\/\//, route => route.abort());
+					await page.goto(`/?host=${host}&scene=reading&theme=dark&reader`);
+					const article = page.locator('article.crate-reading-reader');
+					const more = article.getByRole('button', { name: 'More article actions', exact: true });
+					// The tools row fits on one line at phone width.
+					const tops = await article.locator('.crate-reading-reader__tools > button').evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect().top));
+					expect(new Set(tops).size).toBe(1);
+					await more.click();
+					const menu = page.getByRole('menu', { name: 'More article actions' });
+					const items = host === 'pwa' ? ['Open note', 'Remove offline copy', 'Delete article'] : ['Open note'];
+					await expect(menu.getByRole('menuitem')).toHaveText(items);
+					await expect(menu.getByRole('menuitem').first()).toBeFocused();
+					await page.keyboard.press('ArrowUp');
+					await expect(menu.getByRole('menuitem').last()).toBeFocused();
+					await page.keyboard.press('Escape');
+					await expect(menu).toHaveCount(0);
+					await expect(more).toBeFocused();
+					await more.click();
+					await page.mouse.click(195, 700);
+					await expect(menu).toHaveCount(0);
+					if (host !== 'pwa') return;
+					await more.click();
+					await menu.getByRole('menuitem', { name: 'Delete article' }).click();
+					await expect(page.getByRole('alertdialog', { name: 'Delete article' })).toBeVisible();
+				} finally { await browser.close(); }
+			});
+
 			test(`${host} keeps the reader stable throughout native sharing`, async ({ baseURL }) => {
 				const browser = await ({ chromium, webkit })[browserName].launch();
 				try {

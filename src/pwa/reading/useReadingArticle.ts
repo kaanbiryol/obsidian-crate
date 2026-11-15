@@ -70,7 +70,7 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 			} catch { /* A damaged or blocked cache must not prevent an online open. */ }
 			if (!current()) return;
 			if (!navigator.onLine) {
-				if (!cached) setReader({ item, markdown: null, availableOffline: false, error: 'Connect to the internet to open this article. Select Save for offline to read it without a connection.' });
+				if (!cached) setReader({ item, markdown: null, availableOffline: false, error: 'Connect to the internet to open this article. Select More → Save for offline to read it without a connection.' });
 				return;
 			}
 			try {

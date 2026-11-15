@@ -62,12 +62,15 @@ const reading = ['one good thing', 'another'];
 <form action="https://tracking.invalid"><input autofocus name="name"></form>
 `;
 
-export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, listStyle }: { listStyle?: ReadingLibraryProps['listStyle']; onAdd: () => void; renderNavigation?: ReadingLibraryProps['renderNavigation']; renderLibraryContent?: ReadingLibraryProps['renderLibraryContent'] }) {
+export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, listStyle, pwaActions = false }: { listStyle?: ReadingLibraryProps['listStyle']; onAdd: () => void;
+	/** Match the PWA reader, which also offers offline copies and deletion. */
+	pwaActions?: boolean; renderNavigation?: ReadingLibraryProps['renderNavigation']; renderLibraryContent?: ReadingLibraryProps['renderLibraryContent'] }) {
 	const videoFixture = new URLSearchParams(location.search).has('reading-video');
 	const immediateReaderReturn = new URLSearchParams(location.search).has('reading-back');
 	const [items, setItems] = useState(() => videoFixture ? videos : new URLSearchParams(location.search).has('highlight-library') ? initial.slice(0, 3).map((item, index) => ({ ...item, highlights: [{ start: 0, end: 14, text: 'A good article', note: index === 0 ? 'Revisit this idea' : undefined, createdAt: `2026-09-${23 - index}T10:00:00Z` }] })) : new URLSearchParams(location.search).has('empty') ? [] : new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : new URLSearchParams(location.search).has('vault-note') ? [{ ...initial[0]!, title: 'A vault note', source_url: '' }] : initial);
 	const [article, setArticle] = useState<ReadingItem | null>(() => new URLSearchParams(location.search).has('reader') ? initial[0]! : null);
 	const [adding, setAdding] = useState(false), [url, setUrl] = useState('');
+	const [savedOffline, setSavedOffline] = useState(true);
 	const [mounted, setMounted] = useState(true);
 	const updateCount = useRef(0);
 	useEffect(() => {
@@ -96,7 +99,8 @@ export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, 
 	if (!mounted) return null;
 	return <><ReadingLibraryPanel listStyle={listStyle} renderNavigation={renderNavigation} renderLibraryContent={renderLibraryContent} snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
 		onOpen={async item => { setArticle(item); }} onRefresh={async () => {}}
-		activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={videoFixture ? (article.extraction_status === 'ready' ? 'My notes: revisit the sculpture gallery.' : '') : body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status={videoFixture ? "Details available offline" : "Available offline"} onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onSaveComplete={() => { document.documentElement.dataset.readingSaveCompletions = String(Number(document.documentElement.dataset.readingSaveCompletions ?? 0) + 1); }} onEdit={() => {}} />} />
+		activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={videoFixture ? (article.extraction_status === 'ready' ? 'My notes: revisit the sculpture gallery.' : '') : body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status={videoFixture ? "Details available offline" : "Available offline"} onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onSaveComplete={() => { document.documentElement.dataset.readingSaveCompletions = String(Number(document.documentElement.dataset.readingSaveCompletions ?? 0) + 1); }} onEdit={() => {}}
+			{...pwaActions && { savedOffline, onOfflineChange: async (keep: boolean) => setSavedOffline(keep), onDelete: async () => { setItems(current => current.filter(item => item.crate_reading_id !== article.crate_reading_id)); setArticle(null); } }} />} />
 		{adding && (new URLSearchParams(location.search).get('host') === 'plugin' ? <ReadingDialogHost.Provider value={PluginReadingDialog}><SaveLinkDialog variant={innerWidth > 600 ? 'centered' : 'bottom-sheet'} url={url} onUrl={setUrl} saving={false} onClose={() => setAdding(false)} onSave={() => setAdding(false)} /></ReadingDialogHost.Provider> : <ReadingDialog title="Save a link" onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} onSave={() => setAdding(false)} onCancel={() => setAdding(false)} saving={false} /></ReadingDialog>)}
 	</>;
 }

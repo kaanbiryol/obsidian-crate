@@ -7,6 +7,7 @@ import { useDeferredEntry } from './useDeferredEntry';
 import { useReaderHighlights } from './useReaderHighlights';
 import { ReadingHighlightActions } from './ReadingHighlightActions';
 import { ReadingBody } from './ReadingBody';
+import { ReaderMoreMenu, type ReaderMenuAction } from './ReaderMoreMenu';
 import { ReadingTagsForm } from './ReadingTagsForm';
 import { ReadingHighlightNoteForm } from './ReadingHighlightNoteForm';
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -134,7 +135,13 @@ export function ReadingReader({
 		</form>}</ReadingDialog>}
 	</>;
 	const minutes = useMemo(() => Math.max(1, Math.ceil((markdown ?? '').trim().split(/\s+/).length / 220)), [markdown]);
-	const toggleArchived = () => void run(() => onUpdate!({ reading_status: item.reading_status === 'archived' ? 'inbox' : 'archived' }));
+	const moreActions: ReaderMenuAction[] = [
+		...onEdit ? [{ label: 'Open note', icon: 'file-text', onSelect: onEdit }] : [],
+		...onOfflineChange ? [{ label: savedOffline ? 'Remove offline copy' : 'Save for offline', icon: 'download',
+			disabled: busy || markdown === null, onSelect: () => void run(() => onOfflineChange(!savedOffline)) }] : [],
+		...onDelete ? [{ label: `Delete ${kind}`, icon: 'trash-2', tone: 'danger' as const, disabled: mutationPending, onSelect: () => setDialog('delete') }] : [],
+	];
+	const toggleArchived = () =>void run(() => onUpdate!({ reading_status: item.reading_status === 'archived' ? 'inbox' : 'archived' }));
 	const seekToHighlight = (highlight: ReadingHighlight) => {
 		const seconds = transcriptMoment(segments, highlight.start, highlight.end);
 		if (seconds !== undefined) setVideoSeek({ seconds, reveal: false });
@@ -156,7 +163,7 @@ export function ReadingReader({
 					disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={toggleArchived} />
 				<IconButton size="large" icon="star" label={item.favorite ? 'Remove favorite' : `Favorite ${kind}`} aria-pressed={item.favorite} data-filled={item.favorite}
 					disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ favorite: !item.favorite }))} />
-			</>}</div>
+			</>}<ReaderMoreMenu label={`More ${kind} actions`} actions={moreActions} /></div>
 		</nav>
 		<div className="crate-reading-reader__page">
 			{notice}
@@ -174,12 +181,8 @@ export function ReadingReader({
 					<ReaderAvailability syncStatus={syncStatus} status={status} />
 					{(!videoId || hasVideoNotes) && <IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />}
 					{onUpdate && <IconButton size="large" icon="hash" label={`Edit ${kind} tags`} disabled={mutationPending} onClick={() => setDialog('tags')} />}
-					{onEdit && <IconButton size="large" icon="file-text" label="Open note" onClick={onEdit} />}
 					{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : `Share ${kind}`} aria-disabled={sharing}
 						onClick={() => void shareLink(article.current?.ownerDocument.defaultView, readingTitle(item), item.source_url)} />}
-					{onOfflineChange && <IconButton size="large" icon="download" label={savedOffline ? 'Remove offline copy' : 'Save for offline'} aria-pressed={!!savedOffline} data-filled={savedOffline} disabled={busy || markdown === null}
-						onClick={() => void run(() => onOfflineChange(!savedOffline))} />}
-					{onDelete && <IconButton size="large" icon="trash-2" tone="danger" label={`Delete ${kind}`} disabled={mutationPending} onClick={() => setDialog('delete')} />}
 				</div>
 				{item.tags.length > 0 && <div className="crate-reading-reader__tags">{item.tags.map(tag => <span key={tag}>#{tag}</span>)}</div>}
 			</header>}

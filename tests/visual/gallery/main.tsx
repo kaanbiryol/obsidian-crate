@@ -89,7 +89,7 @@ function Gallery() {
   else if (scene === 'source') content = <SourceNoticeFixture isDark={isDark} />;
   else if (scene === 'motion') content = <MotionFixture host={host} colorScheme={theme} />;
   else if (scene === 'controls') content = <ControlsFixture host={host} />;
-  else if (scene === 'reading') content = <ReadingDialogHost.Provider value={host === 'pwa' ? PwaReadingDialog : ObsidianReadingDialog}><ReadingFixture onAdd={() => setResult('Save link opened')}
+  else if (scene === 'reading') content = <ReadingDialogHost.Provider value={host === 'pwa' ? PwaReadingDialog : ObsidianReadingDialog}><ReadingFixture onAdd={() => setResult('Save link opened')} pwaActions={host === 'pwa'}
     // Match the PWA app: its dock replaces the shared fallback tab bar and add button.
     renderNavigation={host === 'pwa' ? props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" /> : undefined} /></ReadingDialogHost.Provider>;
   else if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;

@@ -136,6 +136,8 @@ html.pwa-document-reader {
   &__quick-actions { padding: 2px; gap: 2px; }
   &__quick-actions:empty { display: none; }
   &__quick-actions > button { border-radius: 50%; }
+  &__quick-actions .crate-reading-menu > button { border-radius: 50%; }
+  .crate-reading-menu__popup { @include glass.surface; }
   &__page { padding-top: var(--pwa-detail-heading-gap); }
   &__page:not(:has(> .crate-reading-reader__header)) { padding-top: 0; }
   &__header { margin-bottom: 20px; }
