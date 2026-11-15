@@ -4,7 +4,7 @@ The browser stores confirmed reminder snapshots in the `crate-reminders` Indexed
 
 ## Confirmed offline copies
 
-The current database version is 1. Databases create `snapshots` (one metadata record per folder), `freshness` and `notes` (one record per note, keyed by folder and path). Unknown store layouts, unexpected keys, and newer database versions are preserved and reported as unsupported. There is no destructive automatic downgrade or database reset. A future migration must follow the same ownership checks or use a separate database name.
+The current database version is 1. Databases create `snapshots` (one metadata record per folder), `freshness` and `notes` (one record per note, keyed by folder and path). Unknown store layouts, unexpected keys, and newer database versions are preserved and reported as unsupported. A later layout is added as database version 2 with an upgrade step. The step runs inside IndexedDB's upgrade transaction, only when the stored layout matches its released version, so an interrupted or failed upgrade leaves version 1 and its data in place. There is no destructive automatic downgrade or database reset. A future migration must follow the same ownership checks or use a separate database name.
 
 Opening the cache stops waiting when IndexedDB reports a blocked upgrade, or after three seconds without an outcome. An abandoned request closes its eventual connection and aborts any later upgrade. Startup and confirmed network mutations can continue. **Offline copy unavailable** explains the problem. Close other tabs and select **Rebuild offline copy** to retry known-format access and request a full server snapshot. Unsupported formats require their matching application version; the rebuild action does not erase unknown stores.
 
@@ -50,6 +50,8 @@ Removal verifies the enrolled folder, storage key and full exported string immed
 ## Verification
 
 `pwa-cache-test.mjs` covers creation, metadata-only 304 refresh, stale revision guards and clearing. `pwa-cache-recovery-test.mjs` runs native IndexedDB in Chromium and WebKit: unsupported-layout preservation, an old connection blocking upgrade, abandoned-request fencing, damaged rows, quota and denied-storage failures, folder-only rebuild, session isolation, future-format preservation, and blocked deletion. It checks that pending-command and editor-draft bytes survive.
+
+`pwa-storage-upgrade-test.mjs` runs native Chromium and WebKit IndexedDB through ordered upgrade steps, a failed or throwing step (the database stays at its old version with its records), an unknown layout, a missing step and a newer version.
 
 `pwa-cache-recovery-ui-test.mjs` exercises the built PWA against native IndexedDB: blocked startup retains the live reminder UI, the keyboard recovery action rejects an unsupported format until explicit cache clearing, a hanging or 503 encryption check shows **Unable to connect** within about 10 seconds above the read-only unencrypted offline copy and refuses edits, damaged cached rows stay unrendered during network failure, and reconnection replaces them without using their ETag or losing drafts and pending commands. Cloudflare responses use the local preview server; these tests do not establish physical-device or hosted acceptance.
 

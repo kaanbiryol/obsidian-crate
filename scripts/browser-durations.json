@@ -7,7 +7,8 @@
     "tests/browser/pwa/pwa-reading-encryption-storage-test.mjs": "local Chromium/WebKit storage and key recovery; conservative 10-second scheduling estimate",
     "tests/browser/pwa/pwa-web-app-unlock-test.mjs": "local Chromium/WebKit combined key import and draft recovery; conservative 10-second scheduling estimate",
     "tests/browser/pwa/pwa-reading-multitab-test.mjs": "local Chromium/WebKit run on 2026-10-21: 23.5 seconds; conservative 25-second scheduling estimate",
-    "native macOS scripts": "measured on the native macOS shards of https://github.com/kaanbiryol/obsidian-crate/actions/runs/39490125141"
+    "native macOS scripts": "measured on the native macOS shards of https://github.com/kaanbiryol/obsidian-crate/actions/runs/39490125141",
+    "tests/browser/pwa/pwa-storage-upgrade-test.mjs": "local chromium/webkit run on 2026-11-15: 1.3 seconds"
   },
   "seconds": {
     "tests/browser/pwa/pwa-encryption-onboarding-test.mjs": 30,
@@ -23,6 +24,7 @@
     "tests/browser/pwa/pwa-startup-empty-test.mjs": 30.9,
     "tests/browser/pwa/pwa-cache-test.mjs": 1.8,
     "tests/browser/pwa/pwa-cache-recovery-test.mjs": 1.9,
+    "tests/browser/pwa/pwa-storage-upgrade-test.mjs": 1.3,
     "tests/browser/pwa/pwa-cache-recovery-ui-test.mjs": 13,
     "tests/browser/pwa/pwa-outbox-recovery-test.mjs": 12.6,
     "tests/browser/pwa/pwa-draft-recovery-test.mjs": 15.7,

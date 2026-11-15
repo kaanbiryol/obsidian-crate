@@ -23,6 +23,7 @@ export const browserScripts = [
 	'tests/browser/pwa/pwa-schedule-test.mjs',
 	'tests/browser/pwa/pwa-cache-test.mjs',
 	'tests/browser/pwa/pwa-cache-recovery-test.mjs',
+	'tests/browser/pwa/pwa-storage-upgrade-test.mjs',
 	'tests/browser/pwa/pwa-cache-recovery-ui-test.mjs',
 	'tests/browser/pwa/pwa-outbox-recovery-test.mjs',
 	'tests/browser/pwa/pwa-draft-recovery-test.mjs',

@@ -1,5 +1,5 @@
 import type { IDBPDatabase } from 'idb';
-import { openVersionOneDatabase } from '../../storage/single-store-database';
+import { openVersionedDatabase } from '../../storage/single-store-database';
 
 const CACHE_DATABASE_NAME = 'crate-reminders';
 export const CACHE_STORE_NAME = 'snapshots';
@@ -23,11 +23,12 @@ export function reportCacheProblem(next: CacheProblem): void {
 
 /** A blocked/failed upgrade must not hold bootstrap or a confirmed mutation open. */
 export function openCacheDatabase(): Promise<IDBPDatabase> {
-	return openVersionOneDatabase(CACHE_DATABASE_NAME, [
+	// Version 1. A new layout appends a version with an upgrade step; see openVersionedDatabase.
+	return openVersionedDatabase(CACHE_DATABASE_NAME, [{ stores: [
 		{ name: CACHE_STORE_NAME, keyPath: 'folderPath' },
 		{ name: FRESHNESS_STORE_NAME, keyPath: 'folderPath' },
 		{ name: NOTES_STORE_NAME, keyPath: ['folderPath', 'path'] },
-	], {
+	] }], {
 		fail: (reason, cause) => {
 			reportCacheProblem(reason);
 			return cause instanceof Error ? cause : new Error('Offline cache is unavailable');
