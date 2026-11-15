@@ -386,6 +386,10 @@ describe('reminder ID marker protection', () => {
 			const longer = `Above\n${line}\n<!-- crate-desc:One\ntwo -->`;
 			const reloaded = `Changed\n${line}\n<!-- crate-desc:Uno\ntwo -->`;
 			expect(edit(longer, 0, { changes: { from: 0, to: longer.indexOf('One') + 3, insert: reloaded.slice(0, reloaded.indexOf('Uno') + 3) }, userEvent: 'set' }).text).toBe(reloaded);
+			// One span from another reminder above into this single-line description.
+			const two = `- [ ] Other\n${block}`;
+			const checked = `- [x] Other\n${line}\n<!-- crate-desc:Soy milk -->`;
+			expect(edit(two, 0, { changes: { from: 3, to: two.indexOf('Oat') + 3, insert: checked.slice(3, checked.indexOf('Soy') + 3) }, userEvent: 'set' }).text).toBe(checked);
 			// Typing a comment marker into the description is still refused.
 			expect(edit(block, from, { changes: { from, insert: '-->' }, userEvent: 'input.type' }).text).toBe(block);
 		});
