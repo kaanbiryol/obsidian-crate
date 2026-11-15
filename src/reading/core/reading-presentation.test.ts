@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ReadingItem } from './model';
-import { filterReadingItems, groupReadingItems, filterReadingHighlights, groupReadingHighlights } from './reading-presentation';
+import { filterReadingItems, groupReadingItems, filterReadingHighlights } from './reading-presentation';
 
 const item = (id: string, savedAt: string, overrides: Partial<ReadingItem> = {}): ReadingItem => ({
 	crate_reading_id: id, crate_reading_version: 1, title: 'A thoughtful essay', source_url: 'https://journal.example.com/read',
@@ -34,19 +34,18 @@ describe('reading navigation', () => {
 });
 
 
-describe('highlight article groups', () => {
-	it('keeps an article together in latest-highlight order, including filtered notes', () => {
+describe('highlight feed', () => {
+	it('interleaves articles newest first, dating unrecorded highlights by their article, and searches notes', () => {
 		const first = item('first', '2026-09-01', { highlights: [
 			{ start: 0, end: 3, text: 'Old', createdAt: '2026-09-20', note: 'Keep' },
 			{ start: 4, end: 7, text: 'New', createdAt: '2026-09-23', note: 'Keep' },
 		] });
-		const second = item('second', '2026-09-02', { highlights: [{ start: 0, end: 6, text: 'Middle', createdAt: '2026-09-22' }] });
-		const entries = filterReadingHighlights([first, second], '');
-		const groups = groupReadingHighlights(entries);
-		expect(groups.map(group => group.item.crate_reading_id)).toEqual(['first', 'second']);
-		expect(groups[0]?.entries.map(entry => entry.highlight.text)).toEqual(['New', 'Old']);
-		expect(groupReadingHighlights(filterReadingHighlights([first, second], 'keep'))).toHaveLength(1);
-		expect(groupReadingHighlights([])).toEqual([]);
-		expect(entries.map(entry => entry.highlight.text)).toEqual(['New', 'Middle', 'Old']);
+		const second = item('second', '2026-09-21', { highlights: [
+			{ start: 0, end: 6, text: 'Middle', createdAt: '2026-09-22' },
+			{ start: 7, end: 12, text: 'Typed' },
+		] });
+		expect(filterReadingHighlights([first, second], '').map(entry => entry.highlight.text)).toEqual(['New', 'Middle', 'Typed', 'Old']);
+		expect(filterReadingHighlights([first, second], 'keep').map(entry => entry.highlight.text)).toEqual(['New', 'Old']);
+		expect(filterReadingHighlights([], '')).toEqual([]);
 	});
 });

@@ -14,11 +14,11 @@ density. Both Obsidian and the PWA receive these tokens.
 
 | Role | Default | Consumers |
 | --- | --- | --- |
-| Row padding | 12px vertically and horizontally | Reminders, projects, Reading articles, highlight article headers and picker options |
+| Row padding | 12px vertically and horizontally | Reminders, projects, Reading articles and picker options |
 | Content / text stack gap | 12px / 4px | Leading icons or accents / title and metadata |
 | Row gap | 0px flat, 8px cards | All four list types, including reminder animation and embedded lists |
-| Nested row padding / indent | 8px vertically / 16px | Subprojects; highlight groups share the indent |
-| Expanded group gap | 8px projects, 16px highlights | Space after expanded groups |
+| Nested row padding / indent | 8px vertically / 16px | Subprojects |
+| Expanded group gap | 8px projects | Space after expanded groups |
 | Section gap | 16px Reading, 24px Upcoming | Space between sections |
 | Passage padding | 16px vertically, standard row inset horizontally | Highlight passages and notes |
 

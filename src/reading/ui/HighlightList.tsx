@@ -6,6 +6,8 @@ import type { ReadingMetadata } from '../core/model';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
+import { readingTitle } from '../core/reading-presentation';
+import { ReadingSourceIcon } from './ReadingSourceIcon';
 
 function highlightDate(value: string): string {
 	const date = new Date(value);
@@ -15,13 +17,15 @@ function highlightDate(value: string): string {
 
 /**
  * Compact rows: the row opens the passage. With row actions a toolbar holds the
- * date, then note, copy and delete controls as separate targets.
+ * date, then note, copy and delete controls as separate targets. With `onOpenItem`
+ * each row names its article, which opens from that line.
  */
-export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAnnotate, onDelete, onCopy, disabled = false, moment, onPlay }: {
+export function HighlightList<T extends ReadingMetadata>({ entries, onView, onOpenItem, onAnnotate, onDelete, onCopy, disabled = false, moment, onPlay }: {
 	moment?: (highlight: ReadingHighlight) => number | undefined;
 	onPlay?: (seconds: number) => void;
 	entries: { item: T; highlight: ReadingHighlight }[];
 	onView?: (item: T, highlight: ReadingHighlight) => void;
+	onOpenItem?: (item: T) => void;
 	onAnnotate?: (item: T, highlight: ReadingHighlight) => void;
 	onDelete?: (item: T, highlight: ReadingHighlight) => void;
 	onCopy?: () => void;
@@ -65,6 +69,8 @@ export function HighlightList<T extends ReadingMetadata>({ entries, onView, onAn
 					{onDelete && <IconButton className="crate-reading-highlights__delete" icon="trash-2" iconSize="s" tone="danger" label="Delete highlight" disabled={disabled} onClick={() => onDelete(item, highlight)} />}
 				</div>
 				: <div className="crate-reading-highlights__meta">
+					{onOpenItem && <Button className="crate-reading-highlights__source" disabled={disabled} aria-label={`${readingTitle(item)}, open ${youtubeVideoId(item.source_url) ? 'video' : 'article'}`}
+						onClick={() => onOpenItem(item)}><ReadingSourceIcon item={item} /><span>{readingTitle(item)}</span></Button>}
 					{highlight.createdAt ? <time dateTime={highlight.createdAt}>{highlightDate(highlight.createdAt)}</time> : <span />}
 					{momentControls && <div className="crate-reading-highlights__actions">{momentControls}</div>}
 				</div>}

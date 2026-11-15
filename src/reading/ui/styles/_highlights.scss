@@ -6,7 +6,7 @@
 	--crate-highlight-accent: var(--text-highlight-bg, #c7a73d);
 	list-style: none; margin: 0; padding: 0; display: grid;
 	&__item {
-		position: relative; display: grid; gap: var(--crate-space-6);
+		position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--crate-space-6);
 		padding: var(--crate-list-passage-padding-block) var(--crate-list-row-padding-inline) var(--crate-space-4);
 		border-radius: 10px; overflow-wrap: anywhere;
 	}
@@ -54,6 +54,24 @@
 		min-height: 44px; margin-left: var(--crate-space-12);
 		font-size: 12px; line-height: 1.4; color: var(--text-faint); font-variant-numeric: tabular-nums;
 	}
+	// The library feed names each excerpt's article; this line opens it.
+	&__source {
+		display: inline-flex; align-items: center; gap: var(--crate-space-8); flex: 0 1 auto; min-width: 0; min-height: 44px;
+		margin: 0 0 0 -8px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; box-shadow: none;
+		font: inherit; font-size: 12px; color: var(--text-muted); text-align: left; cursor: pointer; pointer-events: auto;
+		-webkit-tap-highlight-color: transparent;
+		transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+		> span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		@media (hover: hover) and (pointer: fine) { &:hover:not(:disabled) { background: var(--crate-control-hover-bg); color: var(--text-normal); } }
+		&[data-press-active]:not(:disabled) { background: var(--crate-control-active-bg); }
+		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -2px; }
+		&:disabled { cursor: default; }
+	}
+	&__meta > .crate-reading-highlights__source .crate-reading__source-icon {
+		width: 16px; height: 16px; flex-basis: 16px; border-radius: 4px; font-size: 10px;
+		img { padding: 2px; }
+	}
+	&__meta > .crate-reading-highlights__source + :is(time, span) { flex-shrink: 0; }
 	// 44px controls with 16px icons; negative margins keep the icons on the text edge.
 	&__actions {
 		display: flex; align-items: center; margin-right: -12px;
@@ -116,33 +134,5 @@
 		resize: none; field-sizing: content;
 		&:focus { border-color: var(--crate-divider); }
 		&[aria-invalid="true"] { border-color: var(--text-error); }
-	}
-}
-
-.crate-reminders-ui {
-	.crate-highlight-group {
-		margin-bottom: var(--crate-list-row-gap);
-		&[data-open] { margin-bottom: var(--crate-list-group-gap); }
-		&__header {
-			@include list-item.surface;
-			@include list-item.primary-spacing;
-			display: flex; align-items: center; width: 100%;
-			text-align: left; color: var(--text-normal);
-			> svg { flex-shrink: 0; color: var(--text-muted); }
-			@media (hover: hover) and (pointer: fine) { &:hover { @include list-item.hover; } }
-			&[data-press-active] { @include list-item.active; }
-			&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -2px; }
-		}
-		&__copy { display: grid; gap: var(--crate-list-copy-gap); flex: 1; min-width: 0; }
-		&__copy strong { @include list-item.title; overflow-wrap: anywhere; }
-		&__copy > span { color: var(--text-muted); font-size: var(--crate-font-xxs); font-weight: var(--crate-font-weight-normal); }
-		&__body { padding: var(--crate-space-8) 0 0 var(--crate-list-indent); }
-	}
-	.crate-reading[data-list-style="flat"] .crate-highlight-group:not([data-open]) { margin-bottom: var(--crate-list-flat-row-gap); }
-	.crate-reading[data-list-style="flat"] .crate-highlight-group__header {
-		@include list-item.flat-surface;
-		border-radius: 8px;
-		@media (hover: hover) and (pointer: fine) { &:hover { background: color-mix(in srgb, var(--crate-control-hover-bg) 60%, var(--background-primary)); } }
-		&[data-press-active] { background: color-mix(in srgb, var(--crate-control-active-bg) 75%, var(--background-primary)); }
 	}
 }

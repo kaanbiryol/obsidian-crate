@@ -71,8 +71,11 @@ beside the excerpt, the note below it, and the date with a trailing note control
 Selecting a row opens its passage. The note sheet shows the excerpt above one
 field and saves from its header; the save control stays disabled until the note
 changes, and the typed note survives a failed save. Opened from the Highlights
-sheet, the note sheet stacks over it, so saving or closing returns to the list. The library's **Highlights** view collects excerpts
-from inbox, favorites, and archived articles; search covers excerpts, annotations,
+sheet, the note sheet stacks over it, so saving or closing returns to the list. The library's **Highlights** view lists excerpts
+from inbox, favorites, and archived articles as one feed, newest first; a highlight
+without a creation date sorts by its article's save date. Each row names its article
+below the excerpt, and selecting that line opens the article, whose **Highlights**
+control lists the rest of its excerpts; search covers excerpts, annotations,
 titles, authors, sources, and tags. Article and tag filters narrow the results.
 The list renders 50 excerpts at a time and loads more as it scrolls near the end. The PWA
 Reading menu and Obsidian sidebar expose the same view.

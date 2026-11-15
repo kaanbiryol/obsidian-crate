@@ -12,9 +12,9 @@ import { FloatingActionButton } from '../../ui/shared/FloatingActionButton';
 import { EmptyState } from '../../ui/shared/EmptyState';
 import type { ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
-import { filterReadingHighlights, filterReadingItems, groupReadingItems, groupReadingHighlights, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
+import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
-import { HighlightGroups } from './HighlightGroups';
+import { HighlightList } from './HighlightList';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
 import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
@@ -112,7 +112,6 @@ export function ReadingLibraryPanel({
 			&& (!tag || item.tags.some(value => normalizedTag(value) === normalizedTag(tag))))
 		: filterReadingItems(snapshot.items, section, listQuery, tag), [present, loaded, snapshot.items, section, listQuery, tag]);
 	const excerpts = useMemo(() => filterReadingHighlights(items, listQuery), [items, listQuery]);
-	const excerptGroups = useMemo(() => groupReadingHighlights(excerpts), [excerpts]);
 	const count = section === 'highlights' ? excerpts.length : items.length;
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	// A server library lists every tag; a local one holds them all already.
@@ -125,7 +124,6 @@ export function ReadingLibraryPanel({
 	}, [source, tag, snapshotItems]);
 	const loading = source ? pages.loading && !pages.items.length : snapshot.loading;
 	const more = source ? !!pages.cursor : false;
-	const total = section === 'highlights' ? excerptGroups.length : count;
 	const { loadMore } = pages, pageLoading = !!source && pages.loading, pageError = pages.error;
 	// Near the end, reveal the next rows already loaded, or ask the server for its next page.
 	// Runs after each render too, so a list shorter than its scroller keeps filling.
@@ -133,11 +131,11 @@ export function ReadingLibraryPanel({
 		const list = lists.current.get(section);
 		// A hidden list has no height and would look scrolled to its end.
 		if (!list || !list.clientHeight || listContent || loading || pageLoading || pageError) return;
-		if (visible >= total && !more) return;
+		if (visible >= count && !more) return;
 		if (list.scrollHeight - list.scrollTop - list.clientHeight > NEAR_END_PX) return;
-		if (visible >= total) loadMore();
+		if (visible >= count) loadMore();
 		setVisible(value => value + PAGE_SIZE);
-	}, [section, listContent, loading, pageLoading, pageError, visible, total, more, loadMore]);
+	}, [section, listContent, loading, pageLoading, pageError, visible, count, more, loadMore]);
 	useEffect(() => { loadNearEnd(); }, [loadNearEnd]);
 	const run = (key: string, action: () => Promise<void>) => {
 		if (pending.current.has(key)) return;
@@ -190,8 +188,8 @@ export function ReadingLibraryPanel({
 					</Button>}
 					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" /> : <>
 						{section === 'highlights' && (count > 0
-							? <HighlightGroups key={`${listQuery}:${tag ?? ''}`} disabled={busy.has('open')}
-								entries={excerptGroups.slice(0, visible).flatMap(group => group.entries)} onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} />
+							? <HighlightList entries={excerpts.slice(0, visible)} disabled={busy.has('open')}
+								onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} onOpenItem={item => run('open', () => onOpen(item, undefined, section))} />
 							: !more && <EmptyState className="crate-reading__empty" icon="highlighter" title={highlightsCopy.title} description={highlightsCopy.description} />)}
 						{section !== 'highlights' && items.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open" title={linksCopy.title} description={linksCopy.description}>
 							{section === 'inbox' && !listQuery && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}>
