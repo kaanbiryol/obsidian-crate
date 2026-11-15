@@ -234,10 +234,14 @@ for (const engine of [chromium, webkit]) {
 		await checkClean(page, `${name}: Enter at the end of a description`);
 		assert.match(await doc(), /<!-- crate-desc:one line -->\n- \[ \] Next task/, `${name}: Enter starts a new task\n${await doc()}`);
 
-		// A date chip turns into a phrase when the cursor reaches it, and saves the edit on leaving.
+		// A cursor next to a date chip leaves the stored date in the note; Backspace into the chip
+		// turns it into a phrase, and leaving the line saves the edit.
 		await mount();
 		const buy = await page.evaluate(() => window.coordsAtLineEnd(2));
 		await page.mouse.click(buy.x, buy.y);
+		await settle(page);
+		assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Buy milk 2026-11-20 <!-- crate-id:a -->', `${name}: a cursor keeps the stored date`);
+		await page.keyboard.press('Backspace');
 		await settle(page);
 		assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Buy milk Nov 20 <!-- crate-id:a -->', `${name}: phrase for a date`);
 		for (let step = 0; step < 2; step++) await page.keyboard.press('Backspace');
@@ -250,6 +254,8 @@ for (const engine of [chromium, webkit]) {
 		// A time keeps local time: 12:00 tomorrow is the phrase, not the stored UTC time.
 		const call = await page.evaluate(() => window.coordsAtLineEnd(3));
 		await page.mouse.click(call.x, call.y);
+		await settle(page);
+		await page.keyboard.press('Backspace');
 		await settle(page);
 		assert.equal(await page.evaluate(() => window.view.state.doc.line(3).text), '- [ ] Call Mia tomorrow 12:00 <!-- crate-id:b -->', `${name}: phrase for a time`);
 		// The phrase shows with the date it will save as.

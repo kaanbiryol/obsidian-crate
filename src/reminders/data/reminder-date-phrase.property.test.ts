@@ -2,9 +2,9 @@ import fc from 'fast-check';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { formatLocalDateKey } from '../core/dates/reminderDate';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
-import { EditorSelection, EditorState } from '@codemirror/state';
+import { EditorState } from '@codemirror/state';
 import { editableDatePhrase, reminderDateDisplay } from './reminder-date-display';
-import { createReminderDateChips, datePhraseField, leavePhrase, openDateChip } from '../editor/editor-date-chips';
+import { createReminderDateChips, datePhraseField, leavePhrase } from '../editor/editor-date-chips';
 
 /** A minute in local time within three years of `now`, including DST changes, month ends and leap days. */
 const local = fc.record({
@@ -58,7 +58,7 @@ describe('date phrases', () => {
 		}), { numRuns: 1000 });
 	});
 
-	it('restores the note exactly when a phrase opened by the cursor is left unchanged', () => {
+	it('restores the note exactly when a phrase opened by deleting into its chip is left unchanged', () => {
 		const extensions = createReminderDateChips(() => true, () => undefined);
 		fc.assert(fc.property(now, local, prefix, fc.boolean(), (today, when, start, fromAfter) => {
 			vi.setSystemTime(today);
@@ -67,7 +67,9 @@ describe('date phrases', () => {
 			if (!editable) return;
 			const lineFrom = doc.indexOf('\n') + 1, at = lineFrom + (fromAfter ? editable.to : editable.from);
 			const state = EditorState.create({ doc, selection: { anchor: at }, extensions });
-			const opened = state.update(openDateChip(state, EditorSelection.single(fromAfter ? at + 1 : at - 1), today)!).state;
+			const opened = state.update(fromAfter
+				? { changes: { from: at - 1, to: at }, selection: { anchor: at - 1 }, userEvent: 'delete.backward' }
+				: { changes: { from: at, to: at + 1 }, userEvent: 'delete.forward' }).state;
 			expect(opened.doc.line(2).text).toBe(`${start}Task ${editable.phrase} <!-- crate-id:a -->`);
 			const left = opened.update({ changes: leavePhrase(opened, opened.field(datePhraseField)!).changes }).state;
 			expect(left.doc.toString()).toBe(doc);

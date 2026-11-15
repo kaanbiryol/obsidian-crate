@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EditorSelection, EditorState } from '@codemirror/state';
-import { createReminderDateChips, datePhraseField, editDateChip, leavePhrase, openDateChip, reminderDateRanges } from './editor-date-chips';
+import { createReminderDateChips, datePhraseField, editDateChip, leavePhrase, reminderDateRanges } from './editor-date-chips';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { reminderLineDisplays } from '../data/reminder-date-display';
 
@@ -47,31 +47,14 @@ describe('reminder dates in the editor', () => {
 		}
 	});
 
-	it('turns a saved date into a phrase when the cursor moves next to its chip', () => {
-		vi.useFakeTimers({ toFake: ['Date'] });
-		vi.setSystemTime(now);
-		try {
-			const doc = '- [ ] Pay rent 2026-12-01 <!-- crate-id:a -->';
-			const from = doc.indexOf('2026'), to = from + '2026-12-01'.length;
-			const move = (start: number, head: number) => {
-				const state = EditorState.create({ doc, selection: { anchor: head } });
-				const spec = openDateChip(state, EditorSelection.single(start), now);
-				return spec && state.update(spec).state;
-			};
-			// A click at the end of the line lands after the chip.
-			const clicked = move(0, to)!;
-			expect(clicked.doc.toString()).toBe('- [ ] Pay rent Dec 1 <!-- crate-id:a -->');
-			expect(clicked.selection.main.head).toBe(from + 'Dec 1'.length);
-			// ArrowLeft across the chip keeps the cursor at the end; reaching its start from before stays at the start.
-			expect(move(to, from)!.selection.main.head).toBe(from + 'Dec 1'.length);
-			expect(move(from - 1, from)!.selection.main.head).toBe(from);
-			// Elsewhere on the line, or a selection, leaves the chip alone.
-			expect(move(to, 6)).toBeNull();
-			expect(openDateChip(EditorState.create({ doc, selection: { anchor: from - 3, head: to } }), EditorSelection.single(0), now)).toBeNull();
-			expect(move(to, to)).toBeNull();
-		} finally {
-			vi.useRealTimers();
-		}
+	it('leaves a saved date in the note when the cursor moves next to its chip', () => {
+		const doc = '- [ ] Pay rent 2026-12-01 <!-- crate-id:a -->';
+		const to = doc.indexOf('2026') + '2026-12-01'.length;
+		const state = EditorState.create({ doc, extensions: createReminderDateChips(() => true, () => undefined) });
+		// Before: a cursor placed after the chip wrote "Dec 1" into the note until it left the line.
+		const moved = state.update({ selection: { anchor: to }, userEvent: 'select' }).state;
+		expect(moved.doc.toString()).toBe(doc);
+		expect(moved.field(datePhraseField)).toBeNull();
 	});
 
 	it('restores the stored date when its phrase is left unchanged, and saves an edited one', () => {
@@ -79,8 +62,9 @@ describe('reminder dates in the editor', () => {
 		vi.setSystemTime(now);
 		try {
 			const doc = '- [ ] Pay rent 2026-12-01 <!-- crate-id:a -->\nNext';
-			const state = EditorState.create({ doc, selection: { anchor: doc.indexOf(' <!--') }, extensions: createReminderDateChips(() => true, () => undefined) });
-			const opened = state.update(openDateChip(state, EditorSelection.single(0), now)!).state;
+			const end = doc.indexOf(' <!--');
+			const state = EditorState.create({ doc, selection: { anchor: end }, extensions: createReminderDateChips(() => true, () => undefined) });
+			const opened = state.update({ changes: { from: end - 1, to: end }, selection: { anchor: end - 1 }, userEvent: 'delete.backward' }).state;
 			expect(opened.doc.line(1).text).toBe('- [ ] Pay rent Dec 1 <!-- crate-id:a -->');
 			const phrase = opened.field(datePhraseField)!;
 			const apply = (from: typeof opened) => from.update({ changes: leavePhrase(from, from.field(datePhraseField)!).changes }).state.doc.line(1).text;
@@ -99,7 +83,7 @@ describe('reminder dates in the editor', () => {
 			const doc = '- [ ] Plan next week 2026-10-09 <!-- crate-id:a -->\nNext';
 			const end = doc.indexOf(' <!--');
 			const state = EditorState.create({ doc, selection: { anchor: end }, extensions: createReminderDateChips(() => true, () => undefined) });
-			const opened = state.update(openDateChip(state, EditorSelection.single(0), now)!).state;
+			const opened = state.update({ changes: { from: end - 1, to: end }, selection: { anchor: end - 1 }, userEvent: 'delete.backward' }).state;
 			expect(opened.doc.toString()).toBe(doc);
 			// The open phrase shows as text to edit, not as the chip it was.
 			expect(reminderDateRanges(opened, [{ from: 0, to: doc.length }], text => reminderLineDisplays(text, now))).toEqual([]);

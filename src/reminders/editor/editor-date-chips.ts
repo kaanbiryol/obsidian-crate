@@ -1,4 +1,4 @@
-import { EditorSelection, EditorState, StateEffect, StateField, Transaction, type ChangeSpec, type TransactionSpec } from '@codemirror/state';
+import { EditorState, StateEffect, StateField, Transaction, type ChangeSpec, type TransactionSpec } from '@codemirror/state';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { extractReminderId } from '../core/reminderIdentity';
@@ -7,8 +7,8 @@ import { DescriptionBreakWidget, DescriptionMarkerWidget } from './description-w
 
 /**
  * Schedules on visible lines, relative to the document. A saved date always
- * shows as a chip; a cursor next to it or deleting into it turns it into a
- * phrase to edit until the cursor leaves its line. A typed
+ * shows as a chip; deleting into it turns it into a phrase to edit until the
+ * cursor leaves its line. A cursor next to it changes nothing in the note. A typed
  * phrase shows with the date it will save as while the line's title is being
  * written, and as a chip once the cursor moves on, including to a description
  * typed after it. Invalid phrases and typed descriptions show on every line.
@@ -103,24 +103,6 @@ function showPhrase(from: number, to: number, stored: string, phrase: string, at
 		annotations: Transaction.addToHistory.of(false),
 		...userEvent ? { userEvent } : {},
 	};
-}
-
-/**
- * A cursor the user moved next to a saved date's chip, by click or key, turns
- * the date into a phrase to edit. Called with the settled selection, after
- * other filters moved it, and the one before the move. Arriving from after the chip keeps the cursor at the
- * phrase's end; arriving at its start from before keeps it at the start.
- * Selections leave chips alone, and a date no phrase reproduces stays a chip.
- */
-export function openDateChip(state: EditorState, previous: EditorSelection, now = new Date()): TransactionSpec | null {
-	const after = state.selection;
-	if (after.ranges.length !== 1 || !after.main.empty) return null;
-	const start = previous.main.head, head = after.main.head, line = state.doc.lineAt(head);
-	const editable = editableDatePhrase(line.text, now);
-	if (!editable) return null;
-	const from = line.from + editable.from, to = line.from + editable.to;
-	if ((head !== from && head !== to) || (previous.ranges.length === 1 && previous.main.empty && start === head)) return null;
-	return showPhrase(from, to, line.text.slice(editable.from, editable.to), editable.phrase, head === to || start === to);
 }
 
 /**
@@ -273,17 +255,8 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 		datePhraseField,
 		EditorView.updateListener.of(update => {
 			const phrase = update.state.field(datePhraseField, false), { doc } = update.state;
-			if (!phrase) {
-				const moved = update.selectionSet && !update.docChanged && update.view.hasFocus && isReminderEditor(update.state)
-					&& update.transactions.some(transaction => transaction.isUserEvent('select'));
-				const open = moved ? openDateChip(update.state, update.startState.selection) : null;
-				// A click can send more updates that change nothing; skip only if the text or cursor moved on.
-				if (open) queueMicrotask(() => {
-					const { state } = update.view;
-					if (state.doc === update.state.doc && state.selection.eq(update.state.selection)) update.view.dispatch(open);
-				});
-				return;
-			}
+			// Moving the cursor next to a chip leaves the stored date alone; only deleting into it opens the phrase.
+			if (!phrase) return;
 			const line = doc.lineAt(Math.min(phrase.from, doc.length)).number;
 			if (update.view.hasFocus && update.state.selection.ranges.some(range => doc.lineAt(range.head).number === line)) return;
 			const { changes, restored } = leavePhrase(update.state, phrase);
