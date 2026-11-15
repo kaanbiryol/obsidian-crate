@@ -34,7 +34,9 @@
 		.crate-field__icon { position: static; flex: none; }
 		.crate-text-input { min-height: calc(var(--crate-field-height) - 2px); padding: 8px 0; border: 0; border-radius: 0; background: transparent; }
 		.crate-field__control:has([aria-invalid="true"]) { border-color: var(--text-error); }
-		.crate-icon-button { flex: 0 0 44px; }
+		// The 44px target overhangs the padding so the clear glyph mirrors the search icon's inset.
+		.crate-icon-button { flex: 0 0 44px; margin-inline-end: -13px; }
+		.crate-icon-button svg { box-sizing: border-box; width: 18px; height: 18px; padding: 4px; border-radius: 50%; background: var(--text-faint, var(--text-muted)); color: var(--crate-control-bg); stroke-width: 3px; }
 		&.crate-field--with-action .crate-text-input::-webkit-search-cancel-button { display: none; }
 	}
 	// Override host and feature focus outlines only for text entry; buttons,
