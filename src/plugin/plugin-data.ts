@@ -75,9 +75,9 @@ export async function loadPluginData(plugin: Plugin): Promise<Record<string, unk
 	return copy;
 }
 
-/** Brings loaded plugin data to this build's layout. Before a save can replace an older or a
- * newer layout, the data as loaded is kept beside `data.json`. Failing to keep that copy stops
- * startup rather than risk losing settings. */
+/** Brings loaded plugin data to this build's layout. Before a save can replace an older
+ * layout, the data as loaded is kept beside `data.json`. Failing to keep that copy, or data
+ * from a newer Crate, stops startup rather than risk losing settings. */
 export async function upgradeLoadedPluginData(
 	plugin: Plugin,
 	data: Record<string, unknown>,
@@ -85,15 +85,10 @@ export async function upgradeLoadedPluginData(
 ): Promise<Record<string, unknown>> {
 	const result = upgrade(data);
 	if (result.status === 'current') return result.data;
-	const name = result.status === 'newer' ? `data.json.from-v${result.from}` : `data.json.v${result.from}`;
+	const name = `data.json.v${result.from}`;
 	const { adapter } = plugin.app.vault;
 	const path = `${plugin.manifest.dir}/${name}`;
 	if (!await adapter.exists(path)) await adapter.write(path, JSON.stringify(data));
-	if (result.status === 'newer') {
-		logger.warn(`Plugin data version ${result.from} is newer than ${PLUGIN_DATA_VERSION}; kept ${name}.`);
-		new Notice(`Crate's settings were saved by a newer version of Crate. Settings this version does not know may be lost when it saves. A copy is kept as ${name} in Crate's plugin folder. Update Crate to keep using them.`, 0);
-	} else {
-		logger.info(`Upgraded plugin data from version ${result.from} to ${PLUGIN_DATA_VERSION}; kept ${name}.`);
-	}
+	logger.info(`Upgraded plugin data from version ${result.from} to ${PLUGIN_DATA_VERSION}; kept ${name}.`);
 	return result.data;
 }

@@ -137,13 +137,14 @@ describe('data.json versions', () => {
 		await expect(upgradeLoadedPluginData(h.asPlugin, { dataVersion: 1 }, data => upgradePluginData(data, { 1: value => value }, 2))).rejects.toThrow('Disk full');
 	});
 
-	it('keeps data from a newer Crate, warns, and reads what it understands', async () => {
+	it('stops startup for data from a newer Crate and writes nothing', async () => {
 		const saved = { dataVersion: 7, workerUrl: 'https://crate.example', futureField: { a: 1 } };
 		const h = harness({ 'data.json': JSON.stringify(saved) });
-		expect(await upgradeLoadedPluginData(h.asPlugin, (await loadPluginData(h.asPlugin))!)).toEqual(saved);
-		expect(JSON.parse(h.file('data.json.from-v7')!)).toEqual(saved);
-		expect(Notice.messages).toEqual([expect.stringContaining('saved by a newer version of Crate')]);
-		expect(Notice.messages[0]).toContain('data.json.from-v7');
+		// Before: the data was read best-effort, startup went on and the next save wrote it back as version 1.
+		await expect(upgradeLoadedPluginData(h.asPlugin, (await loadPluginData(h.asPlugin))!)).rejects.toThrow('saved by a newer version of Crate');
+		expect(JSON.parse(h.file('data.json')!)).toEqual(saved);
+		expect(h.adapter.write).not.toHaveBeenCalled();
+		expect(h.plugin.saveData).not.toHaveBeenCalled();
 	});
 
 	it.each([0, -1, 1.5, '2', null])('treats an unreadable version %j as version 1', version => {

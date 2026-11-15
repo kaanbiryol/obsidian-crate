@@ -11,10 +11,7 @@ type PluginDataRecord = Record<string, unknown>;
  * drop fields they do not understand. Released steps never change. */
 const MIGRATIONS: Readonly<Record<number, (data: PluginDataRecord) => PluginDataRecord>> = {};
 
-export type PluginDataUpgrade =
-	| { status: 'current' | 'upgraded'; data: PluginDataRecord; from: number }
-	/** Written by a newer Crate. Its fields are read as far as this build understands them. */
-	| { status: 'newer'; data: PluginDataRecord; from: number };
+export interface PluginDataUpgrade { status: 'current' | 'upgraded'; data: PluginDataRecord; from: number }
 
 /** Data saved before versioning has no `dataVersion` and is version 1. */
 function savedPluginDataVersion(data: PluginDataRecord): number | null {
@@ -29,7 +26,9 @@ export function upgradePluginData(
 ): PluginDataUpgrade {
 	// An unreadable version is treated like the oldest layout; normalization validates every field.
 	const from = savedPluginDataVersion(data) ?? 1;
-	if (from > target) return { status: 'newer', data, from };
+	// A newer layout may rename or reinterpret fields this build would then save over or sync
+	// with defaults, so startup stops and the file stays as the newer Crate wrote it.
+	if (from > target) throw new Error(`Crate's settings were saved by a newer version of Crate (settings version ${from}). Update Crate on this device to use them.`);
 	let next = structuredClone(data);
 	for (let version = from; version < target; version++) {
 		const step = migrations[version];
