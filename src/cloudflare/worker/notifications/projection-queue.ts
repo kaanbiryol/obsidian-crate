@@ -60,9 +60,17 @@ export async function enqueueFileProjection(db: D1Database, path: string, storag
 	const sources = unless(false), identities = unless(true);
 	return [
 		...reset,
+		// This file's job. A commit that adds or removes one of its reminders also checks every
+		// identity again: its snapshot may predate a move away and back that another note's job
+		// projected in between. Written first, while the source state is still the last commit's.
+		db.prepare(`INSERT INTO notification_projection_jobs (path, job_token, recheck)
+    SELECT ?, ?, max(?, ${identities.sql} IS NOT NULL) WHERE ${guard}
+    ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL,
+      recheck = max(notification_projection_jobs.recheck, excluded.recheck), updated_at = datetime('now')`)
+			.bind(path, token, recheck ? 1 : 0, json, ...identities.args, ...args),
 		// Revisit the other owners of reminders that join or leave this note, including on
 		// deletion. Their projection then checks every identity again, so a duplicate quarantines
-		// both notes. This file's own job is written below.
+		// both notes.
 		db.prepare(`INSERT INTO notification_projection_jobs (path, job_token, recheck)
       SELECT DISTINCT file_path, ?, 1 FROM reminder_sources WHERE reminder_id IN (
         SELECT json_extract(value, '$.id') FROM json_each(${identities.sql}) WHERE NOT EXISTS (
@@ -84,10 +92,5 @@ export async function enqueueFileProjection(db: D1Database, path: string, storag
       WHERE json_extract(value, '$.due') != ''
       ON CONFLICT(reminder_id, due_key) DO NOTHING`).bind(Date.now(), json, ...sources.args),
 		...recordReminderSourceState(db, path, storageKey, true, digest),
-		db.prepare(`INSERT INTO notification_projection_jobs (path, job_token, recheck)
-    SELECT ?, ?, ? WHERE ${guard}
-    ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL,
-      recheck = max(notification_projection_jobs.recheck, excluded.recheck), updated_at = datetime('now')`)
-			.bind(path, token, recheck ? 1 : 0, ...args),
 	];
 }

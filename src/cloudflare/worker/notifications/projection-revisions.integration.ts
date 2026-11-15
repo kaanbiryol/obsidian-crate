@@ -49,6 +49,26 @@ describe('authoritative projections and file revisions', () => {
 		await drainNotificationProjections(env);
 		expect(await jobs()).toEqual([]);
 	});
+	it('keeps the schedule of a reminder moved to another note and back before its first note projected again', async () => {
+		await configure();
+		const work = 'Reminders/Work.md', home = 'Reminders/Home.md';
+		const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, work, note, null);
+		await drainNotificationProjections(env);
+		// The reminder moves to Home; Work's projection then fails for a while.
+		const emptied = await writeCommittedMarkdownFile(env.BUCKET, env.DB, work, 'Moved.', first.hash);
+		const moved = await writeCommittedMarkdownFile(env.BUCKET, env.DB, home, note, null);
+		await env.DB.batch([env.DB.prepare("UPDATE notification_projection_jobs SET last_error = 'transient' WHERE path = ?").bind(work),
+			env.DB.prepare("INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES (?, 1, ?, 'transient')").bind(work, Date.now() + 3_600_000)]);
+		await drainNotificationProjections(env);
+		expect((await env.DB.prepare('SELECT file_path FROM reminder_projections').all()).results).toEqual([{ file_path: home }]);
+		// It moves back before Work's job ran again.
+		await writeCommittedMarkdownFile(env.BUCKET, env.DB, home, 'Moved back.', moved.hash);
+		await writeCommittedMarkdownFile(env.BUCKET, env.DB, work, note, emptied.hash);
+		for (let pass = 0; pass < 4 && await drainNotificationProjections(env); pass++);
+		// Before: Work's stale snapshot still held the reminder, so its job wrote nothing after Home's deleted the row.
+		expect((await env.DB.prepare('SELECT file_path, due_datetime FROM reminder_projections WHERE due_at IS NOT NULL').all()).results)
+			.toEqual([{ file_path: work, due_datetime: '2099-01-02T10:00:00.000Z' }]);
+	});
 	it('does not allow startup on another device to replace the saved timezone policy', async () => {
 		await configure();
 		const response = await handleNotificationPolicy(new Request('https://test/reminders/notification-policy', { method: 'POST', body: JSON.stringify({ ...policy, timezone: 'Asia/Tokyo', allDayTime: null }) }), env.DB);
