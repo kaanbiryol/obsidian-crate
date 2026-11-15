@@ -4,6 +4,7 @@ import { readingResponse, ReadingError, readStoredNote, policyStatement, reading
 import { parseReadingItemsQuery, readingItem, readingItemStatements, readingItems, readingTags, type ReadingItemRows } from './queries';
 import { completeReadingIndex, ensureReadingIndex, readingIndexStatement, type ReadingIndexRow } from './library-index';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
+import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
 
 export interface LoadedLibraryRead { policy: ReadingPolicy | null; index: ReadingIndexRow | null; item?: ReadingItemRows }
 
@@ -28,7 +29,7 @@ export async function readLibrary(request: Request, env: Env, current: ReadingPo
 	// Outside the lock, only a complete index is read; a rebuild step writes, so it runs under the lock.
 	const complete = forward ? completeReadingIndex(current, loaded.index) : null;
 	if (forward && !complete) return await forward();
-	const index = complete ?? await ensureReadingIndex(env, current, file => readStoredNote(env, file), loaded.index, encrypted);
+	const index = complete ?? await ensureReadingIndex(env, current, file => readStoredNote(env, file, encrypted ? MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES : undefined), loaded.index, encrypted);
 	// Reads wake notification processing only to continue a rebuild or extract what it queued.
 	if (index.rebuilt && state) await armNotificationCoordinator(state);
 	if (index.state !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Try refreshing shortly.', 503);

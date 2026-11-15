@@ -40,9 +40,10 @@ export async function authority(db: D1Database, principal: AuthPrincipal, featur
 	}
 	return current;
 }
-/** The verified bytes of one file revision. */
-export async function readStoredNote(env: Env, file: StoredReadingFile): Promise<ArrayBuffer> {
-	if (file.size > MAX_READING_BYTES) throw new ReadingError(READING_SIZE_ERROR, 413);
+/** The verified bytes of one file revision; `limit` is larger for encrypted notes, which
+ * are read for the card their upload carried. */
+export async function readStoredNote(env: Env, file: StoredReadingFile, limit = MAX_READING_BYTES): Promise<ArrayBuffer> {
+	if (file.size > limit) throw new ReadingError(READING_SIZE_ERROR, 413);
 	// Verify the stored bytes, then decode; a lossy decode would never match the hash.
 	const bytes = await readVerifiedBytes(env.BUCKET, file);
 	if (!bytes) throw new ReadingError('The saved text is temporarily unavailable.', 503);

@@ -18,6 +18,7 @@ import { sealFile } from '@/encryption/file-codec';
 import { readingUploadCard } from '@/reading/core/reading-card-upload';
 import { openReadingCard } from '@/reading/core/reading-card';
 import { readStoredNote } from './common';
+import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
 import { READING_SHORTCUT_CONTRACT } from '@/reading/shortcut';
 import { meterD1Usage } from '../d1/d1-usage';
 import { readingItems } from './queries';
@@ -120,6 +121,17 @@ it('rebuilds an index of encrypted notes as rows waiting for cards', async () =>
 	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
 	expect((await ensureReadingIndex(env, policy, file => readStoredNote(env, file))).state).toBe('complete');
 	expect((await env.DB.prepare('SELECT count(*) AS n FROM reading_items WHERE stale = 1').first())).toEqual({ n: 2 });
+});
+
+it('rebuilds an encrypted index past a note larger than the plaintext limit', async () => {
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/a.md', 'CRATE-E2EE/1\n{}', null);
+	// About 790 KB of plaintext is enough once encrypted: base64url makes it over 1 MB.
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/b.md', `CRATE-E2EE/1\n${'x'.repeat(1_500_000)}`, null);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/c.md', 'CRATE-E2EE/1\n{"c":1}', null);
+	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
+	const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' };
+	expect((await ensureReadingIndex(env, policy, file => readStoredNote(env, file, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES), undefined, true)).state).toBe('complete');
+	expect((await env.DB.prepare('SELECT path FROM reading_items ORDER BY path').all()).results.map(row => row.path)).toEqual(['Reading/a.md', 'Reading/b.md', 'Reading/c.md']);
 });
 
 it('turns Save to Crate off in encrypted vaults', async () => {
