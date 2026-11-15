@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildConflictDiff } from './conflict-diff';
 
 describe('conflict comparison', () => {
@@ -31,16 +31,33 @@ describe('conflict comparison', () => {
 	});
 });
 
-it('bounds total highlighting time for large conflicts', () => {
+function largeConflict() {
 	let seed = 7;
 	const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
 	const current = Array.from({ length: 200 }, () => Array.from({ length: 600 }, () => `w${Math.floor(random() * 50)}`).join(' '));
 	const saved = current.map(line => line.split(' ').map(word => random() < 0.3 ? `x${Math.floor(random() * 50)}` : word).join(' '));
+	return { current: current.join('\n'), saved: saved.join('\n') };
+}
+
+it('bounds total highlighting time for large conflicts', () => {
+	const { current, saved } = largeConflict();
 	const started = performance.now();
-	const { rows, limited } = buildConflictDiff(current.join('\n'), saved.join('\n'));
+	const { rows } = buildConflictDiff(current, saved);
 	// Before: about 1.9 seconds for this 455 KB file on an M-series Mac.
 	expect(performance.now() - started).toBeLessThan(1_000);
-	expect(limited).toBe(false);
 	expect(rows).toHaveLength(200);
-	expect(rows.every(row => row.current?.changed && row.saved?.changed)).toBe(true);
+});
+
+it('pairs every changed line of a large conflict when its time budgets are not exhausted', () => {
+	// Freeze the clock so the result depends on the edit-length limit, not machine speed.
+	const now = vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 0, 1));
+	try {
+		const { current, saved } = largeConflict();
+		const { rows, limited } = buildConflictDiff(current, saved);
+		expect(limited).toBe(false);
+		expect(rows).toHaveLength(200);
+		expect(rows.every(row => row.current?.changed && row.saved?.changed)).toBe(true);
+	} finally {
+		now.mockRestore();
+	}
 });
