@@ -171,9 +171,10 @@ it('checks a search\'s other words in the term index, so notes without them cost
 	const meter = meterD1Usage(env.DB);
 	const page = await readingItems({ ...env, DB: meter.db }, { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' }, false, { section: 'inbox', cursor: '', q: 'rust design' });
 	expect(page).toMatchObject({ items: [], cursor: null });
-	// Counting both words up to 50 and 500 reads 1,100 rows and walking one word 500. Before:
-	// each walked note was read too, 2,100 rows.
-	expect(meter.usage.rowsRead).toBeLessThanOrEqual(1700);
+	// Counting both words up to 50 and 500 reads 1,100 rows and walking one word 500; a short page
+	// then reads the walk once more, at most the scan budget, to tell whether it ended. Before the
+	// key lookups each walked note was read too.
+	expect(meter.usage.rowsRead).toBeLessThanOrEqual(2200);
 });
 
 it('walks a small favorites section instead of a word every note has', async () => {
@@ -192,4 +193,28 @@ it('walks a small favorites section instead of a word every note has', async () 
 	expect(page).toMatchObject({ items: [], cursor: null });
 	// Counting the section reads 20 rows and walking it about 40; before, the search walked the term.
 	expect(meter.usage.rowsRead).toBeLessThanOrEqual(100);
+});
+
+it('stops a search walk after its scan budget and continues from the last entry read', async () => {
+	const statements: D1PreparedStatement[] = [];
+	for (let n = 0; n < 2500; n++) {
+		// Every title shares the first three letters of the query word but none contains it.
+		const path = `reading/walk-${n}.md`, savedAt = new Date(Date.UTC(2024, 0, 1) + n * 60_000).toISOString();
+		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, terms, words)
+      VALUES (?, ?, 'r', 'h', 1, ?, '{}', ?, 'inbox', '["p:art"]', '["article"]')`).bind(path, `Reading/walk-${n}.md`, crypto.randomUUID(), savedAt));
+		statements.push(env.DB.prepare("INSERT INTO note_terms(term, saved_at, portable_path) VALUES ('p:art', ?, ?)").bind(savedAt, path));
+	}
+	for (let index = 0; index < statements.length; index += 500) await env.DB.batch(statements.slice(index, index + 500));
+	const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' };
+	const meter = meterD1Usage(env.DB);
+	const page = await readingItems({ ...env, DB: meter.db }, policy, false, { section: 'inbox', cursor: '', q: 'artichoke' }) as { items: unknown[]; cursor: string | null };
+	// Before: the walk read every one of the 2,500 entries and their notes, about 5,000 rows, for no match.
+	expect(page.items).toEqual([]);
+	expect(page.cursor).not.toBeNull();
+	expect(meter.usage.rowsRead).toBeLessThanOrEqual(3100);
+	// Following the cursor reaches the end of the walk.
+	let cursor = page.cursor, pages = 1;
+	while (cursor && pages < 5) { cursor = (await readingItems(env, policy, false, { section: 'inbox', cursor, q: 'artichoke' }) as { cursor: string | null }).cursor; pages++; }
+	expect(cursor).toBeNull();
+	expect(pages).toBe(3);
 });

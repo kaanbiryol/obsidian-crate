@@ -47,7 +47,11 @@ entry, where a miss reads no row, so only notes with every term are read. Their 
 words (`words`) then confirm the match by searching the row's JSON text (`instr`), which reads no
 extra rows: a query word of 3 or more letters matches the start of a title word and a shorter one
 a whole word. To find the rarest term it counts each term's notes, up to 50 and, when every term
-has that many, up to 500.
+has that many, up to 500. A walk reads at most 1,000 entries: when those hold fewer than a page of
+matches (a word whose first three letters many titles share, or a common word in a small section),
+the page is short and its cursor continues after the last entry read. The web app follows a few
+such pages before it waits for the next scroll, so one search request stays within about 3,000
+rows read at any library size.
 
 ## Encrypted vaults
 
@@ -117,14 +121,15 @@ integration tests keep the bounds):
 | Delete, written | about 25 |
 | First page, read | about 56, at any library size |
 | One-word search, read | about 104 for a full page; a rare word about 2 per match |
-| Two-word search, read | at most about 1,600 when both words are common and never share a note; about 80 when one is rare |
+| Two-word search, read | at most about 2,100 when both words are common and never share a note (a short page seeks once more to where the walk ended); about 80 when one is rare |
+| Search with no match, read | at most about 3,000 per page (1,000 entries walked, their notes, then a seek to where the walk ended) |
 | Add a highlight, written | about as many as a favorite: the note's `highlight_index` row adds 1 or 2 (a newer highlight moves the row) |
 | Highlights page, read | about one page |
 | Highlight search, read | about one page when matches are common; at most about 4,000 for a page with none (2,000 scanned, then a seek to where the scan ended) |
 | Tag list, read | about one row per tag |
 
 - Each title word is one term, and terms are keyed by saved date with no second index, so a
-  search never scans the library and a term costs one written row.
+  search walks one term's entries, at most 1,000 per page, and a term costs one written row.
 - A status or favorite edit keeps the same terms and only moves the note between section
   indexes.
 - D1 storage is about 2.6 KB per Reading note, most of it the listed item (`metadata_json`,

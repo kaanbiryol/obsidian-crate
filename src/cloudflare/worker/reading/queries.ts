@@ -149,7 +149,7 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	if (!encrypted && query.url) { try { identity = readingUrlIdentity(query.url); } catch { throw new ReadingError('Enter a valid web link.'); } }
 	const terms = queryTerms(encrypted, query, words, identity);
 	const itemColumns = encrypted ? CARD_COLUMNS : ROW_COLUMNS;
-	let page: D1PreparedStatement;
+	let page: D1PreparedStatement, walkEnd: D1PreparedStatement | null = null;
 	if (terms.length) {
 		// Each term lists its notes newest first, so the search walks one term and stops after a
 		// page. The walk checks every other term with an exact key lookup in note_terms, where a
@@ -172,14 +172,19 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 			page = env.DB.prepare(`SELECT ${columns} FROM reading_items i WHERE ${walk.join(' AND ')}
       ORDER BY i.saved_at DESC, i.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...args, ...walkArgs);
 		} else {
-			const walk = ['t.term = ?'], walkArgs: unknown[] = [driver];
+			const walk = ['t.term = ?'], walkArgs: unknown[] = [driver], others: string[] = [], otherArgs: unknown[] = [];
 			if (after) { walk.push('(t.saved_at, t.portable_path) < (?, ?)'); walkArgs.push(...after); }
-			for (const term of terms) if (term !== driver) { walk.push(has('t')); walkArgs.push(term); }
-			// CROSS JOIN keeps the walk outermost, so SQLite never scans the library instead.
+			for (const term of terms) if (term !== driver) { others.push(has('t')); otherArgs.push(term); }
+			// CROSS JOIN keeps the walk outermost, so SQLite never scans the library instead. The
+			// innermost walk reads at most TERM_SCAN entries of one term; the other terms are key
+			// lookups on those entries before any note is read. LIMIT -1 keeps SQLite from merging.
+			const scan = `SELECT t.saved_at, t.portable_path FROM note_terms t WHERE ${walk.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${TERM_SCAN}`;
 			page = env.DB.prepare(`SELECT ${columns}
-      FROM (SELECT t.saved_at, t.portable_path FROM note_terms t WHERE ${walk.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT -1) t
+      FROM (SELECT t.saved_at, t.portable_path FROM (${scan}) t ${others.length ? `WHERE ${others.join(' AND ')}` : ''} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT -1) t
       CROSS JOIN reading_items i ON i.portable_path = t.portable_path
-      WHERE ${where.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...walkArgs, ...args);
+      WHERE ${where.join(' AND ')} ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT ${READING_ITEMS_PAGE}`).bind(...walkArgs, ...otherArgs, ...args);
+			walkEnd = env.DB.prepare(`SELECT saved_at, portable_path FROM note_terms t WHERE ${walk.join(' AND ')}
+      ORDER BY t.saved_at DESC, t.portable_path DESC LIMIT 1 OFFSET ${TERM_SCAN - 1}`).bind(...walkArgs);
 		}
 	} else {
 		const where = [SECTION_FILTERS[section], visible], args: unknown[] = [];
@@ -192,7 +197,11 @@ export async function readingItems(env: Env, current: ReadingPolicy, encrypted: 
 	const [{ results }, queuedRows, issueRows] = await env.DB.batch(first ? [page, queuedStatement(env, current),
 		env.DB.prepare(`SELECT ${ROW_COLUMNS} FROM reading_items WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1 LIMIT 1000`)] : [page]) as [Rows<ReadingRow | CardRow>, Rows<{ note: string }>?, Rows<ReadingRow>?];
 	const last = results.at(-1);
-	const cursor = results.length === READING_ITEMS_PAGE && last ? JSON.stringify([last.saved_at, last.portable_path]) : null;
+	// A short page either reached the end of the walk or its cap; at the cap the next page
+	// continues after the last entry read. The end is a second seek, needed only then.
+	const end = results.length < READING_ITEMS_PAGE && walkEnd ? await walkEnd.first<{ saved_at: string; portable_path: string }>() : null;
+	const key = results.length === READING_ITEMS_PAGE ? last : end;
+	const cursor = key ? JSON.stringify([key.saved_at, key.portable_path]) : null;
 	return listedResponse(current, encrypted, results, cursor, queuedRows?.results, issueRows?.results);
 }
 
@@ -214,6 +223,8 @@ function listedResponse(current: ReadingPolicy, encrypted: boolean, results: Arr
 	return { items: listed.items, issues: issues ? listedPage(current, issues, []).issues : [], cursor };
 }
 
+/** Term entries a search page walks at most; a short page's cursor continues the walk. */
+const TERM_SCAN = 1000;
 /** Rows a filtered Highlights page reads at most. A highlight search checks each note's terms
  * in its row, so a search that matches few notes stops here and its cursor continues the scan. */
 const HIGHLIGHT_SCAN = 2000;
