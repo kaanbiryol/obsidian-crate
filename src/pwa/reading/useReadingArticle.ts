@@ -35,15 +35,27 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 		setReader(null); setReaderClosing(false);
 		return () => { requests.current++; };
 	}, [session]);
+	const shown = useRef(reader);
+	shown.current = reader;
 	useEffect(() => {
-		if (!cache) return;
-		setReader(opened => {
-			if (!opened || !opened.item.path) return opened;
-			// The cache holds only the first inbox page, and nothing offline, so a missing item is not deleted.
-			const item = cache.items.find(item => item.crate_reading_id === opened.item.crate_reading_id);
-			return item ? { ...opened, item } : opened;
-		});
-	}, [cache]);
+		const opened = shown.current;
+		if (!cache || !opened?.item.path) return;
+		const id = opened.item.crate_reading_id;
+		const update = (item: ReadingItem) => setReader(current => current?.item.crate_reading_id === id ? { ...current, item } : current);
+		const listed = cache.items.find(item => item.crate_reading_id === id);
+		if (listed) { update(listed); return; }
+		// The cache holds only the first inbox page, and nothing offline, so a missing item is not
+		// deleted. Online, the server is asked for it, so the reader shows confirmed edits and the
+		// next edit starts from them instead of conflicting with them.
+		if (!session || !navigator.onLine) return;
+		const request = navigation.current;
+		let active = true;
+		queryReadingItems(session, { section: 'all', id }).then(page => {
+			const item = page.items.find(item => item.crate_reading_id === id);
+			if (active && request === navigation.current && item) update(item);
+		}, () => { /* Keep the shown article; the next refresh asks again. */ });
+		return () => { active = false; };
+	}, [cache, session]);
 	const open = useCallback(async (item: ReadingItem, animate = true, section: ReadingSection = 'inbox') => {
 		if (!session || appBack.current) return;
 		const current = () => isCurrentSession(session)

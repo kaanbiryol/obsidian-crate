@@ -171,6 +171,19 @@ it('keeps the open article when a refresh lists a page without it', async () => 
 	expect(hook.current.reader).toMatchObject({ item, markdown: 'Confirmed online text.' });
 });
 
+it('reads the open article from the server when a refresh lists a page without it', async () => {
+	network.mockResolvedValueOnce(Response.json({ item, markdown: 'Confirmed online text.' }));
+	const { hook, replace } = harness();
+	await act(async () => { await hook.current.open(item); });
+	// An archived article confirmed as a favorite is not on the first inbox page.
+	const favorite = { ...item, saved_at: '2026-10-01T12:00:00.000Z', reading_status: 'archived' as const, favorite: true };
+	network.mockResolvedValueOnce(Response.json({ items: [favorite], issues: [], cursor: null }));
+	// Before: the reader kept the pre-edit item, so the next edit sent stale preconditions and conflicted.
+	await act(async () => { replace([]); });
+	await vi.waitFor(() => expect(hook.current.reader).toMatchObject({ item: favorite, markdown: 'Confirmed online text.' }));
+	expect(network.mock.calls.at(-1)?.[0] as string).toContain(`/reading/items?section=all&id=${item.crate_reading_id}`);
+});
+
 it('reopens the article named in the address from its saved copy while offline', async () => {
 	vi.stubGlobal('location', { href: `https://example.test/notifications?section=reading&item=${item.crate_reading_id}` });
 	vi.stubGlobal('navigator', { onLine: false });
