@@ -92,6 +92,24 @@ describe('reminder dates in the editor', () => {
 		}
 	});
 
+	it('edits a past date as its stored text, which is its only phrase', () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(now);
+		try {
+			const doc = '- [ ] Plan next week 2026-10-09 <!-- crate-id:a -->\nNext';
+			const end = doc.indexOf(' <!--');
+			const state = EditorState.create({ doc, selection: { anchor: end }, extensions: createReminderDateChips(() => true, () => undefined) });
+			const opened = state.update(openDateChip(state, EditorSelection.single(0), now)!).state;
+			expect(opened.doc.toString()).toBe(doc);
+			// The open phrase shows as text to edit, not as the chip it was.
+			expect(reminderDateRanges(opened, [{ from: 0, to: doc.length }], text => reminderLineDisplays(text, now))).toEqual([]);
+			const deleted = opened.update({ changes: { from: end - 1, to: end }, selection: { anchor: end - 1 }, userEvent: 'delete.backward' }).state;
+			expect(deleted.doc.line(1).text).toBe('- [ ] Plan next week 2026-10-0 <!-- crate-id:a -->');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('deletes a date whole when no phrase gives it back', () => {
 		// Phrases name minutes, so a time with seconds has none that saves back to it.
 		const stored = '2026-12-01T09:00:30.000Z', doc = `- [ ] Pay rent ${stored} <!-- crate-id:a -->`;

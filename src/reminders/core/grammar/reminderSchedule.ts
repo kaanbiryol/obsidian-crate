@@ -117,6 +117,9 @@ export const findReminderScheduleMatches = (text: string, referenceDate: Date): 
 	for (const link of parseMarkdownLinks(text)) mask(link.index, link.fullMatch.length);
 	for (const url of remaining.matchAll(/\bhttps?:\/\/[^\s)]+/gi)) mask(url.index, url[0].length);
 	for (const literal of findReminderLiteralRanges(remaining)) mask(literal.index, literal.length);
+	// An ISO date joined to a word, as when the space before a stored date is deleted, is text:
+	// reading its clock alone would save a new date inside it on every save.
+	for (const glued of remaining.matchAll(/[\p{L}\p{N}_](\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?)/gu)) mask(glued.index + glued[0].length - glued[1]!.length, glued[1]!.length);
 
 	for (const recurrence of findRecurrenceCandidates(remaining, text, referenceDate)) {
 		const { index } = recurrence;

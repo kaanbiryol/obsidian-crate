@@ -36,6 +36,11 @@ function deletingAroundDescription(transaction: Transaction): TransactionSpec | 
 	if (!description) return null;
 	const { reminder } = description, textStart = reminder.from + TEXT_START.exec(reminder.text)![0].length;
 	if (change.from <= textStart && change.to >= description.to) return null;
+	const userEvent = transaction.annotation(Transaction.userEvent);
+	// All that shows of the reminder, its title and its description's text, removes all of it, so no hidden part is left behind.
+	if (change.from <= textStart && change.to >= description.textTo) {
+		return { changes: { from: change.from, to: description.to }, selection: { anchor: change.from }, ...userEvent ? { userEvent } : {} };
+	}
 	// The comment's closer and the line break after it, which would join the next line onto the comment.
 	const closerEnd = Math.min(description.to + 1, doc.length);
 	const hidden = [[endMarker(reminder)?.from ?? reminder.to, description.textFrom], [description.textTo, closerEnd]] as const;
@@ -49,10 +54,12 @@ function deletingAroundDescription(transaction: Transaction): TransactionSpec | 
 		if (from > at) pieces.push({ from: at, to: from });
 		at = Math.max(at, to);
 	}
-	if (at < change.to) pieces.push({ from: at, to: change.to });
+	if (at < change.to) {
+		// A later reminder whose whole text the deletion covers goes with its hidden tail.
+		pieces.push({ from: at, to: Math.max(change.to, wholeReminderEnd(doc, at, change.to, true) ?? change.to) });
+	}
 	// Deleting only hidden parts is a key at their edge, which the rules below handle.
 	if (!pieces.length) return null;
-	const userEvent = transaction.annotation(Transaction.userEvent);
 	const cursor = Math.min(Math.max(change.from, description.textFrom), description.textTo);
 	const specChanges = transaction.startState.changes(pieces);
 	const spec: TransactionSpec = { changes: specChanges, selection: { anchor: specChanges.mapPos(change.from < description.textFrom ? (endMarker(reminder)?.from ?? reminder.to) : cursor, -1) }, ...userEvent ? { userEvent } : {} };
@@ -168,10 +175,12 @@ function editAtTail(transaction: Transaction, changes: readonly ChangedRange[], 
 			const end = wholeReminderEnd(doc, change.fromA, change.toA, selected(change.fromA, change.toA));
 			if (end !== null) return end === change.toA ? transaction : spec({ from: change.fromA, to: end }, change.fromA);
 		}
-		// Moves the line after a description up to its reminder's text, as a join would without the hidden lines between.
+		// Moves the next line's text up to the reminder's, before its hidden tail, as a join would without the hidden parts.
+		// A reminder joined this way merges into this one, so its own hidden tail goes.
 		const join = (tail: { from: number; to: number }) => {
-			const next = doc.lineAt(tail.to + 1);
-			return spec([{ from: tail.from, insert: next.text }, { from: tail.to, to: next.to }], tail.from);
+			const next = doc.lineAt(tail.to + 1), nextTail = hiddenTail(doc, next);
+			const text = nextTail ? doc.sliceString(next.from, nextTail.from) : next.text;
+			return spec([{ from: tail.from, insert: text }, { from: tail.to, to: nextTail?.to ?? next.to }], tail.from);
 		};
 		const line = change && changes.length === 1 ? doc.lineAt(change.fromA) : null;
 		const found = line ? hiddenTail(doc, line) : null;
@@ -189,7 +198,7 @@ function editAtTail(transaction: Transaction, changes: readonly ChangedRange[], 
 				if (fromA < tail.from) return spec({ from: fromA, to: tail.from, insert: text }, fromA + text.length);
 				if (text) return spec({ from: tail.from, insert: text }, tail.from + text.length);
 				if (tail.to >= doc.length) return [];
-				return tail.description ? join(tail) : spec({ from: tail.to, to: tail.to + 1 }, tail.from);
+				return join(tail);
 			}
 		}
 		// Backspace at the start of the line after a description joins that line to the reminder, not into the description.
@@ -200,7 +209,8 @@ function editAtTail(transaction: Transaction, changes: readonly ChangedRange[], 
 				const above = doc.lineAt(change.fromA);
 				return spec({ from: change.fromA, to: Math.max(below.to, hiddenTail(doc, below)?.to ?? below.to) }, endMarker(above)?.from ?? change.fromA);
 			}
-			const above = tailEndingAt(doc, change.fromA);
+			const aboveLine = doc.lineAt(change.fromA);
+			const above = tailEndingAt(doc, change.fromA) ?? (endMarker(aboveLine) ? hiddenTail(doc, aboveLine) : null);
 			if (above) return join(above);
 		}
 	}

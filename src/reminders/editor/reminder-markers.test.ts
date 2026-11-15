@@ -356,9 +356,18 @@ describe('reminder ID marker protection', () => {
 		expect(edit(short, 7, { changes: { from: 6, to: 7 }, userEvent: 'delete.backward' }).text).toBe('- [ ]  <!-- crate-id:a -->');
 	});
 
-	it('joins the next line instead of deleting the marker alone', () => {
-		expect(edit(`${line}\nNext`, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe(`${line}Next`);
+	it('joins the next line in front of the marker instead of deleting the marker alone', () => {
+		const joined = '- [ ] Buy milkNext <!-- crate-id:a -->';
+		expect(edit(`${line}\nNext`, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' })).toEqual({ text: joined, cursor: end });
+		expect(edit(`${line}\nNext`, line.length + 1, { changes: { from: line.length, to: line.length + 1 }, userEvent: 'delete.backward' }).text).toBe(joined);
 		expect(edit(line, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe(line);
+	});
+
+	it('merges a joined reminder into this one, dropping its hidden marker and description', () => {
+		const doc = `${line}\n- [ ] Eggs <!-- crate-id:b -->\n<!-- crate-desc:Free range -->\nNext`;
+		const merged = '- [ ] Buy milk- [ ] Eggs <!-- crate-id:a -->\nNext';
+		expect(edit(doc, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe(merged);
+		expect(edit(doc, line.length + 1, { changes: { from: line.length, to: line.length + 1 }, userEvent: 'delete.backward' }).text).toBe(merged);
 	});
 
 	describe('with a description', () => {
@@ -377,6 +386,19 @@ describe('reminder ID marker protection', () => {
 			expect(edit(doc, end, { changes: { from: end, to: block.length }, userEvent: 'delete.forward' })).toEqual({ text: `- [ ] Buy milkNext <!-- crate-id:a -->\n${description}`, cursor: end });
 			expect(edit(doc, block.length + 1, { changes: { from: block.length, to: block.length + 1 }, userEvent: 'delete.backward' }).text).toBe(`- [ ] Buy milkNext <!-- crate-id:a -->\n${description}`);
 			expect(edit(block, end, { changes: { from: end, to: block.length }, userEvent: 'delete.forward' }).text).toBe(block);
+		});
+
+		it('deletes the whole reminder when a selection covers its title and its shown description', () => {
+			const doc = `${block}\nNext`, textTo = block.length - ' -->'.length;
+			// Shift+Home from the end of a description shown on its reminder's line selects both.
+			expect(edit(doc, 0, { changes: { from: 0, to: textTo }, userEvent: 'delete.selection' }, textTo).text).toBe('\nNext');
+		});
+
+		it('takes a later reminder’s description along when a selection from a description covers its whole line', () => {
+			const later = '- [ ] Eggs <!-- crate-id:b -->\n<!-- crate-desc:Free range -->';
+			const doc = `${block}\n${later}\nNext`, textTo = block.length - ' -->'.length, laterEnd = block.length + 1 + later.indexOf('\n');
+			// Shift+Down from the end of the description selects to the end of the next reminder's line.
+			expect(edit(doc, laterEnd, { changes: { from: textTo, to: laterEnd }, userEvent: 'delete.selection' }, textTo).text).toBe(`${block}\n\nNext`);
 		});
 
 		it('keeps a cursor in the description between its comment markers', () => {

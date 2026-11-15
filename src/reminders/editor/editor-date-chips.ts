@@ -20,6 +20,8 @@ export function reminderDateRanges(
 ): ReminderDateDisplay[] {
 	const { doc } = state;
 	const touches = (from: number, to: number) => state.selection.ranges.some(range => range.from <= to && range.to >= from);
+	// A past date's only phrase is its stored text, which would read as a chip again; while open it shows as text.
+	const open = state.field(datePhraseField, false);
 	const found: ReminderDateDisplay[] = [];
 	let last = 0;
 	for (const { from, to } of visible) {
@@ -35,6 +37,7 @@ export function reminderDateRanges(
 					to: line.from + display.to,
 					...display.kind === 'description' ? { start: line.from + display.start, breaks: display.breaks.map(position => line.from + position) } : {},
 				};
+				if (display.kind === 'chip' && open && at.from === open.from && at.to === open.to) continue;
 				found.push(display.kind === 'phrase' && !title ? { ...display, ...at, kind: 'chip', typed: true } : { ...display, ...at });
 			}
 		}
@@ -59,6 +62,9 @@ export function editDateChip(transaction: Transaction, now = new Date()): Transa
 	const chip = reminderLineDisplays(line.text, now).find(display => display.kind === 'chip');
 	if (chip?.kind !== 'chip') return null;
 	const from = line.from + chip.from, to = line.from + chip.to;
+	// Already open as its phrase: deletes edit the text.
+	const open = transaction.startState.field(datePhraseField, false);
+	if (open && open.from === from && open.to === to) return null;
 	if (!(backward ? change.to === to && change.from >= from : change.from === from && change.to <= to)) return null;
 	const editable = editableDatePhrase(line.text, now), userEvent = transaction.annotation(Transaction.userEvent);
 	if (editable) return showPhrase(from, to, line.text.slice(chip.from, chip.to), editable.phrase, backward, userEvent);
