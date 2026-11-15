@@ -52,8 +52,9 @@ for (const engine of [chromium, webkit]) {
       localStorage.setItem(t.READING_SESSION_KEY, JSON.stringify(session));
       localStorage.setItem('crate-reminders-auth-token', session.token);
       const state = { ...t.createEncryptionState(bundle, await t.sealRecoveryBundle(bundle, recovery)), mode: 'active' };
-      window.fetch = async path => Response.json(String(path).startsWith('/reading/encrypted-files')
-        ? { files: [], sequence: 1, generation: bundle.generation, nextCursor: null } : { encryption: state, folderLabel: folder.label });
+      // The library lists encrypted cards a page at a time; this one is empty.
+      window.fetch = async path => Response.json(String(path).startsWith('/reading/items')
+        ? { cards: [], cursor: null } : { encryption: state, folderLabel: folder.label });
       location.hash = 'crateReadingKey=' + encodeURIComponent(recovery);
       t.consumeReadingKeyFragment();
       const db = await t.readingDatabase();
@@ -87,9 +88,6 @@ for (const engine of [chromium, webkit]) {
       let refusedReplacement = false;
       try { await t.cacheReadingArticle(session, item, 'Replacement'); } catch { refusedReplacement = true; }
       const preservedReplacement = JSON.stringify(await db.get('values', articleKey)) === JSON.stringify(future);
-      await db.put('values', damaged, 'list:reader');
-      const live = await t.loadReading(session);
-      const preservedList = JSON.stringify(await db.get('values', 'list:reader')) === JSON.stringify(damaged);
 
       // Re-enrollment with a damaged native key retains the same local data key.
       await t.rememberVaultKeys(bundle);
@@ -99,11 +97,12 @@ for (const engine of [chromium, webkit]) {
 
       // A transaction failure may not leave a half-migrated plaintext session.
       t.resetReadingEncryption();
-      await db.put('values', { items: [], issues: [], savedAt: 1 }, 'list:reader');
+      // Migration writes keys in order, so the queue fails after the draft was rewritten.
+      await db.put('values', [{ originalBody: 'private queued edit' }], 'pending:reader');
       await db.put('values', original, 'draft:reader');
       const put = IDBObjectStore.prototype.put;
       IDBObjectStore.prototype.put = function(value, key) {
-        if (key === 'list:reader') throw new DOMException('Quota full', 'QuotaExceededError');
+        if (key === 'pending:reader') throw new DOMException('Quota full', 'QuotaExceededError');
         return put.call(this, value, key);
       };
       let migrationFailed = false;
@@ -123,7 +122,7 @@ for (const engine of [chromium, webkit]) {
       let locked = false;
       try { await t.readReadingDraft(session); } catch { locked = true; }
       return { migrated: migrated.encryptedReading, opened, unrelated, recovered, migrationFailed, rolledBack,
-        healthyArticle: healthyArticle.markdown, preservedArticles, refusedReplacement, preservedReplacement, preservedList, recoveryIssue: live.issues.length === 1,
+        healthyArticle: healthyArticle.markdown, preservedArticles, refusedReplacement, preservedReplacement,
         preservedNewSession: JSON.stringify(survived) === JSON.stringify(ciphertext), staleRejected, locked };
     });
     assert.equal(result.migrated, 1);
@@ -136,7 +135,7 @@ for (const engine of [chromium, webkit]) {
     assert.equal(result.staleRejected, true);
     assert.equal(result.locked, true);
     assert.equal(result.healthyArticle, 'Healthy offline article');
-    for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement', 'preservedList', 'recoveryIssue']) assert.equal(result[key], true, key);
+    for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement']) assert.equal(result[key], true, key);
     console.log(`Reading encryption migration, damaged-cache isolation, key recovery and stale-session fencing passed (${engine.name()})`);
     for (const kind of ['empty', 'pending', 'damaged']) {
       const startup = await browser.newPage();
