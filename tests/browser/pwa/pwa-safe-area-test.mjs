@@ -69,7 +69,7 @@ async function checkIos27(browser, colorScheme, belowStatusBar = false) {
 	});
 	await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
 	await expect(page.locator('html')).toHaveAttribute('data-pwa-ios27-standalone', 'true');
-	await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'black-translucent');
+	await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'default');
 	await page.locator('.pwa-dock [data-dock-active]').waitFor();
 	const launchColor = colorScheme === 'light' ? 'rgb(247, 247, 248)' : 'rgb(13, 13, 15)';
 	const strip = page.locator('#pwa-status-bar');

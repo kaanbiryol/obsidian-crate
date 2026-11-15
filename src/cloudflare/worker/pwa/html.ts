@@ -40,7 +40,7 @@ html,body,#app{background:var(--pwa-launch-bg);color-scheme:inherit}
 <meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
-<!-- Let sheet backdrops cover the status bar; content reserves its top safe area. -->
+<!-- Let sheet backdrops cover the status bar; content reserves its top safe area. The head bootstrap switches iOS 27 to default. -->
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script nonce="${nonce}" id="pwa-status-bar-init">${PWA_STATUS_BAR_INIT_JS}</script>
 <meta name="application-name" content="Crate">

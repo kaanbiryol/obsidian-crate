@@ -5,15 +5,21 @@ import { PWA_STATUS_BAR_INIT_JS } from './status-bar-bootstrap';
 const iphone = (os: string, browser = '') => `Mozilla/5.0 (iPhone; CPU iPhone OS ${os} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) ${browser} Mobile/15E148`;
 const desktop = (device: string) => `Mozilla/5.0 (${device}) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Safari/605.1.15`;
 
-function bootstrap(userAgent: string, { standalone = true, displayMode = false, platform = 'iPhone', maxTouchPoints = 5 } = {}) {
+function run(userAgent: string, { standalone = true, displayMode = false, platform = 'iPhone', maxTouchPoints = 5 } = {}) {
 	const root = { dataset: {} as Record<string, string> };
+	const meta = { content: 'black-translucent', setAttribute(name: string, value: string) { if (name === 'content') this.content = value; } };
 	new Script(PWA_STATUS_BAR_INIT_JS).runInNewContext({
 		navigator: { userAgent, standalone, platform, maxTouchPoints },
 		window: { matchMedia: () => ({ matches: displayMode }) },
-		document: { documentElement: root },
+		document: {
+			documentElement: root,
+			querySelector: (selector: string) => selector === 'meta[name="apple-mobile-web-app-status-bar-style"]' ? meta : null,
+		},
 	});
-	return root.dataset.pwaIos27Standalone === 'true';
+	return { standalone: root.dataset.pwaIos27Standalone === 'true', statusBarStyle: meta.content };
 }
+
+const bootstrap = (...args: Parameters<typeof run>) => run(...args).standalone;
 
 describe('iOS 27 status-bar startup', () => {
 	it.each([
@@ -50,6 +56,20 @@ describe('iOS 27 status-bar startup', () => {
 	it('leaves the Safari browser layout unchanged', () => {
 		expect(bootstrap(iphone('18_6_2', 'Version/27.0 Safari/604.1'), { standalone: false }))
 			.toBe(false);
+	});
+
+	it('uses the default status-bar style on iOS 27, in Safari too, so Add to Home Screen records it', () => {
+		expect(run(iphone('18_7', 'Version/27.2 Safari/604.1')).statusBarStyle).toBe('default');
+		expect(run(iphone('18_7', 'Version/27.2 Safari/604.1'), { standalone: false }).statusBarStyle).toBe('default');
+		expect(run(iphone('27_0')).statusBarStyle).toBe('default');
+	});
+
+	it.each([
+		iphone('18_6_2'),
+		iphone('26_5'),
+		iphone('28_0'),
+	])('keeps black-translucent on other or unknown versions: %s', ua => {
+		expect(run(ua).statusBarStyle).toBe('black-translucent');
 	});
 
 	it('also accepts the standard standalone display mode', () => {

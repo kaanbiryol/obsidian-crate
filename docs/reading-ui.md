@@ -196,12 +196,16 @@ Phone screen headers use a 24px title at its natural line height and a compact
 Loaded and opening headers share these PWA spacing tokens so hydration does not
 move the title or content. Sync and settings retain 44px touch targets.
 On identified iOS/iPadOS 27 Home Screen apps, the head bootstrap enables the
-iOS 27 progressive-blur workaround while keeping `black-translucent` status-bar
-mode. It accepts a real OS 27 token or Safari 27 on an Apple mobile device
-(including desktop-mode iPads); ambiguous frozen user agents skip it.
+iOS 27 progressive-blur workaround. It accepts a real OS 27 token or Safari 27
+on an Apple mobile device (including desktop-mode iPads); ambiguous frozen user
+agents skip it. On iOS 27 the bootstrap also switches the status-bar style from
+`black-translucent` to `default`, in Safari too so **Add to Home Screen**
+records it. An iOS 27.2 install with `black-translucent` drew under the status
+bar (59px top inset), and iOS then ignored the strip below and blurred the
+header title. Existing installs may keep their recorded style until reinstalled.
 Other versions and ordinary browser layouts retain their existing styling.
-iOS 27 Home Screen apps start below the status bar whatever the status-bar
-style, and blur content scrolling under it. iOS paints the status bar in the
+iOS 27 Home Screen apps can start below the status bar, and blur content
+scrolling under it. iOS paints the status bar in the
 color of a real fixed element at the top, so a 12px `#pwa-status-bar` strip
 sets it to the theme color. iOS ignores pseudo-elements for this, and the
 element must stay at least 6px tall and 80% wide. The strip stays above sheets,
