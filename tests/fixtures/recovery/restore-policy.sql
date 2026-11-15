@@ -1,6 +1,6 @@
 INSERT INTO "maintenance_state" ("key","value") VALUES ('crate_deployment_fence','old owner');
 INSERT INTO "maintenance_state" ("key","value") VALUES ('crate_upgrade_checkpoint','old bucket checkpoint');
-INSERT INTO "maintenance_state" ("key","value") VALUES ('crate_upgrade_backup','{"format":2,"phase":"dumping"}');
+INSERT INTO "maintenance_state" ("key","value") VALUES ('crate_upgrade_backup','{"format":1,"phase":"dumping"}');
 INSERT INTO "maintenance_state" ("key","value") VALUES ('crate_restore_progress','old plan:3');
 INSERT INTO "maintenance_state" ("key","value") VALUES ('reminder_source_scan_fixture','old scan');
 INSERT INTO "maintenance_state" ("key","value") VALUES ('reminder_operation_floor','20524');

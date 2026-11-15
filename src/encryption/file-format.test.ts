@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ENCRYPTED_FILE_CONTENT_TYPE, encodeEncryptedFile, fileTransportLimit, isEncryptedFile, MAX_ENCRYPTED_FILE_BYTES, MAX_ENCRYPTED_PUBLIC_DATA_BYTES, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
-const descriptor: EncryptedFileDescriptor = { version: 2, vaultId: 'vault-a', scopeId: 'vault', objectId: 'object-a', keyId: 'key-a', metadata: 'A'.repeat(184) };
+const descriptor: EncryptedFileDescriptor = { version: 1, vaultId: 'vault-a', scopeId: 'vault', objectId: 'object-a', keyId: 'key-a', metadata: 'A'.repeat(184) };
 const ciphertext = 'a.b.c.d.e';
 const frame = (header: unknown, body = ciphertext) => `CRATE-E2EE/1\n${JSON.stringify(header)}\n${body}`;
 
@@ -11,8 +11,6 @@ describe('encrypted file framing', () => {
 		const bytes = encodeEncryptedFile({ descriptor, ciphertext, publicData: { at: '2099-01-01' } });
 		expect(parseEncryptedFile(bytes)).toEqual({ descriptor, ciphertext, publicData: { at: '2099-01-01' } });
 		expect(parseEncryptedFile(new TextDecoder().decode(bytes))).toEqual(parseEncryptedFile(bytes));
-		const v1 = { ...descriptor, version: 1 as const, metadata: 'a.b.c.d.e' };
-		expect(parseEncryptedFile(encodeEncryptedFile({ descriptor: v1, ciphertext, publicData: null })).descriptor).toEqual(v1);
 	});
 
 	it('recognizes the encrypted prefix only', () => {
@@ -32,11 +30,10 @@ describe('encrypted file framing', () => {
 	it.each<[string, unknown, string]>([
 		['a non-object', [], 'Invalid encrypted file descriptor'],
 		['a plaintext path field', { ...descriptor, path: 'Private.md' }, 'Unexpected encrypted file descriptor field'],
-		['version 3', { ...descriptor, version: 3 }, 'Unsupported or damaged encrypted file descriptor'],
+		['version 2', { ...descriptor, version: 2 }, 'Unsupported or damaged encrypted file descriptor'],
 		['an invalid object ID', { ...descriptor, objectId: 'a/b' }, 'Unsupported or damaged encrypted file descriptor'],
 		['oversized metadata', { ...descriptor, metadata: 'A'.repeat(8193) }, 'Unsupported or damaged encrypted file descriptor'],
-		['version 1 compact metadata', { ...descriptor, version: 1 }, 'Unsupported or damaged encrypted file descriptor'],
-		['version 2 JWE metadata', { ...descriptor, metadata: 'a.b.c.d.e' }, 'Unsupported or damaged encrypted file descriptor'],
+		['JWE metadata', { ...descriptor, metadata: 'a.b.c.d.e' }, 'Unsupported or damaged encrypted file descriptor'],
 		['truncated compact metadata', { ...descriptor, metadata: 'A'.repeat(180) }, 'Unsupported or damaged encrypted file descriptor'],
 		['non-string metadata', { ...descriptor, metadata: 5 }, 'Unsupported or damaged encrypted file descriptor'],
 	])('rejects a descriptor with %s', (_, value, message) => {

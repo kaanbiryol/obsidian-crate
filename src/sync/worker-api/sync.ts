@@ -6,7 +6,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
 import { base64ToArrayBuffer } from '../encoding';
 import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { requestFileVersions } from './version-contract';
 import { parseChanges, parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
@@ -345,8 +345,7 @@ export class SyncWorkerApi {
 			}
 			return { success: results.every(result => result.success), results };
 		}
-		const bulkNew = info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY)
-			&& files.every(file => file.expectedHash === null);
+		const bulkNew = files.every(file => file.expectedHash === null);
 
 		const body = JSON.stringify({ files, ...(bulkNew ? { bulkNewFiles: true } : {}) });
 		return this.http.requestJson<BatchUploadResponse>('/sync/batch-upload', {

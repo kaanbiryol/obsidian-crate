@@ -15,7 +15,7 @@ import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-p
 /** `reading_items` holds one row per Reading note in the Reading folder, written in the
  * same D1 batch as the file commit, so reads never re-check `files`. Only a new scope
  * (folder, generation or format), a restore or an initial import rebuilds it from R2. */
-const INDEX_FORMAT = 3;
+const INDEX_FORMAT = 1;
 /** The upsert's unindexed columns for a note with a current card or metadata, from `committed c`. */
 const UNINDEXED = `storage_key = c.storage_key, hash = c.hash, size = c.size, metadata_json = c.metadata_json,
         error = c.error, words = c.words, terms = c.terms, card = c.card, highlighted = c.highlighted, highlighted_at = c.highlighted_at`;
@@ -88,10 +88,7 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 		const data = encryptedCard(content);
 		if (!data) return { ...row, stale: 1 };
 		const { fields } = data;
-		// A version 1 card, from an older client, lists a highlighted note by its saved date and
-		// matches no highlight search.
-		const highlights = data.version === 2 ? { highlighted_at: data.highlighted_at, highlight_terms: JSON.stringify(data.highlight_terms), tag_names: JSON.stringify(data.tag_names) }
-			: { highlighted_at: fields.highlighted ? fields.saved_at : null, highlight_terms: '[]' };
+		const highlights = { highlighted_at: data.highlighted_at, highlight_terms: JSON.stringify(data.highlight_terms), tag_names: JSON.stringify(data.tag_names) };
 		return { ...row, item_id: fields.item_id, saved_at: fields.saved_at, status: fields.status, favorite: fields.favorite ? 1 : 0, highlighted: fields.highlighted ? 1 : 0,
 			terms: JSON.stringify(data.terms), card: JSON.stringify({ card: data.card }), ...highlights };
 	}

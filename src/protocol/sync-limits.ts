@@ -16,7 +16,7 @@ export const BATCH_FILE_SIZE_LIMIT = 1 * 1024 * 1024;
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 
 /** The server commits a batch of new files with one lease and one changelog insert, with or without encryption. */
-export const BULK_NEW_UPLOAD_CAPABILITY = 'bulk-new-file-uploads-v2';
+export const BULK_NEW_UPLOAD_CAPABILITY = 'bulk-new-file-uploads-v1';
 
 /** Largest plaintext file, in bytes, that history, restore and pending-change previews show. */
 export const MAX_PREVIEW_BYTES = 256_000;

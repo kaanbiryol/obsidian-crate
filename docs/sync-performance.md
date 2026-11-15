@@ -1,7 +1,7 @@
 # Initial upload performance
 
 An empty, never-populated remote uses the resumable initial import capability
-`resumable-initial-import-v2` (protocol 1). The first device uploads the vault,
+`resumable-initial-import-v1` (protocol 1). The first device uploads the vault,
 completes its initial sync, and then additional devices download that vault.
 
 Initial imports store file contents in R2 and current file metadata in D1. They
@@ -109,9 +109,9 @@ original path remains metadata and is checked on exact-path reads and writes.
 This preserves spelling, case/Unicode collision protection and file/folder guards.
 Each new file writes one row. A page keeps at most about 1 KB of such a row, and a
 larger row takes an overflow page of its own, which measures 4,691 bytes per row. Two
-choices keep an encrypted file's row small. Devices write version 2 descriptors, whose
+choices keep an encrypted file's row small. A descriptor's
 private metadata is one binary envelope: about 400 to 530 characters of JSON for a
-note, against about 950 for version 1. The Worker stores each descriptor packed, with
+note. The Worker stores each descriptor packed, with
 its IDs as 16 bytes each, about 280 to 410 characters, and rebuilds the exact JSON on
 read; a descriptor that would not rebuild exactly is stored as its JSON. Measured on
 disk, an encrypted note's row takes 692 to 1,207 bytes up to seven folders deep, and a

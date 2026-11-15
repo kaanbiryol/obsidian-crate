@@ -1,5 +1,5 @@
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
-import { BATCH_UPLOAD_MAX_FILES, BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
+import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, SyncApiClient } from './client';
 import type { ApiHttpResponse, ApiHttpTransport } from './http';
@@ -386,14 +386,14 @@ describe('SyncApiClient', () => {
 describe('upload batch negotiation', () => {
 	beforeEach(() => { vi.stubGlobal('window', { setTimeout, clearTimeout }); });
 	afterEach(() => { vi.unstubAllGlobals(); });
-it.each([true, 'bulk'] as const)('splits uploads at the batch limit and requests bulk commits only with server support=%s', async supported => {
+it('splits uploads at the batch limit and requests bulk commits for new files', async () => {
 	const batches: Array<Array<{ path: string; operationId: string }>> = [];
 	const bulkFlags: boolean[] = [];
 	const transport: ApiHttpTransport = async request => {
 		let value: unknown;
 		if (request.url.endsWith('/.well-known/crate')) {
 			value = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL,
-				reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: supported === 'bulk' ? ['sync-v1', BULK_NEW_UPLOAD_CAPABILITY] : supported ? ['sync-v1'] : [] };
+				reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: ['sync-v1'] };
 		} else {
 			const { files, bulkNewFiles } = JSON.parse(request.body as string) as { files: Array<{ path: string; operationId: string }>; bulkNewFiles?: boolean };
 			batches.push(files);
@@ -410,7 +410,7 @@ it.each([true, 'bulk'] as const)('splits uploads at the batch limit and requests
 	})));
 	expect(response.results).toHaveLength(count);
 	expect(batches.map(batch => batch.length)).toEqual([BATCH_UPLOAD_MAX_FILES, 1]);
-	expect(bulkFlags).toEqual([supported === 'bulk', supported === 'bulk']);
+	expect(bulkFlags).toEqual([true, true]);
 	expect(new Set(batches.flat().map(file => file.operationId)).size).toBe(count);
 });
 

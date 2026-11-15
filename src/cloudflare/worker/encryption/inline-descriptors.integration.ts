@@ -86,8 +86,4 @@ it('answers /encryption/metadata by path and revision from the live file and ret
 	// changelog put no longer answers for it.
 	await env.DB.prepare('DELETE FROM file_versions WHERE storage_key = ?').bind(first.revision).run();
 	expect(await lookup([{ path: wire, revision: first.revision }, { path: wire, revision: second.revision }])).toEqual({ [second.revision]: second.descriptor });
-	// Clients that send the previous request shape are told to update.
-	const old = await call('/encryption/metadata', { method: 'POST', body: JSON.stringify({ revisions: [second.revision] }) });
-	expect(old.status).toBe(428);
-	expect(await old.json()).toMatchObject({ code: 'protocol_incompatible' });
 });

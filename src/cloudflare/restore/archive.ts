@@ -9,7 +9,7 @@ interface BackupObject { key: string; sha256: string; size: number; contentType?
 export interface BackupPart { sha256: string; size: number }
 /** Format 2 stores the database in ordered parts under the backup, named by
  * checksum, and shares checksum-named file copies through the backup store. */
-export interface UpgradeBackup { format: 2; complete: true; createdAt: string; source: BackupSource; objects: BackupObject[]; databaseParts: BackupPart[] }
+export interface UpgradeBackup { format: 1; complete: true; createdAt: string; source: BackupSource; objects: BackupObject[]; databaseParts: BackupPart[] }
 export interface BackupChoice { prefix: string; manifest: UpgradeBackup; hash: string }
 export type Cell = string | number | null;
 export interface BackupRow { table: string; columns: string[]; values: Cell[] }
@@ -48,16 +48,16 @@ export async function* listBackupKeys(api: Pick<CloudflareApiClient, 'listR2Obje
 	}
 }
 
-/** Encodes a complete format 2 manifest, the bytes `completeManifest` decodes. */
+/** Encodes a complete format 1 manifest, the bytes `completeManifest` decodes. */
 export function encodeManifest(manifest: Omit<UpgradeBackup, 'format' | 'complete'>): Uint8Array {
 	const { createdAt, source: { account, database, bucket }, databaseParts, objects } = manifest;
-	return new TextEncoder().encode(JSON.stringify({ format: 2, complete: true, createdAt, source: { account, database, bucket }, bookmark: null, databaseParts, objects }));
+	return new TextEncoder().encode(JSON.stringify({ format: 1, complete: true, createdAt, source: { account, database, bucket }, bookmark: null, databaseParts, objects }));
 }
 
-/** Decodes a manifest that claims to be a complete format 2 backup. Callers validate the rest. */
+/** Decodes a manifest that claims to be a complete format 1 backup. Callers validate the rest. */
 export function completeManifest(bytes: Uint8Array): UpgradeBackup | null {
 	const value = JSON.parse(new TextDecoder().decode(bytes)) as UpgradeBackup | null;
-	return value?.format === 2 && value.complete === true && Number.isFinite(Date.parse(value.createdAt)) && Array.isArray(value.objects) ? value : null;
+	return value?.format === 1 && value.complete === true && Number.isFinite(Date.parse(value.createdAt)) && Array.isArray(value.objects) ? value : null;
 }
 
 export async function readBackup(api: Pick<CloudflareApiClient, 'getRecoveryObject'>, source: BackupSource, prefix: string): Promise<BackupChoice> {

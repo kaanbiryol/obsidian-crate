@@ -93,7 +93,7 @@ async function fixture(extraRows = 0) {
 		const bytes = new TextEncoder().encode(transform(await readBackupDatabase(client, source, choice)));
 		const sha256 = await sha256Hex(bytes);
 		buckets.get(source.bucket)!.set(`${choice.prefix}/objects/${sha256}`, bytes);
-		choice.manifest = { ...choice.manifest, format: 2, databaseParts: [{ sha256, size: bytes.length }] };
+		choice.manifest = { ...choice.manifest, format: 1, databaseParts: [{ sha256, size: bytes.length }] };
 		await writeManifest();
 	};
 	api.queryD1.mockClear(); api.putRecoveryObject.mockClear();
@@ -140,7 +140,7 @@ it('stops listing backups at the shared file copies that sort after them', async
 
 it('rejects a corrupt database part before creating any destination', async () => {
 	const f = await fixture();
-	if (f.choice.manifest.format !== 2) throw new Error('Expected a parted backup');
+	if (f.choice.manifest.format !== 1) throw new Error('Expected a parted backup');
 	f.buckets.get(source.bucket)!.set(`${f.choice.prefix}/objects/${f.choice.manifest.databaseParts[0]!.sha256}`, new TextEncoder().encode('DROP TABLE files;'));
 	await expect(f.run()).rejects.toThrow('checksum does not match');
 	expect(f.api.createD1Database).not.toHaveBeenCalled();

@@ -12,7 +12,7 @@ SHA256 = re.compile(r'[a-f0-9]{64}')
 
 def checkpoint_database(remote, prefix, manifest):
     """Return verified export bytes and where each original object's copy is stored."""
-    if manifest.get('format') != 2 or not manifest.get('databaseParts'):
+    if manifest.get('format') != 1 or not manifest.get('databaseParts'):
         raise ValueError('Unsupported upgrade checkpoint format')
     parts = []
     # Parts end at statement boundaries; their concatenation is the database export.

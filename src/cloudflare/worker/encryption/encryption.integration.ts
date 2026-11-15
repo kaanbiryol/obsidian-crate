@@ -60,7 +60,7 @@ it('atomically stores ciphertext, its descriptor and encrypted scheduling projec
 	const descriptors = await env.DB.prepare(`SELECT descriptor FROM files WHERE storage_key = ?1
 		UNION ALL SELECT descriptor FROM changelog WHERE revision = ?1`).bind(stored!.storageKey).all<{ descriptor: string }>();
 	expect(descriptors.results.map(row => JSON.stringify(unpackDescriptor(row.descriptor)))).toEqual([JSON.stringify(file.descriptor), JSON.stringify(file.descriptor)]);
-	expect(descriptors.results[0]!.descriptor.startsWith('2.')).toBe(true);
+	expect(descriptors.results[0]!.descriptor.startsWith('1.')).toBe(true);
 	expect(await env.DB.prepare("SELECT 1 FROM maintenance_state WHERE key LIKE 'e2ee:file:%'").first()).toBeNull();
 	await drainNotificationProjections(env);
 	const alarm = await env.DB.prepare('SELECT content FROM reminder_projections WHERE reminder_id = ?').bind('r1').first<{ content: string }>();

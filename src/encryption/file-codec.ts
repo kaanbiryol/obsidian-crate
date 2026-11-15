@@ -1,4 +1,4 @@
-import { decryptBytes, decryptJson, encryptBytes, type EncryptionContext, type EncryptionKey } from './envelope';
+import { decryptBytes, encryptBytes, type EncryptionContext, type EncryptionKey } from './envelope';
 import { openFileMetadataEnvelope, sealFileMetadata } from './file-metadata-envelope';
 import { encodeEncryptedFile, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
 import { sha256Hex } from '../platform/sha256';
@@ -7,12 +7,10 @@ import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export interface PrivateFileMetadata {
 	/** The version of the descriptor that sealed it. */
-	version: 1 | 2;
+	version: 1;
 	path: string;
 	hash: string;
 	size: number;
-	/** Version 1 only. Files are read by their extension, so version 2 leaves it out. */
-	contentType?: string;
 	publicDataHash: string;
 }
 
@@ -45,9 +43,9 @@ export type PathBinding = string | ((metadataPath: string) => Promise<string>);
 function validateMetadata(value: unknown): asserts value is PrivateFileMetadata {
 	if (!value || typeof value !== 'object') throw new Error('Invalid encrypted file metadata');
 	const item = value as Partial<PrivateFileMetadata>;
-	if ((item.version !== 1 && item.version !== 2) || typeof item.path !== 'string' || !item.path || item.path.length > 4096 || !isSha256Hex(item.hash)
+	if (item.version !== 1 || typeof item.path !== 'string' || !item.path || item.path.length > 4096 || !isSha256Hex(item.hash)
 		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > MAX_FILE_SIZE_BYTES
-		|| (item.version === 1 ? typeof item.contentType !== 'string' || item.contentType.length > 256 : item.contentType !== undefined)
+		|| 'contentType' in item
 		|| !isSha256Hex(item.publicDataHash)) {
 		throw new Error('Encrypted file metadata does not match the requested file');
 	}
@@ -59,10 +57,10 @@ type SealedFile = { bytes: Uint8Array<ArrayBuffer>; descriptor: EncryptedFileDes
 /** Persist these exact returned bytes before dispatching a mutating request. */
 export async function sealFile(input: FileInput, authority: FileEncryptionAuthority): Promise<SealedFile> {
 	const key = authority.key, publicData = input.publicData ?? null;
-	const metadata: PrivateFileMetadata = { version: 2, path: input.path, hash: await digest(input.content),
+	const metadata: PrivateFileMetadata = { version: 1, path: input.path, hash: await digest(input.content),
 		size: input.content.byteLength, publicDataHash: await digest(new TextEncoder().encode(JSON.stringify(publicData))) };
 	validateMetadata(metadata);
-	const descriptor: EncryptedFileDescriptor = { version: 2, vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: crypto.randomUUID(), keyId: key.id, metadata: '' };
+	const descriptor: EncryptedFileDescriptor = { version: 1, vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: crypto.randomUUID(), keyId: key.id, metadata: '' };
 	descriptor.metadata = await sealFileMetadata(metadata, key, descriptor);
 	const ciphertext = await encryptBytes(input.content, key, context(descriptor, 'file'));
 	const bytes = encodeEncryptedFile({ descriptor, ciphertext, publicData });
@@ -76,8 +74,7 @@ export async function openFileMetadata(descriptor: EncryptedFileDescriptor, bind
 
 async function openMetadataWithKey(descriptor: EncryptedFileDescriptor, binding: PathBinding, authority: FileEncryptionAuthority) {
 	const key = fileKey(descriptor, authority);
-	const metadata: unknown = descriptor.version === 1 ? await decryptJson(descriptor.metadata, key, context(descriptor, 'file-metadata'))
-		: { version: 2, ...await openFileMetadataEnvelope(descriptor.metadata, key, descriptor) };
+	const metadata: unknown = { version: 1, ...await openFileMetadataEnvelope(descriptor.metadata, key, descriptor) };
 	validateMetadata(metadata);
 	if (metadata.version !== descriptor.version) throw new Error('Encrypted file metadata does not match the requested file');
 	const path = typeof binding === 'string' ? metadata.path === binding ? binding : null : await binding(metadata.path);

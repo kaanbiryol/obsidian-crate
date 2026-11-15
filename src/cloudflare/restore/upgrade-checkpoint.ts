@@ -49,17 +49,17 @@ const PART_CHARACTERS = 4 * 1024 * 1024;
 interface FileReference { key: string; sha256: string; size: number }
 /** `copying` runs while sync continues. `dumping` and `finishing` stay valid only
  * while every write guard has existed since the dump started. */
-interface CopyingProgress { format: 2; phase: 'copying'; prefix: string }
+interface CopyingProgress { format: 1; phase: 'copying'; prefix: string }
 /** `table` and `after` name the next row to export; earlier rows are saved in `parts`. */
-interface DumpingProgress { format: 2; phase: 'dumping'; prefix: string; createdAt: string; parts: BackupPart[]; table: number; after: unknown[] | null }
-interface ExportedProgress { format: 2; phase: 'finishing' | 'complete'; prefix: string; createdAt: string; parts: BackupPart[] }
+interface DumpingProgress { format: 1; phase: 'dumping'; prefix: string; createdAt: string; parts: BackupPart[]; table: number; after: unknown[] | null }
+interface ExportedProgress { format: 1; phase: 'finishing' | 'complete'; prefix: string; createdAt: string; parts: BackupPart[] }
 type BackupProgress = CopyingProgress | DumpingProgress | ExportedProgress;
 type SavedProgress = { raw: string | null; progress: BackupProgress | null };
 
 function parseProgress(value: unknown): BackupProgress | null {
 	let parsed: Record<string, unknown>;
 	try { parsed = typeof value === 'string' ? JSON.parse(value) as Record<string, unknown> : {}; } catch { return null; }
-	if (!parsed || parsed.format !== 2 || typeof parsed.prefix !== 'string' || !BACKUP_PREFIX.test(parsed.prefix) || parsed.prefix === UPGRADE_BACKUP_STORE) return null;
+	if (!parsed || parsed.format !== 1 || typeof parsed.prefix !== 'string' || !BACKUP_PREFIX.test(parsed.prefix) || parsed.prefix === UPGRADE_BACKUP_STORE) return null;
 	if (parsed.phase === 'copying') return parsed as unknown as BackupProgress;
 	if (!['dumping', 'finishing', 'complete'].includes(String(parsed.phase)) || typeof parsed.createdAt !== 'string' || !Number.isFinite(Date.parse(parsed.createdAt))
 		|| !Array.isArray(parsed.parts) || parsed.parts.some((part: Partial<BackupPart> | null) => !part || !isSha256Hex(part.sha256) || !Number.isSafeInteger(part.size) || Number(part.size) < 0)) return null;
@@ -144,7 +144,7 @@ async function copyFilesBeforePause(context: BackupContext, onProgress?: (messag
 }
 
 /** Exports the paused database in parts that end at statement boundaries. Their
- * concatenation is the same SQL the single-file format stored. */
+ * concatenation is the same SQL as a single-file export. */
 async function dumpDatabase(context: BackupContext, saved: { raw: string; progress: DumpingProgress }): Promise<{ raw: string; progress: ExportedProgress }> {
 	const { api, accountId, bucketName, query, definitions } = context;
 	const tables = definitions.filter(row => row.type === 'table');
@@ -177,7 +177,7 @@ async function dumpDatabase(context: BackupContext, saved: { raw: string; progre
 	}
 	// The changelog's sequence floor and the shared settings are `server_state` columns, exported with its row.
 	buffer += definitions.filter(row => row.type === 'index').map(row => `${String(row.sql)};`).join('\n');
-	const finished: ExportedProgress = { format: 2, phase: 'finishing', prefix: progress.prefix, createdAt: progress.createdAt, parts: await savePart() };
+	const finished: ExportedProgress = { format: 1, phase: 'finishing', prefix: progress.prefix, createdAt: progress.createdAt, parts: await savePart() };
 	return { raw: await saveProgress(query, raw, finished), progress: finished };
 }
 
@@ -206,17 +206,17 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
 	if (!progress || progress.phase === 'complete') {
 		// Pruning runs only between backups, so it never removes copies a backup in progress relies on.
 		await pruneUpgradeBackups({ api, accountId, databaseId, bucketName, onProgress: input.onProgress });
-		progress = { format: 2, phase: 'copying', prefix: `${UPGRADE_BACKUP_PREFIX}${crypto.randomUUID()}` };
+		progress = { format: 1, phase: 'copying', prefix: `${UPGRADE_BACKUP_PREFIX}${crypto.randomUUID()}` };
 		raw = await saveProgress(query, raw, progress);
 	} else if (progress.phase !== 'copying' && !paused) {
 		// The export is valid only while writes stayed paused. Copied files remain reusable.
-		progress = { format: 2, phase: 'copying', prefix: progress.prefix };
+		progress = { format: 1, phase: 'copying', prefix: progress.prefix };
 		raw = await saveProgress(query, raw, progress);
 	}
 	if (progress.phase === 'copying') {
 		await copyFilesBeforePause(context, input.onProgress);
 		input.onProgress?.('Backing up the server database. Large servers can take several minutes…');
-		const dumping: BackupProgress = { format: 2, phase: 'dumping', prefix: progress.prefix, createdAt: new Date().toISOString(), parts: [], table: 0, after: null };
+		const dumping: BackupProgress = { format: 1, phase: 'dumping', prefix: progress.prefix, createdAt: new Date().toISOString(), parts: [], table: 0, after: null };
 		const next = JSON.stringify(dumping);
 		fence.requireVerification();
 		// Pausing writers and starting the export commit together.

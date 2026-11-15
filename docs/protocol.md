@@ -62,7 +62,7 @@ Limits are application guardrails, not a promise that every workload fits a free
 
 ## Supported storage formats
 
-The [generated release contract](current-contract.md) lists current D1 schema versions and registered migrations. Other formats are parser version 4, IndexedDB version 1, version-1 generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered version-1 upload journals, and literal `crate-desc:` description comments, including multiline text. URI-encoded `crate-desc:v1:` comments are also supported and are written only when text contains HTML comment syntax (`--`), literal carriage returns or a leading encoding-like `v<number>:` prefix. Percent signs in literal descriptions remain unchanged; unknown version prefixes and malformed blocks remain errors. Provisioning uses the complete schema-1 baseline; unsupported database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
+The [generated release contract](current-contract.md) lists current D1 schema versions and registered migrations. Other formats are parser version 1, IndexedDB version 1, version-1 generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered version-1 upload journals, and literal `crate-desc:` description comments, including multiline text. URI-encoded `crate-desc:v1:` comments are also supported and are written only when text contains HTML comment syntax (`--`), literal carriage returns or a leading encoding-like `v<number>:` prefix. Percent signs in literal descriptions remain unchanged; unknown version prefixes and malformed blocks remain errors. Provisioning uses the complete schema-1 baseline; unsupported database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
 
 ## Source and occurrence integrity
 
@@ -84,7 +84,7 @@ The file pointer, changelog entry and exact result receipt commit in the same D1
 
 ## Initial import readiness
 
-`resumable-initial-import-v2` is included in protocol 1, in plaintext and encrypted vaults. `/sync/import/complete` verifies the
+`resumable-initial-import-v1` is included in protocol 1, in plaintext and encrypted vaults. `/sync/import/complete` verifies the
 file inventory in pages of up to 2,000 `[path, hash, size]` entries ordered by portable path
 (UTF-8 byte order). Each non-final page returns the next `after` cursor; progress is bound to
 the import generation, so an upload or prune between pages restarts verification. The `final`

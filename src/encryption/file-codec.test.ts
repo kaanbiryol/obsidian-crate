@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encryptJson, generateEncryptionSecret, importEncryptionSecret } from './envelope';
+import { generateEncryptionSecret, importEncryptionSecret } from './envelope';
 import { decodeBase64Url, encodeBase64Url } from './encoding';
 import { openFile, openFileMetadata, sealFile } from './file-codec';
 import { encodeEncryptedFile, isEncryptedFile, parseEncryptedFile, validateFileDescriptor } from './file-format';
@@ -47,14 +47,14 @@ describe('encrypted file transport', () => {
 		expect(opened.content.at(-1)).toBe(255);
 	}, 15_000);
 
-	it('seals metadata in a compact version 2 envelope bound to the descriptor', async () => {
+	it('seals metadata in a compact envelope bound to the descriptor', async () => {
 		const owner = await authority();
 		const path = '\uFEFFCafé/Ünïcødé.md';
 		const file = await sealFile({ ...input, path }, owner);
-		expect(file.descriptor.version).toBe(2);
+		expect(file.descriptor.version).toBe(1);
 		expect(file.descriptor.metadata).toMatch(/^[A-Za-z0-9_-]+$/);
 		expect(file.descriptor.metadata.length).toBeLessThan(220);
-		expect(await openFileMetadata(file.descriptor, path, owner)).toEqual({ version: 2, path, hash: file.metadata.hash, size: file.metadata.size, publicDataHash: file.metadata.publicDataHash });
+		expect(await openFileMetadata(file.descriptor, path, owner)).toEqual({ version: 1, path, hash: file.metadata.hash, size: file.metadata.size, publicDataHash: file.metadata.publicDataHash });
 		for (const field of ['vaultId', 'scopeId', 'objectId', 'keyId'] as const) {
 			const other = field === 'keyId' ? { ...owner, key: { ...owner.key, id: 'other' } } : { ...owner, [field]: 'other' };
 			await expect(openFileMetadata({ ...file.descriptor, [field]: 'other' }, path, other)).rejects.toThrow();
@@ -62,7 +62,7 @@ describe('encrypted file transport', () => {
 		await expect(openFileMetadata(file.descriptor, path, { ...owner, key: await importEncryptionSecret(generateEncryptionSecret()) })).rejects.toThrow();
 	});
 
-	it('rejects every changed, missing or added byte of a version 2 envelope', async () => {
+	it('rejects every changed, missing or added byte of the envelope', async () => {
 		const owner = await authority();
 		const file = await sealFile(input, owner);
 		const bytes = decodeBase64Url(file.descriptor.metadata, 6144);
@@ -79,19 +79,6 @@ describe('encrypted file transport', () => {
 		for (const metadata of [file.descriptor.metadata + '=', loose]) {
 			expect(() => validateFileDescriptor({ ...file.descriptor, metadata })).toThrow();
 		}
-	});
-
-	it('does not confuse version 1 and version 2 metadata', async () => {
-		const owner = await authority();
-		const file = await sealFile(input, owner);
-		const v2 = file.metadata;
-		const jwe = (value: unknown) => encryptJson(value, owner.key, { vaultId: owner.vaultId, scopeId: owner.scopeId, objectId: file.descriptor.objectId, purpose: 'file-metadata' });
-		const v1 = { ...file.descriptor, version: 1 as const, metadata: await jwe({ ...v2, version: 1, contentType: 'text/markdown' }) };
-		// A genuine version 1 descriptor still opens.
-		expect(await openFileMetadata(v1, input.path, owner)).toMatchObject({ version: 1, path: input.path, contentType: 'text/markdown' });
-		await expect(openFileMetadata({ ...v1, metadata: await jwe({ ...v2, version: 2 }) }, input.path, owner)).rejects.toThrow();
-		await expect(openFileMetadata({ ...file.descriptor, metadata: v1.metadata }, input.path, owner)).rejects.toThrow();
-		await expect(openFileMetadata({ ...v1, metadata: file.descriptor.metadata }, input.path, owner)).rejects.toThrow();
 	});
 
 	it('refuses a descriptor moved onto another file and names it cannot keep', async () => {

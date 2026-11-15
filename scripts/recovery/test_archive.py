@@ -182,7 +182,7 @@ class ArchiveTests(unittest.TestCase):
     def test_restore_limits_reminder_jobs_to_selected_folder_and_preserves_import_progress(self):
         self.remote.sql += b"\nINSERT INTO files(path, portable_path, storage_key, hash, size) SELECT 'Notes/Other.md', 'notes/other.md', storage_key, hash, size FROM files;"
         self.remote.sql += b"\nINSERT INTO server_state(id, import_token, import_state, import_generation) VALUES(1, 'resume-token', 'importing', 4);"
-        self.remote.sql += b"\nINSERT INTO maintenance_state(key, value) VALUES('reminder_source_scan_v9:Reminders', '');"
+        self.remote.sql += b"\nINSERT INTO maintenance_state(key, value) VALUES('reminder_source_scan_portable_v1:Reminders', '');"
         recovery.backup(self.remote, self.directory)
         target = Remote(b'', {})
         target.database, target.bucket = 'restore', 'restore'

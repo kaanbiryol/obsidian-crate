@@ -16,11 +16,6 @@ export async function handleEncryptionMetadata(request: Request, db: D1Database)
 	// 1,000 pairs of a 1,024-character path and its revision.
 	const parsed = await parseJsonObject(request, 2 * 1024 * 1024);
 	if (!parsed.ok) return parsed.response;
-	// Releases before inline descriptors named revisions alone. Their stored rows can no
-	// longer be found that way, so those clients are told to update.
-	if ('revisions' in parsed.value && !('files' in parsed.value)) {
-		return corsResponse({ error: 'Update Crate to open this encrypted vault.', code: 'protocol_incompatible' }, 428);
-	}
 	const files = parsed.value.files;
 	const pairs: Array<{ portable: string; revision: string }> = [];
 	if (Array.isArray(files) && files.length <= ENCRYPTION_METADATA_BATCH) {

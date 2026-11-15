@@ -69,11 +69,10 @@ way a reminder note carries its notification schedules:
   each word, the hash of its first three letters (or of the whole word when it is shorter), so the
   server matches tokens it cannot read; the device rechecks the titles it decrypts.
 
-- **Highlights and tags (card version 2).** The card also carries when the note was last
+- **Highlights and tags.** The card also carries when the note was last
   highlighted, the hashed highlight terms, and each tag's name sealed with the vault key and bound
   to its hashed term. The server keeps one sealed name per tag in `reading_tags` while any note has
-  the term. A version 1 card, from an older client, lists a highlighted note by its saved date,
-  matches no highlight search and adds no tag name, until a device saves the note again.
+  the term.
 
 ### What the server learns
 

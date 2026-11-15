@@ -21,7 +21,7 @@ const checkpoint = { id: '0f0f0f0f-1111-4222-8333-444444444444', sequence: 12, t
 describe('frozen protocol fixtures', () => {
 	testFrozenFixtures(new URL('./__fixtures__/', import.meta.url), [
 		{
-			// The 0.9.0 Worker's public handshake, including fields older parsers ignore.
+			// The Worker's public handshake, including fields older parsers ignore.
 			file: 'server-info.v1.json',
 			stored: () => ({
 				service: 'crate', serverVersion: '0.9.0', pwaAssetVersion: 'fixture-pwa-1',
@@ -31,7 +31,7 @@ describe('frozen protocol fixtures', () => {
 					'reminder-operation-receipts', 'conditional-file-mutations', 'settings-v1', 'devices-v1', 'reminders-v1', 'reading-v1',
 					'reading-fetching-consent-v1', 'shared-features-v1', 'reading-shortcut-pairing-v1', 'reading-shortcut-transport-v1', 'notifications-v1'],
 				shortcut: { version: 1, revision: 1, minimumRevision: 1 },
-				serverRevision: 2, schemaVersion: 1, deploymentFingerprint: hash('d'), reminderOperationDay: 20757,
+				serverRevision: 1, schemaVersion: 1, deploymentFingerprint: hash('d'), reminderOperationDay: 20757,
 			}),
 			decode: (stored: unknown) => {
 				const info = parseCrateServerInfo(stored);

@@ -1,7 +1,7 @@
 import { decodeBase64Url, encodeBase64Url, isEncryptionId } from './encoding';
 import type { EncryptionKey } from './envelope';
 
-/** The private metadata of a version 2 file descriptor, sealed in one compact envelope:
+/** The private metadata of a file descriptor, sealed in one compact envelope:
  * base64url(wrapped content key || IV || AES-256-GCM ciphertext and tag). As with JWE
  * A256KW, a fresh content key per envelope is wrapped with the vault key by AES-KW. The
  * descriptor's IDs are bound as additional data instead of being repeated in a header,
@@ -22,7 +22,7 @@ export interface FileMetadataIds { vaultId: string; scopeId: string; objectId: s
 function additionalData(ids: FileMetadataIds): Uint8Array<ArrayBuffer> {
 	const values = [ids.vaultId, ids.scopeId, ids.objectId, ids.keyId];
 	if (!values.every(isEncryptionId)) throw new Error('Invalid encryption context');
-	return new TextEncoder().encode(['crate-e2ee-v2/file-metadata', ...values].join('\n'));
+	return new TextEncoder().encode(['crate-e2ee-v1/file-metadata', ...values].join('\n'));
 }
 const hexBytes = (hex: string) => Uint8Array.from(hex.match(/../g)!, byte => parseInt(byte, 16));
 const bytesHex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');

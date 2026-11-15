@@ -57,7 +57,7 @@ async function harness() {
 		for (const file of files) objects.set(upgradeBackupStoreKey(await sha256Hex(file)), new TextEncoder().encode(file));
 		for (const key of extra) objects.set(`${prefix}/${key}`, new Uint8Array([1]));
 		if (manifest !== null) objects.set(`${prefix}/archive.json`, new TextEncoder().encode(typeof manifest === 'string' ? manifest : JSON.stringify({
-			complete: true, format: 2, objects: await Promise.all(files.map(async file => ({ key: file, sha256: await sha256Hex(file), size: file.length }))), ...manifest,
+			complete: true, format: 1, objects: await Promise.all(files.map(async file => ({ key: file, sha256: await sha256Hex(file), size: file.length }))), ...manifest,
 		})));
 		return prefix;
 	};
@@ -92,7 +92,7 @@ it('copies files before pausing writers, then exports a paused database that res
 	expect(() => h.db.exec('DELETE FROM files')).toThrow('upgrade in progress');
 	expect(h.fence.mutate.mock.calls.map(([, step]) => step)).toEqual(['freeze-upgrade-data', 'verify-upgrade-checkpoint']);
 	const manifest = h.manifest();
-	expect(manifest).toMatchObject({ format: 2, complete: true });
+	expect(manifest).toMatchObject({ format: 1, complete: true });
 	expect(manifest.databaseParts.map(part => part.sha256)).toEqual([expect.stringMatching(/^[a-f0-9]{64}$/)]);
 	expect(manifest.objects.map(item => item.key)).toEqual(['existing-object', 'historical-object']);
 	for (const item of manifest.objects) expect(await sha256Hex(h.objects.get(upgradeBackupStoreKey(item.sha256))!)).toBe(item.sha256);
@@ -159,7 +159,7 @@ it('resumes copying files without pausing writers or repeating verified copies',
 		return read(...args);
 	});
 	await expect(h.run()).rejects.toMatchObject({ status: 503 });
-	expect(h.progress()).toMatchObject({ format: 2, phase: 'copying' });
+	expect(h.progress()).toMatchObject({ format: 1, phase: 'copying' });
 	expect(h.fence.requireVerification).not.toHaveBeenCalled();
 	expect(h.fence.mutate).not.toHaveBeenCalled();
 	expect(() => h.db.exec("UPDATE auth_tokens SET device_name = 'Still syncing'")).not.toThrow();
@@ -259,7 +259,7 @@ it('waits for Cloudflare rate limits through the real API client and completes',
 	const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
 	try { await h.run(undefined, new CloudflareApiClient('token', transport, { sleep })); }
 	finally { now.mockRestore(); }
-	expect(h.manifest()).toMatchObject({ format: 2, complete: true });
+	expect(h.manifest()).toMatchObject({ format: 1, complete: true });
 	expect(requests).toBeGreaterThan(20);
 	expect(sleep.mock.calls.filter(([milliseconds]) => milliseconds === 7_000).length).toBe(Math.floor(requests / 4));
 	// Bulk requests are paced 300 ms apart.
@@ -321,7 +321,7 @@ it('does not prune while a backup is in progress and keeps shared copies when a 
 	await h.seed('b', { createdAt: '2026-02-01T00:00:00Z' }, ['newer']);
 	const orphan = upgradeBackupStoreKey(await sha256Hex('orphan'));
 	h.objects.set(orphan, new TextEncoder().encode('orphan'));
-	h.db.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_upgrade_backup', ?)").run(JSON.stringify({ format: 2, phase: 'copying', prefix: `__crate__/backups/schema-upgrade-${crypto.randomUUID()}` }));
+	h.db.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_upgrade_backup', ?)").run(JSON.stringify({ format: 1, phase: 'copying', prefix: `__crate__/backups/schema-upgrade-${crypto.randomUUID()}` }));
 	await h.run();
 	expect(h.api.deleteRecoveryObject).not.toHaveBeenCalled();
 	await releaseUpgradeGuards(h.api, 'account', 'database', h.fence as unknown as DeploymentFence);

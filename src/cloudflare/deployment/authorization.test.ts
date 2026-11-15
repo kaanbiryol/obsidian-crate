@@ -23,7 +23,7 @@ function harness(status: number, scope = CLOUDFLARE_OAUTH_SCOPES.join(' ')) {
 		transport, loadArtifacts: async () => ({ version: '0.4.0', fingerprint: 'f'.repeat(64), workerBundle: '', workerBundleSha256: '', d1Schema: '', d1SchemaSha256: '' }),
 		openExternal: vi.fn(), withAuthorization: testAuthorization });
 	const choice: BackupChoice = { prefix: `__crate__/backups/schema-upgrade-${settings.cloudflareDeployment.d1DatabaseId}`, hash: 'b'.repeat(64),
-		manifest: { format: 2, complete: true, createdAt: new Date().toISOString(), source: { account: settings.cloudflareDeployment.accountId, database: settings.cloudflareDeployment.d1DatabaseId, bucket: name }, databaseParts: [{ sha256: 'c'.repeat(64), size: 1 }], objects: [] } };
+		manifest: { format: 1, complete: true, createdAt: new Date().toISOString(), source: { account: settings.cloudflareDeployment.accountId, database: settings.cloudflareDeployment.d1DatabaseId, bucket: name }, databaseParts: [{ sha256: 'c'.repeat(64), size: 1 }], objects: [] } };
 	const authorize: WithCloudflareAuthorization = operation => connection.withAuthorization(operation);
 	return { connection, service, transport, operations: {
 		update: () => authorizedBy(authorize, service).deployWithSavedAuthorization('update', async () => null),

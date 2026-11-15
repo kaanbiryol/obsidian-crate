@@ -49,7 +49,7 @@ class DownloadCheckpointTests(unittest.TestCase):
         live, old = self.files
         db.execute('INSERT INTO files (path, portable_path, hash, size, storage_key) VALUES (?, ?, ?, ?, ?)', ('Note.md', 'note.md', digest(self.files[live]), len(self.files[live]), live))
         db.execute('INSERT INTO file_versions (storage_key, path, hash, size, reason, expires_at) VALUES (?, ?, ?, ?, ?, ?)', (old, 'Note.md', digest(self.files[old]), len(self.files[old]), 'replaced', 1))
-        db.execute("INSERT INTO maintenance_state (key, value) VALUES ('crate_upgrade_backup', '{\"format\":2,\"phase\":\"dumping\"}')")
+        db.execute("INSERT INTO maintenance_state (key, value) VALUES ('crate_upgrade_backup', '{\"format\":1,\"phase\":\"dumping\"}')")
         db.commit()
         self.sql = '\n'.join(db.iterdump()).encode()
         db.close()
@@ -70,7 +70,7 @@ class DownloadCheckpointTests(unittest.TestCase):
             self.remote.objects[PREFIX + '/objects/' + digest(part)] = part
         for data in self.files.values():
             self.remote.objects[STORE + '/objects/' + digest(data)] = data
-        self.remote.objects[PREFIX + '/archive.json'] = self.manifest(format=2, databaseParts=[{'sha256': digest(part), 'size': len(part)} for part in parts])
+        self.remote.objects[PREFIX + '/archive.json'] = self.manifest(format=1, databaseParts=[{'sha256': digest(part), 'size': len(part)} for part in parts])
 
     def assert_restorable(self):
         directory = Path(self.temp.name) / 'checkpoint'

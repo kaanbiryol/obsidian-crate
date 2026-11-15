@@ -1,11 +1,11 @@
 {
-	"stored": "{\"version\":2,\"vaultId\":\"263d20c2-de47-459a-b603-973181a5b6d4\",\"scopeId\":\"vault\",\"objectId\":\"88502a91-2adb-4c11-a68e-211faf5c6457\",\"keyId\":\"fixture-key\",\"metadata\":\"eObtV3d32Xl5bhG00c-cAFFd_bxhFIVOXW0d5dgDbIjT3Td9gzoPNQwq6zYiThSWQx4-u8jvDBZWVEnFj3ivIyyQ1eqBnj_mCIJlzTp3Ldg5_Vq3OjfyJIuKKgQ35TExgwnSNmnFNknR82FZzs4LCsUB15cWVDz_l4KUKptaB1ZdwmvhqzVS-xGo9s7l4RMKmmZ1awo2dNY\"}",
+	"stored": "{\"version\":1,\"vaultId\":\"263d20c2-de47-459a-b603-973181a5b6d4\",\"scopeId\":\"vault\",\"objectId\":\"9add5827-7813-4c16-9f86-35d47d525e2e\",\"keyId\":\"fixture-key\",\"metadata\":\"JX6w9DRCCnKobsHW04nCNPbEWHzNIuZmcJt2O3VJIHni4o6SqKO6fFd0H_rm7zLNHQ_c6P-52KtcQk1szh5v9O8DaXfRqKTuQtRxxr_JK-IGYKn6VZdE9hnTOkq0Q-rpXvHLAsWu7HbJJoYO8CCHbBYtkvNBLPpmivu-JhMT7QoMsAUgEOidAOKEEvpLXcY0iGlLbe123uQ\"}",
 	"decoded": {
-		"version": 2,
+		"version": 1,
 		"vaultId": "263d20c2-de47-459a-b603-973181a5b6d4",
 		"scopeId": "vault",
-		"objectId": "88502a91-2adb-4c11-a68e-211faf5c6457",
+		"objectId": "9add5827-7813-4c16-9f86-35d47d525e2e",
 		"keyId": "fixture-key",
-		"metadata": "eObtV3d32Xl5bhG00c-cAFFd_bxhFIVOXW0d5dgDbIjT3Td9gzoPNQwq6zYiThSWQx4-u8jvDBZWVEnFj3ivIyyQ1eqBnj_mCIJlzTp3Ldg5_Vq3OjfyJIuKKgQ35TExgwnSNmnFNknR82FZzs4LCsUB15cWVDz_l4KUKptaB1ZdwmvhqzVS-xGo9s7l4RMKmmZ1awo2dNY"
+		"metadata": "JX6w9DRCCnKobsHW04nCNPbEWHzNIuZmcJt2O3VJIHni4o6SqKO6fFd0H_rm7zLNHQ_c6P-52KtcQk1szh5v9O8DaXfRqKTuQtRxxr_JK-IGYKn6VZdE9hnTOkq0Q-rpXvHLAsWu7HbJJoYO8CCHbBYtkvNBLPpmivu-JhMT7QoMsAUgEOidAOKEEvpLXcY0iGlLbe123uQ"
 	}
 }

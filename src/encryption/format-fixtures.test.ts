@@ -13,7 +13,7 @@ import { PathTags } from './path-tags';
 import { importNotificationKeys, openNotification } from './notification-keys';
 import { createReminderProjection } from '../reminders/core/encrypted-schedule-projection';
 import type { EncryptedSchedules } from './notification-format';
-import { openReadingCard, openReadingTagName, readingCardData, sealReadingCard, validateReadingCardData, type ReadingCardData } from '../reading/core/reading-card';
+import { openReadingCard, openReadingTagName, readingCardData, validateReadingCardData, type ReadingCardData } from '../reading/core/reading-card';
 import { deriveReadingSearchKey, hashedHighlightTerms, hashedReadingTerms } from './reading-search';
 
 /**
@@ -58,7 +58,7 @@ const fixture = <T>(value: Fixture<T>) => value as Fixture<unknown>;
 
 const envelopeContext = { vaultId: bundle.vaultId, scopeId: 'vault', objectId: 'shared-settings', purpose: 'settings' as const };
 const envelopeValue = { theme: 'dark', folders: ['Reminders', 'Reading'], note: 'Ünïcødé ✓' };
-const vaultFileInput = { path: 'Reminders/Personal.md', contentType: 'text/markdown', content: '- [ ] Dentist 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->\n', publicData: { version: 1, reminders: [] } };
+const vaultFileInput = { path: 'Reminders/Personal.md', content: '- [ ] Dentist 2099-01-02T10:00:00.000Z <!-- crate-id:r1 -->\n', publicData: { version: 1, reminders: [] } };
 const tagPaths = ['Note.md', 'folder/Note.md', 'Folder/NOTE.md', 'Reminders/Personal.md', 'a/b/c/attachment.png', 'Café/Ünïcødé.md'];
 const localState = { vaultId: bundle.vaultId, scopeId: 'vault', storageKey: 'crate-outbox', value: '{"pending":[{"id":"op-1"}]}' };
 const pairingContext: PairingContext = { version: 1, id: 'fixture-pairing', origin: 'https://crate.example.test', vaultId: bundle.vaultId, generation: 1 };
@@ -83,21 +83,8 @@ const fixtures: Record<string, Fixture<unknown>> = {
 			const opened = await openFile(text(bytes), vaultFileInput.path, authority);
 			expect(new TextDecoder().decode(opened.content)).toBe(vaultFileInput.content);
 			expect(opened.publicData).toEqual(vaultFileInput.publicData);
-			expect(opened.metadata).toMatchObject({ version: 1, path: vaultFileInput.path, contentType: vaultFileInput.contentType });
-		},
-	}),
-	'file-v2-vault-key': fixture<{ bytes: string }>({
-		generate: async () => {
-			const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath(vaultFileInput.path);
-			return { bytes: new TextDecoder().decode((await sealFile({ ...vaultFileInput, content: text(vaultFileInput.content) }, authority)).bytes) };
-		},
-		verify: async ({ bytes }) => {
-			const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath(vaultFileInput.path);
-			const opened = await openFile(text(bytes), vaultFileInput.path, authority);
-			expect(new TextDecoder().decode(opened.content)).toBe(vaultFileInput.content);
-			expect(opened.publicData).toEqual(vaultFileInput.publicData);
-			expect(opened.metadata).toMatchObject({ version: 2, path: vaultFileInput.path, size: text(vaultFileInput.content).length });
-			expect(opened.metadata.contentType).toBeUndefined();
+			expect(opened.metadata).toMatchObject({ version: 1, path: vaultFileInput.path, size: text(vaultFileInput.content).length });
+			expect(opened.metadata).not.toHaveProperty('contentType');
 		},
 	}),
 	'recovery-v1': fixture<{ code: string; envelope: RecoveryEnvelope }>({
@@ -145,22 +132,9 @@ const fixtures: Record<string, Fixture<unknown>> = {
 			expect(titles).toEqual([{ title: 'Dentist', body: 'Personal' }, { title: 'Groceries', body: 'Personal' }]);
 		},
 	}),
-	// A Reading card a device posts for one encrypted note, and the hashed search terms beside it.
-	'reading-card-v1': fixture<{ wire: string; card: string; terms: string[] }>({
-		generate: async () => {
-			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1 };
-			const wire = 'tagtagtagtagtagtagtagtagta/cardcardcardcardcardcardca.md';
-			return { wire, card: await sealReadingCard(readingCard, wire, 'a'.repeat(64), keys),
-				terms: await hashedReadingTerms(await deriveReadingSearchKey(bundle.vaultId, bundle.vault), readingCard) };
-		},
-		verify: async ({ wire, card, terms }) => {
-			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1 };
-			expect(await openReadingCard(card, wire, keys)).toEqual({ item: readingCard, hash: 'a'.repeat(64) });
-			expect(await hashedReadingTerms(await deriveReadingSearchKey(bundle.vaultId, bundle.vault), readingCard)).toEqual(terms);
-		},
-	}),
-	// Version 2 adds when the note was last highlighted, hashed highlight terms and sealed tag names.
-	'reading-card-v2': fixture<{ wire: string; data: ReadingCardData }>({
+	// A Reading card a device posts for one encrypted note: the sealed card, hashed search and
+	// highlight terms, when it was last highlighted and its sealed tag names.
+	'reading-card-v1': fixture<{ wire: string; data: ReadingCardData }>({
 		generate: async () => {
 			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1, searchKey: await deriveReadingSearchKey(bundle.vaultId, bundle.vault) };
 			const wire = 'tagtagtagtagtagtagtagtagta/cardcardcardcardcardcardca.md';
@@ -169,7 +143,6 @@ const fixtures: Record<string, Fixture<unknown>> = {
 		verify: async ({ wire, data }) => {
 			const keys = { vaultId: bundle.vaultId, key: await vaultKey(), keyGeneration: 1 }, searchKey = await deriveReadingSearchKey(bundle.vaultId, bundle.vault);
 			validateReadingCardData(data);
-			if (data.version !== 2) throw new Error('Expected a version 2 card');
 			expect(await openReadingCard(data.card, wire, keys)).toEqual({ item: highlightedCard, hash: 'a'.repeat(64) });
 			expect(await hashedReadingTerms(searchKey, highlightedCard)).toEqual(data.terms);
 			expect(await hashedHighlightTerms(searchKey, highlightedCard)).toEqual(data.highlight_terms);
