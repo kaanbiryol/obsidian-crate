@@ -4,6 +4,7 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, typ
 import { extractReminderId } from '../core/reminderIdentity';
 import { createReminderDateChip, editableDatePhrase, reminderLineDisplays, type ReminderDateDisplay } from '../data/reminder-date-display';
 import { DescriptionBreakWidget, DescriptionMarkerWidget } from './description-widgets';
+import { endMarker } from './reminder-hidden-ranges';
 
 /**
  * Schedules on visible lines, relative to the document. A saved date always
@@ -119,8 +120,10 @@ export function openDateChip(state: EditorState, previous: EditorSelection, now 
 	const editable = editableDatePhrase(line.text, now);
 	if (!editable) return null;
 	const from = line.from + editable.from, to = line.from + editable.to;
-	if ((head !== from && head !== to) || (previous.ranges.length === 1 && previous.main.empty && start === head)) return null;
-	return showPhrase(from, to, line.text.slice(editable.from, editable.to), editable.phrase, head === to || start === to);
+	// The line's end, past the hidden ID that follows the date, shows right after the chip too.
+	const atEnd = (position: number) => position === to || (position === line.to && endMarker(line)?.from === to);
+	if ((head !== from && !atEnd(head)) || (previous.ranges.length === 1 && previous.main.empty && start === head)) return null;
+	return showPhrase(from, to, line.text.slice(editable.from, editable.to), editable.phrase, atEnd(head) || atEnd(start));
 }
 
 /**

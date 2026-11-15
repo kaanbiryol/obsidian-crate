@@ -65,6 +65,11 @@ describe('reminder dates in the editor', () => {
 			// ArrowLeft across the chip keeps the cursor at the end; reaching its start from before stays at the start.
 			expect(move(to, from)!.selection.main.head).toBe(from + 'Dec 1'.length);
 			expect(move(from - 1, from)!.selection.main.head).toBe(from);
+			// The line's end sits past the hidden ID, which shows right after the chip.
+			const ended = move(0, doc.length)!;
+			expect(ended.doc.toString()).toBe('- [ ] Pay rent Dec 1 <!-- crate-id:a -->');
+			expect(ended.selection.main.head).toBe(from + 'Dec 1'.length);
+			expect(move(doc.length, doc.length)).toBeNull();
 			// Elsewhere on the line, or a selection, leaves the chip alone.
 			expect(move(to, 6)).toBeNull();
 			expect(openDateChip(EditorState.create({ doc, selection: { anchor: from - 3, head: to } }), EditorSelection.single(0), now)).toBeNull();
