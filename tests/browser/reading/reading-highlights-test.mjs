@@ -44,8 +44,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     let offline = false, offlineHold = null;
     const setOffline = async value => {
       offline = value;
-      if (!value) { await offlineHold?.detach(); offlineHold = null; }
+      const held = !value && offlineHold;
+      if (held) { await offlineHold.detach(); offlineHold = null; }
       await context.setOffline(value);
+      // Detaching the held session already reported online without an event, so
+      // the reconnect the app listens for has to be announced here.
+      if (held) await page.evaluate(() => window.dispatchEvent(new Event('online')));
     };
     await page.goto(readingUrl);
     const open = async (status = 'Available offline') => {
