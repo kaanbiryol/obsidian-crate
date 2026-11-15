@@ -412,8 +412,19 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await dock.click({ button: 'right' });
     await page.getByRole('button', { name: 'Highlights', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Highlights', exact: true })).toBeVisible();
+    await expect(page.locator('.crate-reading-highlights__item')).not.toHaveCount(0);
+    // Searching narrows the listed highlights at once; the list never blanks while the server answers.
+    await page.evaluate(() => {
+      window.__fewestHighlights = Infinity;
+      new MutationObserver(() => {
+        window.__fewestHighlights = Math.min(window.__fewestHighlights, document.querySelectorAll('.crate-reading-highlights__item').length);
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+    const searched = page.waitForResponse(response => { const url = new URL(response.url()); return url.pathname === '/reading/items' && url.searchParams.get('q') === 'worth keeping'; });
     await page.getByRole('searchbox', { name: 'Search reading' }).fill('worth keeping');
+    await searched;
     await expect(page.locator('.crate-reading-highlights__item')).toHaveCount(1);
+    assert.equal(await page.evaluate(() => window.__fewestHighlights), 1, 'Search must not blank the highlights list');
     await page.screenshot({ path: `test-results/reading/${name}-highlights-library.png` });
     await page.getByRole('button', { name: 'View in article', exact: true }).click();
     await expect(marks.first()).toBeFocused();

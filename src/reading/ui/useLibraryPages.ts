@@ -31,7 +31,8 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		const source = latest.current;
 		if (!source) return;
 		const requested = key;
-		setPages(state => ({ ...state, key: requested, loading: true, error: null, ...replace && state.key !== requested ? { items: [], cursor: null } : {} }));
+		// A new search or tag keeps the previous items listed until its first page answers.
+		setPages(state => ({ ...state, key: requested, loading: true, error: null, ...replace && state.key !== requested ? { cursor: null } : {} }));
 		try {
 			let page = await source.load({ section, q: query, tag, cursor });
 			for (let follows = 0; !page.items.length && page.cursor && follows < MAX_EMPTY_FOLLOWS && current.current === requested; follows++) {
@@ -51,7 +52,9 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		const timer = window.setTimeout(() => { void fetchPage(null, true); }, query ? SEARCH_DELAY_MS : 0);
 		return () => window.clearTimeout(timer);
 	}, [fetchPage, query, enabled, revision]);
-	const loadMore = useCallback(() => { if (pages.cursor && !pages.loading) void fetchPage(pages.cursor, false); }, [fetchPage, pages.cursor, pages.loading]);
 	const settled = pages.key === key;
-	return { items: settled ? pages.items : [], cursor: settled ? pages.cursor : null, loading: pages.loading || !settled, error: settled ? pages.error : null, loadMore };
+	const loadMore = useCallback(() => { if (settled && pages.cursor && !pages.loading) void fetchPage(pages.cursor, false); }, [fetchPage, settled, pages.cursor, pages.loading]);
+	// Until the new search or tag answers, the previous pages stay listed so the caller can
+	// narrow them locally instead of blanking the list.
+	return { items: pages.items, cursor: settled ? pages.cursor : null, loading: pages.loading || !settled, error: settled ? pages.error : null, loadMore };
 }

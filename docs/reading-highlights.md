@@ -77,6 +77,8 @@ without a creation date sorts by its article's save date. Each row names its art
 below the excerpt, and selecting that line opens the article, whose **Highlights**
 control lists the rest of its excerpts; search covers excerpts, annotations,
 titles, authors, sources, and tags. Article and tag filters narrow the results.
+While a new search or tag loads, the current results stay listed and narrow
+locally, so the list and count never blank.
 The list renders 50 excerpts at a time and loads more as it scrolls near the end. The PWA
 Reading menu and Obsidian sidebar expose the same view.
 
