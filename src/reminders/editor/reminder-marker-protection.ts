@@ -270,7 +270,11 @@ export function protectReminderIdMarker(transaction: Transaction): Transaction |
 		// Moved typing must keep the comment readable too, as typing a comment marker would not.
 		if (inside) return breaksDescription(startState.update({ ...inside, filter: false })) ? [] : inside;
 	}
-	if (transaction.docChanged && breaksDescription(transaction)) return [];
+	// Only the user's own edits are refused. A file reload, a write from another view, undo and redo
+	// must apply: Obsidian has already recorded the new text as saved, and dropping it would let
+	// this editor save the old text back over it.
+	const typed = transaction.isUserEvent('input') || transaction.isUserEvent('delete') || transaction.isUserEvent('move');
+	if (transaction.docChanged && typed && breaksDescription(transaction)) return [];
 	const changes: { fromA: number; toA: number; text: string }[] = [];
 	if (transaction.docChanged) transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => changes.push({ fromA, toA, text: inserted.toString() }));
 	const selected = (from: number, to: number) => startState.selection.ranges.some(range => !range.empty && range.from <= from && range.to >= to);

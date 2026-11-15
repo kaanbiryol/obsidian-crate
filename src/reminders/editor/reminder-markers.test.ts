@@ -374,6 +374,22 @@ describe('reminder ID marker protection', () => {
 		const description = '<!-- crate-desc:Oat milk -->';
 		const block = `${line}\n${description}`;
 
+		it('applies file reloads and programmatic writes that change a description', () => {
+			// Obsidian loads an external change as a transaction with this event after recording
+			// the new text as saved; dropping it would let the editor save the old text back.
+			const from = line.length + 1 + '<!-- crate-desc:'.length, to = block.length - ' -->'.length;
+			const encoded = `${line}\n<!-- crate-desc:v1:Oat%20milk%20%2D%2D%20urgent -->`;
+			const insert = 'v1:Oat%20milk%20%2D%2D%20urgent';
+			expect(edit(block, 0, { changes: { from, to, insert }, userEvent: 'set' }).text).toBe(encoded);
+			expect(edit(block, 0, { changes: { from, to, insert } }).text).toBe(encoded);
+			// A change from above the reminder into the first line of a longer description.
+			const longer = `Above\n${line}\n<!-- crate-desc:One\ntwo -->`;
+			const reloaded = `Changed\n${line}\n<!-- crate-desc:Uno\ntwo -->`;
+			expect(edit(longer, 0, { changes: { from: 0, to: longer.indexOf('One') + 3, insert: reloaded.slice(0, reloaded.indexOf('Uno') + 3) }, userEvent: 'set' }).text).toBe(reloaded);
+			// Typing a comment marker into the description is still refused.
+			expect(edit(block, from, { changes: { from, insert: '-->' }, userEvent: 'input.type' }).text).toBe(block);
+		});
+
 		it('continues Enter after the description so it stays on its reminder', () => {
 			const { text, cursor } = edit(block, end, { changes: { from: end, insert: '\n- [ ] ' }, userEvent: 'input' });
 			expect(text).toBe(`${block}\n- [ ] `);
