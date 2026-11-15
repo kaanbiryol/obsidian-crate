@@ -609,7 +609,7 @@ it('opens the reminders view only while reminders are enabled', async () => {
 it('rebuilds the backend for a new folder only while reminders are enabled', async () => {
 	const { changeReminderFolder } = await loadPluginIntegrationModule();
 	const plugin = createPlugin();
-	Object.assign(plugin.syncRuntime, { republishReminderNotes: vi.fn(async () => {}) });
+	Object.assign(plugin.syncRuntime, { republishFolderNotes: vi.fn(async () => {}) });
 	plugin.remindersSettings.enabled = false;
 	await changeReminderFolder(plugin as never, 'Tasks');
 	expect(reminderIndexFactory).not.toHaveBeenCalled();

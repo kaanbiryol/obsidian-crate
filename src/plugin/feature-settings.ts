@@ -2,7 +2,7 @@ import { Notice, TFile, TFolder, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import type { SyncState } from '../sync/types';
 import { captureServerConnection, serverRequest } from './server-request';
-import { restartReading } from '../reading/runtime';
+import { republishReadingNotes, restartReading } from '../reading/runtime';
 import { readReadingPolicy } from '../reading/server';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { parseFeaturePolicy, type FeaturePolicy, type SharedFeatures } from '../protocol/feature-policy';
@@ -147,6 +147,7 @@ async function apply(plugin: CratePlugin, policy: FeaturePolicy, activate: boole
 		await plugin.writeSettings({ reading: { ...plugin.settings.reading, enabled: reading } }, assertCurrent);
 		assertCurrent();
 		restartReading(plugin, activate && reading);
+		if (reading) republishReadingNotes(plugin, plugin.settings.reading.folderPath);
 	}
 	if (plugin.remindersSettings.enabled !== reminders) {
 		if (activate) {

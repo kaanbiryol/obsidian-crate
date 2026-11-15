@@ -36,7 +36,7 @@ function harness() {
 	Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } },
 		secretStorage: { get: () => null },
 		settings: normalizeCrateSettings({ workerUrl: 'https://first.example' }, '.obsidian'),
-		syncRuntime: { getApiClient, republishReminderNotes: async () => {} }, saveData, loadData: async () => data });
+		syncRuntime: { getApiClient, republishFolderNotes: async () => {} }, saveData, loadData: async () => data });
 	return { plugin, api, getApiClient, saveData, ensureNotificationPolicy, updateNotificationPolicy,
 		setOnline: (value: boolean) => { online = value; }, policy: () => policy };
 }

@@ -374,7 +374,9 @@ describe('Reading folder change', () => {
 		const detachLeavesOfType = vi.fn();
 		Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, writeSettings });
 		Object.assign(h.workspace, { detachLeavesOfType });
-		return { ...h, writeSettings, detachLeavesOfType };
+		const republish = vi.fn(async () => {});
+		Object.assign(h.plugin.syncRuntime, { republishFolderNotes: republish });
+		return { ...h, writeSettings, detachLeavesOfType, republish };
 	}
 
 	it('pauses the running server policy, moves it, then saves the folder and restarts Reading there', async () => {
@@ -396,6 +398,8 @@ describe('Reading folder change', () => {
 			];
 			expect(order).toEqual([...order].sort((a, b) => a - b));
 			expect(getReadingLibrary(h.plugin)).toBeDefined();
+			// In an encrypted vault, notes already in the new folder upload again with their cards.
+			expect(h.republish).toHaveBeenCalledExactlyOnceWith('Articles');
 		} finally { stopReading(h.plugin); }
 	});
 

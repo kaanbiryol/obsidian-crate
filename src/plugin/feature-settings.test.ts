@@ -2,12 +2,12 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type CratePlugin from './CratePlugin';
 import { refreshSharedFeatures, registerSharedFeatures, setSharedFeature, SHARED_FEATURES_REFRESH_INTERVAL_MS } from './feature-settings';
 import type { SyncState } from '../sync/types';
-import { restartReading } from '../reading/runtime';
+import { republishReadingNotes, restartReading } from '../reading/runtime';
 import { serverRequest } from './server-request';
 import { setRemindersEnabled } from '../reminders/plugin-integration';
 import { Notice } from '../test/mocks/obsidian';
 vi.mock('./server-request', async importOriginal => ({ ...await importOriginal<typeof import('./server-request')>(), serverRequest: vi.fn() }));
-vi.mock('../reading/runtime', () => ({ restartReading: vi.fn() }));
+vi.mock('../reading/runtime', () => ({ restartReading: vi.fn(), republishReadingNotes: vi.fn() }));
 vi.mock('../reminders/plugin-integration', () => ({
 	setRemindersEnabled: vi.fn(async (plugin: { remindersSettings: { enabled: boolean } }, enabled: boolean) => { plugin.remindersSettings.enabled = enabled; }),
 }));
@@ -81,6 +81,8 @@ it('starts a feature the server already has on once this vault turns it on', asy
 	await setSharedFeature(plugin as unknown as CratePlugin, 'reading', true);
 	expect(plugin.settings.reading).toEqual({ enabled: true, folderPath: 'Reading', confirmed: true });
 	expect(restartReading).toHaveBeenCalledExactlyOnceWith(plugin, true);
+	// In an encrypted vault, notes already in the folder upload again with their Reading cards.
+	expect(republishReadingNotes).toHaveBeenCalledExactlyOnceWith(plugin, 'Reading');
 	expect(Notice.messages).toEqual([]);
 });
 it('checks the shared policy at startup and after completed syncs at most every ten minutes, not on a timer', async () => {

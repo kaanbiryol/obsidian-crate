@@ -250,4 +250,14 @@ export async function changeReadingFolder(plugin: ReadingRuntimeHost, folderPath
 	await plugin.writeSettings({ reading: { ...plugin.settings.reading, folderPath } }, assertCurrent);
 	assertCurrent();
 	restartReading(plugin);
+	if (plugin.settings.reading.enabled) republishReadingNotes(plugin, folderPath);
+}
+
+/** An encrypted vault lists only notes whose upload carried a Reading card, and a device adds
+ * one only to a note in its Reading folder while Reading is on: notes already in the folder are
+ * uploaded again so the web app lists them. */
+export function republishReadingNotes(plugin: ReadingRuntimeHost, folder: string): void {
+	void plugin.syncRuntime.republishFolderNotes(folder).catch((error: unknown) => {
+		new Notice(`Reading notes in ${folder} will appear in the web app after their next edit. ${error instanceof Error ? error.message : ''}`.trim());
+	});
 }

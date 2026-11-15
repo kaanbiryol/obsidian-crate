@@ -48,7 +48,7 @@ export async function changeReminderFolder(plugin: CratePlugin, folderPath: stri
 		pendingServerFolder: plugin.settings.workerUrl
 			? { id: crypto.randomUUID(), workerUrl: plugin.settings.workerUrl, folderPath: folder } : undefined });
 	void ensureReminderNotificationPolicy(plugin);
-	void plugin.syncRuntime.republishReminderNotes(folder).catch(error => {
+	void plugin.syncRuntime.republishFolderNotes(folder).catch(error => {
 		new Notice(`Reminders in ${folder} will schedule notifications after their next edit. ${error instanceof Error ? error.message : ''}`.trim());
 	});
 	if (!plugin.remindersSettings.enabled) return;
