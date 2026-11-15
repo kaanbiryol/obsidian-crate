@@ -92,7 +92,7 @@ Beyond what it already sees (sizes, write times, folder structure):
 - how many distinct tags the library has;
 - when a search repeats, and which notes it matches.
 
-It never sees words, titles, tags, links, highlights or article text. This belongs in the
+It cannot read words, titles, tags, links, highlights or article text, but the hashes are the same for every note and include common words, so how often each hash appears and which hashes occur together can hint at common words over a large library. This belongs in the
 independent security review listed in [Reading and encryption](reading-e2ee-assessment.md).
 
 ## Web app

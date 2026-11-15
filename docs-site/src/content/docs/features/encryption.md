@@ -91,7 +91,7 @@ Encryption only protects data from now on. Earlier exports, hosting provider sna
 
 ## What stays private
 
-Your notes, attachments, file and folder names, file history, shared settings, reminder text, and notification text are all encrypted. So are Reading articles, links, tags, highlights, and queued saves.
+Your notes, attachments, file and folder names, file history, shared settings, reminder text, and notification text are all encrypted. So are Reading articles, links, tags, highlights, and queued saves. To search Reading in the web app, the server keeps keyed hashes of word beginnings, which it can match but not read.
 
 Your server can still see some details about your data, such as folder structure, file sizes, and when reminders are due.
 
@@ -106,6 +106,9 @@ Your server can still see some details about your data, such as folder structure
 - Notification delivery information
 - When a file gets back a name it had before in the same folder
 - How long each notification's text is, and whether it changed
+- For each Reading note: when it was saved and last highlighted, whether it is archived or a favorite, and whether it has highlights
+- Which Reading notes share the first three letters of a word in their title, highlights or highlight notes, a tag or a link, and which notes a search matches
+- How many tags your Reading library has
 
 Without encryption, your server can also read your synced content.
 
