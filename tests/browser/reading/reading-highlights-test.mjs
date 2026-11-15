@@ -37,6 +37,16 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     browser = await engine.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     page = await context.newPage();
+    // Chromium has no touch-drag API, so handle drags use a CDP session. Detaching one
+    // resets navigator.onLine, and an attached session that does not emulate offline
+    // loses the context's offline emulation on reload. While offline, a held session
+    // repeats it until the test reconnects.
+    let offline = false, offlineHold = null;
+    const setOffline = async value => {
+      offline = value;
+      if (!value) { await offlineHold?.detach(); offlineHold = null; }
+      await context.setOffline(value);
+    };
     await page.goto(readingUrl);
     const open = async (status = 'Available offline') => {
       await page.getByRole('button', { name: /example.invalid Highlight article/ }).click();
@@ -122,6 +132,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
           for (let step = 1; step <= 8; step++) await input.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x + (target.x - start.x) * step / 8, y: start.y + (target.y - start.y) * step / 8 }] });
           await input.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
         } finally { await input.detach(); }
+        if (offline) {
+          offlineHold ??= await context.newCDPSession(page);
+          await offlineHold.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+        }
       } else {
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
         await page.mouse.move(target.x, target.y, { steps: 8 }); await page.mouse.up();
@@ -130,7 +144,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     };
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-    await context.setOffline(true);
+    await setOffline(true);
     // The settled pane drops its transform once the reader pins its chrome.
     await expect(page.locator('.crate-reading__reader-pane')).toHaveCSS('transform', 'none');
     const initialBody = await page.locator('.crate-reading-reader__body').boundingBox();
@@ -274,7 +288,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(code.locator('.hljs-keyword')).toHaveText('let');
     assert.equal(await code.textContent(), codeExample, 'Code survives offline reopening and highlight repainting');
     const excerpt = 'A useful article excerpt.';
-    await context.setOffline(false);
+    await setOffline(false);
     await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights?.[0]?.text).toBe(excerpt);
     const committed = await (await download()).text();
     assert.ok(committed.includes('==A useful== **==article excerpt==**==.=='), committed);
@@ -467,7 +481,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     // selection controls. Finish deletion in the reader before selecting again.
     await expect(marks).toHaveCount(0);
     await expect(actions).toHaveCount(0);
-    await context.setOffline(true);
+    await setOffline(true);
     await select(inlineStart + 6, 6);
     await expect(marks).toHaveText('Button');
     await dragHandle('start', inlineStart + 4);
@@ -475,7 +489,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await dragHandle('start', inlineStart + 6);
     await expect(marks).toHaveText('Button');
     if (name === 'chromium') { await page.reload(); await expect(marks).toHaveText('Button'); }
-    await context.setOffline(false);
+    await setOffline(false);
     await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights?.[0]?.codeAnchor).toBe(true);
     const unchangedBody = async () => { const note = await (await download()).text(); return note.slice(note.indexOf('\n---\n') + 5); };
     assert.equal(await unchangedBody(), `\n<!-- crate:article:start -->\n${codeMarkdown}\n<!-- crate:article:end -->\n`);
@@ -532,7 +546,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       // Finish online hydration before selecting in the offline document. A
       // late refresh can replace its text nodes and discard the native range.
       await page.waitForLoadState('networkidle');
-      await context.setOffline(true);
+      await setOffline(true);
       await expect(page.locator('[data-sync-state="offline"]').first()).toBeVisible();
       await body.evaluate(async element => {
         element.scrollIntoView({ block: 'center', behavior: 'instant' });
@@ -558,7 +572,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await expect.poll(async () => (await marks.allTextContents()).join('')).toBe(excerpt);
       assert.equal(await body.textContent(), beforeText);
       if (name === 'chromium') { await page.reload(); await expect.poll(async () => (await marks.allTextContents()).join('')).toBe(excerpt); }
-      await context.setOffline(false);
+      await setOffline(false);
       await expect.poll(async () => (await api(`/reading/item?id=${saved.id}`)).item.highlights?.[0]?.text).toBe(excerpt);
       const [stored] = (await api(`/reading/item?id=${saved.id}`)).item.highlights;
       assert.equal(!!stored.textAnchor, !native, `Correct source representation for ${markdown}`);
