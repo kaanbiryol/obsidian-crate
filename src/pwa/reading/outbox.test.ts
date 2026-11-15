@@ -19,7 +19,7 @@ vi.mock('./storage/storage', () => ({
 	readingDrainLock: async <T>(action: () => Promise<T>) => action(),
 	pendingReading: async (session: ReadingSession) => structuredClone(storage.values.get(`pending:${session.id}`) ?? []) as PendingReading[],
 	savePendingReading: vi.fn(async (session: ReadingSession, value: PendingReading[]) => { storage.values.set(`pending:${session.id}`, structuredClone(value)); }),
-	removeEarlierReadingCopies: async () => {},
+	removeRetiredReadingRecords: async () => {},
 	readReadingArticle: async (_session: ReadingSession, id: string) => storage.values.get(`article:${id}`),
 	cacheReadingArticle: vi.fn(async (_session: ReadingSession, item: { crate_reading_id: string }, markdown: string, options: { etag?: string; refresh?: boolean } = {}) => {
 		if (options.refresh && !storage.values.has(`article:${item.crate_reading_id}`)) return false;

@@ -409,9 +409,9 @@ settings can remove it while the stored record still matches the export.
 Settings deadlines and failure announcements use the same outbox policy: transient
 errors remain visible, while toasts wait until automatic recovery stops or review
 is required.
-`pwa/reading/storage/cache.ts` owns `commitReadingCache`, keeping uncertain-source
-preservation, article pruning, encrypted records and list persistence in one guarded
-transaction. `reading/storage/database.ts` owns database lifetime and raw encrypted values;
+`pwa/reading/storage/cache.ts` owns the offline copies the user saves and, in one guarded
+transaction after a confirmed load, `removeRetiredReadingRecords`: the library caches earlier
+versions stored, an earlier sign-in's readable copies and copies stored without being asked. `reading/storage/database.ts` owns database lifetime and raw encrypted values;
 `pwa/storage/single-store-database.ts` shares bounded opening, schema validation and late
 request fencing with the encryption databases. Reading retains its cached
 connection, and each feature retains its own records and transactions.

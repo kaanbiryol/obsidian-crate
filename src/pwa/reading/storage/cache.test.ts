@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
-import { cacheReadingArticle, readOfflineReadingItems, readReadingArticle, removeEarlierReadingCopies, removeReadingArticle } from './cache';
+import { cacheReadingArticle, readOfflineReadingItems, readReadingArticle, removeRetiredReadingRecords, removeReadingArticle } from './cache';
 import { decodeReadingValue } from './private-storage';
 import { READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { AUTH_TOKEN_KEY } from '../../config';
@@ -57,8 +57,20 @@ it('removes only readable copies an earlier sign-in saved', async () => {
 	await cacheReadingArticle(session, item(1), 'Mine');
 	values.set(`article:earlier:${item(2).crate_reading_id}`, { item: item(2), markdown: 'Earlier', usedAt: 1, offline: true });
 	values.set(`article:earlier:${item(3).crate_reading_id}`, 'unreadable bytes');
-	await removeEarlierReadingCopies(session);
+	await removeRetiredReadingRecords(session);
 	expect(articleKeys()).toEqual([articleKey(1), `article:earlier:${item(3).crate_reading_id}`]);
+});
+
+it('removes the library caches and automatic copies earlier versions stored', async () => {
+	await cacheReadingArticle(session, item(1), 'Saved for offline');
+	values.set(articleKey(2), { item: item(2), markdown: 'Opened by an older version', usedAt: 1, prefetched: true });
+	values.set(articleKey(3), 'unreadable bytes');
+	for (const key of [`list:${session.id}`, `article-index:${session.id}`, `encrypted-index:${session.id}`, 'list:earlier'])
+		values.set(key, { items: [item(4)], issues: [], savedAt: 1 });
+	values.set(`pending:${session.id}`, []); values.set(`draft:${session.id}`, { url: 'https://example.test/draft' });
+	values.set(`attempt:${session.id}:a`, { body: 'exact bytes' });
+	await removeRetiredReadingRecords(session);
+	expect([...values.keys()].sort()).toEqual([articleKey(1), articleKey(3), `attempt:${session.id}:a`, `draft:${session.id}`, `pending:${session.id}`].sort());
 });
 
 it('refreshes only copies the user saved', async () => {

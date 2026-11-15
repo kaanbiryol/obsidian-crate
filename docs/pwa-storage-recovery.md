@@ -80,14 +80,14 @@ the three-second deadline aborts pending upgrades and fences late connections.
 Closing an obsolete connection releases Reading's cached handle so a later open
 can retry.
 
-Reading validates session fields, list and article caches, drafts and pending commands
+Reading validates session fields, saved article copies, drafts and pending commands
 when reading browser storage. A damaged pending queue blocks dispatch and retains its
 original records for **Export earlier changes** or **Export Reading data**. Validation
 preserves exact dispatched request bodies, operation IDs and unknown metadata. It never
 repairs an uncertain command or interprets an unreadable queue as empty.
 
-Hydration reads the cache, queue and draft independently. A damaged cache can be replaced
-by a confirmed server refresh without discarding pending work. A damaged draft remains
+Hydration reads the queue and draft independently; the library itself is never stored on the
+device, so a refresh needs no stored list. A damaged draft remains
 untouched: the empty capture form cannot overwrite it during startup. Export and review
 the retained data before changing browser storage; reload after repairing storage.
 
@@ -95,11 +95,11 @@ the retained data before changing browser storage; reload after repairing storag
 preservation. `tests/browser/reading/reading-optimistic-test.mjs` also verifies native
 IndexedDB preservation through reload and retry in Chromium and WebKit.
 
-Reading refresh commits the list and article removals in one IndexedDB transaction.
-The same transaction removes the readable lists, indexes and articles saved under
-earlier sign-ins, whose session IDs change with the credential and folder generation,
-so the article cap covers the whole device. Their pending changes, drafts, saved
-request attempts and unreadable records stay for review and export, except captures
+After a confirmed library load, one IndexedDB transaction removes the library caches earlier
+versions stored, the readable offline copies saved under earlier sign-ins (whose session IDs
+change with the credential and folder generation), and this session's copies an earlier version
+stored without being asked. Copies the user saved are never evicted. Pending changes, drafts,
+saved request attempts and unreadable records stay for review and export, except captures
 an earlier sign-in to the same Reading folder never sent: hydration moves those into
 the current queue under the queue lock, in one transaction. They have no operation ID
 or receipt yet, so sending them cannot repeat a write. Removing an
@@ -109,8 +109,12 @@ offline are stored. A list response never removes an offline copy: a source issu
 remains visible while the saved copy is retained, and a page without the article
 does not prove it was deleted. Unknown article records remain available for export.
 HTTP failures and rejected pages leave stored copies, pending changes and drafts
-unchanged. `tests/browser/reading/reading-cache-recovery-test.mjs` tests these boundaries
-in native Chromium and WebKit storage.
+unchanged. A confirmed load deletes the library caches earlier versions stored, and
+unlocking an encrypted session deletes them in the same transaction that seals this
+session's records, so a plaintext library never outlives the switch to encryption.
+`tests/browser/reading/reading-cache-recovery-test.mjs` and
+`tests/browser/pwa/pwa-reading-encryption-storage-test.mjs` test these boundaries in native
+Chromium and WebKit storage.
 
 Reading enrollment captures the current credentials and logout marker before
 exchanging a setup grant. A delayed response cannot replace a newer session or

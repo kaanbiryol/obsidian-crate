@@ -12,6 +12,10 @@ export const isPendingReadingKey = (key: string) => key.startsWith('pending:');
 /** An offline article copy from any session. */
 export const isArticleReadingKey = (key: string) => key.startsWith('article:');
 
+/** Library caches earlier versions stored. The library now stays on the server, so they are
+ * only dead data, and a plaintext one must not outlive the switch to encryption. */
+export const isRetiredReadingCacheKey = (key: string) => key.startsWith('list:') || key.startsWith('article-index:') || key.startsWith('encrypted-index:');
+
 /** Records written for one Reading session, plus shared incoming shares. */
 export function isSessionReadingKey(key: string, sessionId: string): boolean {
 	return [readingKeys.draft, readingKeys.pending].some(build => key === build(sessionId))

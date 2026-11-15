@@ -2,7 +2,7 @@ import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection
 import { onReadingEncryptionReset } from './session/encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders, readingNoteFolder } from './session/encryption-session';
 import { readReadingAttempt, writeReadingAttempt } from './storage/storage';
-import { cacheReadingArticle, readReadingArticle, removeEarlierReadingCopies, type ReadingCache } from './storage/storage';
+import { cacheReadingArticle, readReadingArticle, removeRetiredReadingRecords, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
 import type { ReadingItem } from '@/reading/core/model';
@@ -108,7 +108,7 @@ export async function queryReadingTags(session: ReadingSession): Promise<string[
 export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
 	const page = await queryReadingItems(session, { section: 'inbox' });
 	if (new Set(page.items.map(item => item.crate_reading_id)).size !== page.items.length) throw new Error('Reading library response is unreadable.');
-	await removeEarlierReadingCopies(session);
+	await removeRetiredReadingRecords(session);
 	return { items: page.items, issues: page.issues, savedAt: Date.now(), cursor: page.cursor };
 }
 

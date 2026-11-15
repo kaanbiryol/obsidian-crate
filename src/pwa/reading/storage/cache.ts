@@ -5,7 +5,7 @@ import { readingDatabase, readReadingValue } from './database';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
 import { isReadingArticleCache, type ReadingArticleCache } from './storage-validation';
-import { isArticleReadingKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
+import { isArticleReadingKey, isRetiredReadingCacheKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { readingNoteFolder } from '../session/encryption-session';
 
 /** The library's first inbox page and its issues, kept in memory only. The library stays on
@@ -20,28 +20,30 @@ export async function readReadingArticle(session: ReadingSession, id: string) {
 	return value.offline ? value : undefined;
 }
 
-/** Offline copies saved under an earlier sign-in; session IDs change with the token and the
- * folder generation. Queues, drafts and attempts are not copies. */
-const isEarlierCopyKey = (key: string, sessionId: string) => isArticleReadingKey(key) && !key.startsWith(readingKeys.articlePrefix(sessionId));
-
-/** A copy this version can read; unknown or undecodable records stay exportable. */
-function isReadableCopy(key: string, raw: unknown): boolean {
+/** The readable record at `key`, or undefined; unknown or undecodable records stay exportable. */
+function readableCopy(key: string, raw: unknown): Record<string, unknown> | undefined {
 	// Plaintext copies are checked by shape: once storage is private, decoding refuses them,
 	// and an earlier sign-in's plaintext copy must not outlive the switch to encryption.
 	let value: unknown = raw;
 	if (isRecord(raw) && 'encryptedReading' in raw) {
-		try { value = decodeReadingValue(key, raw); } catch { return false; }
+		try { value = decodeReadingValue(key, raw); } catch { return undefined; }
 	}
-	return isRecord(value) && isRecord(value.item) && typeof value.markdown === 'string';
+	return isRecord(value) && isRecord(value.item) && typeof value.markdown === 'string' ? value : undefined;
 }
 
-/** Removes readable offline copies an earlier sign-in saved, once this session is confirmed. */
-export async function removeEarlierReadingCopies(session: ReadingSession): Promise<void> {
+/** Once this session is confirmed, removes the library caches earlier versions stored, readable
+ * offline copies an earlier sign-in saved (session IDs change with the token and the folder
+ * generation), and this session's copies an earlier version stored without being asked.
+ * Queues, drafts and attempts are not copies. */
+export async function removeRetiredReadingRecords(session: ReadingSession): Promise<void> {
 	const db = await readingDatabase(); assertReadingSession(session);
-	const tx = db.transaction('values', 'readwrite');
+	const tx = db.transaction('values', 'readwrite'), mine = readingKeys.articlePrefix(session.id);
 	try {
 		for (const key of await tx.store.getAllKeys()) {
-			if (isEarlierCopyKey(key, session.id) && isReadableCopy(key, await tx.store.get(key))) await tx.store.delete(key);
+			if (isRetiredReadingCacheKey(key)) { await tx.store.delete(key); continue; }
+			if (!isArticleReadingKey(key)) continue;
+			const copy = readableCopy(key, await tx.store.get(key));
+			if (copy && (!key.startsWith(mine) || copy.offline !== true)) await tx.store.delete(key);
 		}
 		assertReadingSession(session);
 		await tx.done;
