@@ -87,6 +87,23 @@ const fixtures: Record<string, Fixture<unknown>> = {
 			expect(opened.metadata).not.toHaveProperty('contentType');
 		},
 	}),
+	// Retired: release 0.12.0 also wrote `version: 1` descriptors, with JWE metadata, and its
+	// servers sealed Shortcut saves to the vault seal key. Current clients refuse both by shape
+	// rather than misread them; 0.12.0 servers are below the schema floor and are replaced.
+	'file-jwe-metadata-0.12': fixture<{ bytes: string }>({
+		generate: async () => { throw new Error('Retired format: keep the stored sample'); },
+		verify: async ({ bytes }) => {
+			const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath(vaultFileInput.path);
+			await expect(openFile(text(bytes), vaultFileInput.path, authority)).rejects.toThrow(/encrypted file descriptor/);
+		},
+	}),
+	'file-sealed-to-vault-0.12': fixture<{ bytes: string }>({
+		generate: async () => { throw new Error('Retired format: keep the stored sample'); },
+		verify: async ({ bytes }) => {
+			const authority = (await FileKeyAuthority.fromBundle(bundle)).forPath('Reading/Saved article.md');
+			await expect(openFile(text(bytes), 'Reading/Saved article.md', authority)).rejects.toThrow(/encrypted file descriptor/);
+		},
+	}),
 	'recovery-v1': fixture<{ code: string; envelope: RecoveryEnvelope }>({
 		generate: async () => ({ code: await recoveryCode(), envelope: await sealRecoveryBundle(bundle, await recoveryCode()) }),
 		verify: async ({ code, envelope }) => {
