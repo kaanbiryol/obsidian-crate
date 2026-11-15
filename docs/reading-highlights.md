@@ -74,7 +74,7 @@ changes, and the typed note survives a failed save. Opened from the Highlights
 sheet, the note sheet stacks over it, so saving or closing returns to the list. The library's **Highlights** view collects excerpts
 from inbox, favorites, and archived articles; search covers excerpts, annotations,
 titles, authors, sources, and tags. Article and tag filters narrow the results.
-The list renders at most 100 excerpts until **Show more** is selected. The PWA
+The list renders 50 excerpts at a time and loads more as it scrolls near the end. The PWA
 Reading menu and Obsidian sidebar expose the same view.
 
 Highlights use the existing durable offline queue and immutable operation receipts.

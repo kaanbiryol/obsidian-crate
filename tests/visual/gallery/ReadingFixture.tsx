@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ReadingLibraryPanel, type ReadingLibraryProps } from '@/reading/ui/ReadingLibrary';
 import { ReadingReader } from '@/reading/ui/Reader';
 import type { ReadingItem } from '@/reading/core/model';
+import type { ReadingLibrarySource } from '@/reading/ui/useLibraryPages';
 import { ReadingDialog, ReadingDialogHost } from '@/reading/ui/ReadingDialog';
 import { PluginReadingDialog } from '@/reading/ui/plugin/ObsidianReadingDialog';
 import { SaveLinkDialog } from '@/reading/ui/plugin/SaveLinkDialog';
@@ -73,6 +74,15 @@ export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, 
 	const [savedOffline, setSavedOffline] = useState(true);
 	const [mounted, setMounted] = useState(true);
 	const updateCount = useRef(0);
+	// `paged` lists the library through server-sized pages, like the PWA.
+	const source = useMemo<ReadingLibrarySource | undefined>(() => new URLSearchParams(location.search).has('paged') ? {
+		load: async ({ cursor }) => {
+			document.documentElement.dataset.readingPageLoads = String(Number(document.documentElement.dataset.readingPageLoads ?? 0) + 1);
+			const start = Number(cursor ?? 0), end = start + 50;
+			return { items: items.slice(start, end), cursor: end < items.length ? String(end) : null };
+		},
+		loadTags: async () => [], revision: items, present: listed => listed,
+	} : undefined, [items]);
 	useEffect(() => {
 		if (!new URLSearchParams(location.search).has('reader-action-lifetime')) return;
 		const replace = () => setArticle({ ...initial[0]!, crate_reading_id: initial[1]!.crate_reading_id, title: 'A newly saved article' });
@@ -97,7 +107,7 @@ export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, 
 		}
 		setItems(items => items.map(current => current.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current)); setArticle(current => current?.crate_reading_id === item.crate_reading_id ? { ...current, ...changes } : current); };
 	if (!mounted) return null;
-	return <><ReadingLibraryPanel listStyle={listStyle} renderNavigation={renderNavigation} renderLibraryContent={renderLibraryContent} snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
+	return <><ReadingLibraryPanel listStyle={listStyle} renderNavigation={renderNavigation} renderLibraryContent={renderLibraryContent} source={source} snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
 		onOpen={async item => { setArticle(item); }} onRefresh={async () => {}}
 		activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} markdown={videoFixture ? (article.extraction_status === 'ready' ? 'My notes: revisit the sculpture gallery.' : '') : body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status={videoFixture ? "Details available offline" : "Available offline"} onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onSaveComplete={() => { document.documentElement.dataset.readingSaveCompletions = String(Number(document.documentElement.dataset.readingSaveCompletions ?? 0) + 1); }} onEdit={() => {}}
 			{...pwaActions && { savedOffline, onOfflineChange: async (keep: boolean) => setSavedOffline(keep), onDelete: async () => { setItems(current => current.filter(item => item.crate_reading_id !== article.crate_reading_id)); setArticle(null); } }} />} />

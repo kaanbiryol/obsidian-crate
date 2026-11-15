@@ -30,7 +30,7 @@ stay.
 - **Highlights:** highlight text, highlight notes and the title, through `highlight_index`. Each
   row's terms are checked in the row (`instr`), so a filtered page scans at most 2,000 rows, newest
   highlight first, and a short or empty page carries a cursor that continues the scan. The web app
-  asks for up to four such pages before it shows **Show more**. A page also ends before its notes
+  asks for up to four such pages per load, and loads again while the list end stays in view. A page also ends before its notes
   pass 512 KB. Article text is not searched; Obsidian searches it.
 - **Tags:** the tags view lists every tag and searches the list on the device. Selecting a tag
   filters the current section by its `t:` term.

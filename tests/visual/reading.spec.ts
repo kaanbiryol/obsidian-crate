@@ -139,15 +139,29 @@ for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard
 	}, host)).toEqual({ bottom: 484, inset: '360px', active: 'INPUT' });
 });
 
+test('a server library loads its next page as the list nears its end', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/?host=pwa&scene=reading&theme=light&many=1&paged=1');
+	const rows = page.locator('.crate-reading__open'), list = page.locator('.crate-reading__list-scroll');
+	await expect(rows).toHaveCount(50);
+	await expect(page.locator('html')).toHaveAttribute('data-reading-page-loads', '1');
+	await list.evaluate(element => { element.scrollTop = element.scrollHeight - element.clientHeight - 2000; });
+	await page.waitForTimeout(100);
+	await expect(rows).toHaveCount(50);
+	await list.evaluate(element => { element.scrollTop = element.scrollHeight; });
+	await expect(rows).toHaveCount(100);
+	await expect(page.locator('html')).toHaveAttribute('data-reading-page-loads', '2');
+	await expect(page.getByRole('button', { name: 'Show more' })).toHaveCount(0);
+});
+
 test('a narrow Obsidian pane uses phone navigation and preserves a long list position', async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 900 });
 	await page.goto('/?host=plugin&scene=reading&theme=dark&many=1');
 	await page.locator('.crate-reading-workspace').evaluate(element => { element.classList.add('reading-narrow-test'); });
-	await expect(page.locator('.crate-reading__open')).toHaveCount(100);
+	await expect(page.locator('.crate-reading__open')).toHaveCount(50);
 	const list = page.locator('.crate-reading__list-scroll');
 	await list.evaluate(element => { element.scrollTop = element.scrollHeight; });
-	await page.getByRole('button', { name: 'Show more' }).click();
-	await expect(page.locator('.crate-reading__open')).toHaveCount(200);
+	await expect(page.locator('.crate-reading__open')).toHaveCount(100);
 	const target = page.locator('.crate-reading__open').nth(98);
 	await target.scrollIntoViewIfNeeded();
 	const position = await list.evaluate(element => element.scrollTop);

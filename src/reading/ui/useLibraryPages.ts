@@ -17,7 +17,7 @@ interface Pages { key: string; items: ReadingItem[]; cursor: string | null; load
 // Typing waits this long before a search reaches the server.
 const SEARCH_DELAY_MS = 250;
 // A filtered Highlights page scans a bounded run of notes, so it can come back empty with a
-// cursor. The first request follows up to this many more before the list offers Show more.
+// cursor. Each request follows up to this many more before the list asks again on scroll.
 const MAX_EMPTY_FOLLOWS = 3;
 
 /** The loaded pages for one section, search and tag; a change starts again from the first page. */

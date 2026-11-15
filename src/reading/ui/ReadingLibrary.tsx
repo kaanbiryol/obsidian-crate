@@ -53,7 +53,10 @@ export interface ReadingLibraryProps {
 
 const sectionIcons = { inbox: 'inbox', favorites: 'star', archived: 'archive', highlights: 'highlighter' };
 const navigationItems = readingSections.map(item => ({ ...item, iconName: sectionIcons[item.id] }));
-const PAGE_SIZE = 100;
+// Matches the server's page, so a local library reveals rows at the same pace.
+const PAGE_SIZE = 50;
+// Scrolling within this distance of the list's end loads the next page.
+const NEAR_END_PX = 800;
 
 /** Shared workspace. Uses the same stacked app layout at every width. */
 export function ReadingLibraryPanel({
@@ -122,6 +125,20 @@ export function ReadingLibraryPanel({
 	}, [source, tag, snapshotItems]);
 	const loading = source ? pages.loading && !pages.items.length : snapshot.loading;
 	const more = source ? !!pages.cursor : false;
+	const total = section === 'highlights' ? excerptGroups.length : count;
+	const { loadMore } = pages, pageLoading = !!source && pages.loading, pageError = pages.error;
+	// Near the end, reveal the next rows already loaded, or ask the server for its next page.
+	// Runs after each render too, so a list shorter than its scroller keeps filling.
+	const loadNearEnd = useCallback(() => {
+		const list = lists.current.get(section);
+		// A hidden list has no height and would look scrolled to its end.
+		if (!list || !list.clientHeight || listContent || loading || pageLoading || pageError) return;
+		if (visible >= total && !more) return;
+		if (list.scrollHeight - list.scrollTop - list.clientHeight > NEAR_END_PX) return;
+		if (visible >= total) loadMore();
+		setVisible(value => value + PAGE_SIZE);
+	}, [section, listContent, loading, pageLoading, pageError, visible, total, more, loadMore]);
+	useEffect(() => { loadNearEnd(); }, [loadNearEnd]);
 	const run = (key: string, action: () => Promise<void>) => {
 		if (pending.current.has(key)) return;
 		pending.current.add(key); setBusy(new Set(pending.current)); setError(null);
@@ -161,7 +178,7 @@ export function ReadingLibraryPanel({
 					trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
 				{tagsOpen && <ReadingTagList load={loadTags} onClose={() => setTagsOpen(false)} onSelect={value => { setTag(value); resetList(); }} />}
 				{beforeListContent}
-				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1}>
+				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1} onScroll={loadNearEnd}>
 					{notice}
 					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, section))}
 						onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
@@ -190,8 +207,7 @@ export function ReadingLibraryPanel({
 								</Button>
 							</li>)}</ul>
 						</section>)}
-						{(visible < (section === 'highlights' ? excerptGroups.length : count) || more) && <Button variant="outline" className="crate-reading__more" aria-busy={pages.loading}
-							onClick={() => { if (visible >= (section === 'highlights' ? excerptGroups.length : count)) pages.loadMore(); setVisible(value => value + PAGE_SIZE); }}>Show more</Button>}
+						{more && pageLoading && <LoadingIndicator label="Loading more" />}
 					</>)}
 				</div>
 				{!renderNavigation && <FloatingActionButton className="crate-reading__mobile-add" aria-label="Save a link" onClick={onAdd} animateOnMount={false} />}
