@@ -19,7 +19,8 @@ import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { clearSettingsUiState, createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
-import { keepLastGoodPluginData, loadPluginData } from './plugin-data';
+import { keepLastGoodPluginData, loadPluginData, upgradeLoadedPluginData } from './plugin-data';
+import { PLUGIN_DATA_VERSION } from './plugin-data-version';
 import {
 	buildPersistedCrateSettings,
 	normalizeCrateSettings,
@@ -63,7 +64,9 @@ export default class CratePlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const signal = getPluginLifecycleSignal(this);
-		const data = await loadPluginData(this) as PluginData | null;
+		const loaded = await loadPluginData(this);
+		if (signal.aborted) return;
+		const data = (loaded && await upgradeLoadedPluginData(this, loaded)) as PluginData | null;
 		if (signal.aborted) return;
 		this.firstRun = data === null;
 		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
@@ -160,9 +163,9 @@ export default class CratePlugin extends Plugin {
 		this.settingTab?.update();
 	}
 
-	/** Core and reminder settings share one plugin data record. */
+	/** Core and reminder settings share one plugin data record, stamped with its layout version. */
 	private persist(settings: PersistedCrateSettings, reminders = this.remindersSettings): Promise<void> {
-		return this.saveData({ ...settings, reminders });
+		return this.saveData({ dataVersion: PLUGIN_DATA_VERSION, ...settings, reminders });
 	}
 
 	private enqueueSettingsWrite(operation: (signal: AbortSignal) => Promise<void>): Promise<void> {

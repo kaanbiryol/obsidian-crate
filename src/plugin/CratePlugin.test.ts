@@ -158,6 +158,7 @@ describe('CratePlugin settings persistence', () => {
 		await plugin.setDebugLogging(enabled);
 		expect(saveData).toHaveBeenCalledTimes(1);
 		expect(saveData).toHaveBeenCalledWith(expect.objectContaining({
+			dataVersion: 1,
 			debugLogging: enabled,
 			reminders: DEFAULT_REMINDERS_SETTINGS,
 		}));

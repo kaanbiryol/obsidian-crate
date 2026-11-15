@@ -1,7 +1,8 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Plugin } from 'obsidian';
 import { Notice } from '../test/mocks/obsidian';
-import { keepLastGoodPluginData, loadPluginData } from './plugin-data';
+import { keepLastGoodPluginData, loadPluginData, upgradeLoadedPluginData } from './plugin-data';
+import { upgradePluginData } from './plugin-data-version';
 
 const dir = '.obsidian/plugins/crate';
 const TORN = '{"workerUrl":"https://crate.exa';
@@ -83,13 +84,13 @@ it('stops without touching data.json when it cannot be read', async () => {
 });
 
 it('writes the good copy only when its content changed, replacing it atomically', async () => {
-	const h = harness({ 'data.last-good.json': '{"lastSeq":1}' });
+	const h = harness({ 'data.last-good.json': '{"dataVersion":1,"lastSeq":1}' });
 	await keepLastGoodPluginData(h.asPlugin, { lastSeq: 1 });
 	expect(h.adapter.write).not.toHaveBeenCalled();
 	await keepLastGoodPluginData(h.asPlugin, { lastSeq: 2 });
-	expect(h.adapter.write).toHaveBeenCalledExactlyOnceWith(`${dir}/data.last-good.json.tmp`, '{"lastSeq":2}');
+	expect(h.adapter.write).toHaveBeenCalledExactlyOnceWith(`${dir}/data.last-good.json.tmp`, '{"dataVersion":1,"lastSeq":2}');
 	expect(h.names()).toEqual(['data.last-good.json']);
-	expect(h.file('data.last-good.json')).toBe('{"lastSeq":2}');
+	expect(h.file('data.last-good.json')).toBe('{"dataVersion":1,"lastSeq":2}');
 });
 
 it('keeps the previous good copy when writing its replacement fails', async () => {
@@ -97,4 +98,55 @@ it('keeps the previous good copy when writing its replacement fails', async () =
 	h.adapter.write.mockRejectedValueOnce(new Error('Disk full'));
 	await keepLastGoodPluginData(h.asPlugin, { lastSeq: 2 });
 	expect(h.file('data.last-good.json')).toBe('{"lastSeq":1}');
+});
+
+describe('data.json versions', () => {
+	it('reads unversioned and current data as version 1 without writing a copy', async () => {
+		for (const saved of ['{"workerUrl":"https://crate.example"}', '{"dataVersion":1,"workerUrl":"https://crate.example"}']) {
+			const h = harness({ 'data.json': saved });
+			const data = await loadPluginData(h.asPlugin);
+			expect(await upgradeLoadedPluginData(h.asPlugin, data!)).toEqual({ dataVersion: 1, workerUrl: 'https://crate.example' });
+			expect(h.names()).toEqual(['data.json']);
+			expect(Notice.messages).toEqual([]);
+		}
+	});
+
+	it('runs each upgrade step in order and keeps the older data before any save', async () => {
+		const h = harness({ 'data.json': '{"dataVersion":1,"interval":60,"unknown":"kept"}' });
+		const steps = {
+			1: (data: Record<string, unknown>) => { const { interval, ...rest } = data; return { ...rest, syncInterval: interval }; },
+			2: (data: Record<string, unknown>) => ({ ...data, syncInterval: Number(data.syncInterval) * 2 }),
+		};
+		const upgraded = await upgradeLoadedPluginData(h.asPlugin, (await loadPluginData(h.asPlugin))!, data => upgradePluginData(data, steps, 3));
+		expect(upgraded).toEqual({ dataVersion: 3, syncInterval: 120, unknown: 'kept' });
+		expect(JSON.parse(h.file('data.json.v1')!)).toEqual({ dataVersion: 1, interval: 60, unknown: 'kept' });
+		expect(JSON.parse(h.file('data.json')!)).toEqual({ dataVersion: 1, interval: 60, unknown: 'kept' });
+		expect(h.plugin.saveData).not.toHaveBeenCalled();
+	});
+
+	it('never replaces a copy an earlier upgrade kept', async () => {
+		const h = harness({ 'data.json': '{"dataVersion":1}', 'data.json.v1': '{"dataVersion":1,"first":true}' });
+		await upgradeLoadedPluginData(h.asPlugin, { dataVersion: 1 }, data => upgradePluginData(data, { 1: value => value }, 2));
+		expect(h.file('data.json.v1')).toBe('{"dataVersion":1,"first":true}');
+	});
+
+	it('stops startup when an upgrade step is missing or the copy cannot be kept', async () => {
+		const h = harness();
+		await expect(upgradeLoadedPluginData(h.asPlugin, { dataVersion: 1 }, data => upgradePluginData(data, {}, 2))).rejects.toThrow('no upgrade for settings version 1');
+		h.adapter.write.mockRejectedValueOnce(new Error('Disk full'));
+		await expect(upgradeLoadedPluginData(h.asPlugin, { dataVersion: 1 }, data => upgradePluginData(data, { 1: value => value }, 2))).rejects.toThrow('Disk full');
+	});
+
+	it('keeps data from a newer Crate, warns, and reads what it understands', async () => {
+		const saved = { dataVersion: 7, workerUrl: 'https://crate.example', futureField: { a: 1 } };
+		const h = harness({ 'data.json': JSON.stringify(saved) });
+		expect(await upgradeLoadedPluginData(h.asPlugin, (await loadPluginData(h.asPlugin))!)).toEqual(saved);
+		expect(JSON.parse(h.file('data.json.from-v7')!)).toEqual(saved);
+		expect(Notice.messages).toEqual([expect.stringContaining('saved by a newer version of Crate')]);
+		expect(Notice.messages[0]).toContain('data.json.from-v7');
+	});
+
+	it.each([0, -1, 1.5, '2', null])('treats an unreadable version %j as version 1', version => {
+		expect(upgradePluginData({ dataVersion: version, a: 1 })).toEqual({ status: 'current', from: 1, data: { dataVersion: 1, a: 1 } });
+	});
 });
