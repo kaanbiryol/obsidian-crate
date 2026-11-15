@@ -22,7 +22,7 @@ const METADATA_CONCURRENCY = 4;
 // Reuse across the overlapping requests of one large inventory.
 const MAX_VERIFIED_METADATA = ENCRYPTION_METADATA_BATCH * METADATA_CONCURRENCY;
 /** Public data for a file: `path` is its plaintext path and `wire` its server path. */
-type PublicDataBuilder = (path: string, content: ArrayBuffer, wire: string) => Promise<unknown>;
+export type PublicDataBuilder = (path: string, content: ArrayBuffer, wire: string) => Promise<unknown>;
 interface VerifiedRevision { metadata: PrivateFileMetadata; wireHash: string; wire: string }
 /** A plaintext precondition to translate into the server's ciphertext hash. */
 export interface ExpectedHashRequest { path: string; expected: string | null; revision?: string | null }

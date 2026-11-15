@@ -8,8 +8,9 @@ import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/plugin/reminders-view';
 import { createLogger } from './logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { CRATE_ICON_ID, CRATE_ICON_SVG } from '../ui/crate-icon';
-import { createReminderMarkerHiding, createReminderLineLeaveExtension } from './data/editor-line-leave';
-import { createReminderDateChips } from './data/editor-date-chips';
+import { createReminderLineLeaveExtension } from './editor/reminder-line-leave';
+import { createReminderMarkerHiding } from './editor/reminder-marker-hiding';
+import { createReminderDateChips } from './editor/editor-date-chips';
 import { createReadingDateChips } from './data/reading-date-chips';
 import { openReminderEditModal } from './ui/plugin/reminder-modal/reminderEditorModals';
 

@@ -237,6 +237,20 @@ export default tseslint.config(
 		},
 	},
 	{
+		// Sync stays feature-neutral; features plug in through callbacks the plugin wires.
+		// No earlier no-restricted-imports block covers src/sync, so none is replaced here.
+		files: ['src/sync/**/*.{ts,tsx}'],
+		ignores: ['**/*.test.ts', '**/*.integration.ts', '**/*-test-harness.ts'],
+		rules: {
+			'@typescript-eslint/no-restricted-imports': ['error', {
+				patterns: [{
+					regex: '^(?:@/|(?:\\.\\./)+)(?:reminders|reading)(?:/|$)',
+					message: 'Sync must not import feature code; inject it from src/plugin instead.',
+				}],
+			}],
+		},
+	},
+	{
 		// Crate's settings tab is a dynamic workflow with section-specific cleanup
 		// and OAuth/device actions that are not representable as static controls.
 		files: ['src/ui/settings/settings-tab.ts'],

@@ -30,34 +30,28 @@ import { NotificationsWorkerApi } from './notifications';
 import { SharedSettingsWorkerApi, type VersionedSharedSettings } from './shared-settings';
 import { SyncWorkerApi, type ChangesPage, type DownloadedBatch, type DownloadedFile } from './sync';
 import { InitialImportApi } from './initial-import';
-import { EncryptedFiles } from '../encryption/encrypted-files';
+import { EncryptedFiles, type PublicDataBuilder } from '../encryption/encrypted-files';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
-import { importNotificationKeys } from '../../encryption/notification-keys';
-import { createReminderProjection } from '../../reminders/core/encrypted-schedule-projection';
 import { readServerEncryption } from '../encryption/server-encryption';
 import { importEncryptionSecret, type EncryptionKey } from '../../encryption/envelope';
 import type { PathTags } from '../../encryption/path-tags';
 import { openFolderLabel, sealFolderLabel } from '../../encryption/folder-label';
-import { deriveReadingSearchKey } from '../../encryption/reading-search';
-import { readingUploadCard } from '../../reading/core/reading-card-upload';
 
 export { HttpError, SyncTransportError } from './http';
+
+/** Imports the keys a vault's note projection needs and returns the projection: the
+ * public data each encrypted note carries, so the server can act on it without reading the note. */
+export type NoteProjectionFactory = (bundle: VaultKeyBundle) => Promise<PublicDataBuilder>;
 
 export class SyncApiClient {
 	getEncryptionState() { return readServerEncryption(this.http); }
 	refusePlaintext(refused: boolean): void { this.http.refusePlaintext(refused); }
 	observeEncryption(callback: (() => void) | undefined): void { this.http.observeEncryption(callback); }
-	/** Notes inside `reminderFolders()` carry encrypted notification schedules, and notes
-	 * inside `readingFolder()` their Reading card. */
-	async configureEncryption(bundle: VaultKeyBundle, reminderFolders: () => readonly string[], readingFolder?: () => string | null): Promise<void> {
-		const notifications = await importNotificationKeys(bundle.vaultId, bundle.notifications);
-		let cardKeys: Parameters<typeof readingUploadCard>[4] | undefined;
-		// A reminder note carries its schedules and a Reading note its card, so the server can
-		// schedule and list them without reading the note.
-		const encryption = await EncryptedFiles.create(this.http, bundle, async (path, bytes, wire) =>
-			(cardKeys ? await readingUploadCard(readingFolder?.(), path, wire, bytes, cardKeys) : null) ?? createReminderProjection(notifications, reminderFolders(), path, bytes));
+	/** Each encrypted note carries the public data `createNoteProjection` returns for it. */
+	async configureEncryption(bundle: VaultKeyBundle, createNoteProjection: NoteProjectionFactory): Promise<void> {
+		const noteProjection = await createNoteProjection(bundle);
+		const encryption = await EncryptedFiles.create(this.http, bundle, noteProjection);
 		const folderKey = await importEncryptionSecret(bundle.vault);
-		cardKeys = { vaultId: bundle.vaultId, key: folderKey, keyGeneration: bundle.generation, searchKey: await deriveReadingSearchKey(bundle.vaultId, bundle.vault) };
 		// Assign only after every key imports, so a failure leaves no request encrypted.
 		this.syncApi.setEncryption(encryption);
 		this.initialImport.setEncryption(encryption);

@@ -37,6 +37,7 @@ OBSIDIAN_DEV_VAULTS='["./test-vault", "/path/to/another/vault"]'
 | Sync planning, local checkpoints and transfers | `src/sync/` |
 | Shared Markdown identity, mutation and recurrence rules | `src/reminders/core/`, `src/reminders/utils/` |
 | Vault-backed reminder indexing and writing | `src/reminders/data/` |
+| CodeMirror reminder extensions (hidden markers, descriptions, date chips) | `src/reminders/editor/` |
 | Browser session, cache, outbox and client UI | `src/pwa/` |
 | Deployment authorization and provisioning | `src/cloudflare/` |
 | Authenticated API, D1 publication, R2 and notifications | `src/cloudflare/worker/` |

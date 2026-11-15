@@ -633,6 +633,10 @@ may import only an allowlist: `protocol/`, `encryption/`, `platform/`, the share
 reminder and Reading domain folders, release metadata and the PWA shell in
 `pwa/shell/`, plus the update screen and transition keys in `pwa/update/`.
 `scripts/worker-import-boundary.mjs` enforces it through ESLint.
+Production `sync/` modules do not import `reminders/` or `reading/`, which ESLint also
+enforces. In an encrypted vault, `plugin/note-projection.ts` builds each note's public
+data (its Reading card, else its reminder schedules) and the plugin passes it to
+`SyncRuntime`, which hands it to `SyncApiClient.configureEncryption`.
 
 `pwa/reminders/outbox/reminder-outbox.ts` owns automatic retry eligibility. Mount, foreground,
 connectivity and timer wakeups honor the stored deadline and attempt budget.

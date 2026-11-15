@@ -35,8 +35,9 @@ const { outputFiles } = await build({
 		import { EditorState } from '@codemirror/state';
 		import { EditorView, drawSelection, keymap } from '@codemirror/view';
 		import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-		import { createReminderMarkerHiding, createReminderLineLeaveExtension } from './src/reminders/data/editor-line-leave';
-		import { createReminderDateChips } from './src/reminders/data/editor-date-chips';
+		import { createReminderLineLeaveExtension } from './src/reminders/editor/reminder-line-leave';
+		import { createReminderMarkerHiding } from './src/reminders/editor/reminder-marker-hiding';
+		import { createReminderDateChips } from './src/reminders/editor/editor-date-chips';
 		import { normalizeReminderScheduleLine } from './src/reminders/core/normalizeReminderSchedule';
 		import { readDescriptionBlock } from './src/reminders/core/reminderDescription';
 

@@ -25,6 +25,7 @@ export * from './src/sync/encryption/server-encryption';
 export * from './src/sync/encryption/reset';
 export * from './src/sync/worker-api/http';
 export * from './src/sync/worker-api/client';
+export * from './src/plugin/note-projection';
 export * from './src/sync/encryption/encrypted-files';
 export * from './src/sync/worker-api/sync';
 export * from './src/sync/durability/durable-restores';
@@ -113,11 +114,11 @@ async function verify(type) {
 			const recovered = await t.openRecoveryBundle(state.recovery, recovery);
 			if (JSON.stringify(recovered) !== JSON.stringify(bundle)) throw new Error('Vault recovery failed');
 			if ((await createHttp(token).requestJson('/health').then(() => 200, error => error.status)) !== 401) throw new Error('Setup kept the old device credential');
-			const api = new t.SyncApiClient(origin, owner, transport); await api.configureEncryption(bundle, () => ['Reminders']);
+			const api = new t.SyncApiClient(origin, owner, transport); await api.configureEncryption(bundle, t.createNoteProjection(() => ['Reminders']));
 			if (Object.keys((await api.getManifest()).files).length) throw new Error('Setup kept plaintext server files');
 			if ((await api.getSharedSettings()).settings !== null) throw new Error('Setup kept plaintext shared settings');
 			// A new client must create the first encrypted settings version.
-			const settingsWriter = new t.SyncApiClient(origin, owner, transport); await settingsWriter.configureEncryption(bundle, () => ['Reminders']);
+			const settingsWriter = new t.SyncApiClient(origin, owner, transport); await settingsWriter.configureEncryption(bundle, t.createNoteProjection(() => ['Reminders']));
 			await settingsWriter.putSharedSettings(seedSettings);
 			if (JSON.stringify((await api.getSharedSettings()).settings) !== JSON.stringify(seedSettings)) throw new Error('First encrypted settings write failed');
 			// Upload this device's notes as the plugin does: sealed, at their tagged server paths.

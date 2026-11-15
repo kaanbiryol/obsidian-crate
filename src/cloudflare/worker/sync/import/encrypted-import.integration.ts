@@ -14,6 +14,7 @@ import { sealFile } from '../../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../../encryption/file-format';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER } from '../../../../encryption/server-state';
 import { createReminderProjection } from '../../../../reminders/core/encrypted-schedule-projection';
+import { createNoteProjection } from '../../../../plugin/note-projection';
 import { parseEncryptedNotification } from '../../../../encryption/notification-format';
 import { importInventoryPages, INITIAL_IMPORT_CAPABILITY } from '@/protocol/initial-import';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
@@ -151,7 +152,7 @@ it('completes reminder readiness from the public data of encrypted reminder note
 it('uploads an encrypted first sync through the import and resumes it on a restarted device', async () => {
 	const device = new SyncTestDevice('encrypted-import', env); devices.push(device);
 	await device.authorize(3600_000);
-	const open = async () => { await device.open(); await device.api.configureEncryption(fixture.bundle, () => ['Reminders'], () => 'Reading'); };
+	const open = async () => { await device.open(); await device.api.configureEncryption(fixture.bundle, createNoteProjection(() => ['Reminders'], () => 'Reading')); };
 	await open();
 	for (let i = 0; i < 40; i++) device.disk.write(`note-${i}.md`, `# Note ${i}`);
 	const finish = vi.spyOn(device.api.initialImport, 'finish').mockRejectedValueOnce(new Error('offline'));
@@ -171,7 +172,7 @@ it('uploads an encrypted first sync through the import and resumes it on a resta
 	// Another device reads the vault back in plaintext.
 	const other = new SyncTestDevice('encrypted-reader', env); devices.push(other);
 	await other.authorize(3600_000); await other.open();
-	await other.api.configureEncryption(fixture.bundle, () => ['Reminders'], () => 'Reading');
+	await other.api.configureEncryption(fixture.bundle, createNoteProjection(() => ['Reminders'], () => 'Reading'));
 	expect((await other.engine.sync()).errors).toEqual([]);
 	expect(other.disk.text('note-0.md')).toBe('# Note 0, edited');
 	expect(other.disk.text('new.md')).toBe('# New');
@@ -180,7 +181,7 @@ it('uploads an encrypted first sync through the import and resumes it on a resta
 it('recovers on the next sync when an encrypted import batch commits but its response is lost', async () => {
 	const device = new SyncTestDevice('encrypted-lost-batch', env); devices.push(device);
 	await device.authorize(3600_000); await device.open();
-	await device.api.configureEncryption(fixture.bundle, () => ['Reminders'], () => 'Reading');
+	await device.api.configureEncryption(fixture.bundle, createNoteProjection(() => ['Reminders'], () => 'Reading'));
 	for (let i = 0; i < 10; i++) device.disk.write(`note-${i}.md`, `# Note ${i}`);
 	// The batch commits on the server; the device never hears back.
 	const upload = device.api.initialImport.upload.bind(device.api.initialImport);
@@ -192,7 +193,7 @@ it('recovers on the next sync when an encrypted import batch commits but its res
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM files WHERE descriptor IS NOT NULL').first()).toEqual({ n: 10 });
 	const other = new SyncTestDevice('encrypted-lost-batch-reader', env); devices.push(other);
 	await other.authorize(3600_000); await other.open();
-	await other.api.configureEncryption(fixture.bundle, () => ['Reminders'], () => 'Reading');
+	await other.api.configureEncryption(fixture.bundle, createNoteProjection(() => ['Reminders'], () => 'Reading'));
 	expect((await other.engine.sync()).errors).toEqual([]);
 	expect(other.disk.text('note-9.md')).toBe('# Note 9');
 });

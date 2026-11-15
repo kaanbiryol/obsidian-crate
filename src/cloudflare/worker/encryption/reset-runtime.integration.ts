@@ -16,6 +16,7 @@ import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 import { sha256Hex } from '@/platform/sha256';
 import { loadEncryptionKeys } from '../../../sync/encryption/key-storage';
+import { createNoteProjection } from '../../../plugin/note-projection';
 import { openFile } from '../../../encryption/file-codec';
 import { readEncryptionState } from './state';
 
@@ -114,7 +115,7 @@ it('syncs first so a server-only change survives turning encryption off', async 
 	expect((await runtime.sync()).success).toBe(true);
 	const other = new SyncTestDevice('encrypted-device', env); clients.push(other);
 	await other.authorize(); await other.open();
-	await other.api.configureEncryption(loadEncryptionKeys(storage)!, () => ['Reminders'], () => 'Reading');
+	await other.api.configureEncryption(loadEncryptionKeys(storage)!, createNoteProjection(() => ['Reminders'], () => 'Reading'));
 	other.disk.write('remote-only.md', 'only on the server\n');
 	expect((await other.engine.sync()).success).toBe(true);
 	const messages: string[] = [];
@@ -372,7 +373,7 @@ describe('a device without keys for an encrypted vault', () => {
 it('refuses keyed uploads to a server whose encryption was turned off', async () => {
 	const keyed = new SyncTestDevice('keyed-device', env); clients.push(keyed);
 	await keyed.authorize(); await keyed.open();
-	await keyed.api.configureEncryption(loadEncryptionKeys(storage)!, () => ['Reminders'], () => 'Reading');
+	await keyed.api.configureEncryption(loadEncryptionKeys(storage)!, createNoteProjection(() => ['Reminders'], () => 'Reading'));
 	keyed.disk.write('note.md', 'encrypted copy\n');
 	expect((await keyed.engine.sync()).success).toBe(true);
 	// Another device turned encryption off, or a backup from before encryption was restored.

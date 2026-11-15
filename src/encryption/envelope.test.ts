@@ -73,4 +73,48 @@ describe('client encryption envelopes', () => {
 			await expect(importEncryptionSecret({ id: 'key', secret })).rejects.toThrow();
 		}
 	});
+
+	it('refuses invalid contexts and values before sealing', async () => {
+		const key = await freshKey();
+		for (const changed of [{ ...context, vaultId: '' }, { ...context, objectId: 'a/b' }, { ...context, purpose: 'other' as 'file' }]) {
+			await expect(encryptJson({ text: 'private' }, key, changed)).rejects.toThrow('Invalid encryption context');
+		}
+		await expect(encryptJson(undefined, key, context)).rejects.toThrow('Value cannot be encrypted as JSON');
+		await expect(encryptBytes(new Uint8Array(25 * 1024 * 1024 + 1), key, context)).rejects.toThrow('Content exceeds the encryption size limit');
+		await expect(importEncryptionSecret({ id: 'a b', secret: generateEncryptionSecret().secret })).rejects.toThrow('Invalid encryption key');
+		await expect(importEncryptionSecret({ id: 'key', secret: 5 as unknown as string })).rejects.toThrow('Invalid encryption key');
+	});
+
+	it('rejects envelopes with the wrong shape before decrypting', async () => {
+		const key = await freshKey();
+		const sealed = await encryptJson({ text: 'private' }, key, context);
+		const rest = sealed.split('.').slice(1);
+		for (const envelope of [5, sealed.split('.').slice(0, 4).join('.'), `${sealed}.x`, `.${rest.join('.')}`, `${'A'.repeat(2049)}.${rest.join('.')}`]) {
+			await expect(decryptBytes(envelope as string, key, context)).rejects.toThrow('Invalid encrypted envelope');
+		}
+		await expect(decryptBytes('a.'.repeat(4) + 'a'.repeat(34 * 1024 * 1024), key, context)).rejects.toThrow('Invalid encrypted envelope');
+		await expect(decryptBytes(sealed, { ...key, id: 'other-key' }, context)).rejects.toThrow('Encrypted data belongs to another vault, scope, object, or key version');
+	});
+
+	it('rejects an extra protected header field even when authenticated', async () => {
+		const key = await freshKey();
+		const withExtra = await new CompactEncrypt(new Uint8Array([1])).setProtectedHeader({
+			alg: 'A256KW', enc: 'A256GCM', typ: 'crate-e2ee+jwe', v: 1, kid: key.id, note: 'x',
+			vault: context.vaultId, scope: context.scopeId, object: context.objectId, purpose: context.purpose,
+		}).encrypt(key.key);
+		await expect(decryptBytes(withExtra, key, context)).rejects.toThrow('Encrypted data belongs to another vault, scope, object, or key version');
+	});
+
+	it.each([[1, 'a shorter wrapped key'], [2, 'a shorter IV'], [4, 'a shorter tag']])('rejects segment %i with %s', async segment => {
+		const key = await freshKey();
+		const parts = (await encryptJson({ text: 'private' }, key, context)).split('.');
+		parts[segment] = encodeBase64Url(decodeBase64Url(parts[segment]!, 64).slice(1));
+		await expect(decryptJson(parts.join('.'), key, context)).rejects.toThrow('Invalid encrypted envelope');
+	});
+
+	it('rejects non-UTF-8 and non-JSON plaintext as JSON', async () => {
+		const key = await freshKey();
+		await expect(decryptJson(await encryptBytes(new Uint8Array([0xff]), key, context), key, context)).rejects.toThrow(TypeError);
+		await expect(decryptJson(await encryptBytes(new TextEncoder().encode('{'), key, context), key, context)).rejects.toThrow(SyntaxError);
+	});
 });

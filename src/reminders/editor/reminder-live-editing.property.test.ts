@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
-import { createReminderMarkerHiding } from './editor-line-leave';
+import { createReminderMarkerHiding } from './reminder-marker-hiding';
 import { readDescriptionBlock } from '../core/reminderDescription';
 
 const extensions = createReminderMarkerHiding(() => true, () => false);

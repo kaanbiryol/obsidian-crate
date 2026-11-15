@@ -20,7 +20,7 @@ import type { EncryptionServerState } from '../../encryption/server-state';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from '../types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
-import { SyncApiClient } from '../worker-api/client';
+import { SyncApiClient, type NoteProjectionFactory } from '../worker-api/client';
 import { SyncEngine } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
 import { deleteManifestFile, type ApplyInfrastructureConfigInput } from './config';
@@ -76,10 +76,8 @@ export class SyncRuntime {
 		private secretStorage: SecretStorageService,
 		private persistSettings: (update?: Partial<SyncSettings>) => Promise<void>,
 		private prepareReminderScope?: () => Promise<void>,
-		/** Notes inside these folders carry encrypted notification schedules. */
-		private reminderFolders: () => readonly string[] = () => [],
-		/** The Reading folder, whose notes carry their card in an encrypted vault. */
-		private readingFolder: () => string | null = () => null,
+		/** The public data each note carries in an encrypted vault; none by default. */
+		private createNoteProjection: NoteProjectionFactory = async () => async () => null,
 		/** Runs when a first upload starts, before it lists vault files. */
 		private prepareInitialUpload?: () => Promise<void>,
 	) {
@@ -317,7 +315,7 @@ export class SyncRuntime {
 		try {
 			await configureClientEncryption(this.apiClient, {
 				settings: this.settings, secretStorage: this.secretStorage, persistSettings: update => this.persistSettings(update),
-				reminderFolders: this.reminderFolders, readingFolder: this.readingFolder, isCurrent: client => this.apiClient === client,
+				createNoteProjection: this.createNoteProjection, isCurrent: client => this.apiClient === client,
 			});
 		} catch (error) {
 			if (this.initializationRevision !== initializationRevision) return;

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EditorSelection, EditorState, Transaction, type TransactionSpec } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
-import { createReminderLineLeaveExtension, createReminderMarkerHiding, hiddenDescriptionRanges, hiddenReminderMarkerRanges, protectReminderIdMarker, reminderClipboard, reminderIdChangesForLeftLines } from './editor-line-leave';
+import { createReminderLineLeaveExtension, reminderIdChangesForLeftLines } from './reminder-line-leave';
+import { hiddenDescriptionRanges, hiddenReminderMarkerRanges, reminderClipboard } from './reminder-hidden-ranges';
+import { protectReminderIdMarker } from './reminder-marker-protection';
+import { createReminderMarkerHiding } from './reminder-marker-hiding';
 import { normalizeReminderIds } from '../core/normalizeReminderIds';
 import { readDescriptionBlock } from '../core/reminderDescription';
 

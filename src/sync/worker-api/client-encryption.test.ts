@@ -3,6 +3,7 @@ import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { ENCRYPTION_VAULT_HEADER } from '../../encryption/server-state';
 import { EncryptedFiles } from '../encryption/encrypted-files';
 import { SyncApiClient } from './client';
+import { createNoteProjection } from '../../plugin/note-projection';
 import type { ApiHttpTransport } from './http';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
@@ -28,7 +29,7 @@ it('stays unencrypted when a key fails to import after the file keys', async () 
 	const transport = vi.fn<ApiHttpTransport>(async () => response({ files: {} }));
 	const client = new SyncApiClient('https://crate.example', 'token', transport);
 
-	await expect(client.configureEncryption(bundle, () => [])).rejects.toThrow();
+	await expect(client.configureEncryption(bundle, createNoteProjection(() => []))).rejects.toThrow();
 
 	expect(client.isEncrypted()).toBe(false);
 	await client.getFileMetadata(['note.md']);

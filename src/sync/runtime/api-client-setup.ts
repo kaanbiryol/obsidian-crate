@@ -2,7 +2,7 @@ import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
 import type { SecretStorageService } from '../../plugin/secret-storage';
 import { loadEncryptionKeys } from '../encryption/key-storage';
-import type { SyncApiClient } from '../worker-api/client';
+import type { NoteProjectionFactory, SyncApiClient } from '../worker-api/client';
 import type { SyncSettings } from '../settings';
 
 const logger = createLogger('SyncRuntime');
@@ -11,9 +11,8 @@ export interface ApiClientEncryptionSetup {
 	settings: SyncSettings;
 	secretStorage: SecretStorageService;
 	persistSettings: (update?: Partial<SyncSettings>) => Promise<void>;
-	/** Notes inside these folders carry encrypted notification schedules. */
-	reminderFolders: () => readonly string[];
-	readingFolder: () => string | null;
+	/** The public data each encrypted note carries. */
+	createNoteProjection: NoteProjectionFactory;
 	/** Whether `client` is still the runtime's connection. */
 	isCurrent: (client: SyncApiClient) => boolean;
 }
@@ -24,7 +23,7 @@ export async function configureClientEncryption(client: SyncApiClient, setup: Ap
 	const { settings, secretStorage } = setup;
 	const keys = loadEncryptionKeys(secretStorage);
 	if (keys) {
-		await client.configureEncryption(keys, setup.reminderFolders, setup.readingFolder);
+		await client.configureEncryption(keys, setup.createNoteProjection);
 		if (settings.encryptedVaultId !== keys.vaultId) await setup.persistSettings({ encryptedVaultId: keys.vaultId });
 		return;
 	}

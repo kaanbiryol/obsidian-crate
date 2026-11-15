@@ -29,7 +29,7 @@ export default defineConfig({
 			exclude: ['src/**/*.test.ts', 'src/**/*-test-harness.ts', 'src/**/test-support/**', 'src/test/**', 'src/**/*.d.ts'],
 			thresholds: {
 				'src/sync/**': { statements: 86, branches: 80, functions: 85, lines: 89 },
-				'src/encryption/**': { statements: 76, branches: 76, functions: 86, lines: 81 },
+				'src/encryption/**': { statements: 96, branches: 96, functions: 96, lines: 97 },
 				'src/protocol/**': { statements: 94, branches: 89, functions: 97, lines: 97 },
 				'src/reminders/core/**': { statements: 93, branches: 88, functions: 95, lines: 95 },
 			},

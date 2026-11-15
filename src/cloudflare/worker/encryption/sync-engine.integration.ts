@@ -10,6 +10,7 @@ import type { PathTags } from '../../../encryption/path-tags';
 import { SyncWorkerApi } from '../../../sync/worker-api/sync';
 import { createReadingNote } from '../../../reading/core/notes';
 import { vaultEntry } from '../../../sync/runtime/vault-event-gate';
+import { createNoteProjection } from '../../../plugin/note-projection';
 
 const devices: SyncTestDevice[] = [];
 let bundle: VaultKeyBundle;
@@ -31,7 +32,7 @@ afterEach(async () => {
 const reminderFolders = () => ['Reminders'];
 async function open(device: SyncTestDevice) {
 	await device.open();
-	await device.api.configureEncryption(bundle, reminderFolders, () => 'Reading');
+	await device.api.configureEncryption(bundle, createNoteProjection(reminderFolders, () => 'Reading'));
 }
 async function device(id: string, disk: { caseInsensitive?: boolean } = {}) {
 	const result = new SyncTestDevice(id, env, disk); devices.push(result);
@@ -258,7 +259,7 @@ it('republishes unchanged notes so a newly chosen reminders folder gets its sche
 	let folders = ['Reminders'];
 	const client = new SyncTestDevice('republish', env); devices.push(client);
 	await client.authorize(3600_000); await client.open();
-	await client.api.configureEncryption(bundle, () => folders);
+	await client.api.configureEncryption(bundle, createNoteProjection(() => folders));
 	await client.disk.vault.adapter.mkdir('Tasks');
 	client.disk.write('Tasks/todo.md', '- [ ] Call the bank 2099-01-02T10:00:00.000Z <!-- crate-id:bank -->\n');
 	await sync(client);

@@ -79,6 +79,7 @@ These tests protect stored user data and released clients. When one fails, the c
 - Shared plugin code must run on mobile: no Node or Electron APIs. Plugin file access stays inside the vault.
 - Register commands with `this.addCommand(...)` and keep released command IDs. Give settings defaults and validation; await `loadData()` / `saveData()` where ordering matters.
 - Use Obsidian `register*` helpers so reload and unload leak nothing.
+- New or changed UI and feature modules take the values they use, or `Pick<CratePlugin, ...>`, rather than the whole `CratePlugin`, so tests need no full plugin fake. Do not convert untouched modules just for this.
 - Keep startup light. Defer expensive work, batch vault access, debounce filesystem reactions, and avoid large in-memory structures.
 - Preserve data-safety invariants: a successful request keeps byte, revision and operation-identity guarantees under response loss and retries; deletion requires verified absence; recovery retains local-only intent.
 - Use sentence case and short UI copy. In instructions, **bold** literal UI labels, say "select" for interactions, and use arrows for navigation.

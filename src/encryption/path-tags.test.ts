@@ -68,3 +68,17 @@ it('recovers plaintext folder names only from a label for the same folder', asyn
 	expect(await openFolderLabel(wire, label, t, key, vaultId)).toBe('Notes/Reading');
 	await expect(openFolderLabel(await t.wire('Reminders'), label, t, key, vaultId)).rejects.toThrow('does not match');
 });
+
+it('treats a claimed path that cannot be tagged as a mismatch, not a crash', async () => {
+	const t = await tags();
+	const key = await importEncryptionSecret(secret);
+	const deep = Array.from({ length: 64 }, () => 'a').join('/');
+	await expect(t.wire(deep)).rejects.toThrow();
+	await expect(resolveEncryptedPath(t, await t.wire('Reading/Note.md'), deep)).rejects.toThrow('Encrypted file metadata does not match the requested file');
+	const wire = await t.wire('Reading');
+	const { label } = await sealFolderLabel('Reading', t, key, vaultId);
+	expect(await openFolderLabel(wire, label, t, key, vaultId)).toBe('Reading');
+	await expect(openFolderLabel(await t.wire('Other'), label, t, key, vaultId)).rejects.toThrow('does not match this vault');
+	await expect(openFolderLabel(wire, label, t, key, 'another-vault')).rejects.toThrow();
+});
+
