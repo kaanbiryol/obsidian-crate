@@ -864,7 +864,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await fresh.close();
 });
 
-for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: unanswered encryption check shows the saved library read-only`, { timeout: 90000 }, async t => {
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(`Reading ${name}: unanswered encryption check keeps the library read-only`, { timeout: 90000 }, async t => {
   const fixture = await openReadingBrowserFixture(t, name, engine);
   const { page, readingSync, faults, sent } = fixture;
   await fixture.enroll();
@@ -880,7 +880,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await page.reload();
   // Before: a full-screen error hid the saved library on a device without encryption evidence.
   await expect(page.locator('.crate-reading__notice').filter({ hasText: 'Unable to connect.' })).toBeVisible();
-  await saved.waitFor();
+  // The library list is no longer stored on the device (only articles saved for
+  // offline are), so the read-only library keeps its controls but lists no links.
+  await expect(page.getByRole('searchbox', { name: 'Search reading' })).toBeVisible();
+  await expect(saved).toHaveCount(0);
   await expect(page.locator('.crate-encryption-unlock')).toHaveCount(0);
   await page.getByRole('button',{name:'Save a link',exact:true}).click();
   await page.getByLabel('Link',{exact:true}).fill('https://offline.example.invalid/refused');
