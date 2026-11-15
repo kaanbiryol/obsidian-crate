@@ -61,6 +61,28 @@ describe('local Reading library', () => {
 		expect(reads).toHaveBeenCalledTimes(2); expect(h.library.getSnapshot().items[0]?.favorite).toBe(true);
 		h.files.delete(item.path); await h.library.refresh(); expect(h.library.getSnapshot().items).toEqual([]);
 	});
+	it('keeps notes that change or arrive while the list is first being built', async () => {
+		const h = harness();
+		const a = createReadingNote({ id: '0cf86c65-51e2-4e2b-8987-0a4732473588', url: 'https://example.com/a', savedAt: '2026-09-21T12:00:00Z' });
+		h.files.set('Reading/a.md', a);
+		h.files.set('Reading/b.md', createReadingNote({ id: '1cf86c65-51e2-4e2b-8987-0a4732473588', url: 'https://example.com/b', savedAt: '2026-09-21T12:00:00Z' }));
+		let release!: () => void;
+		const blocked = new Promise<void>(resolve => { release = resolve; });
+		const read = h.vault.read.bind(h.vault);
+		h.vault.read = async file => { if (file.path === 'Reading/b.md') await blocked; return read(file); };
+		h.library.retain();
+		await vi.waitFor(() => expect(h.library.getSnapshot().loading).toBe(true));
+		// Vault events during the build: the runtime forwards them only to an active library.
+		expect(h.library.active).toBe(true);
+		h.files.set('Reading/a.md', updateReadingNote(a, '0cf86c65-51e2-4e2b-8987-0a4732473588', { favorite: true }));
+		h.files.set('Reading/c.md', createReadingNote({ id: '2cf86c65-51e2-4e2b-8987-0a4732473588', url: 'https://example.com/c', savedAt: '2026-09-21T12:00:00Z' }));
+		h.library.invalidate('Reading/a.md');
+		const refreshed = h.library.refreshPaths(['Reading/a.md', 'Reading/c.md']);
+		release(); await refreshed;
+		const items = h.library.getSnapshot().items;
+		expect(items.map(item => item.path).sort()).toEqual(['Reading/a.md', 'Reading/b.md', 'Reading/c.md']);
+		expect(items.find(item => item.path === 'Reading/a.md')?.favorite).toBe(true);
+	});
 	it('records markers typed in Obsidian once the note is no longer open in an editor', async () => {
 		const h = harness(); const { item } = await h.library.add('https://example.com', undefined, false);
 		const manual = h.files.get(item.path)!.replace('<!-- crate:article:end -->', 'Read ==this passage==.\n<!-- crate:article:end -->');

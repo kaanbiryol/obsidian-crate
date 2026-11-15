@@ -66,6 +66,8 @@ export class ReadingLibrary {
 	private stale = new Set<string>();
 	// A full scan has listed the folder, so single notes can be updated on their own.
 	private listed = false;
+	// The first full scan is running; changes meanwhile are refreshed once it finishes.
+	private building = false;
 	// Views using the list; at zero the list is released after a delay.
 	private holders = 0;
 	private releaseTimer: ReturnType<typeof setTimeout> | undefined;
@@ -78,8 +80,8 @@ export class ReadingLibrary {
 		private background?: ReadingIssueSource, startAfter: Promise<void> = Promise.resolve()) {
 		this.queue = startAfter;
 	}
-	/** True once the list is built; until then vault changes need no work here. */
-	get active(): boolean { return this.listed; }
+	/** True while the list is built or being built; otherwise vault changes need no work here. */
+	get active(): boolean { return this.listed || this.building; }
 	/** A view uses the list: it is built now, and kept current until the last holder lets go. */
 	retain(): () => void {
 		this.holders++;
@@ -155,8 +157,8 @@ export class ReadingLibrary {
 		this.parsed = { content, metadata };
 		return metadata;
 	}
-	// Before the list is built, the next scan takes every note from the cache anyway.
-	invalidate(path: string): void { if (this.listed) this.stale.add(path); }
+	// Before the list is built or being built, the next scan takes every note from the cache anyway.
+	invalidate(path: string): void { if (this.active) this.stale.add(path); }
 	private isNotePath(path: string): boolean { return path.startsWith(`${this.folder}/`) && /\.md$/i.test(path); }
 	private findFile(path: string): ReadingFile | undefined {
 		return (this.vault.file ? this.vault.file(path) ?? undefined : this.vault.files().find(file => file.path === path));
@@ -258,6 +260,10 @@ export class ReadingLibrary {
 		throw error;
 	}
 	private async scan(): Promise<void> {
+		// A note that changes after this scan read it, or arrives after it listed the folder, is
+		// refreshed by the event's own refresh, queued behind this scan.
+		const first = !this.listed;
+		if (first) this.building = true;
 		try {
 			this.assertActive();
 			const files = this.vault.files().filter(file => this.isNotePath(file.path));
@@ -278,6 +284,7 @@ export class ReadingLibrary {
 			// An action without a view, such as Add link, keeps the list only briefly.
 			this.scheduleRelease();
 		} catch (error) { this.failed(error); }
+		finally { if (first) this.building = false; }
 	}
 	/** Loads only `paths`. Before the first full scan, or for a path that is not a note (such
 	 * as a renamed folder), it lists the whole folder instead. */
