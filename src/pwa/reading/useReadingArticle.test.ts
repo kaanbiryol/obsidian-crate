@@ -49,7 +49,8 @@ function harness() {
 	let cache: ReadingCache = { items: [item], issues: [], savedAt: 1 };
 	const hook = renderHook(() => useReadingArticle({ session, cache, pending: [], isCurrentSession: () => true,
 		reportSessionError, run: async action => action() }));
-	return { hook, update: (next: ReadingItem) => { cache = { ...cache, items: [next] }; hook.rerender(); } };
+	return { hook, update: (next: ReadingItem) => { cache = { ...cache, items: [next] }; hook.rerender(); },
+		replace: (items: ReadingItem[]) => { cache = { ...cache, items }; hook.rerender(); } };
 }
 
 it('loads a validated live article without changing its content', async () => {
@@ -158,4 +159,25 @@ it('shows a saved copy already moved to an edited item instead of downloading it
 	await act(async () => { update(highlighted); });
 	expect(network).toHaveBeenCalledOnce();
 	expect(hook.current.reader).toMatchObject({ item: highlighted, markdown: 'Confirmed online text.', availableOffline: true });
+});
+
+it('keeps the open article when a refresh lists a page without it', async () => {
+	network.mockResolvedValueOnce(Response.json({ item, markdown: 'Confirmed online text.' }));
+	const { hook, replace } = harness();
+	await act(async () => { await hook.current.open(item); });
+	// Offline refreshes list nothing, and online ones list only the first inbox page.
+	// Before: either closed the reader, for example right after saving a highlight offline.
+	await act(async () => { replace([]); });
+	expect(hook.current.reader).toMatchObject({ item, markdown: 'Confirmed online text.' });
+});
+
+it('reopens the article named in the address from its saved copy while offline', async () => {
+	vi.stubGlobal('location', { href: `https://example.test/notifications?section=reading&item=${item.crate_reading_id}` });
+	vi.stubGlobal('navigator', { onLine: false });
+	const cache: ReadingCache = { items: [], issues: [], savedAt: 1 };
+	const hook = renderHook(() => useReadingArticle({ session, cache, pending: [], isCurrentSession: () => true,
+		reportSessionError, run: async action => action() }));
+	// Before: an offline reload stayed in the library because the offline cache lists nothing.
+	await vi.waitFor(() => expect(hook.current.reader).toMatchObject({ item, markdown: saved.markdown, availableOffline: true }));
+	expect(network).not.toHaveBeenCalled();
 });

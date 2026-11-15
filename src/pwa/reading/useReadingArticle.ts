@@ -39,8 +39,9 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 		if (!cache) return;
 		setReader(opened => {
 			if (!opened || !opened.item.path) return opened;
+			// The cache holds only the first inbox page, and nothing offline, so a missing item is not deleted.
 			const item = cache.items.find(item => item.crate_reading_id === opened.item.crate_reading_id);
-			return item ? { ...opened, item } : null;
+			return item ? { ...opened, item } : opened;
 		});
 	}, [cache]);
 	const open = useCallback(async (item: ReadingItem, animate = true, section: ReadingSection = 'inbox') => {
@@ -127,9 +128,15 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 		if (!session || !requestedItem || !cache) return;
 		const item = presentReadingItems(cache.items, pending).find(item => item.crate_reading_id === requestedItem);
 		setRequestedItem(null);
-		// An article past the first page is looked up on the server.
+		// An article past the first page is looked up on the server, or offline in its saved copy.
 		void run(async () => {
-			const found = item ?? (navigator.onLine ? (await queryReadingItems(session, { section: 'all', id: requestedItem })).items[0] : undefined);
+			let found = item;
+			if (!found && navigator.onLine) found = (await queryReadingItems(session, { section: 'all', id: requestedItem })).items[0];
+			else if (!found) {
+				// Offline, the library cache lists nothing; a damaged copy just leaves the library open.
+				const saved = await readReadingArticle(session, requestedItem).catch(() => undefined);
+				if (saved) found = presentReadingItems([saved.item], pending)[0];
+			}
 			if (found) await open(found, false);
 		});
 	}, [cache, pending, session, open, run, requestedItem]);

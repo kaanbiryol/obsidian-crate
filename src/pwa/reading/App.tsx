@@ -59,7 +59,8 @@ function ReadingAppContent() {
 	})();
 	// Offline, the library is the articles saved on this device; online, the server lists it page by page.
 	const offlineItems = useOfflineReadingItems(session, isOffline, reader?.availableOffline);
-	const visibleItems = useMemo(() => presentReadingItems((isOffline ? offlineItems : cache?.items) ?? [], pending), [isOffline, offlineItems, cache, pending]);
+	const confirmedItems = isOffline ? offlineItems : cache?.items;
+	const visibleItems = useMemo(() => presentReadingItems(confirmedItems ?? [], pending), [confirmedItems, pending]);
 	const source = useMemo<ReadingLibrarySource | undefined>(() => session && !isOffline && !readOnly && cache ? {
 		load: async ({ section, q, tag, cursor }) => {
 			// The sync just read the first inbox page; the library shows it without asking again.
@@ -92,7 +93,8 @@ function ReadingAppContent() {
 		retry: () => void run(refreshManually), review: () => setSettingsOpen(true),
 		update: (item, changes) => updateItem(item, changes, reader ?? undefined),
 		current: id => visibleItems.find(item => item.crate_reading_id === id) ?? (visibleReader?.crate_reading_id === id ? visibleReader : undefined) });
-	const readerHighlights = useMemo(() => reader ? pendingReadingHighlights(cache?.items.find(item => item.crate_reading_id === reader.item.crate_reading_id) ?? reader.item, pending) : [], [reader, cache, pending]);
+	// An article opened from the list carries its pending changes; compare with the confirmed copy.
+	const readerHighlights = useMemo(() => reader ? pendingReadingHighlights(confirmedItems?.find(item => item.crate_reading_id === reader.item.crate_reading_id) ?? reader.item, pending) : [], [reader, confirmedItems, pending]);
 
 	if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
 	// A share stays staged until a connected Reading session copies it into its draft.
