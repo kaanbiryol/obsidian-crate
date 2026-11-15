@@ -176,11 +176,13 @@ function editAtTail(transaction: Transaction, changes: readonly ChangedRange[], 
 			if (end !== null) return end === change.toA ? transaction : spec({ from: change.fromA, to: end }, change.fromA);
 		}
 		// Moves the next line's text up to the reminder's, before its hidden tail, as a join would without the hidden parts.
-		// A reminder joined this way merges into this one, so its own hidden tail goes.
-		const join = (tail: { from: number; to: number }) => {
+		// A reminder joined this way merges into this one, so its ID marker goes. Its description stays, under the
+		// merged line, when this reminder has none; when both have one, the join is refused rather than lose either.
+		const join = (tail: { from: number; to: number; description: boolean }) => {
 			const next = doc.lineAt(tail.to + 1), nextTail = hiddenTail(doc, next);
+			if (nextTail?.description && tail.description) return [];
 			const text = nextTail ? doc.sliceString(next.from, nextTail.from) : next.text;
-			return spec([{ from: tail.from, insert: text }, { from: tail.to, to: nextTail?.to ?? next.to }], tail.from);
+			return spec([{ from: tail.from, insert: text }, { from: tail.to, to: nextTail?.description ? next.to : nextTail?.to ?? next.to }], tail.from);
 		};
 		const line = change && changes.length === 1 ? doc.lineAt(change.fromA) : null;
 		const found = line ? hiddenTail(doc, line) : null;

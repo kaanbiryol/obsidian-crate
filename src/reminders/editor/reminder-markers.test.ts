@@ -363,11 +363,22 @@ describe('reminder ID marker protection', () => {
 		expect(edit(line, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe(line);
 	});
 
-	it('merges a joined reminder into this one, dropping its hidden marker and description', () => {
+	it('merges a joined reminder into this one, dropping its hidden marker and keeping its description', () => {
 		const doc = `${line}\n- [ ] Eggs <!-- crate-id:b -->\n<!-- crate-desc:Free range -->\nNext`;
-		const merged = '- [ ] Buy milk- [ ] Eggs <!-- crate-id:a -->\nNext';
+		// Before: the joined reminder's description was deleted with its marker.
+		const merged = '- [ ] Buy milk- [ ] Eggs <!-- crate-id:a -->\n<!-- crate-desc:Free range -->\nNext';
 		expect(edit(doc, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe(merged);
 		expect(edit(doc, line.length + 1, { changes: { from: line.length, to: line.length + 1 }, userEvent: 'delete.backward' }).text).toBe(merged);
+		// Without a description it merges as before.
+		const plain = `${line}\n- [ ] Eggs <!-- crate-id:b -->\nNext`;
+		expect(edit(plain, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe('- [ ] Buy milk- [ ] Eggs <!-- crate-id:a -->\nNext');
+	});
+
+	it('refuses to join two reminders that both have a description', () => {
+		const block = `${line}\n<!-- crate-desc:Oat milk -->`;
+		const doc = `${block}\n- [ ] Eggs <!-- crate-id:b -->\n<!-- crate-desc:Free range -->`;
+		expect(edit(doc, end, { changes: { from: end, to: block.length }, userEvent: 'delete.forward' }).text).toBe(doc);
+		expect(edit(doc, block.length + 1, { changes: { from: block.length, to: block.length + 1 }, userEvent: 'delete.backward' }).text).toBe(doc);
 	});
 
 	describe('with a description', () => {
