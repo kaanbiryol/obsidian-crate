@@ -16,7 +16,7 @@ export function ReadingOpening() {
 			countUnit="saved link"
 			showMeta={false}
 			reserveMetaSpace
-			rightContent={<div className="crate-view-header-actions"><span className="pwa-reading-opening__sync" aria-hidden="true" /><span inert aria-hidden="true"><IconButton size="large" iconSize="l" icon="settings" label="Open settings" onClick={() => {}} /></span><FeatureSwitcherButton /></div>}
+			rightContent={<div className="crate-view-header-actions"><span className="pwa-reading-opening__sync" aria-hidden="true" /><span inert aria-hidden="true"><IconButton size="large" iconSize="l" className="crate-reading__tags" icon="hash" label="Tags" onClick={() => {}} /></span><span inert aria-hidden="true"><IconButton size="large" iconSize="l" icon="settings" label="Open settings" onClick={() => {}} /></span><FeatureSwitcherButton /></div>}
 		/>
 		<div className="pwa-reading-opening__search" aria-hidden="true" />
 		<div className="pwa-mode-opening__content"><LoadingIndicator label="Loading Reading" /></div>
