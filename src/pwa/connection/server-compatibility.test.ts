@@ -10,7 +10,9 @@ const info = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, prot
 const fetchMock = vi.fn(async () => Response.json(info));
 
 // Each test starts a minute later, so a result shared by the previous test has expired.
-let now = performance.now();
+// Whole milliseconds keep the arithmetic exact: from a fractional start, `at + 5_000 - at`
+// can round just below 5_000 and keep reusing the result.
+let now = Math.round(performance.now());
 beforeEach(() => {
 	vi.spyOn(performance, 'now').mockImplementation(() => now);
 	now += 60_000;
