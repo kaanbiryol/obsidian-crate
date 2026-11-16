@@ -35,7 +35,9 @@ export function normalizeReminderScheduleLine(
 	if (parsed.datePart && parsed.datePart !== parsed.recurrencePart) {
 		const position = content.lastIndexOf(parsed.datePart);
 		if (position === -1) throw new UnresolvedReminderScheduleError();
-		content = content.slice(0, position) + dateText + content.slice(position + parsed.datePart.length);
+		// The matched phrase can take the spaces around it, which keep it apart from the text next to it, such as an important `!`.
+		const [, before = '', after = ''] = /^(\s*)[\s\S]*?(\s*)$/.exec(parsed.datePart) ?? [];
+		content = content.slice(0, position) + before + dateText + after + content.slice(position + parsed.datePart.length);
 	} else {
 		content = `${content} ${dateText}`;
 	}

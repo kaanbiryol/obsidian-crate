@@ -75,3 +75,20 @@ describe('parseReminderContent hasTime', () => {
 		expect(result.cleanContent).toContain('task');
 	});
 });
+
+describe('parseReminderContent decimals before a date', () => {
+	it('keeps a version or decimal before a month name in the title', () => {
+		// Chrono read the digits after the point as the day: no date for v2.0, Feb 5 for 2.5.
+		for (const title of ['Ship v2.0', 'Ship 2.5', 'Ship v2.0.1', 'Pay 9.99']) {
+			const result = parseReminderContent(`${title} Feb 1`);
+			expect(result.datePart, title).toBe('Feb 1');
+			expect([result.dueDate!.getMonth(), result.dueDate!.getDate()], title).toEqual([1, 1]);
+			expect(result.cleanContent).toBe(title);
+		}
+	});
+
+	it('still reads a dotted date and a dotted time', () => {
+		expect(parseReminderContent('Meet 12.05.2026').datePart).toBe('12.05.2026');
+		expect(parseReminderContent('Call at 9.30').datePart).toBe('at 9.30');
+	});
+});
