@@ -324,6 +324,15 @@ for (const engine of [chromium, webkit]) {
 		await settle(page);
 		assert.equal(await doc(), '# Errands\n- [ ] Plain <!-- crate-id:c -->\nOutro', `${name}: undo removes the new reminder's ID`);
 		await checkClean(page, `${name}: after undoing a new reminder`);
+		// A date typed on a reminder that has an ID is saved on leaving too, so coming back to the line's start shows a chip.
+		await mount('# Errands\n- [ ] Print photos <!-- crate-id:p -->\nOutro', '# Errands\n- [ ] Print photos'.length);
+		await page.keyboard.type(' tomorrow 12:00');
+		await page.keyboard.press('ArrowDown');
+		await settle(page);
+		await page.evaluate(() => window.place(window.view.state.doc.line(2).from));
+		await settle(page);
+		assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Print photos 2026-11-15T11:00:00.000Z <!-- crate-id:p -->', `${name}: typed date saved on a reminder with an ID`);
+		assert.ok((await visible()).includes('- [ ] Print photos Tomorrow, 12:00'), `${name}: saved date shows as a chip at the line's start`);
 
 		// Writing a new reminder with a date and a description in one line.
 		await mount();

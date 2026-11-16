@@ -6,6 +6,7 @@ import { extractReminderId, reminderIdMarkers, stripReminderIdMarker } from '../
 import { inlineDescriptionChanges } from '../data/inline-description';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { TASK_WITH_TEXT } from './reminder-hidden-ranges';
+import { datePhraseField } from './editor-date-chips';
 
 /** The part of a view update that decides which lines a cursor left. */
 interface LineLeave {
@@ -36,11 +37,17 @@ function lineChange(line: Line, text: string): ChangeSpec {
 	return { from: line.from + start, to: line.to - end, insert: text.slice(start, text.length - end) };
 }
 
-/** Typed dates saved on the new reminder lines among `lineNumbers`; lines with an ID are saved by the scan. */
-function scheduleChanges(doc: Text, lineNumbers: readonly number[]): ChangeSpec[] {
+/**
+ * Typed dates saved on the reminder lines among `lineNumbers`. Lines with an ID too: the scan would save them
+ * only after the note is written and no sync is running, and until then coming back shows the phrase again.
+ * A saved date open as its phrase is left alone: the date chips restore or save it.
+ */
+function scheduleChanges(state: EditorState, lineNumbers: readonly number[]): ChangeSpec[] {
+	const { doc } = state, phrase = state.field(datePhraseField, false);
+	const open = phrase && phrase.from <= doc.length ? doc.lineAt(phrase.from).number : 0;
 	return lineNumbers.flatMap(number => {
+		if (number === open) return [];
 		const line = doc.line(number);
-		if (extractReminderId(line.text)) return [];
 		let saved: string;
 		try { saved = normalizeReminderScheduleLine(line.text); } catch { return []; }
 		return saved === line.text ? [] : [lineChange(line, saved)];
@@ -120,7 +127,7 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 		if (!left.length) return;
 		const { view } = update, { doc } = update.state;
 		let descriptions = inlineDescriptionChanges(doc, left);
-		let dates = descriptions.length ? null : scheduleChanges(doc, left);
+		let dates = descriptions.length ? null : scheduleChanges(update.state, left);
 		// Only a line the scan reads as a task is rewritten, not one inside a code block, frontmatter
 		// or a comment. Checked only when a leave would write, since it reads the whole note.
 		if (descriptions.length || dates?.length) {
@@ -130,7 +137,7 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 				left = kept;
 				if (!left.length) return;
 				descriptions = inlineDescriptionChanges(doc, left);
-				dates = descriptions.length ? null : scheduleChanges(doc, left);
+				dates = descriptions.length ? null : scheduleChanges(update.state, left);
 			}
 		}
 		// Without a description or date to save the IDs are known now; otherwise they follow the edited lines.
@@ -148,7 +155,7 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 			};
 			// Filters would keep the block from landing after the line's hidden markers.
 			if (descriptions.length) apply({ changes: descriptions, userEvent: 'input.description', filter: false });
-			const saved = dates ?? scheduleChanges(view.state.doc, lines);
+			const saved = dates ?? scheduleChanges(view.state, lines);
 			if (saved.length) apply({ changes: saved, userEvent: 'input.date', filter: false });
 			// Undo would remove the hidden ID unseen, and leaving the line again would mint another.
 			const ids = known ?? reminderIdChanges(view.state.doc, lines);
