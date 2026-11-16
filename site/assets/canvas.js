@@ -247,7 +247,7 @@ document.querySelectorAll('.notify-stage').forEach((stage) => {
 })();
 
 // Track the pointer so card highlights follow it.
-document.querySelectorAll('.hosting-option, .encryption-diagram').forEach((card) => {
+document.querySelectorAll('.hosting-option, .encryption-diagram, .save-source, .choose-feature, .install-steps').forEach((card) => {
   card.addEventListener('pointermove', (event) => {
     if (event.pointerType !== 'mouse') return;
     const bounds = card.getBoundingClientRect();

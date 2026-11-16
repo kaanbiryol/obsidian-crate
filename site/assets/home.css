@@ -58,11 +58,13 @@
 #sync > .reminder-recording figcaption,#reminders > .reminder-recording figcaption { max-width:680px; }
 #sync > .reminder-recording figcaption p:not(.feature-label),#reminders > .reminder-recording figcaption p:not(.feature-label) { max-width:560px; font-size:17px; }
 @media(max-width:600px) { #sync > .reminder-recording,#reminders > .reminder-recording { gap:28px; } }
-#reminders > .reminder-recording--note { grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:72px; margin-top:72px; }
-#reminders > .reminder-recording--note .recording-media { order:-1; }
+/* The second way to add a reminder: copy on the left, recording on the right. */
+#reminders > .reminder-recording--note { grid-template-columns:minmax(280px,1fr) minmax(0,592px); gap:56px; margin-top:72px; }
+/* The note recording is 1184px wide; 592px shows it at exactly 2x, so its text stays sharp. */
+#reminders > .reminder-recording--note .recording-media { max-width:592px; }
 #reminders > .reminder-recording--note figcaption { max-width:390px; }
 #reminders > .reminder-recording--note h3 { margin:0 0 18px; font-size:clamp(24px,2.4vw,28px); font-weight:500; letter-spacing:-.035em; line-height:1.2; }
-@media(max-width:850px) { #reminders > .reminder-recording--note { grid-template-columns:minmax(0,1fr); gap:32px; margin-top:56px; } #reminders > .reminder-recording--note .recording-media { order:0; } #reminders > .reminder-recording--note figcaption { max-width:520px; } #reminders > .reminder-recording--note .recording-media { max-width:560px; } }
+@media(max-width:850px) { #reminders > .reminder-recording--note { grid-template-columns:minmax(0,1fr); gap:28px; margin-top:56px; } #reminders > .reminder-recording--note .recording-media { order:0; } #reminders > .reminder-recording--note figcaption { max-width:520px; } #reminders > .reminder-recording--note .recording-media { max-width:560px; } }
 
 /* Hero secondary action. */
 .hero-copy .actions { gap:12px; }
@@ -208,8 +210,8 @@ main { overflow-x:clip; }
 /* A soft light follows the pointer across the larger cards. */
 @property --glow { syntax:"<number>"; inherits:false; initial-value:0; }
 @media(hover:hover) {
- .hosting-option,.encryption-diagram { background-image:radial-gradient(320px circle at var(--glow-x,50%) var(--glow-y,50%),rgb(139 92 246 / calc(var(--glow) * .13)),transparent 70%); transition:--glow 300ms ease,border-color 150ms ease; }
- .hosting-option:hover,.encryption-diagram:hover { --glow:1; border-color:var(--line-strong); }
+ .hosting-option,.encryption-diagram,.save-source,.choose-feature,.install-steps { background-image:radial-gradient(320px circle at var(--glow-x,50%) var(--glow-y,50%),rgb(139 92 246 / calc(var(--glow) * .13)),transparent 70%); transition:--glow 300ms ease,border-color 150ms ease; }
+ .hosting-option:hover,.encryption-diagram:hover,.save-source:hover,.choose-feature:hover,.install-steps:hover { --glow:1; border-color:var(--line-strong); }
 }
 
 /* Beta pill: links the release notes above the hero headline. */
@@ -277,3 +279,55 @@ main { overflow-x:clip; }
 .has-first-frame { position:relative; }
 .recording-first-frame { position:absolute; z-index:1; display:block; opacity:0; pointer-events:none; transition:none; }
 .recording-first-frame.is-visible { opacity:1; transition:opacity 400ms ease; }
+
+/* Polish pass: quieter chrome, lit surfaces and hairlines that fade at the edges. */
+:root { --header-height:73px; --surface:#131317; --hairline:linear-gradient(90deg,transparent,var(--line-strong) 18%,var(--line-strong) 82%,transparent); }
+@media(max-width:1000px) { :root { --header-height:67px; } }
+
+/* Header: clear over the hero, frosted once the page scrolls. */
+.canvas-header { background:transparent; border-bottom-color:transparent; backdrop-filter:none; transition:background-color 250ms ease,border-color 250ms ease,box-shadow 250ms ease; }
+.canvas-header.is-scrolled,.canvas-header:has(.nav-links.is-open) { background:#0c0c0fc7; border-bottom-color:var(--line); backdrop-filter:blur(20px) saturate(1.5); }
+.header-action { box-shadow:inset 0 1px 0 #fff,0 1px 2px #0006; transition:background-color 150ms ease; }
+.header-action:hover { background:#fff; }
+.header-github { border-color:transparent; transition:color 150ms ease,background-color 150ms ease,border-color 150ms ease; }
+
+/* Hero: the glow runs up behind the header. */
+.hero-band { position:relative; isolation:isolate; margin-top:calc(-1 * var(--header-height)); padding-top:var(--header-height); border-bottom:0; background:radial-gradient(ellipse 70% 420px at 50% 0,#8b5cf624,transparent 70%),radial-gradient(ellipse at 50% 72%,#8b5cf618,transparent 64%); }
+.hero-band::after { content:""; position:absolute; inset:auto 0 0; height:1px; background:var(--hairline); }
+main h1 > span,main h2 { padding-bottom:.12em; background:linear-gradient(180deg,#fff 20%,#ffffffb0); -webkit-background-clip:text; background-clip:text; color:transparent; }
+main h1 > span + span { background-image:linear-gradient(180deg,#ddd3fa 10%,#9d8fc4); }
+main h1 { margin-bottom:18px; letter-spacing:-.05em; }
+@media(forced-colors:active) { main h1 > span,main h2 { background:none; color:CanvasText; } }
+
+/* Buttons: a top highlight on the primary action, glass on the secondary. */
+.button { background:linear-gradient(180deg,#fbfaff,#ddd6ee); box-shadow:inset 0 1px 0 #fff,0 1px 2px #0008; transition:background 150ms ease,transform 150ms ease,box-shadow 150ms ease,border-color 150ms ease; }
+.button:hover { background:linear-gradient(180deg,#fff,#e9e3f6); box-shadow:inset 0 1px 0 #fff,0 1px 2px #0008; }
+.button--secondary,.button--secondary:hover { background:#ffffff0a; border-color:#ffffff1f; box-shadow:inset 0 1px 0 #ffffff12; }
+.button--secondary:hover { background:#ffffff14; border-color:#ffffff33; }
+.button:active { transform:translateY(0) scale(.985); }
+
+/* Section dividers fade out at both ends instead of running edge to edge. */
+.sync-showcase,.reading-section,.install-section,.choose-features,.hosting-section,.encryption-feature,.site-footer { border-image:var(--hairline) 1; }
+#reminders::before { border-image:var(--hairline) 1; }
+
+/* Cards share one lit surface. */
+.save-source,.choose-feature,.hosting-option,.encryption-diagram { border-radius:16px; background-color:var(--surface); box-shadow:inset 0 1px 0 #ffffff0d,0 1px 2px #0004; }
+.save-source,.choose-feature { transition:--glow 300ms ease,border-color 150ms ease; }
+
+/* Recordings sit in a hairline frame with depth. */
+#sync > .reminder-recording video,#reminders > .reminder-recording video { border-radius:14px; box-shadow:0 0 0 1px #ffffff14,0 40px 90px -40px #000; }
+
+/* Install steps read as one panel. */
+.install-steps { gap:0; padding:4px 28px; border:1px solid var(--line); border-radius:16px; background-color:var(--surface); box-shadow:inset 0 1px 0 #ffffff0d,0 1px 2px #0004; }
+.install-steps li,.install-steps li + li { padding-block:24px; }
+.install-steps li > span { border-color:#bca7ef33; background:#1c1826; }
+.copy-field { background:#0c0c0f; }
+@media(max-width:600px) { .install-steps { padding-inline:18px; } }
+
+/* Feature intros: the heading on the left, its description and guide on the right. */
+@media(min-width:851px) {
+ #sync > .reminder-recording:not(.reminder-recording--note) figcaption,#reminders > .reminder-recording:not(.reminder-recording--note) figcaption,.reading-intro { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,440px); column-gap:64px; row-gap:0; align-items:start; justify-items:start; max-width:none; }
+ #sync > .reminder-recording:not(.reminder-recording--note) figcaption > h2,#reminders > .reminder-recording:not(.reminder-recording--note) figcaption > h2,.reading-intro > h2 { grid-row:1 / span 2; max-width:560px; margin:0; }
+ #sync > .reminder-recording:not(.reminder-recording--note) figcaption > p,#reminders > .reminder-recording:not(.reminder-recording--note) figcaption > p,.reading-intro > p { grid-column:2; max-width:none; margin-top:8px; font-size:16px; }
+ #sync > .reminder-recording:not(.reminder-recording--note) figcaption > a,#reminders > .reminder-recording:not(.reminder-recording--note) figcaption > a,.reading-intro > .intro-actions { grid-column:2; margin-top:6px; }
+}
