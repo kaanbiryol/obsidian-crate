@@ -26,11 +26,16 @@ describe('inline reminder descriptions', () => {
 		expect(inlineDescription('Plain // text')).toBeNull();
 	});
 
-	it('starts a description at a separator with nothing typed after it yet', () => {
-		expect(inlineDescription('- [ ] Call Mia //')).toEqual({ from: 14, start: 17, to: 17, breaks: [], description: '' });
-		expect(inlineDescription('- [ ] Call Mia // <!-- crate-id:a -->')).toEqual({ from: 14, start: 17, to: 17, breaks: [], description: '' });
+	it('starts a description once a space is typed after the separator', () => {
+		// Until then the separator is title text, so typing `//s` never switches to a description and back.
+		expect(inlineDescription('- [ ] Call Mia //')).toBeNull();
+		expect(inlineDescription('- [ ] Call Mia // <!-- crate-id:a -->')).toBeNull();
+		expect(inlineDescription('- [ ] Call Mia //s <!-- crate-id:a -->')).toBeNull();
+		expect(inlineDescription('- [ ] Call Mia // ')).toEqual({ from: 14, start: 18, to: 18, breaks: [], description: '' });
+		expect(inlineDescription('- [ ] Call Mia //  <!-- crate-id:a -->')).toEqual({ from: 14, start: 18, to: 18, breaks: [], description: '' });
 		// Leaving a separator with nothing after it drops it.
-		expect(moved('- [ ] Call Mia // <!-- crate-id:a -->\nNext', [1])).toBe('- [ ] Call Mia <!-- crate-id:a -->\nNext');
+		expect(moved('- [ ] Call Mia //  <!-- crate-id:a -->\nNext', [1])).toBe('- [ ] Call Mia <!-- crate-id:a -->\nNext');
+		expect(moved('- [ ] Call Mia // <!-- crate-id:a -->\nNext', [1])).toBe('- [ ] Call Mia // <!-- crate-id:a -->\nNext');
 	});
 
 	it('moves the description under the reminder, after its hidden markers', () => {
@@ -39,11 +44,13 @@ describe('inline reminder descriptions', () => {
 	});
 
 	it('reads each further separator as a new line', () => {
-		const text = '- [ ] Call Mia // bring receipts //  // ask about May // <!-- crate-id:a -->';
+		const text = '- [ ] Call Mia // bring receipts //  // ask about May //  <!-- crate-id:a -->';
 		const found = inlineDescription(text)!;
 		expect(found.description).toBe('bring receipts\n\nask about May');
 		expect(found.breaks.map(position => text.slice(position, position + 3))).toEqual([' //', ' //', ' //']);
 		expect(moved(`${text}\nNext`, [1])).toBe('- [ ] Call Mia <!-- crate-id:a -->\n<!-- crate-desc:bring receipts\n\nask about May -->\nNext');
+		// A separator with no space after it yet is the description's text.
+		expect(inlineDescription('- [ ] Call Mia // bring receipts //t <!-- crate-id:a -->')?.description).toBe('bring receipts //t');
 	});
 
 	it('adds to a description the reminder already has', () => {

@@ -180,9 +180,10 @@ describe('reminder dates in the editor', () => {
 		expect(description?.kind === 'description' && description.breaks.map(position => doc.slice(position))).toEqual([' // two']);
 	});
 
-	it('switches to the description as soon as the separator is typed', () => {
+	it('switches to the description once a space follows the separator', () => {
 		const doc = '- [ ] Call Mia tomorrow 12:00 //';
-		expect(shown(doc, EditorSelection.single(doc.length))).toEqual(['typed chip:tomorrow 12:00', 'description: //']);
+		expect(shown(doc, EditorSelection.single(doc.length))).toEqual(['phrase:tomorrow 12:00']);
+		expect(shown(`${doc}s`, EditorSelection.single(doc.length + 1))).toEqual(['phrase:tomorrow 12:00']);
 		expect(shown(`${doc} `, EditorSelection.single(doc.length + 1))).toEqual(['typed chip:tomorrow 12:00', 'description: // ']);
 	});
 });

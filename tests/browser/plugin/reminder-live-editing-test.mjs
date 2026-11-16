@@ -372,6 +372,15 @@ for (const engine of [chromium, webkit]) {
 		await settle(page);
 		assert.match(await doc(), /\n- \[ \] Eat food 2026-11-15T11:00:00\.000Z <!-- crate-id:[0-9a-f-]{36} -->\n<!-- crate-desc:bring plates\nand cups -->$/, `${name}: new reminder saved\n${await doc()}`);
 		await checkClean(page, `${name}: after writing a reminder`);
+		// A separator starts a description only once a space follows it; `//s` stays in the title.
+		await mount('# Errands\n\nOutro', 10);
+		await page.keyboard.type('- [ ] Get flower //');
+		assert.equal((await visible())[1], '- [ ] Get flower //', `${name}: a separator alone stays in the title`);
+		await page.keyboard.type('s');
+		assert.equal((await visible())[1], '- [ ] Get flower //s', `${name}: a separator before a letter stays in the title`);
+		await page.keyboard.press('ArrowDown');
+		await settle(page);
+		assert.match(await doc(), /^# Errands\n- \[ \] Get flower \/\/s <!-- crate-id:[0-9a-f-]{36} -->\nOutro$/, `${name}: title with a separator saved\n${await doc()}`);
 
 		// Undo and redo through everything above never shows stored syntax or breaks a comment.
 		for (let step = 0; step < 30; step++) {
