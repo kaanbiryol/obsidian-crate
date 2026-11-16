@@ -185,7 +185,7 @@
 .encryption-feature { margin-top:56px; padding-top:48px; border-top:1px solid var(--line); scroll-margin-top:24px; }
 .encryption-layout { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); align-items:center; gap:72px; }
 .encryption-status { display:inline-flex; align-items:center; padding:5px 9px; margin-bottom:20px; border:1px solid #bca7ef26; border-radius:5px; color:var(--accent-text); font-size:12px; line-height:1.4; }
-.encryption-copy h3 { margin:0 0 18px; font-size:clamp(28px,3vw,36px); font-weight:500; letter-spacing:-.035em; line-height:1.2; text-wrap:balance; }
+.encryption-copy h3 { margin:0 0 18px; font-size:clamp(24px,2.4vw,28px); font-weight:500; letter-spacing:-.035em; line-height:1.2; text-wrap:balance; }
 .encryption-description { max-width:390px; color:var(--muted); font-size:16px; line-height:1.75; }
 .encryption-guide { display:inline-flex; align-items:center; gap:10px; min-height:44px; margin-top:12px; color:var(--accent-text); font-size:14px; }
 .encryption-guide:hover { color:var(--text); }

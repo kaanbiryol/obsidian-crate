@@ -73,7 +73,8 @@ window.addEventListener('scroll', () => {
 window.addEventListener('resize', () => updateNavigation(true));
 updateNavigation();
 
-// Hold the last frame, then fade the video over its stationary phone backdrop.
+// Hold the last frame, then crossfade into the first frame and play again.
+// Falls back to fading the video out when the first frame could not be captured.
 document.querySelectorAll('.reminder-recording video, .notification-preview video, .reading-share video').forEach((recording) => {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const isGalleryPreview = Boolean(recording.closest('a[data-gallery-video]'));
@@ -81,15 +82,41 @@ document.querySelectorAll('.reminder-recording video, .notification-preview vide
   let visible = false;
   let replayTimer;
   let replaying = false;
+  let firstFrame;
   recording.muted = true;
   recording.loop = false;
 
+  // Keep a copy of the opening frame to dissolve into from the last one.
+  recording.addEventListener('loadeddata', () => {
+    if (firstFrame || recording.currentTime > 0.1) return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = recording.videoWidth;
+      canvas.height = recording.videoHeight;
+      canvas.getContext('2d').drawImage(recording, 0, 0);
+      canvas.className = 'recording-first-frame';
+      canvas.setAttribute('aria-hidden', 'true');
+      const host = recording.parentElement;
+      if (getComputedStyle(host).position === 'static') host.classList.add('has-first-frame');
+      recording.after(canvas);
+      firstFrame = canvas;
+    } catch {
+      firstFrame = undefined;
+    }
+  }, { once: true });
+
+  function showFirstFrame() {
+    const { offsetLeft, offsetTop, offsetWidth, offsetHeight } = recording;
+    Object.assign(firstFrame.style, { left: `${offsetLeft}px`, top: `${offsetTop}px`, width: `${offsetWidth}px`, height: `${offsetHeight}px`, borderRadius: getComputedStyle(recording).borderRadius });
+    firstFrame.classList.add('is-visible');
+  }
   const canAutoplay = () => visible && !document.hidden && !reducedMotion.matches && !document.querySelector('#media-viewer[open]');
   function cancelReplay() {
     window.clearTimeout(replayTimer);
     replayTimer = undefined;
     replaying = false;
     recording.classList.remove('is-restarting');
+    firstFrame?.classList.remove('is-visible');
   }
   function play() {
     recording.play().catch(() => {
@@ -113,12 +140,13 @@ document.querySelectorAll('.reminder-recording video, .notification-preview vide
     if (replayTimer !== undefined) return;
     replayTimer = window.setTimeout(() => {
       replaying = true;
-      recording.classList.add('is-restarting');
+      if (firstFrame) showFirstFrame();
+      else recording.classList.add('is-restarting');
       replayTimer = window.setTimeout(() => {
         replayTimer = undefined;
         if (canAutoplay()) recording.currentTime = 0;
         else cancelReplay();
-      }, 350);
+      }, firstFrame ? 450 : 350);
     }, replayDelay);
   }
   recording.addEventListener('seeked', () => {
@@ -128,6 +156,7 @@ document.querySelectorAll('.reminder-recording video, .notification-preview vide
   });
   recording.addEventListener('playing', () => {
     recording.classList.remove('is-restarting');
+    firstFrame?.classList.remove('is-visible');
     replaying = false;
   });
   recording.addEventListener('ended', updatePlayback);

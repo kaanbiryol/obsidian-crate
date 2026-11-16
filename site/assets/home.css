@@ -7,7 +7,6 @@
 .sync-intro figcaption,.reading-intro { grid-template-columns:minmax(0,1fr); gap:16px; }
 .sync-intro figcaption { max-width:none; }
 .sync-intro figcaption p,.reading-intro p { max-width:560px; }
-.sync-intro figcaption .feature-label,.reading-intro .feature-label,.reminder-recording figcaption .feature-label { margin:0 0 6px; color:var(--accent-text); font:12px ui-monospace,monospace; }
 #sync > .reminder-recording,#reminders > .reminder-recording { margin-top:0; }
 #reminders > .reminder-recording h2 { margin-bottom:18px; }
 .overview-grid { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:36px; --gallery-media-height:220px; }
@@ -26,6 +25,8 @@
 .detail-switcher-tabs button { padding:3px 9px; border:1px solid var(--line); border-radius:999px; background:transparent; color:var(--muted); font:inherit; font-size:13px; line-height:1.4; cursor:pointer; transition:color 150ms ease,background-color 150ms ease,border-color 150ms ease; }
 .detail-switcher-tabs button:hover { color:var(--text); }
 .overview-grid .detail-switcher-tabs { justify-content:flex-start; }
+.mobile-gallery .detail-switcher-tabs { flex-wrap:nowrap; }
+.mobile-gallery .detail-switcher-tabs button { padding-inline:7px; }
 .detail-switcher-tabs button[aria-pressed="true"] { border-color:#bca7ef33; background:#1c1826; color:var(--accent-text); }
 @media(prefers-reduced-motion:reduce) { .detail-switcher-media > a,.detail-switcher-media > a:not(.is-active),.detail-switcher-tabs button { transition:none; } }
 .hosting-option p { margin-bottom:18px; }
@@ -44,18 +45,24 @@
  .overview-grid { grid-template-columns:1fr; --gallery-media-height:240px; }
  .mobile-gallery { --gallery-media-height:260px; gap:28px 16px; }
  .mobile-gallery > .feature-preview { flex-basis:calc((100% - 16px)/2); }
- .reading-previews { grid-template-columns:1fr; --gallery-media-height:340px; gap:32px; }
+ .reading-previews { grid-template-columns:repeat(2,minmax(0,1fr)); --gallery-media-height:260px; gap:28px 16px; }
+ .reading-previews > :last-child:nth-child(odd) { grid-column:1 / -1; justify-self:center; width:calc((100% - 16px)/2); }
+ .mobile-gallery .detail-switcher-tabs button { padding-inline:4px; font-size:11px; }
 }
 
 
 /* Consistent section labels: one monospace label style per section. */
-.hosting-intro .feature-label,.install-intro .feature-label { margin:0 0 6px; }
 /* Give recording headings room so they wrap like the other section headings. */
 /* Sync and Reminders lead with the heading, then the full-width recording below. */
 #sync > .reminder-recording,#reminders > .reminder-recording { grid-template-columns:minmax(0,1fr); gap:48px; }
 #sync > .reminder-recording figcaption,#reminders > .reminder-recording figcaption { max-width:680px; }
 #sync > .reminder-recording figcaption p:not(.feature-label),#reminders > .reminder-recording figcaption p:not(.feature-label) { max-width:560px; font-size:17px; }
 @media(max-width:600px) { #sync > .reminder-recording,#reminders > .reminder-recording { gap:28px; } }
+#reminders > .reminder-recording--note { grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:72px; margin-top:72px; }
+#reminders > .reminder-recording--note .recording-media { order:-1; }
+#reminders > .reminder-recording--note figcaption { max-width:390px; }
+#reminders > .reminder-recording--note h3 { margin:0 0 18px; font-size:clamp(24px,2.4vw,28px); font-weight:500; letter-spacing:-.035em; line-height:1.2; }
+@media(max-width:850px) { #reminders > .reminder-recording--note { grid-template-columns:minmax(0,1fr); gap:32px; margin-top:56px; } #reminders > .reminder-recording--note .recording-media { order:0; } #reminders > .reminder-recording--note figcaption { max-width:520px; } #reminders > .reminder-recording--note .recording-media { max-width:560px; } }
 
 /* Hero secondary action. */
 .hero-copy .actions { gap:12px; }
@@ -89,8 +96,7 @@ main { overflow-x:clip; }
 
 
 /* Reading has no side visual, so its intro centers over the phone row. */
-.reading-intro { justify-items:center; text-align:center; }
-.reading-intro .body-copy { margin-inline:auto; }
+.reading-intro h2 { max-width:680px; }
 
 /* Sync previews: lift the cards off the page so the dark captures read clearly. */
 .overview-grid .feature-preview-media { border-color:#bca7ef1f; background:radial-gradient(ellipse at 50% 0,#8b5cf614,transparent 70%),#17171c; transition:border-color 150ms ease,background-color 150ms ease; }
@@ -111,7 +117,7 @@ main { overflow-x:clip; }
    The video draws its own phone; the idle phone stays visible while it fades for replay. */
 .notify-spotlight { position:relative; isolation:isolate; margin-top:96px; text-align:center; }
 .notify-spotlight::before { content:""; position:absolute; inset:18% 10% 0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse at center,#8b5cf624,transparent 62%); }
-.notify-intro h3 { margin:0 0 16px; font-size:clamp(28px,3vw,36px); font-weight:500; letter-spacing:-.035em; line-height:1.2; }
+.notify-intro h3 { margin:0 0 16px; font-size:clamp(24px,2.4vw,28px); font-weight:500; letter-spacing:-.035em; line-height:1.2; }
 .notify-intro p { max-width:520px; margin:0 auto; color:var(--muted); font-size:16px; line-height:1.7; }
 .notify-stage { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:40px; margin-top:48px; }
 .notification-preview { margin:0; }
@@ -157,7 +163,7 @@ main { overflow-x:clip; }
 
 /* Each feature links to its guide right under the description. */
 .intro-guide { margin-top:12px; }
-.intro-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px 24px; margin-top:16px; }
+.intro-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:8px 24px; margin-top:16px; }
 .button--small { min-height:40px; padding:.55rem .95rem; font-size:13px; }
 
 /* Install steps: a direct link into Obsidian and a closing note. */
@@ -220,7 +226,7 @@ main { overflow-x:clip; }
 .reading-share { display:flex; justify-content:center; margin:0 0 48px; }
 .reading-share .gallery-video-trigger { display:block; height:480px; }
 .reading-share video { display:block; width:auto; height:100%; }
-.save-sources-title { margin:0 0 32px; font-size:clamp(28px,3vw,36px); font-weight:500; letter-spacing:-.035em; line-height:1.2; text-align:center; }
+.save-sources-title { margin:0 0 32px; font-size:clamp(24px,2.4vw,28px); font-weight:500; letter-spacing:-.035em; line-height:1.2; text-align:center; }
 .save-sources-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; max-width:1000px; margin:0 auto; padding:0; list-style:none; }
 .save-source { padding:22px 22px 24px; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
 .save-source > .icon { box-sizing:content-box; width:20px; height:20px; padding:9px; margin-bottom:16px; border:1px solid #bca7ef33; border-radius:10px; background:#1c1826; color:var(--accent-text); stroke-width:1.6; }
@@ -254,7 +260,6 @@ main { overflow-x:clip; }
 .choose-features { border-top:1px solid var(--line); }
 .choose-features > .section { display:flex; flex-direction:column; align-items:center; padding-block:80px; }
 .choose-features-intro { max-width:640px; margin-bottom:36px; text-align:center; }
-.choose-features-intro .feature-label { margin:0 0 6px; }
 .choose-features-intro h2 { margin-bottom:14px; }
 .choose-features-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; width:100%; max-width:1000px; margin:0 0 20px; padding:0; list-style:none; }
 .choose-feature { padding:22px 22px 24px; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
@@ -268,3 +273,7 @@ main { overflow-x:clip; }
 .feature-switch.is-on::after { left:16px; background:#fff; }
 @media(max-width:700px) { .choose-features-grid { grid-template-columns:minmax(0,1fr); gap:12px; } }
 @media(max-width:600px) { .choose-features > .section { padding-block:56px; } .choose-features-intro { margin-bottom:24px; } }
+/* Opening frame laid over a finished recording so the replay dissolves into it. */
+.has-first-frame { position:relative; }
+.recording-first-frame { position:absolute; z-index:1; display:block; opacity:0; pointer-events:none; transition:none; }
+.recording-first-frame.is-visible { opacity:1; transition:opacity 400ms ease; }
