@@ -224,6 +224,17 @@ for (const engine of [chromium, webkit]) {
 		await outro(page);
 		await settle(page);
 		await checkClean(page, `${name}: after backspacing a description`);
+		// Deleting all of a description's text removes its comment once the cursor leaves the reminder.
+		await mount();
+		await page.evaluate(() => window.place(window.doc().indexOf('Described') + 3));
+		await page.keyboard.press('End');
+		for (let step = 0; step < 'one line'.length; step++) await page.keyboard.press('Backspace');
+		await settle(page);
+		assert.ok((await doc()).includes('- [ ] Described <!-- crate-id:f -->\n<!-- crate-desc: -->\n'), `${name}: an emptied description stays while it is edited\n${await doc()}`);
+		await outro(page);
+		await settle(page);
+		assert.ok((await doc()).includes('- [ ] Described <!-- crate-id:f -->\n- [ ] Multi'), `${name}: an emptied description is removed\n${await doc()}`);
+		await checkClean(page, `${name}: after emptying a description`);
 
 		// Enter at the end of a description starts a new task; inside, it breaks the line.
 		await mount();

@@ -17,15 +17,35 @@ interface LineLeave {
 	isFocused: boolean;
 }
 
-/** Task lines with text that the cursor just left. */
-function leftTaskLines({ startState, state, changes, wasFocused, isFocused }: LineLeave): number[] {
-	// Lines left by an unfocused editor were not being typed, so the scan writes them.
-	if (!wasFocused) return [];
+/** The lines the cursors were on before the update and are on after it, in the new document. */
+function cursorLines({ startState, state, changes, isFocused }: LineLeave): { previous: Set<number>; current: Set<number> } {
 	const { doc } = state;
 	// Map each old cursor's line start: Obsidian's Enter rewrites the line's last character, which would carry the cursor itself along.
 	const previous = new Set(startState.selection.ranges.map(range => doc.lineAt(changes.mapPos(startState.doc.lineAt(range.head).from, -1)).number));
 	const current = new Set(isFocused ? state.selection.ranges.map(range => doc.lineAt(range.head).number) : []);
+	return { previous, current };
+}
+
+/** Task lines with text that the cursor just left. */
+function leftTaskLines(leave: LineLeave): number[] {
+	// Lines left by an unfocused editor were not being typed, so the scan writes them.
+	if (!leave.wasFocused) return [];
+	const { doc } = leave.state, { previous, current } = cursorLines(leave);
 	return [...previous].filter(line => !current.has(line) && TASK_WITH_TEXT.test(doc.line(line).text));
+}
+
+const EMPTY_DESCRIPTION = /^<!-- crate-desc:\s*-->$/;
+
+/**
+ * The description lines left empty, as deleting all of a description's text leaves them, on the reminders
+ * the cursor just left. A description is edited on its own hidden line, so the cursor leaves either line.
+ */
+function emptiedDescriptionLines(leave: LineLeave): number[] {
+	if (!leave.wasFocused) return [];
+	const { doc } = leave.state, { previous, current } = cursorLines(leave);
+	return [...new Set([...previous].flatMap(line => [line, line + 1]))].filter(line => line > 1 && line <= doc.lines
+		&& !current.has(line) && !current.has(line - 1)
+		&& EMPTY_DESCRIPTION.test(doc.line(line).text) && TASK_WITH_TEXT.test(doc.line(line - 1).text));
 }
 
 /** The change that replaces a line's text with `text`, touching only the span that differs. */
@@ -123,8 +143,10 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 		const isFocused = update.view.hasFocus;
 		const wasFocused = update.focusChanged ? !isFocused : isFocused;
 		if (!canAssign(update.state)) return;
-		let left = leftTaskLines({ ...update, wasFocused, isFocused });
-		if (!left.length) return;
+		const leave = { ...update, wasFocused, isFocused };
+		let left = leftTaskLines(leave);
+		const emptied = emptiedDescriptionLines(leave);
+		if (!left.length && !emptied.length) return;
 		const { view } = update, { doc } = update.state;
 		let descriptions = inlineDescriptionChanges(doc, left);
 		let dates = descriptions.length ? null : scheduleChanges(update.state, left);
@@ -135,23 +157,25 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 			const kept = left.filter(number => tasks.has(number - 1));
 			if (kept.length !== left.length) {
 				left = kept;
-				if (!left.length) return;
+				if (!left.length && !emptied.length) return;
 				descriptions = inlineDescriptionChanges(doc, left);
 				dates = descriptions.length ? null : scheduleChanges(update.state, left);
 			}
 		}
 		// Without a description or date to save the IDs are known now; otherwise they follow the edited lines.
 		const known = descriptions.length || dates?.length ? null : reminderIdChanges(update.state.doc, left);
-		if (known && !known.length) return;
+		if (known && !known.length && !emptied.length) return;
 		// A view cannot dispatch during its own update; skip if the text moved on meanwhile.
 		queueMicrotask(() => {
 			if (view.state.doc !== update.state.doc) return;
-			let lines = left;
+			let lines = left, blocks = emptied;
 			// Undo brings back what each step replaced, so it never leaves half of it.
 			const apply = (spec: TransactionSpec) => {
 				const before = view.state.doc, transaction = view.state.update(spec);
 				view.dispatch(transaction);
-				lines = lines.map(number => view.state.doc.lineAt(transaction.changes.mapPos(before.line(number).from, -1)).number);
+				const map = (number: number) => view.state.doc.lineAt(transaction.changes.mapPos(before.line(number).from, -1)).number;
+				lines = lines.map(map);
+				blocks = blocks.map(map);
 			};
 			// Filters would keep the block from landing after the line's hidden markers.
 			if (descriptions.length) apply({ changes: descriptions, userEvent: 'input.description', filter: false });
@@ -160,6 +184,10 @@ export function createReminderLineLeaveExtension(canAssign: (state: EditorState)
 			// Undo would remove the hidden ID unseen, and leaving the line again would mint another.
 			const ids = known ?? reminderIdChanges(view.state.doc, lines);
 			if (ids.length) view.dispatch({ changes: ids, annotations: Transaction.addToHistory.of(false) });
+			// An emptied description goes with the line break before it; a description moved into it meanwhile stays.
+			const { doc: now } = view.state;
+			const empty = blocks.filter(number => number > 1 && number <= now.lines && EMPTY_DESCRIPTION.test(now.line(number).text));
+			if (empty.length) view.dispatch({ changes: empty.map(number => ({ from: now.line(number - 1).to, to: now.line(number).to })), userEvent: 'delete.description', filter: false });
 		});
 	});
 }
