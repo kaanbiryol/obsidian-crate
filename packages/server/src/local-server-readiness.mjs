@@ -1,6 +1,13 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
-/** Verify the public route reaches this running instance, not a stale tunnel. */
+/** Verify the public route reaches this running instance, not a stale tunnel.
+ * @param {object} options
+ * @param {string} options.origin
+ * @param {string} options.instance
+ * @param {AbortSignal} [options.signal]
+ * @param {typeof fetch} [options.fetchPublic]
+ * @param {number} [options.interval]
+ * @param {(ready: boolean) => void} [options.onChange] */
 export function monitorPublicReadiness({ origin, instance, signal, fetchPublic = fetch,
 	interval = 5000, onChange = () => {} }) {
 	const controller = new AbortController();

@@ -6,7 +6,6 @@ import { SyncQueueController } from '../queue/controller';
 import { pendingChangeKey } from '../pending/pending-change';
 import { TFolder } from 'obsidian';
 import { cancelSyncResult, createEmptySyncResult } from '../sync-result';
-import * as conflict from '../conflict/conflict';
 import { SyncRuntime } from './runtime';
 import type { SyncResult } from '../types';
 import {
@@ -243,11 +242,13 @@ describe('SyncRuntime startup event handling', () => {
 		vi.spyOn(SyncEngine.prototype, 'sync').mockResolvedValueOnce(
 			cancelSyncResult({ ...createEmptySyncResult(), conflicts: ['notes/startup-conflict.md'] }),
 		);
-		const notifyConflicts = vi.spyOn(conflict, 'notifyConflicts').mockImplementation(() => {});
 		const { runtime, settings } = createRuntimeHarness();
+		// Conflict notices come from result listeners, which a cancelled sync never reaches.
+		const resultListener = vi.fn();
+		runtime.addSyncResultListener(resultListener);
 		await runtime.initialize();
 		expect(await runtime.waitForStartupSync()).toBe(false);
-		expect(notifyConflicts).not.toHaveBeenCalled();
+		expect(resultListener).not.toHaveBeenCalled();
 		expect(settings.syncHistory).toHaveLength(0);
 	});
 });

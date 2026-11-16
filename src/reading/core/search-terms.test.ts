@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { highlightedAt, highlightsMatch, highlightTerms, readingTerms, searchableQuery, searchWords, titleMatches, wordTerm } from './search-terms';
+import { highlightedAt, highlightsMatch, highlightTerms, matchesReadingQuery, readingTerms, searchableQuery, searchWords, titleMatches, wordTerm } from './search-terms';
 
 it('searches only from three characters, counting letters rather than code units or edge spaces', () => {
 	expect(searchableQuery('ja')).toBe('');
@@ -51,4 +51,16 @@ it('matches a highlight search when every query word starts a title, highlight o
 	expect(highlightsMatch(item, 'habi revis')).toBe(true);
 	expect(highlightsMatch(item, 'essay patient')).toBe(true);
 	expect(highlightsMatch(item, 'abits')).toBe(false);
+});
+
+it('matches a library search by title, or highlights in the Highlights tab, and by tag', () => {
+	const item = { title: 'Systems at scale', tags: ['Café'], highlights: [{ start: 0, end: 20, text: 'Queues absorb bursts' }] };
+	expect(matchesReadingQuery(item, { query: 'sys sca', highlights: false })).toBe(true);
+	expect(matchesReadingQuery(item, { query: 'queues', highlights: false })).toBe(false);
+	expect(matchesReadingQuery(item, { query: 'queues', highlights: true })).toBe(true);
+	// Tags compare case-insensitively after Unicode normalization.
+	expect(matchesReadingQuery(item, { query: '', tag: 'CAFE\u0301', highlights: false })).toBe(true);
+	expect(matchesReadingQuery(item, { query: 'systems', tag: 'other', highlights: false })).toBe(false);
+	// An empty or blank query, and no tag, match every note.
+	for (const query of ['', '   ']) expect(matchesReadingQuery(item, { query, tag: null, highlights: true })).toBe(true);
 });

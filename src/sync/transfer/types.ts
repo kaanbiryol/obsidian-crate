@@ -5,6 +5,17 @@ import type { BatchUploadFile, BatchUploadResponse, FileEntry, UploadResult } fr
 import type { RecordConflictInput } from '../conflict/store';
 import type { UploadApplyPhase } from '../diagnostics/upload-diagnostics';
 
+/** A local file read and hashed for upload. */
+export interface PreparedUpload {
+	path: string;
+	content: ArrayBuffer;
+	hash: string;
+	size: number;
+	mtime?: number;
+	contentType?: string;
+	expectedHash?: string | null;
+}
+
 interface TransferManifest {
 	getEntry(path: string): Readonly<FileEntry> | undefined;
 	hashMatches(path: string, hash: string): boolean;

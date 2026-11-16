@@ -20,7 +20,9 @@ import { parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles } 
 import { processDiff as transferProcessDiff } from '../transfer/process';
 import { uploadPreparedFiles as transferUploadPreparedFiles } from '../transfer/upload';
 import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from '../transfer/constants';
-import type { FileDiff, PreparedUpload, SyncResult, SyncState, SyncWork } from '../types';
+import type { SyncResult, SyncState, SyncWork } from '../types';
+import type { FileDiff } from '../planner/types';
+import type { PreparedUpload } from '../transfer/types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { assertNoOpenInitialImport, runInitialImport } from './initial-import';
 import { finishInitialSetup } from './initial-setup';
@@ -33,6 +35,8 @@ import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
 import { createPathRecord } from '../../protocol/path-record';
 import { replaceVaultBeforeFirstSync } from '../local/vault-replacement';
+import { mergeSyncResults } from '../sync-result';
+import { createAbortError } from '../abort';
 import type { SyncQueueControllerContext } from '../queue/controller';
 
 const VAULT_REPLACEMENT_UNFINISHED = 'Select Sync now to finish replacing this vault with your Crate server’s contents.';
@@ -60,11 +64,9 @@ interface SyncEngineContextDependencies {
 	getModifiedIso: (path: string, fallbackMtime?: number) => Promise<string>;
 	getPendingKeys: () => string[];
 	verifyContent: (files: VaultFile[]) => Promise<boolean>;
-	reconcileVersionConflicts: (keys: PendingKey[], result: SyncResult) => Promise<void>;
 	updateState: (updates: Partial<SyncState>) => void;
 	reconnectNotice: ReconnectNotice;
-	throwIfDestroyed: () => void;
-	isDestroyed: () => boolean;
+	signal: AbortSignal;
 	/** Prepares reminder settings again, logging rather than throwing a failure. */
 	retryReminderScope: () => Promise<void>;
 	verifyPendingPaths: (keys: string[], isCurrent: (key: string) => boolean, replayed?: ReadonlySet<string>) => Promise<string[]>;
@@ -102,7 +104,7 @@ export class SyncEngineContexts {
 			encrypted: this.encrypted,
 		};
 		this.localDiffPlanner = {
-			throwIfDestroyed: d.throwIfDestroyed,
+			signal: d.signal,
 			vault: d.vault,
 			plannedContent: this.plannedContent,
 			localManifest: d.localManifest,
@@ -120,7 +122,7 @@ export class SyncEngineContexts {
 			recoverUploads: this.recoverUploads,
 			getStatus: d.getStatus,
 			...this.completion,
-			throwIfDestroyed: d.throwIfDestroyed,
+			signal: d.signal,
 			localManifest: d.localManifest,
 			deleteRemoteFiles: this.deleteRemoteFiles,
 			getManifest: () => d.api.getManifest(),
@@ -135,7 +137,7 @@ export class SyncEngineContexts {
 					this.markUploadOnly();
 					await d.prepareInitialUpload?.();
 				},
-				shouldIgnore: d.shouldIgnore, throwIfDestroyed: d.throwIfDestroyed,
+				shouldIgnore: d.shouldIgnore, signal: d.signal,
 				save: () => d.localManifest.save(),
 				setLastSeq: this.setLastSeq,
 				report: this.reportWork,
@@ -159,7 +161,7 @@ export class SyncEngineContexts {
 			}, remoteFiles, concurrency, options),
 			processDiff: this.processDiff,
 			prepareFullSyncUpload: diff => prepareTransferUploadFromPath(this.transfer, diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
-			reconcileVersionConflicts: d.reconcileVersionConflicts,
+			reconcileVersionConflicts: this.reconcileVersionConflicts,
 			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles,
 			setLastSeq: this.setLastSeq,
 		};
@@ -184,7 +186,7 @@ export class SyncEngineContexts {
 			localManifest: d.localManifest,
 			shouldIgnore: d.shouldIgnore,
 			...this.completion,
-			isDestroyed: d.isDestroyed,
+			signal: d.signal,
 			getStatus: d.getStatus,
 			verifyPendingPaths: d.verifyPendingPaths,
 			prepareUploadFromPath: this.prepareUploadFromPath,
@@ -235,7 +237,7 @@ export class SyncEngineContexts {
 					// Conflicted paths return to the queue pass for a fresh reconciliation.
 					reconcileVersionConflicts: async keys => { retryPaths.push(...keys); },
 					localManifest: d.localManifest,
-					throwIfDestroyed: d.throwIfDestroyed,
+					signal: d.signal,
 				}, diffs, createPathRecord<FileEntry>(), result, () => {});
 				for (const failure of failures) onFailure?.(failure);
 				return retryPaths;
@@ -277,6 +279,20 @@ export class SyncEngineContexts {
 		return this.replayUploads();
 	};
 
+	/** Reconciles queued paths after the checks every targeted transfer runs first. */
+	readonly reconcilePaths = async (queueKeys: PendingKey[], recover = true, onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> => {
+		await this.beforeTargetedTransfer({ recover });
+		this.dependencies.signal.throwIfAborted();
+		return this.reconcileQueuePaths(queueKeys, onFailure);
+	};
+
+	/** Folds a reconciliation of paths that lost a version race into the running sync's result. */
+	private readonly reconcileVersionConflicts = async (keys: PendingKey[], result: SyncResult): Promise<void> => {
+		const reconciliation = await this.reconcilePaths(keys);
+		mergeSyncResults(result, reconciliation);
+		if (reconciliation.outcome === 'cancelled') throw createAbortError('Sync reconciliation aborted');
+	};
+
 	/** Runs before a queue flush or a targeted reconciliation transfers anything. The local
 	 * replacement check comes first, so no server request runs before it passes. */
 	readonly beforeTargetedTransfer = async ({ recover }: { recover: boolean }): Promise<void> => {
@@ -298,7 +314,7 @@ export class SyncEngineContexts {
 		const d = this.dependencies;
 		return replaceVaultBeforeFirstSync({
 			settings: d.getSettings(), manifest: d.localManifest, vault: d.vault, pluginDir: d.pluginDir,
-			reportWork: this.reportWork, throwIfDestroyed: d.throwIfDestroyed,
+			reportWork: this.reportWork, signal: d.signal,
 		});
 	};
 
@@ -307,7 +323,7 @@ export class SyncEngineContexts {
 		return finishInitialSetup({
 			manifest: d.localManifest, lastSeq: d.getSettings().lastSeq,
 			initialImport: d.api.initialImport, prepareReminderScope: d.prepareReminderScope,
-			reportWork: this.reportWork, markUploadOnly: this.markUploadOnly, throwIfDestroyed: d.throwIfDestroyed,
+			reportWork: this.reportWork, markUploadOnly: this.markUploadOnly, signal: d.signal,
 		});
 	};
 
@@ -319,7 +335,7 @@ export class SyncEngineContexts {
 			setLastSeq: this.setLastSeq,
 			persistSettings: d.persistSettings,
 			reportWork: this.reportWork,
-			throwIfDestroyed: d.throwIfDestroyed,
+			signal: d.signal,
 			vault: d.vault,
 			fileManager: d.fileManager,
 			files: d.files,
@@ -334,7 +350,7 @@ export class SyncEngineContexts {
 			processDiff: this.processDiff,
 			prepareUploadFromPath: this.prepareUploadFromPath,
 			uploadPreparedFiles: this.uploadPreparedFiles,
-			reconcileVersionConflicts: d.reconcileVersionConflicts,
+			reconcileVersionConflicts: this.reconcileVersionConflicts,
 			awaitingReviewPaths: () => d.conflictStore.awaitingReviewPaths(path => d.localManifest.getEntry(path)?.revision),
 			getRemoteEntries: async paths => (await d.api.getFileMetadata(paths)).files,
 		}, {

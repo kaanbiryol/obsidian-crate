@@ -1,6 +1,5 @@
 import type { SyncResult, SyncState } from '../types';
 import { createAbortError, isAbortError } from '../abort';
-import { notifyConflicts } from '../conflict/conflict';
 import { retryWithBackoff, runConcurrentTasks } from '../concurrency';
 import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
@@ -34,7 +33,6 @@ interface SyncEngineLifecycleDependencies {
 export class SyncEngineLifecycle {
 	private syncInterval: ReturnType<typeof setInterval> | null = null;
 	private abortController = new AbortController();
-	private destroyed = false;
 	private consecutiveCheckFailures = 0;
 	private lastCheckAttempt = 0;
 	private checking = false;
@@ -45,17 +43,13 @@ export class SyncEngineLifecycle {
 		return this.abortController.signal;
 	}
 
-	get isDestroyed(): boolean {
-		return this.destroyed;
-	}
-
 	get checkFailureCount(): number {
 		return this.consecutiveCheckFailures;
 	}
 
 	startPeriodicSync(): void {
 		this.stopPeriodicSync();
-		if (this.destroyed) return;
+		if (this.abortSignal.aborted) return;
 		const syncIntervalSeconds = this.dependencies.getSyncIntervalSeconds();
 		if (syncIntervalSeconds > 0) {
 			this.syncInterval = setInterval(
@@ -70,7 +64,7 @@ export class SyncEngineLifecycle {
 	}
 
 	private async localContentCheck(): Promise<void> {
-		if (this.destroyed || this.checking) return;
+		if (this.abortSignal.aborted || this.checking) return;
 		this.checking = true;
 		try { await this.dependencies.verifyLocalContent?.(); }
 		catch (error) { if (!isAbortError(error)) logger.warn('Local content check failed:', errorMessage(error)); }
@@ -84,29 +78,24 @@ export class SyncEngineLifecycle {
 	}
 
 	async runConcurrent<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
-		return runConcurrentTasks(tasks, concurrency, () => this.destroyed);
+		return runConcurrentTasks(tasks, concurrency, this.abortSignal);
 	}
 
 	async retryWithBackoff<T>(fn: () => Promise<T>): Promise<T> {
 		return retryWithBackoff(fn, {
 			maxRetries: MAX_RETRIES,
 			baseDelayMs: RETRY_BASE_DELAY_MS,
-			isDestroyed: () => this.destroyed,
+			signal: this.abortSignal,
 		});
 	}
 
-	throwIfDestroyed(): void {
-		if (this.destroyed) throw createAbortError('Sync engine destroyed');
-	}
-
 	destroy(): void {
-		this.destroyed = true;
-		this.abortController.abort();
+		this.abortController.abort(createAbortError('Sync engine destroyed'));
 		this.stopPeriodicSync();
 	}
 
 	async periodicCheck(): Promise<void> {
-		if (this.destroyed || this.checking) return;
+		if (this.abortSignal.aborted || this.checking) return;
 		this.checking = true;
 		try { await this.runPeriodicCheck(); } finally { this.checking = false; }
 	}
@@ -147,7 +136,6 @@ export class SyncEngineLifecycle {
 			logger.info('Periodic check: changes detected, running sync');
 			const result = await dependencies.sync();
 			if (result.outcome === 'cancelled') return;
-			notifyConflicts(result.conflicts);
 			this.consecutiveCheckFailures = result.success ? 0 : this.consecutiveCheckFailures + 1;
 		} catch (error) {
 			if (isAbortError(error)) return;

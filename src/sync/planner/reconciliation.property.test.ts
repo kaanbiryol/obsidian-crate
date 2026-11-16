@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
-import type { FileDiff } from '../types';
+import type { FileDiff } from './types';
 import { classifyPath, classifyPaths } from './reconciliation';
 
 // A small hash and revision alphabet makes equal and unequal states both common.

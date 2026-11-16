@@ -115,7 +115,7 @@ describe('selected sync with durable file operations', () => {
 
 	it('shows checking, per-file progress, and saving during selected uploads', async () => {
 		const h = await harness(), labels: string[] = [];
-		h.engine.setStateChangeCallback(state => labels.push(formatSyncProgress(null, state.work)));
+		h.hooks.onStateChange = state => labels.push(formatSyncProgress(null, state.work));
 		h.remote.metadata.mockImplementation(async () => {
 			expect(labels.at(-1)).toBe('Checking for changes…');
 			return { files: {} };

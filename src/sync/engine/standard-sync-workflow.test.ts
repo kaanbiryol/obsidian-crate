@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FileDiff, SyncResult } from '../types';
+import type { SyncResult } from '../types';
+import type { FileDiff } from '../planner/types';
 import type { FileEntry } from '../../protocol/sync-types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './standard-sync-workflow';
 import { AUTH_ERROR_MESSAGE, ReconnectNotice } from '../sync-outcome';
@@ -31,7 +32,6 @@ function createContext(options: {
 		updateState: vi.fn(),
 		getManifest: vi.fn(async () => ({ files: {}, lastSeq: 9 })),
 		incrementalSync: vi.fn(async () => null),
-		throwIfDestroyed: vi.fn(),
 		createFullSyncPlan: vi.fn(async () => ({
 			localFiles,
 			diffs: [uploadDiff],
@@ -59,7 +59,7 @@ function createContext(options: {
 		updateState: spies.updateState,
 		getManifest: spies.getManifest,
 		incrementalSync: spies.incrementalSync,
-		throwIfDestroyed: spies.throwIfDestroyed,
+		signal: new AbortController().signal,
 		createFullSyncPlan: spies.createFullSyncPlan,
 		processDiff: spies.processDiff,
 		deleteRemoteFiles: spies.deleteRemoteFiles,

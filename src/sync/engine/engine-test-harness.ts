@@ -1,6 +1,6 @@
 import type { SyncEngineContexts } from './contexts';
 import { vi } from 'vitest';
-import { SyncEngine } from './engine';
+import { SyncEngine, type SyncEngineHooks } from './engine';
 import { ConflictStore } from '../conflict/store';
 import { createEmptySyncResult } from '../sync-result';
 import type { CrateSettings } from '../../plugin/settings-types';
@@ -153,7 +153,9 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 
 	const manifest = new LocalManifest(plugin.app as never, plugin.manifest, getCheckpointAuthority(settings) || 'unconfigured');
 	let conflictStore!: ConflictStore;
-	const engine = new SyncEngine(plugin as never, api as never, settings, {
+	// Tests replace a hook by assigning it; the engine reads hooks when it calls them.
+	const hooks: SyncEngineHooks = { persistSettings: async () => {} };
+	const engine = new SyncEngine(plugin as never, api as never, settings, hooks, {
 		localManifest: manifest,
 		createFiles: createFiles as never,
 		createConflictStore: onActiveCountChange => conflictStore = new ConflictStore(plugin.app as never, plugin.manifest, onActiveCountChange),
@@ -174,7 +176,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 	};
 	const localManifest: Omit<LocalManifest, keyof typeof spies> & typeof spies = Object.assign(manifest, spies);
 
-	return { engine, settings, fileManager, workspace, api, vault, localManifest, conflictStore };
+	return { engine, hooks, settings, fileManager, workspace, api, vault, localManifest, conflictStore };
 }
 
 export type Harness = ReturnType<typeof createHarness>;

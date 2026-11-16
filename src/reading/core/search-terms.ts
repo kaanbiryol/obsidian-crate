@@ -78,6 +78,13 @@ export const highlightsMatch = (item: Pick<ReadingMetadata, 'title' | 'highlight
 export const highlightMatches = (title: string, highlight: { text: string; note?: string }, query: string) =>
 	wordsMatch(searchWords(`${title} ${highlight.text} ${highlight.note ?? ''}`, MAX_HIGHLIGHT_WORDS), query);
 
+/** Whether a listed note matches a library search: `query` its title, or in the Highlights tab
+ * its title and highlights, and `tag` one of its tags. An empty query or tag matches every note. */
+export function matchesReadingQuery(item: Pick<ReadingMetadata, 'title' | 'tags' | 'highlights'>, { query, tag, highlights }: { query: string; tag?: string | null; highlights: boolean }): boolean {
+	if (query.trim() && !(highlights ? highlightsMatch(item, query) : titleMatches(item.title, query))) return false;
+	return !tag || item.tags.some(value => normalizedTag(value) === normalizedTag(tag));
+}
+
 function wordsMatch(words: string[], query: string): boolean {
 	return searchWords(query, MAX_QUERY_WORDS).every(part => words.some(word => word.startsWith(part)));
 }

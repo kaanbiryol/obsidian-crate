@@ -23,18 +23,21 @@ import { HomeScreenInstallSteps } from '../components/HomeScreenInstall';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
 import { usePwaPreferences } from './usePwaPreferences';
 import { useSheetTransition } from '../hooks/useSheetTransition';
-import { useSettingsStore } from './settings-context';
+import { useSettingsSelector, useSettingsStore } from './settings-context';
+import { shallowEqual, type SettingsSnapshot } from './settings-store';
+import { ReminderRecoveryNotices } from '../reminders/notices/ReminderRecoveryNotices';
 import { useAppUpdate } from '../update/PwaUpdateProvider';
 import { PwaUpdateNotice, PwaUpdateFeedback } from '../update/PwaUpdateNotice';
 import type { PwaPreferences } from './preferences';
 
 type SettingsAction = 'refresh' | 'export-reminders' | 'export-reading' | 'logout';
+const selectFeatures = ({ reminders, reading }: SettingsSnapshot) => ({ reminders, reading });
 
 export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { navigation: PushedScreenHistory<'shortcut' | 'logout' | 'install'>; onReviewReminders: () => void; onOpenEnd: () => void }) {
 	const store = useSettingsStore();
 	const appUpdate = useAppUpdate();
-	const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
-	const { reminders, reading } = snapshot;
+	const features = useSettingsSelector(selectFeatures, shallowEqual);
+	const { reminders, reading } = features;
 	const { preferences, updatePreferences } = usePwaPreferences();
 	const homeScreen = useHomeScreenInstall();
 	const encryption = useSyncExternalStore(subscribeReminderEncryption, reminderEncryptionSnapshot);
@@ -48,7 +51,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 	const exclusive = appUpdate.updating || pending.has('logout');
 	const [message, setMessage] = useState<string | null>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
-	const { ready, unsynced, status: syncStatus } = pwaSyncState(snapshot);
+	const { ready, unsynced, status: syncStatus } = pwaSyncState(features);
 	const attention = [reminders?.connected && reminders.attention ? 'Reminders: ' + reminders.attention : null, reading?.attention ? 'Reading: ' + reading.attention : null].filter(Boolean);
 	const navigate = (next: 'settings' | 'shortcut' | 'logout' | 'install') => {
 		setMessage(null);
@@ -70,6 +73,8 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 	const refreshAll = () => refreshPwaSync(store.getSnapshot());
 	const readingExport = reading?.onExport && <SettingsAction icon={Download} disabled={exclusive || pending.has('export-reading')} onClick={() => void run('export-reading', reading.onExport!)}>Export Reading data</SettingsAction>;
 	const reminderExport = reminders?.onExport && <SettingsAction icon={Download} disabled={exclusive || pending.has('export-reminders')} onClick={() => void run('export-reminders', reminders.onExport!)}>Export unsynced reminders</SettingsAction>;
+	const reminderRecovery = reminders && <ReminderRecoveryNotices recoveryChanges={reminders.recoveryChanges} quarantinedChanges={reminders.quarantinedChanges}
+		folderPath={reminders.config.folderPath} onResume={reminders.onResumeRecovery} onRemove={reminders.onRemoveQuarantined} />;
 
 	const close = () => {
 		if (exclusive || closing) return false;
@@ -99,7 +104,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 					<p>This logs out of Reading and Reminders and clears their offline data and drafts from this device. Your synced data stays on the server.</p>
 					{unsynced && <p className="settings-attention">There are unsynced or unverified changes on this device. Sync or review them before logging out.</p>}
 					{(reminderExport || readingExport) && <div className="settings-recovery-actions">{reminderExport}{readingExport}</div>}
-					{reminders?.recovery}
+					{reminderRecovery}
 					<div className="settings-actions">
 						<Button variant="outline" size="touch" disabled={exclusive} onClick={() => navigate('settings')}>Cancel</Button>
 						<Button variant="outline" size="touch" tone="danger" disabled={exclusive || !ready} aria-disabled={busy || !ready} onClick={() => void run('logout', async () => {
@@ -129,7 +134,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 						{readingExport}
 						<SettingsAction icon={RefreshCw} disabled={exclusive || pending.has('refresh') || !ready} aria-busy={pending.has('refresh')} onClick={() => void run('refresh', refreshAll)}>Refresh all</SettingsAction>
 						{reminders?.attention && <SettingsAction icon={ChevronRight} onClick={() => { finish(); onReviewReminders(); }}>Review reminders</SettingsAction>}
-						{reminders?.recovery}
+						{reminderRecovery}
 						{reminderExport}
 						<EncryptionSetupHint reading={reading} />
 					</SettingsSection></div>

@@ -5,7 +5,8 @@ import { hasUnresolvedConflict, recordResolvedRace } from '../sync-result';
 import { PREPARE_CONCURRENCY } from '../transfer/constants';
 import { uploadFullSyncPlan } from './full-sync-upload';
 import { createLogger } from '../logger';
-import type { FileDiff, RemoteManifest, SyncResult } from '../types';
+import type { SyncResult } from '../types';
+import type { FileDiff, RemoteManifest } from '../planner/types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import { getPathEntry } from '../../protocol/path-record';
 import { namespaceConflictLookup } from '../namespace-conflicts';
@@ -27,7 +28,7 @@ export async function runFullSync(
 	progressCallback?: (current: number, total: number) => void,
 ): Promise<void> {
 	try {
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		context.updateState({ work: { phase: 'server' } });
 		// The local scan and hashing overlap the manifest request.
 		const manifestRequest = context.getManifest();
@@ -89,7 +90,7 @@ export async function runFullSync(
 			failures.push(...await uploadFullSyncPlan(context, uploadDiffs, localFiles, result, () => advance()));
 		}
 
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		await applyRemaining([...clearing].filter(diff => diff.action === 'delete-local'));
 
 		if (downloadDiffs.length > 0) {
@@ -105,7 +106,7 @@ export async function runFullSync(
 			progressCallback?.(current, total);
 		}
 
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 
 		const unapplied = remainingDiffs.filter(diff => !clearing.has(diff));
 		const remoteDeletes = unapplied.filter(diff => diff.action === 'delete');

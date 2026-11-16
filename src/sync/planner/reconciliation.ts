@@ -1,4 +1,4 @@
-import type { FileDiff } from '../types';
+import type { FileDiff } from './types';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { LocalManifestView } from '../manifest/manifest';
 import { getPathEntry } from '../../protocol/path-record';

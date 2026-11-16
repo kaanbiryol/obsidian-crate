@@ -330,7 +330,7 @@ describe('multiple real sync engines across Worker and storage boundaries', () =
 		expect(reader.disk.has('Archive/old.md')).toBe(false);
 
 		const persist = vi.fn(async () => {});
-		reader.engine.setSettingsPersistence(persist);
+		reader.hooks.persistSettings = persist;
 		reader.settings.ignorePatterns = reader.settings.ignorePatterns.filter(pattern => pattern !== 'Archive/');
 		reader.engine.updateSettings(reader.settings);
 		await vi.waitFor(() => expect(persist).toHaveBeenCalled());

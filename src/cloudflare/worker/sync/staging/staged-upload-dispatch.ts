@@ -2,15 +2,13 @@ import { commitStagedFile, commitStagedFiles, type CommitResult } from '../mutat
 import { armNotificationCoordinator } from '../../notifications/lifecycle';
 import { FileNamespaceConflictError } from '../file-namespace';
 import type { Env } from '../../types';
-import { isReminderPath } from '../../reminders/scope';
-import { isReadingNotePath } from '../../reading/library-index';
+import { createsNotificationWork, needsStagedReminderBytes, policyFenceRefusal, readCommitFolders } from './commit-context';
 import { getNotificationPolicy } from '../../notifications/policy';
 import { readEncryptionState } from '../../encryption/state';
 import type { UploadCommitInput, UploadCommitters } from './upload-committers';
 import { commitCoordinatorUpload, commitCoordinatorUploads } from '../../coordinator/coordinator';
 import type { UploadOperation } from '../upload-operations';
 import { isMarkdownPath } from '../../../../protocol/note-paths';
-import { MAX_REMINDER_NOTE_BYTES } from '../../../../reminders/core/constants';
 
 type UploadParams = UploadCommitInput;
 type CommitUpload = UploadCommitters['commitUpload'];
@@ -122,12 +120,10 @@ export async function prepareCoordinatedUploads(request: Request): Promise<Uploa
 
 /** Framed bytes need no policy fence: the commit projects whatever folder is current. */
 export async function commitCoordinatedUploads(files: UploadsParams, state: DurableObjectState, env: Env): Promise<Response> {
-	const current = await env.DB.prepare(`SELECT p.folder_path, r.folder_path AS reading_folder
-    FROM (SELECT 1) LEFT JOIN notification_policy p ON p.id = 1 LEFT JOIN reading_policy r ON r.id = 1`)
-		.first<{ folder_path: string | null; reading_folder: string | null }>();
-	if (createsNotificationWork(files.map(file => file.path), current?.folder_path ?? null, current?.reading_folder ?? null)) await armNotificationCoordinator(state);
-	return Response.json(await commitStagedFiles(env.BUCKET, env.DB, files.map(file => ({ ...file, reminderFolder: current?.folder_path ?? null,
-		readingPolicy: current?.reading_folder ? { folder_path: current.reading_folder } : null }))));
+	const current = await readCommitFolders(env.DB);
+	if (createsNotificationWork(files.map(file => file.path), current)) await armNotificationCoordinator(state);
+	return Response.json(await commitStagedFiles(env.BUCKET, env.DB, files.map(file => ({ ...file, reminderFolder: current.reminderFolder,
+		readingPolicy: current.readingPolicy }))));
 }
 
 export async function prepareCoordinatedUpload(request: Request, env: Env): Promise<UploadParams | Response> {
@@ -140,8 +136,10 @@ export async function prepareCoordinatedUpload(request: Request, env: Env): Prom
 	}
 	const policy = await getNotificationPolicy(env.DB);
 	metadata.reminderPolicyRevision = policy?.revision ?? null;
-	// Plaintext bytes matter only to a reminder note, and one over the limit is rejected by its size.
-	if ((!isReminderPath(metadata.path, policy?.folderPath ?? null) || metadata.size > MAX_REMINDER_NOTE_BYTES)
+	// Unlike a bulk new-file commit, which keeps the encryption state its lease was taken
+	// under, this commit validates against the state current under the lock. A vault
+	// encrypted since the upload began therefore needs the bytes too.
+	if (!needsStagedReminderBytes(metadata, policy?.folderPath ?? null)
 		&& !await readEncryptionState(env.DB)) return { ...metadata, content: new ArrayBuffer(0) };
 	const object = await env.BUCKET.get(metadata.objectKey);
 	if (!object) return Response.json({ error: 'Staged object unavailable' }, { status: 503 });
@@ -149,25 +147,16 @@ export async function prepareCoordinatedUpload(request: Request, env: Env): Prom
 	return { ...metadata, content };
 }
 
-/** Only reminder notes and plaintext Reading notes queue projection or index work.
- * Arming for others would add a full notification pass per commit. */
-export function createsNotificationWork(paths: readonly string[], reminderFolder: string | null, readingFolder: string | null): boolean {
-	return paths.some(path => isReminderPath(path, reminderFolder) || (readingFolder !== null && isReadingNotePath(path, readingFolder)));
-}
-
 export async function commitCoordinatedUpload(params: UploadParams, state: DurableObjectState, env: Env): Promise<Response> {
 	// One read under the lock covers the policy fence and the folders used by the
 	// reminder projection and the Reading index.
-	const current = await env.DB.prepare(`SELECT p.revision, p.folder_path, r.folder_path AS reading_folder
-    FROM (SELECT 1) LEFT JOIN notification_policy p ON p.id = 1 LEFT JOIN reading_policy r ON r.id = 1`)
-		.first<{ revision: string | null; folder_path: string | null; reading_folder: string | null }>();
-	if (params.reminderPolicyRevision !== undefined && params.reminderPolicyRevision !== (current?.revision ?? null)) {
-		return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
-	}
-	if (createsNotificationWork([params.path], current?.folder_path ?? null, current?.reading_folder ?? null)) await armNotificationCoordinator(state);
+	const current = await readCommitFolders(env.DB);
+	const refused = policyFenceRefusal([params.reminderPolicyRevision], current);
+	if (refused) return refused;
+	if (createsNotificationWork([params.path], current)) await armNotificationCoordinator(state);
 	try {
-		return Response.json(await commitStagedFile(env.BUCKET, env.DB, { ...params, reminderFolder: current?.folder_path ?? null,
-			readingPolicy: current?.reading_folder ? { folder_path: current.reading_folder } : null }));
+		return Response.json(await commitStagedFile(env.BUCKET, env.DB, { ...params, reminderFolder: current.reminderFolder,
+			readingPolicy: current.readingPolicy }));
 	} catch (error) {
 		if (error instanceof FileNamespaceConflictError) return error.toResponse();
 		throw error;

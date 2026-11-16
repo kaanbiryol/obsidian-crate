@@ -8,11 +8,12 @@ import { isSha256Hex } from '../platform/validation';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { verifyVaultCredential, writeSyncSettings } from './sync-connection';
 import { confirmVaultReplacement } from './vault-replacement';
+import { beginConnectionOperation, runningConnectionOperation } from './connection-operation';
 
-const connecting = new WeakSet<CratePlugin>();
-
-export function isSelfHostedConnectionPending(plugin: CratePlugin): boolean {
-	return connecting.has(plugin);
+function claimConnection(plugin: CratePlugin): () => void {
+	const release = beginConnectionOperation(plugin, 'self-hosted');
+	if (!release) throw new ConnectionSetupError('busy');
+	return release;
 }
 
 /** A Quick Tunnel can change address while its persisted server stays the same.
@@ -20,7 +21,7 @@ export function isSelfHostedConnectionPending(plugin: CratePlugin): boolean {
  * Unencrypted connections keep normal server-change reconciliation. */
 export async function updateSelfHostedServerAddress(plugin: CratePlugin, address: string): Promise<void> {
 	if (plugin.settings.cloudflareDeployment || !plugin.syncRuntime.isConfigured()) throw new ConnectionSetupError('not-self-hosted');
-	if (connecting.has(plugin) || plugin.cloudflareDeploymentService.isBusy || plugin.cloudflareDeploymentService.pendingIntent) {
+	if (runningConnectionOperation(plugin) || plugin.cloudflareDeploymentService.isBusy || plugin.cloudflareDeploymentService.pendingIntent) {
 		throw new ConnectionSetupError('busy');
 	}
 	const expected = { workerUrl: plugin.settings.workerUrl, authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '' };
@@ -28,7 +29,7 @@ export async function updateSelfHostedServerAddress(plugin: CratePlugin, address
 	const workerUrl = requireNormalizedWorkerUrl(address);
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
-	connecting.add(plugin);
+	const release = claimConnection(plugin);
 	try {
 		if (plugin.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) {
 			await plugin.syncRuntime.updateEncryptionResetAddress(workerUrl, signal);
@@ -43,7 +44,7 @@ export async function updateSelfHostedServerAddress(plugin: CratePlugin, address
 		signal.throwIfAborted();
 		if (plugin.settings.cloudflareDeployment) throw new ConnectionSetupError('changed');
 		await plugin.syncRuntime.applyInfrastructureConfig({ workerUrl, authToken: expected.authToken }, signal, expected);
-	} finally { connecting.delete(plugin); }
+	} finally { release(); }
 }
 
 /** Validate the server and vault credential before changing local settings. */
@@ -59,7 +60,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 		}
 	};
 	assertAvailable();
-	if (connecting.has(plugin)) throw new ConnectionSetupError('busy');
+	if (runningConnectionOperation(plugin)) throw new ConnectionSetupError('busy');
 	const workerUrl = requireNormalizedWorkerUrl(address);
 	if (reconnect && workerUrl !== requireNormalizedWorkerUrl(expected.workerUrl)) throw new ConnectionSetupError('address-update-required');
 	let authToken = token.trim();
@@ -67,7 +68,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 	if (!pairing && !isSha256Hex(authToken)) throw new ConnectionSetupError('invalid-token');
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();
-	connecting.add(plugin);
+	const release = claimConnection(plugin);
 	try {
 		if (pairing) authToken = await exchangeSelfHostedPairingCode(workerUrl, authToken, signal);
 		const api = await verifyVaultCredential(workerUrl, authToken, signal);
@@ -86,6 +87,6 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 		}
 		return { encrypted: Boolean(encryption) };
 	} finally {
-		connecting.delete(plugin);
+		release();
 	}
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PreparedUpload } from '../types';
+import type { PreparedUpload } from '../transfer/types';
 import { runIncrementalSync } from './incremental';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
 import { SyncIssueError } from '../issues';
@@ -59,7 +59,7 @@ it('falls back to full sync when cursor is expired', async () => {
 				getAllPaths: vi.fn(() => []),
 				getManifest: vi.fn(() => ({ version: 1, files: {} })),
 			},
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
@@ -139,7 +139,7 @@ it('falls back to full sync when cursor is expired', async () => {
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [{ path: 'notes/queued.md', hash: newLocalHash }], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
@@ -219,7 +219,7 @@ it('falls back to full sync when cursor is expired', async () => {
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [{ path: 'notes/shared.md', hash: localHash }], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
@@ -275,7 +275,7 @@ it('falls back to full sync when cursor is expired', async () => {
 				getAllPaths: vi.fn(() => []),
 				getManifest: vi.fn(() => ({ version: 1, files: {} })),
 			},
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
@@ -338,7 +338,7 @@ it('falls back to full sync when cursor is expired', async () => {
 				getAllPaths: vi.fn(() => []),
 				getManifest: vi.fn(() => ({ version: 1, files: {} })),
 			},
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
@@ -385,7 +385,7 @@ it('falls back to full sync when cursor is expired', async () => {
 				getAllPaths: vi.fn(() => []),
 				getManifest: vi.fn(() => ({ version: 1, files: {} })),
 			},
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),

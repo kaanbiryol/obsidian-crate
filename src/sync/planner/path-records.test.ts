@@ -20,7 +20,7 @@ function createPlanner(localPaths: string[] = []) {
 	} as unknown as Vault;
 	const localManifest = new LocalManifest({ vault }, { dir: '.obsidian/plugins/crate' });
 	const context: FullSyncPlannerContext = {
-		vault, localManifest, throwIfDestroyed: () => {}, shouldIgnore: () => false,
+		vault, localManifest, signal: new AbortController().signal, shouldIgnore: () => false,
 		runConcurrent: async tasks => Promise.all(tasks.map(task => task())),
 		encrypted: () => false,
 	};

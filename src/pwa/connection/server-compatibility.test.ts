@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { forgetCompatibleProtocol, requireCompatibleProtocol, requireCompatibleServer } from './server-compatibility';
 import { makeApiFetch } from './api-fetch';
+import { reminderTransport } from '../reminders/reminder-transport';
 
 vi.mock('../reminders/encryption-session', () => ({ prepareReminderEncryption: async () => null, reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }) }));
 
@@ -45,7 +46,7 @@ it('negotiates the change protocol once per page until the server refuses it', a
 		: refuse ? Response.json({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible' }, { status: 428 })
 			: Response.json({ success: true }));
 	vi.stubGlobal('fetch', network);
-	const api = makeApiFetch('session', vi.fn());
+	const api = makeApiFetch('session', vi.fn(), reminderTransport);
 	const change = () => api('/reminders/delete', { method: 'DELETE', body: '{}' });
 	const serverInfoReads = () => network.mock.calls.filter(([path]) => path === '/.well-known/crate').length;
 	await change();

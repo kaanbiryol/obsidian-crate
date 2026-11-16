@@ -9,6 +9,7 @@ import { handleSubscribe, handleUnsubscribe } from './notifications/subscription
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { writeCommittedMarkdownFile } from './sync/markdown-files';
 import { makeApiFetch } from '@/pwa/connection/api-fetch';
+import { reminderTransport } from '@/pwa/reminders/reminder-transport';
 import { performPwaLogout } from '@/pwa/connection/usePwaSessionLifecycle';
 import { invalidatePwaSession } from '@/pwa/connection/session-generation';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
@@ -131,7 +132,7 @@ it('composes browser logout with the real API wrapper and Worker revocation', as
 	const network = vi.fn(async (path: string, init?: RequestInit) => worker.fetch(new Request(`https://test${path}`, init), env));
 	vi.stubGlobal('fetch', network);
 	expect(await performPwaLogout({
-		apiFetch: makeApiFetch(localToken, () => { throw new Error('Unexpected unauthorized callback'); }),
+		apiFetch: makeApiFetch(localToken, () => { throw new Error('Unexpected unauthorized callback'); }, reminderTransport),
 		disablePushNotifications: async () => {},
 		clearLocalSession: () => { invalidatePwaSession(); localToken = null; },
 	})).toBe(false);

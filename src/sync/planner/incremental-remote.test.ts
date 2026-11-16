@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Platform } from 'obsidian';
-import type { PreparedUpload, SyncResult } from '../types';
+import type { SyncResult } from '../types';
+import type { PreparedUpload } from '../transfer/types';
 import { runIncrementalSync } from './incremental';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
 import { sha256Hex } from '../../platform/sha256';
@@ -108,7 +109,7 @@ describe('runIncrementalSync', () => {
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),

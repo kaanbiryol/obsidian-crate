@@ -1,6 +1,7 @@
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { afterEach, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api-fetch';
+import { reminderTransport } from '../reminders/reminder-transport';
 import { AUTH_TOKEN_KEY } from '../config';
 import { READING_SESSION_KEY } from '../reading/session/session';
 import { invalidatePwaSession } from './session-generation';
@@ -21,7 +22,7 @@ it('dispatches the captured revocation after local logout while fencing ordinary
 		return new Response(JSON.stringify({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] }));
 	});
 	vi.stubGlobal('fetch', network);
-	const apiFetch = makeApiFetch('old-token', vi.fn());
+	const apiFetch = makeApiFetch('old-token', vi.fn(), reminderTransport);
 	const ordinary = apiFetch('/reminders/create', { method: 'POST' }).catch((error: unknown) => error);
 	const failed = await performPwaLogout({ apiFetch, disablePushNotifications: async () => {}, clearLocalSession: () => { invalidatePwaSession(); values.set(AUTH_TOKEN_KEY, 'new-token'); } });
 	expect(failed).toBe(false);
@@ -43,7 +44,7 @@ it('revokes a shared reminders and Reading credential once', async () => {
 		: new Response(JSON.stringify({ service: 'crate', serverVersion: '0.1.0', serverRevision: 4, reminderOperationDay: 20_000, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] })));
 	vi.stubGlobal('fetch', network);
 	const failed = await performPwaLogout({
-		apiFetch: makeApiFetch(token, vi.fn()),
+		apiFetch: makeApiFetch(token, vi.fn(), reminderTransport),
 		disablePushNotifications: async () => {},
 		clearLocalSession: () => { invalidatePwaSession(); values.delete(AUTH_TOKEN_KEY); },
 	});

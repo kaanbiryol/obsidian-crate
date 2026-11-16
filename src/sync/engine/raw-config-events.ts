@@ -13,7 +13,7 @@ interface RawConfigEventHost {
 	vault: { readonly configDir: string; readonly adapter: Pick<DataAdapter, 'stat'> };
 	manifest: Pick<LocalManifest, 'hasFile'>;
 	queue: Pick<SyncQueueController, 'onFileChange' | 'onFileDelete' | 'hasPendingKey'>;
-	isDestroyed: () => boolean;
+	signal: AbortSignal;
 	isSyncing: () => boolean;
 	shouldIgnore: (path: string) => boolean;
 	/** Returns a check that stays true until the next sync activity starts. */
@@ -33,10 +33,10 @@ export function createRawConfigEventHandler(host: RawConfigEventHost): (path: st
 	let verificationTask: Promise<unknown> = Promise.resolve();
 	return async path => {
 		if (!isHiddenPath(path) && !path.startsWith(`${host.vault.configDir}/`)) return;
-		if (host.isDestroyed() || host.shouldIgnore(path)) return;
+		if (host.signal.aborted || host.shouldIgnore(path)) return;
 		const revision = {};
 		revisions.set(path, revision);
-		const isCurrent = () => !host.isDestroyed() && revisions.get(path) === revision && !host.shouldIgnore(path);
+		const isCurrent = () => !host.signal.aborted && revisions.get(path) === revision && !host.shouldIgnore(path);
 		try {
 			assertLocalSyncPath(path);
 			const stat = await host.vault.adapter.stat(path);

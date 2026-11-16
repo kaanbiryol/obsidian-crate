@@ -5,7 +5,7 @@ import type { EncryptionServerState } from '../../../encryption/server-state';
 import { createLogger } from '../../../sync/logger';
 import { errorMessage } from '../../../platform/logger';
 import { getPluginLifecycleSignal } from '../../../plugin/lifecycle-state';
-import { cachedSettingsRequest } from '../../../plugin/settings-ui-state';
+import { cachedSettingsRequest } from '../settings-ui-state';
 import { EncryptionResetModal } from './encryption-reset-modal';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 import { EncryptionModal, encryptionModalTitle } from './encryption-modal';

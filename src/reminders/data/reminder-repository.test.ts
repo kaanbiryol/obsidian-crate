@@ -22,6 +22,7 @@ function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 		renameFile: () => {},
 		isReminderFile: () => true,
 		onIndexChange: () => () => {},
+		getVersion: () => 0,
 		applyOptimisticCreate: () => {},
 		applyOptimisticUpdate: () => {},
 		applyOptimisticDelete: () => {},

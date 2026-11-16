@@ -120,6 +120,9 @@ mutations replace entries through the manifest so revision tracking and checks
 across asynchronous reads agree. Diagnostics remain outside recovery equivalence.
 `RenameDependencies` in `sync/manifest/rename-dependencies.ts` indexes renamed
 baseline paths by their current location and applies file and folder moves.
+`sync/engine/local-changes.ts` finds local edits that fired no vault event: the
+startup scan while automatic sync is off, content checks of same-metadata edits and
+verification that pending paths are unchanged before the queue settles them.
 Pending previews, discard preparation and post-sync baseline verification live in
 `sync/engine/pending-changes.ts`; `SyncQueueController` owns the pending set, its
 revisions, event coalescing, debounce timing and accepted flush batches. Each batch
@@ -360,6 +363,11 @@ verification and key-import policy through `encryption/encryption-verification.t
 their local storage migration and cache responsibilities. Expired credentials are
 matched against the current connection before suspension; expiry preserves drafts
 and pending changes, while explicit logout clears both features' local data.
+`connection/api-fetch.ts` is the app credential's feature-neutral transport: Reminders
+supplies its encryption check, encrypted router and folder-change handling
+(`reminders/reminder-transport.ts`), and `encryption/encryption-off-trust.ts` keeps the
+unencrypted verdict that lets a change skip the probe for 30 seconds. Reading sends
+through its own `reading/api.ts` and checks before every plaintext body.
 Connection boundaries publish typed issues from `connection/issues.ts`; recovery
 screens choose cleanup, reconnect or retry actions from the issue kind, independently
 of its display message.
@@ -441,6 +449,10 @@ scan re-reads its inventory if one of those events occurs before publication.
 The same invalidation also stops the scanner's ID normalization, preventing a late
 read from rewriting a note after it moves out of the reminder folder. This keeps
 immediate index updates authoritative over older asynchronous reads.
+The index advances `getVersion()` before each change notification. Obsidian reminder
+views read it through `useReminderRepository`, a `useSyncExternalStore` hook that
+selects again after an index change, after a folder change publishes a new backend,
+or after an explicit refresh following a user action.
 Rewriting a note under its editor can drop unsaved typing, so
 `reminders/data/editor-normalization.ts` writes normalization (identifiers, typed
 dates, duplicate repair) of a note shown in a loaded source-mode editor as one editor
@@ -609,8 +621,15 @@ reminder data, session, outbox, and editor hooks independently of the screen.
 Its screen-facing contract groups connection, sync, mutations, editor, status and
 presentation models. The always-mounted provider retains hydration, recovery and
 update-readiness registration when the reminders screen is hidden.
+Both feature runtimes publish their settings model with `useFeatureSettings`. Callbacks
+are published as stable functions that call the latest render's, so
+`settings/settings-store.ts` skips a model whose fields are unchanged, and Settings,
+the sync indicator and the update provider render again only when the fields they
+read through `useSettingsSelector` change.
 `useReminderSync` owns the confirmed snapshot, hydrates it from the offline copy
-after startup and exposes reads and explicit commit/reset operations.
+after startup and exposes reads and explicit commit/reset operations. Its loading,
+refreshing, data mode and error transitions are the pure reducer in
+`reminder-sync-state.ts`; the hook keeps effects, requests and refs.
 `reminder-list-response.ts` decides what a list response or failure means (304, invalid
 body, disk fallback); the hook applies that outcome. Indexing progress is separate from failure state, so an
 HTTP 202 preparation response remains a syncing status without recovery attention.

@@ -5,7 +5,7 @@ import { parseJsonObject, parseOptionalString } from '../http/request-validation
 import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
 import { DEVICE_PAIRING_GRANT, parseDevicePairingRecord, type DevicePairingRecord } from '../../../protocol/device-pairing';
-import { revokeCredentialStatements } from './revocation';
+import { RESET_GENERATION_SQL, revokeCredentialStatements } from './revocation';
 
 const respond = (body: unknown, status = 200) => corsResponse(body, status, { 'Cache-Control': 'no-store' });
 const invalid = () => respond({ error: 'This pairing code expired or was already used. Create a new one on your desktop.' }, 410);
@@ -33,7 +33,7 @@ export async function exchangeDevicePairing(request: Request, db: D1Database): P
 	// The exact unclaimed record and the current reset generation authorize one token.
 	// An encryption reset replaces every credential, so a code issued before it is void.
 	const grant = `EXISTS (SELECT 1 FROM grants WHERE kind = '${DEVICE_PAIRING_GRANT}' AND key = ? AND payload = ?
-		AND json_extract(payload, '$.resetGeneration') = COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), ''))`;
+		AND json_extract(payload, '$.resetGeneration') = ${RESET_GENERATION_SQL})`;
 	const created = 'EXISTS (SELECT 1 FROM auth_tokens WHERE id = ? AND token_hash = ?)';
 	// Re-pairing a device replaces its previous credential and what that credential owned,
 	// only once this redemption has created its token.

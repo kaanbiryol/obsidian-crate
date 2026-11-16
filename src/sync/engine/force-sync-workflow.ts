@@ -13,7 +13,9 @@ import {
 import { createLogger } from '../logger';
 import { getPathEntry } from '../../protocol/path-record';
 import { namespaceConflictLookup } from '../namespace-conflicts';
-import type { PreparedUpload, RemoteManifest, SyncResult } from '../types';
+import type { SyncResult } from '../types';
+import type { PreparedUpload } from '../transfer/types';
+import type { RemoteManifest } from '../planner/types';
 import type { LocalManifest } from '../manifest/manifest';
 import type { MutationFailure } from '../../protocol/sync-types';
 import {
@@ -44,7 +46,7 @@ export interface ForceSyncWorkflowContext extends WorkflowCompletionContext {
 		result: SyncResult,
 		options: import('../transfer/upload').UploadPreparedFilesOptions
 	): Promise<void>;
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 	deleteRemoteFiles: DeleteRemoteFiles;
 }
 
@@ -60,13 +62,13 @@ export async function runForceFullSyncWorkflow(
 	try {
 		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		context.updateState({ work: { phase: 'server' } });
 		const remoteManifest = await context.getManifest();
 		const remotePaths = new Set(Object.keys(remoteManifest.files));
 
 		context.updateState({ work: { phase: 'scanning' } });
-		const localFiles = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
+		const localFiles = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.signal.throwIfAborted());
 		// Skipped files stay local paths, so their server copy is neither replaced nor deleted.
 		const localPaths = new Set(localFiles.map(file => file.path));
 		const { eligible: files, skipped } = partitionSkippedUploads(localFiles, context.encrypted());
@@ -102,7 +104,7 @@ export async function runForceFullSyncWorkflow(
 		if (files.length) context.updateState({ work: { phase: 'preparing' } });
 		await uploadPipelined(context, files, result, {
 			prepare: async file => {
-				context.throwIfDestroyed();
+				context.signal.throwIfAborted();
 				const upload = await context.prepareForceUpload(file, getPathEntry(remoteManifest.files, file.path)?.hash ?? null);
 				current++;
 				progressCallback?.(current, total);
@@ -110,7 +112,7 @@ export async function runForceFullSyncWorkflow(
 			},
 			retry: true,
 			onFailure: failure => { failures.push(failure); },
-			beforeChunk: () => context.throwIfDestroyed(),
+			beforeChunk: () => context.signal.throwIfAborted(),
 			reportWork: work => context.updateState({ work }),
 			afterChunk: () => {
 				if (result.errors.length > 0) {
@@ -119,7 +121,7 @@ export async function runForceFullSyncWorkflow(
 			},
 		});
 
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 
 		await deleteRemoteOnly(remoteOnlyPaths.filter(path => localConflict(path) === undefined));
 

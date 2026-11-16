@@ -3,7 +3,9 @@ import { errorMessage } from '../../platform/logger';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import { uploadPipelined } from '../transfer/upload-pipeline';
-import type { UploadDiff, PreparedUpload, SyncResult, SyncWork } from '../types';
+import type { SyncResult, SyncWork } from '../types';
+import type { UploadDiff } from '../planner/types';
+import type { PreparedUpload } from '../transfer/types';
 import { decodePendingChange, type PendingKey } from '../pending/pending-change';
 import { recordResolvedRace } from '../sync-result';
 import { isAbortError } from '../abort';
@@ -15,7 +17,7 @@ export interface FullSyncUploadContext {
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 	reconcileVersionConflicts?(keys: PendingKey[], result: SyncResult): Promise<void>;
 	localManifest: Pick<LocalManifest, 'getEntry'>;
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 }
 
 /** Bound retained bytes while using the same CAS/receipt validation as initial sync.
@@ -25,7 +27,7 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 	const failures: MutationFailure[] = [];
 	await uploadPipelined(context, diffs, result, {
 		prepare: async diff => {
-			context.throwIfDestroyed();
+			context.signal.throwIfAborted();
 			try {
 				const prepared = await context.prepareFullSyncUpload(diff);
 				if (prepared) return prepared;
@@ -50,7 +52,7 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 			}
 		} } : {}),
 		beforeChunk: () => {
-			context.throwIfDestroyed();
+			context.signal.throwIfAborted();
 			context.reportWork?.({ phase: 'uploading', current: processed, total: diffs.length });
 		},
 		onProcessed: count => {

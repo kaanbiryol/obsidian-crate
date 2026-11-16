@@ -16,7 +16,7 @@ it('waits for schedules before treating a vault as established', async () => {
 	const { api, requestJson } = harness();
 	requestJson.mockResolvedValueOnce({ ready: false }).mockResolvedValueOnce({ ready: true });
 	let finished = false;
-	const waiting = api.waitUntilReady('token', () => {}).then(() => { finished = true; });
+	const waiting = api.waitUntilReady('token', new AbortController().signal).then(() => { finished = true; });
 	await vi.advanceTimersByTimeAsync(500);
 	expect(finished).toBe(false);
 	await vi.advanceTimersByTimeAsync(500); await waiting;
@@ -28,7 +28,7 @@ it('preserves a completed-upload session for retry after a reminder error', asyn
 	const { api, requestJson } = harness();
 	requestJson.mockResolvedValueOnce({ ready: false, error: 'Duplicate reminder identity' })
 		.mockResolvedValueOnce({ import: { token: 'token', state: 'complete' } });
-	await expect(api.waitUntilReady('token', () => {})).rejects.toThrow('Files uploaded. Reminder setup needs attention');
+	await expect(api.waitUntilReady('token', new AbortController().signal)).rejects.toThrow('Files uploaded. Reminder setup needs attention');
 	expect(await api.begin()).toEqual({ token: 'token', state: 'complete' });
 });
 
@@ -40,7 +40,7 @@ it('preserves every reported note and reminder scope, and filters unsafe remote 
 		{ path: '../outside.md', message: 'Bad path' },
 		{ path: 'invalid.md', message: 42 },
 	] });
-	const error = await api.waitUntilReady('token', () => {}).catch((error: unknown) => error);
+	const error = await api.waitUntilReady('token', new AbortController().signal).catch((error: unknown) => error);
 	expect(syncErrorIssues(error)).toEqual([
 		{ scope: 'reminders', path: 'Reminders/café: draft.md', message: 'Unsupported reminder description encoding on line 4', code: 'unsupported-description-encoding', line: 4 },
 		{ scope: 'reminders', path: 'Reminders/two.md', message: 'Duplicate reminder identity' },
@@ -52,7 +52,7 @@ it('preserves every reported note and reminder scope, and filters unsafe remote 
 it('retains older server errors without guessing which part of their text is a filename', async () => {
 	const { api, requestJson } = harness();
 	requestJson.mockResolvedValue({ ready: false, error: 'note.md: bad description' });
-	const error = await api.waitUntilReady('token', () => {}).catch((error: unknown) => error);
+	const error = await api.waitUntilReady('token', new AbortController().signal).catch((error: unknown) => error);
 	expect(syncErrorIssues(error)).toEqual([{ scope: 'reminders', message: 'Files uploaded. Reminder setup needs attention: note.md: bad description' }]);
 });
 
@@ -60,10 +60,10 @@ it('stops polling when the sync is cancelled', async () => {
 	vi.useFakeTimers();
 	const { api, requestJson } = harness();
 	requestJson.mockResolvedValue({ ready: false });
-	let cancelled = false;
-	const pending = api.waitUntilReady('token', () => { if (cancelled) throw new Error('cancelled'); });
+	const controller = new AbortController();
+	const pending = api.waitUntilReady('token', controller.signal);
 	const rejected = expect(pending).rejects.toThrow('cancelled');
-	await vi.advanceTimersByTimeAsync(500); cancelled = true;
+	await vi.advanceTimersByTimeAsync(500); controller.abort(new Error('cancelled'));
 	await vi.advanceTimersByTimeAsync(500); await rejected;
 	expect(requestJson).toHaveBeenCalledOnce();
 });
@@ -75,7 +75,7 @@ it('reports live remaining work while polling and accepts older servers without 
 	const counts = { scanning: false, remainingFiles: 0, remainingSchedules: 42 };
 	requestJson.mockResolvedValueOnce({ ready: false, progress: counts })
 		.mockResolvedValueOnce({ ready: false }).mockResolvedValueOnce({ ready: true });
-	const waiting = api.waitUntilReady('token', () => {}, progress);
+	const waiting = api.waitUntilReady('token', new AbortController().signal, progress);
 	await vi.advanceTimersByTimeAsync(2000); await waiting;
 	expect(progress).toHaveBeenCalledExactlyOnceWith(counts);
 });
@@ -84,14 +84,14 @@ it('polls every second for the first minute, then every 5 seconds, and still sto
 	vi.useFakeTimers();
 	const { api, requestJson } = harness();
 	requestJson.mockResolvedValue({ ready: false });
-	let cancelled = false;
-	const pending = api.waitUntilReady('token', () => { if (cancelled) throw new Error('cancelled'); });
+	const controller = new AbortController();
+	const pending = api.waitUntilReady('token', controller.signal);
 	const rejected = expect(pending).rejects.toThrow('cancelled');
 	await vi.advanceTimersByTimeAsync(60_000);
 	expect(requestJson).toHaveBeenCalledTimes(61);
 	await vi.advanceTimersByTimeAsync(20_000);
 	expect(requestJson).toHaveBeenCalledTimes(65);
-	cancelled = true;
+	controller.abort(new Error('cancelled'));
 	await vi.advanceTimersByTimeAsync(1000); await rejected;
 	expect(requestJson).toHaveBeenCalledTimes(65);
 });

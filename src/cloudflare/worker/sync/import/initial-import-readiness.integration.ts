@@ -229,16 +229,16 @@ it('preserves initial uploads when reminder settings fail and resumes without up
 	const device = new SyncTestDevice('initial-policy-retry', env); clients.push(device);
 	await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
 	device.disk.write('Reminders/task.md', note('2099-01-01T12:00:00.000Z'));
-	device.engine.setReminderScopePreparation(async () => { throw new Error('reminder settings unavailable'); });
+	device.hooks.prepareReminderScope = async () => { throw new Error('reminder settings unavailable'); };
 	const interrupted = await device.engine.sync();
 	expect(interrupted).toMatchObject({ success: false, uploaded: 1, errors: ['reminder settings unavailable'] });
 	expect(await env.DB.prepare('SELECT import_state AS state FROM server_state').first()).toEqual({ state: 'importing' });
 	expect(await env.DB.prepare("SELECT 1 FROM files WHERE portable_path = 'reminders/task.md'").first()).not.toBeNull();
 
 	device.close(); await device.open();
-	device.engine.setReminderScopePreparation(async () => {
+	device.hooks.prepareReminderScope = async () => {
 		await device.api.ensureNotificationPolicy({ enabled: true, folderPath: 'Reminders', timezone: 'UTC', allDayTime: null });
-	});
+	};
 	const put = vi.spyOn(env.BUCKET, 'put');
 	const upload = vi.spyOn(device.api.initialImport, 'upload');
 	const wait = vi.spyOn(device.api.initialImport, 'waitUntilReady');
@@ -259,10 +259,10 @@ it('schedules a reminder that gets its ID before the first upload from that one 
 	device.disk.write(path, '- [ ] Task @2099-01-01T12:00:00.000Z\n');
 	let writesVault: boolean | undefined;
 	// Stands in for the reminder index, which writes missing IDs once sync allows vault writes.
-	device.engine.setInitialUploadPreparation(async () => {
+	device.hooks.prepareInitialUpload = async () => {
 		writesVault = device.engine.getState().writesVault;
 		device.disk.write(path, `${note('2099-01-01T12:00:00.000Z', id)}\n`);
-	});
+	};
 	const upload = vi.spyOn(device.api.initialImport, 'upload');
 	const wait = vi.spyOn(device.api.initialImport, 'waitUntilReady');
 	const syncing = device.engine.sync();
@@ -288,7 +288,7 @@ it.each(['failed', 'pending'])('syncs an ordinary edit while reminder settings a
 	let release!: () => void;
 	const pending = new Promise<void>(resolve => { release = resolve; });
 	const prepare = vi.fn(() => status === 'failed' ? Promise.reject(new Error('settings unavailable')) : pending);
-	device.engine.setReminderScopePreparation(prepare);
+	device.hooks.prepareReminderScope = prepare;
 	device.disk.write('note.md', 'updated');
 	try {
 		expect(await device.engine.sync()).toMatchObject({ success: true, uploaded: 1 });

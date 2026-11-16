@@ -5,7 +5,7 @@ import { createEncryptionState, type EncryptionServerState } from '../../../encr
 import type { EncryptionProgress } from '../../../sync/encryption/server-encryption';
 import { createEncryptionSetup } from '../../../sync/encryption/reset';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
-import { createSettingsUiState } from '../../../plugin/settings-ui-state';
+import { createSettingsUiState } from '../settings-ui-state';
 
 let state: EncryptionServerState | null;
 let body: FakeElement;

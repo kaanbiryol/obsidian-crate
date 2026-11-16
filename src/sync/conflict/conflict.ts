@@ -2,7 +2,7 @@
  * Conflict detection and resolution
  */
 
-import { Notice, type Vault } from 'obsidian';
+import type { Vault } from 'obsidian';
 import { createLogger } from '../logger';
 import { ensureParentFolder, insertBeforeExtension } from '../local/file-discovery';
 import type { ConflictRecord } from '../types';
@@ -69,18 +69,4 @@ export function isConflictFile(path: string): boolean {
 export function getOriginalPathFromConflictFile(path: string): string | null {
 	if (!isConflictFile(path)) return null;
 	return path.replace(CONFLICT_TAG_PATTERN, '');
-}
-
-/**
- * Show a persistent notice summarizing conflicts from a background sync.
- * Duration 0 = user must dismiss manually.
- */
-export function notifyConflicts(conflictPaths: string[]): void {
-	if (conflictPaths.length === 0) return;
-
-	const message = conflictPaths.length === 1
-		? `Sync conflict: ${conflictPaths[0]}\nReview the affected file; a local version may have been saved as a conflict copy.`
-		: `${conflictPaths.length} sync conflicts detected.\nReview the affected files and any conflict copies.`;
-
-	new Notice(message, 0);
 }

@@ -1,7 +1,8 @@
 import { pendingChangeKey } from '../pending/pending-change';
 import type { DownloadRequest } from '../transfer/download';
 import { describe, expect, it, vi } from 'vitest';
-import type { PreparedUpload, SyncResult } from '../types';
+import type { SyncResult } from '../types';
+import type { PreparedUpload } from '../transfer/types';
 import { BATCH_DELETE_MAX_FILES, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { runIncrementalSync } from './incremental';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
@@ -115,7 +116,7 @@ describe('runIncrementalSync', () => {
 				batchDelete,
 			},
 			localManifest,
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => ['notes/local-delete.md']),
 			parallelDownloadAndSaveFiles,
@@ -185,7 +186,7 @@ describe('runIncrementalSync', () => {
 				})),
 			},
 			localManifest,
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => ['notes/ok.md', 'notes/fail.md']),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
@@ -291,7 +292,7 @@ describe('runIncrementalSync', () => {
 				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
-			throwIfDestroyed: () => {}, shouldIgnore: vi.fn(() => false),
+			signal: new AbortController().signal, shouldIgnore: vi.fn(() => false),
 			getLocalChanges: vi.fn(async () => ({ changes: [], discoveredPaths: new Set<string>() })),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),

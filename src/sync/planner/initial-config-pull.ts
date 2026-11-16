@@ -32,7 +32,7 @@ export async function prepareInitialConfigPull(
 	// Save the original hashes before any downloads or baseline updates. A retry
 	// may replace only those same setup bytes, even after a restart or partial pull.
 	await policy.save(state);
-	context.throwIfDestroyed?.();
+	context.signal.throwIfAborted();
 	return state;
 }
 

@@ -1,4 +1,3 @@
-import { notifyConflicts } from '../conflict/conflict';
 import { createLogger } from '../logger';
 import type { SyncResult } from '../types';
 
@@ -17,11 +16,7 @@ export interface StartupSyncContext {
  * false if it was cancelled. */
 export function runStartupSync(context: StartupSyncContext): Promise<boolean> {
 	return context.sync()
-		.then(result => {
-			if (result.outcome === 'cancelled') return false;
-			notifyConflicts(result.conflicts);
-			return true;
-		})
+		.then(result => result.outcome !== 'cancelled')
 		.catch(error => {
 			logger.error('Startup sync failed:', error);
 			return true;

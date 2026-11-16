@@ -34,7 +34,7 @@ it('prepares the next chunk of an initial import while the current one uploads',
 			getManifest: async () => ({ files: {} }),
 			initialImport: { begin: async () => ({ state: 'importing', token: 't' }), prune: async () => {}, upload, finish: async () => 1 },
 		} as never,
-		shouldIgnore: () => false, throwIfDestroyed: () => {}, save: async () => {}, setLastSeq: () => {}, report: () => {},
+		shouldIgnore: () => false, signal: new AbortController().signal, save: async () => {}, setLastSeq: () => {}, report: () => {},
 		getImportToken: () => undefined, setImportToken: () => {},
 	}, createEmptySyncResult());
 	expect(result?.uploaded).toBe(200);
@@ -55,7 +55,7 @@ it('lets local writers finish before a first upload lists vault files, and only 
 			initialImport: { begin: async () => ({ state, token: 't' }), prune: async () => {}, upload: vi.fn(), finish: async () => 1 },
 		} as never,
 		beforeUpload,
-		shouldIgnore: () => false, throwIfDestroyed: () => {}, save: async () => {}, setLastSeq: () => {}, report: () => {},
+		shouldIgnore: () => false, signal: new AbortController().signal, save: async () => {}, setLastSeq: () => {}, report: () => {},
 		getImportToken: () => 't', setImportToken: () => {},
 	});
 	await runInitialImport(context('complete'), createEmptySyncResult());
@@ -86,7 +86,7 @@ function importContext(token: string | undefined, revision: string | undefined) 
 				finish: async () => 1,
 			},
 		} as never,
-		shouldIgnore: () => false, throwIfDestroyed: () => {}, setLastSeq: () => {}, report: () => {},
+		shouldIgnore: () => false, signal: new AbortController().signal, setLastSeq: () => {}, report: () => {},
 		save: async () => { calls.push('save'); },
 		getImportToken: () => token,
 		setImportToken: (value: string | undefined) => { calls.push(`token ${value}`); },
@@ -126,7 +126,7 @@ it('records verified modification times, so the next scan does not reread the im
 				upload: async (_token: string, batch: Array<{ path: string; hash: string }>) => ({ results: batch.map(file => ({ path: file.path, success: true, hash: file.hash, revision: 'r' })) }),
 			},
 		} as never,
-		shouldIgnore: () => false, throwIfDestroyed: () => {}, save: async () => {}, setLastSeq: () => {}, report: () => {},
+		shouldIgnore: () => false, signal: new AbortController().signal, save: async () => {}, setLastSeq: () => {}, report: () => {},
 		getImportToken: () => 't', setImportToken: () => {},
 	}, createEmptySyncResult());
 	expect(setEntry).toHaveBeenCalledTimes(200);
@@ -163,7 +163,7 @@ it('keeps three import requests busy and checkpoints every 256 confirmed files',
 				},
 			},
 		} as never,
-		shouldIgnore: () => false, throwIfDestroyed: () => {}, setLastSeq: () => {}, report: () => {},
+		shouldIgnore: () => false, signal: new AbortController().signal, setLastSeq: () => {}, report: () => {},
 		save: async () => { calls.push(`save ${confirmed}`); },
 		getImportToken: () => 't', setImportToken: () => {},
 	}, createEmptySyncResult());
@@ -197,7 +197,7 @@ it('saves the confirmed files when a later import request fails', async () => {
 				},
 			},
 		} as never,
-		shouldIgnore: () => false, throwIfDestroyed: () => {}, setLastSeq: () => {}, report: () => {},
+		shouldIgnore: () => false, signal: new AbortController().signal, setLastSeq: () => {}, report: () => {},
 		save: async () => { calls.push('save'); },
 		getImportToken: () => 't', setImportToken: () => {},
 	}, result)).rejects.toThrow('offline');

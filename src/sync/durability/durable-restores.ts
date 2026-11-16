@@ -2,6 +2,7 @@ import type { CrateServerInfo } from '../../protocol/server-info';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
 import type { FileMetadataResponse, RemoteFileVersion, RestoreFileRequest, UploadResult } from '../../protocol/sync-types';
 import { getPathEntry } from '../../protocol/path-record';
+import { isSyncRevision } from '../../protocol/sync-validation';
 import type { LocalManifest } from '../manifest/manifest';
 import { HttpError } from '../worker-api/http';
 import { isRefusedWrite } from '../failures';
@@ -46,7 +47,7 @@ export class DurableRestores {
 			const request = intent.encryptedWire
 				? { ...intent.request, path: intent.encryptedWire.path, expectedHash: intent.encryptedWire.expectedHash } : intent.request;
 			const result = await this.transport.restoreFileVersion(request);
-			if (!result.success || result.path !== request.path || result.hash !== (intent.encryptedWire?.restoredHash ?? intent.version.hash) || !result.revision) {
+			if (!result.success || result.path !== request.path || result.hash !== (intent.encryptedWire?.restoredHash ?? intent.version.hash) || !isSyncRevision(result.revision)) {
 				throw new Error('Invalid restore receipt. The original restore is preserved; retry after checking the server.');
 			}
 		} catch (error) {

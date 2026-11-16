@@ -3,7 +3,7 @@ import { partitionSkippedUploads } from '../local/local-file-changes';
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "../local/file-discovery";
 import { createAbortError } from "../abort";
-import type { FullSyncPlan, FullSyncPlannerContext } from "./types";
+import type { DownloadDiff, FileDiff, FullSyncPlan, FullSyncPlannerContext, UploadDiff } from "./types";
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
@@ -26,7 +26,7 @@ export async function createFullSyncPlan(
 	void remoteRequest.catch((error: unknown) => { remoteFailure = { error }; });
 	// An abort is not attributed to the file being read; `scan` raises the request's error instead.
 	const throwIfStopped = () => {
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		if (remoteFailure) throw createAbortError('Remote manifest request failed');
 	};
 	// A failed request takes precedence over a local failure, as when it finished first.
@@ -68,7 +68,7 @@ export async function createFullSyncPlan(
 
 	const manifestEntries = context.localManifest.getManifest().files;
 	const initialConfig = await prepareInitialConfigPull(context, localFiles, files.map(file => file.path), remoteFiles);
-	const diffMap = new Map<string, import("../types").FileDiff>();
+	const diffMap = new Map<string, FileDiff>();
 	for (const diff of classifyPaths(localFiles, remoteFiles, manifestEntries)) {
 		const setupHash = initialConfig && getPathEntry(initialConfig.files, diff.path);
 		diffMap.set(diff.path, diff.action === 'conflict' && diff.cause === 'concurrent-create' && setupHash === diff.localHash
@@ -115,8 +115,8 @@ export async function createFullSyncPlan(
 	return {
 		localFiles,
 		diffs,
-		uploadDiffs: diffs.filter((diff): diff is import("../types").UploadDiff => diff.action === "upload"),
-		downloadDiffs: diffs.filter((diff): diff is import("../types").DownloadDiff => diff.action === "download"),
+		uploadDiffs: diffs.filter((diff): diff is UploadDiff => diff.action === "upload"),
+		downloadDiffs: diffs.filter((diff): diff is DownloadDiff => diff.action === "download"),
 		remainingDiffs: diffs.filter((diff) =>
 			diff.action === "conflict" || diff.action === "delete" || diff.action === "delete-local"
 		),

@@ -13,7 +13,8 @@ import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { DeleteRemoteFiles } from '../transfer/delete';
 import type { ConditionalDeleteCandidate } from '../transfer/delete-batches';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
-import type { PreparedUpload, SyncIssue, SyncResult, SyncState } from '../types';
+import type { SyncIssue, SyncResult, SyncState } from '../types';
+import type { PreparedUpload } from '../transfer/types';
 import type { WorkflowCompletionContext } from '../sync-outcome';
 
 interface QueueManifest {
@@ -38,7 +39,7 @@ export interface QueueFlushContext extends WorkflowCompletionContext {
 	beginBatch(): QueueFlushBatch;
 	apiConfigured(): boolean;
 	localManifest: QueueManifest;
-	isDestroyed(): boolean;
+	signal: AbortSignal;
 	getStatus(): SyncState['status'];
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
 	triggerDebouncedSync(): void;
@@ -120,7 +121,7 @@ async function uploadQueuedChanges(
 	try {
 		await uploadPipelined(context, uploadPaths, uploadResult, {
 			prepare: async path => {
-				if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
+				if (context.signal.aborted) throw createAbortError('Queue preparation aborted');
 				try { return await withSyncFileContext(path, () => context.prepareUploadFromPath(path)); }
 				catch (error) {
 					if (!(error instanceof SkippedFileError)) throw error;
@@ -171,7 +172,7 @@ async function reportFlushResult(context: QueueFlushContext, result: SyncResult)
 export async function processPendingChanges(
 	context: QueueFlushContext,
 ): Promise<void> {
-	if (context.isDestroyed()) return;
+	if (context.signal.aborted) return;
 
 	if (context.getQueuedKeyCount() === 0) {
 		context.updateState({ pendingChanges: 0 });
@@ -201,7 +202,7 @@ export async function processPendingChanges(
 
 	try {
 		await context.recoverUploads();
-		if (context.isDestroyed()) throw createAbortError('Queue recovery aborted');
+		if (context.signal.aborted) throw createAbortError('Queue recovery aborted');
 		const deletes = deletedPaths.flatMap(path => {
 			const expectedHash = context.localManifest.getEntry(path)?.hash;
 			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
@@ -278,7 +279,7 @@ export async function processPendingChanges(
 		if (isAbortError(error)) {
 			batch.requeue(paths.filter(path => !completedQueueKeys.has(path)));
 			batch.release();
-			if (!context.isDestroyed()) context.updateState({ status: 'idle', pendingChanges: context.getQueuedKeyCount() });
+			if (!context.signal.aborted) context.updateState({ status: 'idle', pendingChanges: context.getQueuedKeyCount() });
 			logger.info('Queue processing aborted');
 		} else {
 			flushFailed = true;
@@ -313,7 +314,7 @@ export async function processPendingChanges(
 	} finally {
 		batch.release();
 		if (
-			!context.isDestroyed()
+			!context.signal.aborted
 			&& context.getQueuedKeyCount() > 0
 			&& reconciliationKeys.size === 0
 			&& !state.hasTerminalFailure

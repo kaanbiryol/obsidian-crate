@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptySyncResult } from '../sync-result';
-import type { PreparedUpload } from '../types';
+import type { PreparedUpload } from './types';
 import type { UploadPreparedFilesOptions } from './upload';
 import { uploadPipelined } from './upload-pipeline';
 import { getBatchUploadConcurrency } from './budget';

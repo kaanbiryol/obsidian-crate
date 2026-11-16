@@ -47,7 +47,7 @@ describe('SyncEngine event queue behavior', () => {
 
 	it('notifies state listeners only when a file event changes the pending set', () => {
 		const states: number[] = [];
-		harness.engine.setStateChangeCallback(state => states.push(state.pendingChanges));
+		harness.hooks.onStateChange = state => states.push(state.pendingChanges);
 		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
 		expect(states).toEqual([1]);
 		// Autosaves of an already pending file only restart the countdown.
@@ -102,11 +102,11 @@ describe('SyncEngine event queue behavior', () => {
 		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
 
 		const idlePendingCounts: number[] = [];
-		harness.engine.setStateChangeCallback((state) => {
+		harness.hooks.onStateChange = (state) => {
 			if (state.status === 'idle') {
 				idlePendingCounts.push(harness.engine.getPendingKeys().length);
 			}
-		});
+		};
 
 		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
 		await vi.advanceTimersByTimeAsync(5000);
@@ -120,7 +120,7 @@ describe('SyncEngine event queue behavior', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
 		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
 		const syncing: Array<boolean | undefined> = [];
-		harness.engine.setStateChangeCallback(state => { if (state.status === 'syncing') syncing.push(state.writesVault); });
+		harness.hooks.onStateChange = state => { if (state.status === 'syncing') syncing.push(state.writesVault); };
 		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
 		await vi.advanceTimersByTimeAsync(5000);
 		await harness.engine.waitForIdle();
@@ -138,7 +138,7 @@ describe('SyncEngine event queue behavior', () => {
 	it.each(['failed', 'pending'])('reports successful automatic uploads while reminder settings are %s', async status => {
 		const pending = createDeferred<void>();
 		const prepare = vi.fn(() => status === 'failed' ? Promise.reject(new Error('settings unavailable')) : pending.promise);
-		harness.engine.setReminderScopePreparation(prepare);
+		harness.hooks.prepareReminderScope = prepare;
 		const content = toArrayBuffer('A');
 		harness.vault.getAbstractFileByPath.mockReturnValue({
 			path: 'notes/a.md',
@@ -148,7 +148,7 @@ describe('SyncEngine event queue behavior', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
 		const onQueueSyncResult = vi.fn(async () => {});
-		harness.engine.setAutomaticSyncResultCallback(onQueueSyncResult);
+		harness.hooks.onAutomaticSyncResult = onQueueSyncResult;
 
 		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
 		await vi.advanceTimersByTimeAsync(5000);
@@ -169,7 +169,7 @@ describe('SyncEngine event queue behavior', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
 		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
 		const settingsAtReport: Array<string | null> = [];
-		harness.engine.setAutomaticSyncResultCallback(() => { settingsAtReport.push(harness.settings.lastSync); });
+		harness.hooks.onAutomaticSyncResult = () => { settingsAtReport.push(harness.settings.lastSync); };
 
 		harness.engine.onFileChange({ path: 'notes/a.md' } as never);
 		await vi.advanceTimersByTimeAsync(5000);
@@ -310,7 +310,7 @@ describe('SyncEngine event queue behavior', () => {
 			reportingStarted.resolve();
 			return reporting.promise;
 		});
-		harness.engine.setAutomaticSyncResultCallback(onQueueSyncResult);
+		harness.hooks.onAutomaticSyncResult = onQueueSyncResult;
 
 		try {
 			harness.engine.onFileChange({ path: 'notes/a.md' } as never);
@@ -349,7 +349,7 @@ describe('SyncEngine event queue behavior', () => {
 		it('records the reconciliation a lost upload race starts after the flush result', async () => {
 			Object.assign(harness.api, { getFileMetadata: vi.fn().mockResolvedValue({ files: {} }) });
 			const recorded: SyncResult[] = [];
-			harness.engine.setAutomaticSyncResultCallback(result => { recorded.push(result); });
+			harness.hooks.onAutomaticSyncResult = result => { recorded.push(result); };
 
 			harness.engine.onFileChange({ path: 'notes/a.md' } as never);
 			await vi.advanceTimersByTimeAsync(5000);
@@ -370,11 +370,11 @@ describe('SyncEngine event queue behavior', () => {
 			spyOnIncrementalSync(harness.engine, null).mockReturnValue(running.promise);
 			let manualSync: Promise<SyncResult> | undefined;
 			const recorded: SyncResult[] = [];
-			harness.engine.setAutomaticSyncResultCallback(result => {
+			harness.hooks.onAutomaticSyncResult = result => {
 				recorded.push(result);
 				// A manual sync starts before the queued reconciliation does.
 				manualSync ??= harness.engine.sync();
-			});
+			};
 
 			harness.engine.onFileChange({ path: 'notes/a.md' } as never);
 			await vi.advanceTimersByTimeAsync(5000);

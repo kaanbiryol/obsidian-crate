@@ -1,21 +1,14 @@
-import { homedir, hostname as computerName } from 'node:os';
+// The CLI entry: parses arguments, turns signals into an abort, runs one command and
+// closes what it opened, in order, even after a failure. Commands live in commands/.
+import { homedir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { createInterface } from 'node:readline/promises';
-import { packaged, runtimeRoot } from './assets.mjs';
-import { openLocalRuntime, issueLocalDevice, listLocalDevices, revokeLocalDevice } from './local-server-runtime.mjs';
-import { listenLocalServer } from './local-server-http.mjs';
-import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, saveQuickSettings, saveTailscaleSettings, setupRemoteAccess, startTunnel } from './local-server-tunnel.mjs';
-import { currentTailscaleHostname, startTailscaleFunnel, tailscaleSocket } from './local-server-tailscale.mjs';
-import { runProcess } from './local-server-process.mjs';
-import { startQuickServer } from './local-server-quick.mjs';
-import { createPairing, requestLocalControl, requestLocalPairing, startLocalControl } from './local-server-pairing.mjs';
-import { monitorPublicReadiness } from './local-server-readiness.mjs';
-import { randomUUID } from 'node:crypto';
-import { access } from 'node:fs/promises';
-import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from './local-server-backup.mjs';
+import { tailscaleSocket } from './local-server-tailscale.mjs';
 import { closeLocalServerResources } from './local-server-lifecycle.mjs';
-import { resolveServerOrigin, resolveStartMode, validateCommandOptions } from './local-server-options.mjs';
+import { validateCommandOptions } from './local-server-options.mjs';
+import { backup, checkUpgrade, restore, upgrade } from './commands/data.mjs';
+import { addDevice, listDevices, pair, revoke } from './commands/devices.mjs';
+import { start } from './commands/start.mjs';
 
 const help = `Crate local server
 
@@ -46,56 +39,20 @@ Stop the server before offline add-device administration.
 Default data directory: ~/.crate/server (one vault per directory).
 See docs/self-hosting.md for backups, updates, and other HTTPS proxies.`;
 
+/** @type {Record<string, import('./local-server-options.mjs').Command>} */
+const commands = {
+	setup: start, start, 'add-device': addDevice, pair, devices: listDevices, revoke,
+	backup, upgrade, restore, 'check-upgrade': checkUpgrade,
+};
+
 const shutdown = new AbortController();
 const stopped = new Promise(resolve => shutdown.signal.addEventListener('abort', resolve, { once: true }));
 const onSignal = () => shutdown.abort();
 const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
 for (const signal of signals) process.on(signal, onSignal);
-let runtime;
-let server;
-let tunnel;
-let quickServer;
-let control;
-let readiness;
 const docker = process.env.CRATE_DOCKER === '1';
-const pairCommand = docker ? 'docker compose exec crate crate pair --name "My phone"'
-	: process.argv[1].endsWith('crate-server.mjs') ? 'npx @kaanbiryol/crate-server pair --name "My phone"' : 'npm run server -- pair --name "My phone"';
-function printPairing(pairing) {
-	console.log(`Pairing code (single use, expires in 10 minutes): ${pairing.code}\nPaste this code into Crate → Connect to your server. Keep it private.`);
-}
-function readinessChanged(ready) {
-	console.log(ready ? 'Ready: the public HTTPS address reaches this Crate server.'
-		: 'Waiting for public access: checking the tunnel and DNS. The local server is running; keep it running while this check retries.');
-}
-
-async function buildIfSource() {
-	if (!packaged) await runProcess(process.execPath, [join(runtimeRoot, 'scripts/build-worker.mjs')], { signal: shutdown.signal });
-}
-
-/** Uses the running server's control socket, or opens the stopped server's data. */
-async function administer(dataDir, method, path, body, offline) {
-	try { return await requestLocalControl(dataDir, method, path, body); }
-	catch (error) {
-		if (error.code !== 'ENOENT') throw new Error(error.message || 'Could not reach the running server. Keep Crate running, check the data directory, then try again.');
-	}
-	// Never initialize an empty directory as a side effect of administration.
-	await access(join(dataDir, 'server.json')).catch(() => { throw new Error(`No Crate server data in ${dataDir}. Pass the server's --data-dir.`); });
-	const admin = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
-	try { return await offline(admin); } finally { await admin.close(); }
-}
-
-function printDevices(devices) {
-	if (!devices.length) { console.log('No devices are connected.'); return; }
-	const labels = { vault: 'Obsidian', reminders: 'Reminders web app', reading_capture: 'Reading shortcut' };
-	for (const device of devices) {
-		console.log(`${device.id}  ${device.name || 'Unnamed'} · ${labels[device.scope] ?? device.scope}${device.platform ? ` (${device.platform})` : ''} · last seen ${device.lastSeenAt ?? 'never'} UTC`);
-	}
-	console.log('Revoke one with the revoke command and --id TOKEN_ID.');
-}
-
-function printDevice(name, credential) {
-	console.log(`Device: ${name}\nToken ID: ${credential.id}\nAccess token (shown once): ${credential.token}\nPaste this token into Crate → Connect to your server. Keep it private.`);
-}
+/** @type {import('./local-server-lifecycle.mjs').CommandResources} */
+const resources = {};
 
 try {
 	const { values, positionals } = parseArgs({ allowPositionals: true, options: {
@@ -103,118 +60,20 @@ try {
 		output: { type: 'string' }, backup: { type: 'string' },
 		hostname: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, local: { type: 'boolean' }, quick: { type: 'boolean' }, tailscale: { type: 'boolean' }, help: { type: 'boolean' },
 	} });
-	let command = positionals[0];
+	const command = positionals[0];
 	if (values.help || !command) console.log(help);
 	else {
 		validateCommandOptions(positionals, values, { dockerWithoutTailscale: () => docker && !tailscaleSocket() });
 		process.umask(0o077);
 		const dataDir = resolve(values['data-dir'] ?? join(homedir(), '.crate', 'server'));
-		if (command === 'backup') {
-			if (!values.output) throw new Error('Provide --output with a new backup directory. Stop the server before backing up.');
-			console.log(`Backup verified: ${await backupLocalServer(dataDir, values.output)}`);
-		} else if (command === 'upgrade') {
- if (!values.output) throw new Error('Stop the server and provide --output with a new backup directory.');
- const upgraded = await openLocalRuntime({ dataDir, administrative: true, upgradeBackup: values.output });
- await upgraded.close();
- console.log('Server data upgraded. The verified backup is at ' + resolve(values.output));
-		} else if (command === 'restore') {
-			if (!values.backup) throw new Error('Provide --backup with a verified backup directory. Restore into an empty data directory.');
-			await restoreLocalServer(dataDir, values.backup);
-			console.log(`Backup restored and database verified: ${dataDir}. Start Crate to resume.`);
-		} else if (command === 'check-upgrade') {
-			const checked = await checkLocalUpgrade(dataDir);
-			console.log(`Compatible: server revision ${checked.from} → ${checked.to}, runtime ${checked.runtime}.${checked.requiresMigration ? ' The database needs a migration: run upgrade with a new --output backup directory before starting.' : ''} Back up before updating; no data was changed by this check.`);
-		} else if (command === 'devices') {
-			printDevices((await administer(dataDir, 'GET', '/devices', undefined, async admin => ({ devices: await listLocalDevices(admin.db) }))).devices);
-		} else if (command === 'revoke') {
-			if (!values.id?.trim()) throw new Error('Provide --id with a token ID from the devices command.');
-			const id = values.id.trim();
-			const { revoked } = await administer(dataDir, 'POST', '/revoke', { id }, async admin => ({ revoked: await revokeLocalDevice(admin, id) }));
-			if (!revoked) throw new Error('No device has that token ID. Run the devices command to list current IDs.');
-			console.log('Device revoked. It can no longer sync; pair it again to reconnect.');
-		} else if (command === 'pair') {
-			const pairing = await requestLocalPairing(dataDir, values.name);
-			console.log(`Server address to paste into Obsidian: ${pairing.origin}`);
-			printPairing(pairing);
-		} else {
-		let remote = command !== 'add-device' && !values.local ? await readRemoteSettings(dataDir) : null;
-		const { quick, tailscale, port, host } = resolveStartMode(command, values, remote);
-		if (quick) {
-			console.log('Starting Crate with a Cloudflare Quick Tunnel. Files stay on this computer; public HTTPS traffic passes through Cloudflare.');
-			console.log('This temporary address changes on restart. Keep the server computer awake and online.');
-			if (command === 'setup') await buildIfSource();
-			quickServer = await startQuickServer({ dataDir, port, name: values.name, signal: shutdown.signal, onReadiness: readinessChanged });
-			await saveQuickSettings(dataDir, port);
-			console.log(`Server address to paste into Obsidian: ${quickServer.runtime.origin}\nInternal listener (diagnostics only): 127.0.0.1:${quickServer.server.address().port}\nData: ${dataDir}`);
-			if (quickServer.pairingCode) printPairing(quickServer.pairingCode);
-			else console.log('Existing device tokens remain valid. Update the server address in Crate to the URL above.');
-			console.log(`Connect in Obsidian → Settings → Crate → Connect to your server, then select Sync now.\nUse Copy setup link or Show QR code in Crate to enroll the PWA. A new tunnel address requires fresh PWA enrollment.\nAdd a device without restarting: ${pairCommand}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Keep this terminal open. Press Ctrl+C to stop safely.'}`);
-			const result = await Promise.race([stopped.then(() => null), quickServer.tunnel.exited]);
-			if (result && !shutdown.signal.aborted) throw new Error(`Cloudflare Quick Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Restart Crate to get a new address.`);
-		} else {
-			if (command === 'setup' && tailscale) {
-				console.log('Setting up Tailscale Funnel. Files stay on this computer; public HTTPS traffic passes through Tailscale.');
-				await buildIfSource();
-				// Lock and validate storage before exposing anything.
-				runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
-				const hostname = await currentTailscaleHostname(shutdown.signal);
-				if (remote && remote.hostname !== hostname) throw new Error(`This directory was set up for https://${remote.hostname}. Rename this computer back in Tailscale to keep connected devices and PWAs.`);
-				remote = await saveTailscaleSettings(dataDir, hostname, port);
-				await runtime.close();
-				runtime = null;
-				command = 'start';
-			} else if (command === 'setup') {
-				let hostname = values.hostname ?? remote?.hostname;
-				if (!hostname) {
-					if (!process.stdin.isTTY) throw new Error('Provide --hostname crate.example.com when setup runs without an interactive terminal.');
-					const prompt = createInterface({ input: process.stdin, output: process.stdout });
-					try { hostname = await prompt.question('Public hostname on your Cloudflare domain (e.g. crate.example.com): ', { signal: shutdown.signal }); }
-					finally { prompt.close(); }
-				}
-				hostname = normalizeTunnelHostname(hostname);
-				if (remote && remote.hostname !== hostname) throw new Error('This directory already has a saved hostname. Reuse it to preserve installed PWA connections.');
-				console.log(`Setting up https://${hostname}. Files stay on this computer; public HTTPS traffic passes through Cloudflare.`);
-				await buildIfSource();
-				// Lock and validate storage before installing or provisioning anything.
-				runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
-				shutdown.signal.throwIfAborted();
-				await ensureCloudflared({ signal: shutdown.signal });
-				remote = await setupRemoteAccess({ dataDir, hostname, port, signal: shutdown.signal });
-				await runtime.close();
-				runtime = null;
-				command = 'start';
-			}
-			shutdown.signal.throwIfAborted();
-			const origin = resolveServerOrigin({ remote, tailscale, origin: values.origin, port, host });
-			runtime = await openLocalRuntime({ dataDir, origin, administrative: command === 'add-device', handleSignals: false });
-			shutdown.signal.throwIfAborted();
-			if (command === 'add-device') printDevice(values.name, await issueLocalDevice(runtime.db, values.name));
-			else {
-				const instance = randomUUID();
-				const pairing = createPairing({ db: runtime.db });
-				server = await listenLocalServer(runtime, { host, port, pairing, instance, tunnel: remote ? (tailscale ? 'tailscale' : 'cloudflare') : null });
-				control = await startLocalControl({ dataDir, pairing, origin, runtime });
-				const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
-				if (existing.count === 0) printPairing(pairing.issue(values.name?.trim() || computerName().slice(0, 128)));
-				shutdown.signal.throwIfAborted();
-				if (remote) tunnel = tailscale ? await startTailscaleFunnel(remote, shutdown.signal) : await startTunnel(dataDir, remote, shutdown.signal);
-				console.log(`Server address to paste into Obsidian: ${runtime.origin}\nInternal listener (diagnostics only): ${host}:${port}\nData: ${runtime.dataDir}\nAdd a device without restarting: ${pairCommand}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Press Ctrl+C to stop safely.'}`);
-				if (origin.startsWith('https://')) readiness = monitorPublicReadiness({ origin, instance, signal: shutdown.signal, onChange: readinessChanged });
-				if (remote) console.log(`${tailscale ? 'Tailscale Funnel is starting; the first time, approve Funnel at the link Tailscale prints. A new public name can take up to 10 minutes to resolve.' : 'Tunnel is starting; initial DNS/certificate propagation may take a few minutes.'}\nUse this HTTPS server address in Obsidian, then Copy setup link or Show QR code to enroll the PWA.`);
-				const result = await Promise.race([stopped.then(() => null), ...(tunnel ? [tunnel.exited] : [])]);
-				if (result && !shutdown.signal.aborted) throw new Error(tailscale
-					? `Tailscale Funnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check the Tailscale output above. On Linux, allow your user once with: sudo tailscale set --operator=$USER`
-					: `Cloudflare Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check cloudflared output and restart.`);
-			}
-		}
-		}
+		await commands[command]({ command, values, dataDir, docker, signal: shutdown.signal, stopped }, resources);
 	}
 } catch (error) {
 	if (!shutdown.signal.aborted) { console.error(error.message); process.exitCode = 1; }
 } finally {
 	try {
-		if (quickServer) await quickServer.close();
-		else await closeLocalServerResources({ readiness, control, tunnel, server, runtime });
+		if (resources.quickServer) await resources.quickServer.close();
+		else await closeLocalServerResources(resources);
 	} catch (error) { console.error(error.message); process.exitCode = 1; }
 	for (const signal of signals) process.removeListener(signal, onSignal);
 }

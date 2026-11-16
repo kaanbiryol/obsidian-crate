@@ -1,4 +1,3 @@
-import { SyncEngine } from '../engine/engine';
 import { describe, expect, it, vi } from 'vitest';
 import type { SyncResult } from '../types';
 import { cancelSyncResult, createEmptySyncResult } from '../sync-result';
@@ -16,13 +15,11 @@ import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../settings';
 
 describe('SyncRuntime operation wrappers', () => {
 	it.each(['manual', 'automatic'] as const)('does not record %s cancellation as sync history or checkpoint progress', async mode => {
-		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const { runtime, persistSettings, settings, engineHooks } = createRuntimeHarness();
 		const result = cancelSyncResult({ ...createEmptySyncResult(), uploaded: 1, uploadedPaths: ['saved.md'] });
 		const saveSharedHistoryCheckpoint = vi.fn(async () => undefined);
-		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
 		await initializeRuntime(runtime, { sync: vi.fn(async () => result), saveSharedHistoryCheckpoint });
-		const automatic = callback.mock.calls.at(-1)![0];
-		callback.mockRestore();
+		const automatic = engineHooks().onAutomaticSyncResult!;
 		if (mode === 'manual') expect(await runtime.sync()).toBe(result);
 		else await automatic(result);
 		expect(settings.syncHistory).toEqual([]);
@@ -33,12 +30,10 @@ describe('SyncRuntime operation wrappers', () => {
 	});
 
 	it('announces each recorded manual and automatic result, but not cancellations', async () => {
-		const { runtime } = createRuntimeHarness();
+		const { runtime, engineHooks } = createRuntimeHarness();
 		const result = { ...createEmptySyncResult(), downloadedPaths: ['.obsidian/app.json'] };
-		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
 		await initializeRuntime(runtime, { sync: vi.fn(async () => result), saveSharedHistoryCheckpoint: vi.fn(async () => undefined) });
-		const automatic = callback.mock.calls.at(-1)![0];
-		callback.mockRestore();
+		const automatic = engineHooks().onAutomaticSyncResult!;
 		const listener = vi.fn();
 		runtime.addSyncResultListener(listener);
 		await runtime.sync();
@@ -74,12 +69,10 @@ describe('SyncRuntime operation wrappers', () => {
 	it('spaces a failed checkpoint save like a saved one instead of retrying after every sync', async () => {
 		vi.useFakeTimers({ now: Date.parse('2026-10-17T10:00:00Z') });
 		try {
-			const { runtime } = createRuntimeHarness();
+			const { runtime, engineHooks } = createRuntimeHarness();
 			const saveSharedHistoryCheckpoint = vi.fn(async () => { throw new Error('Vault too large for a shared checkpoint'); });
-			const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
 			await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveSharedHistoryCheckpoint, trackedFileCount: () => 100_001 });
-			const automatic = callback.mock.calls.at(-1)![0];
-			callback.mockRestore();
+			const automatic = engineHooks().onAutomaticSyncResult!;
 			await automatic(createEmptySyncResult());
 			await automatic(createEmptySyncResult());
 			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce();
@@ -109,16 +102,14 @@ describe('SyncRuntime operation wrappers', () => {
 	});
 
 	it.each(['manual', 'automatic'] as const)('does not publish %s completion after its engine is replaced during checkpointing', async mode => {
-		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const { runtime, persistSettings, settings, engineHooks } = createRuntimeHarness();
 		const checkpoint = createDeferred<{ id: string }>();
 		const saveSharedHistoryCheckpoint = vi.fn(() => checkpoint.promise);
-		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
 		await initializeRuntime(runtime, {
 			sync: vi.fn(async () => createEmptySyncResult()),
 			saveSharedHistoryCheckpoint,
 		} as never);
-		const automatic = callback.mock.calls.at(-1)![0];
-		callback.mockRestore();
+		const automatic = engineHooks().onAutomaticSyncResult!;
 		const operation = mode === 'manual' ? runtime.sync() : automatic(createEmptySyncResult());
 		await vi.waitFor(() => expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
 		await initializeRuntime(runtime);
@@ -246,7 +237,7 @@ describe('SyncRuntime operation wrappers', () => {
 	});
 
 	it('records, persists, and announces automatic queue sync activity', async () => {
-		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const { runtime, persistSettings, settings, engineHooks } = createRuntimeHarness();
 		const state = {
 			status: 'idle' as const,
 			lastSync: '2026-02-15T12:00:00.000Z',
@@ -265,11 +256,10 @@ describe('SyncRuntime operation wrappers', () => {
 			uploadedPaths: ['notes/automatic.md'],
 		};
 		const listener = vi.fn();
-		const callback = vi.spyOn(SyncEngine.prototype, 'setAutomaticSyncResultCallback');
 		await initializeRuntime(runtime, engine);
 		runtime.addStateChangeListener(listener);
 
-		await callback.mock.calls[0]![0](result);
+		await engineHooks().onAutomaticSyncResult!(result);
 
 		expect(settings.syncHistory[0]).toEqual(expect.objectContaining({
 			type: 'sync',

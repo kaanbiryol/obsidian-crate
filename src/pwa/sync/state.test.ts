@@ -6,7 +6,7 @@ function snapshot(): SettingsSnapshot {
 	const feature = { updateReady: true, updateContentReady: true, canApplyUpdate: () => true, ready: true, connected: true, enabled: true, pendingCount: 0, status: { state: 'synced' as const, label: 'All changes synced' }, attention: null, unsynced: false, onRefresh: vi.fn(async () => {}), onLogout: vi.fn(async () => {}) };
 	return { open: false, syncRequested: false,
 		reading: { ...feature, shortcut: null, issues: null },
-		reminders: { ...feature, onRefresh: vi.fn(async () => {}), config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, push: { phase: 'unsupported', status: null }, onEnablePush: vi.fn(async () => {}), recovery: null },
+		reminders: { ...feature, onRefresh: vi.fn(async () => {}), config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, push: { phase: 'unsupported', status: null }, onEnablePush: vi.fn(async () => {}), recoveryChanges: [], quarantinedChanges: [], onRemoveQuarantined: vi.fn(async () => true) },
 	};
 }
 

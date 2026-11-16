@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PreparedUpload } from '../types';
+import type { PreparedUpload } from './types';
 import { createBatchUploadChunks } from './prepare';
 import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 

@@ -10,18 +10,30 @@ import { createPairing, startLocalControl } from './local-server-pairing.mjs';
 import { monitorPublicReadiness } from './local-server-readiness.mjs';
 import { closeLocalServerResources } from './local-server-lifecycle.mjs';
 
+/** @param {string} output @returns {string | null} */
 export function quickTunnelOrigin(output) {
 	return output.match(/https:\/\/[a-z0-9]+(?:-[a-z0-9]+)*\.trycloudflare\.com(?=[\s/]|$)/)?.[0] ?? null;
 }
 
+/**
+ * @param {object} options
+ * @param {string} options.command The cloudflared executable.
+ * @param {number} options.port
+ * @param {AbortSignal} [options.signal]
+ * @param {number} [options.timeout] Milliseconds to wait for the public address.
+ */
 export async function startQuickTunnel({ command, port, signal, timeout = 60_000 }) {
 	const temporary = await mkdtemp(join(tmpdir(), 'crate-quick-'));
 	const config = join(temporary, 'config.yml');
 	await writeFile(config, '{}\n', { mode: 0o600 });
 	let output = '';
+	/** @type {(origin: string) => void} */
 	let discovered;
+	/** @type {Promise<string>} */
 	const originReady = new Promise(resolve => { discovered = resolve; });
+	/** @type {import('./local-server-process.mjs').StartedProcess | undefined} */
 	let child;
+	/** @type {NodeJS.Timeout | undefined} */
 	let timer;
 	try {
 		child = startProcess(command, ['tunnel', '--config', config, '--no-autoupdate', '--url', `http://127.0.0.1:${port}`,
@@ -33,10 +45,10 @@ export async function startQuickTunnel({ command, port, signal, timeout = 60_000
 		const origin = await Promise.race([
 			originReady,
 			child.exited.then(result => { throw new Error(`Cloudflare Quick Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). ${output.slice(-2000)}`); }),
-			new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Timed out waiting for a Cloudflare Quick Tunnel address. Check internet access and retry.')), timeout); }),
+			/** @type {Promise<never>} */ (new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Timed out waiting for a Cloudflare Quick Tunnel address. Check internet access and retry.')), timeout); })),
 		]);
 		signal?.throwIfAborted();
-		return { origin, exited: child.exited, async stop() { await child.stop(); await rm(temporary, { recursive: true, force: true }); } };
+		return { origin, exited: child.exited, async stop() { await /** @type {import('./local-server-process.mjs').StartedProcess} */ (child).stop(); await rm(temporary, { recursive: true, force: true }); } };
 	} catch (error) {
 		await child?.stop();
 		await rm(temporary, { recursive: true, force: true });
@@ -44,15 +56,36 @@ export async function startQuickTunnel({ command, port, signal, timeout = 60_000
 	} finally { clearTimeout(timer); }
 }
 
+/** @typedef {Awaited<ReturnType<typeof startQuickServer>>} QuickServer */
+
+/**
+ * Serves a data directory through a Quick Tunnel. On a startup failure it closes what it
+ * opened; afterwards `close` stops everything in order.
+ * @param {object} options
+ * @param {string} options.dataDir
+ * @param {number} [options.port] 0 picks a free port.
+ * @param {string} [options.name] Names the first device's pairing code.
+ * @param {AbortSignal} [options.signal]
+ * @param {(ready: boolean) => void} [options.onReadiness]
+ */
 export async function startQuickServer({ dataDir, port = 0, name = hostname().slice(0, 128), signal, onReadiness }) {
+	/** @type {import('./local-server-runtime.mjs').LocalRuntime | undefined} */
 	let runtime;
+	/** @type {import('./local-server-runtime.mjs').LocalRuntime | null | undefined} */
 	let active;
+	/** @type {import('node:http').Server | undefined} */
 	let server;
+	/** @type {Awaited<ReturnType<typeof startQuickTunnel>> | undefined} */
 	let tunnel;
+	// Assigned before the listener accepts a pairing request: `active` stays unset until then.
+	/** @type {import('./local-server-pairing.mjs').LocalPairing} */
 	let pairing;
+	/** @type {Awaited<ReturnType<typeof startLocalControl>> | undefined} */
 	let control;
+	/** @type {ReturnType<typeof monitorPublicReadiness> | undefined} */
 	let readiness;
 	const instance = randomUUID();
+	/** @param {unknown} [startupError] */
 	async function close(startupError) {
 		active = null;
 		await closeLocalServerResources({ readiness, control, tunnel, server, runtime }, startupError);
@@ -63,10 +96,11 @@ export async function startQuickServer({ dataDir, port = 0, name = hostname().sl
 		const command = await installCloudflared({ signal });
 		server = await listenLocalServer(() => active, { host: '127.0.0.1', port, instance, tunnel: 'cloudflare',
 			pairing: { exchange: code => pairing.exchange(code) } });
-		tunnel = await startQuickTunnel({ command, port: server.address().port, signal });
+		tunnel = await startQuickTunnel({ command, port: /** @type {import('node:net').AddressInfo} */ (server.address()).port, signal });
 		await runtime.close();
 		runtime = await openLocalRuntime({ dataDir, origin: tunnel.origin, handleSignals: false });
 		signal?.throwIfAborted();
+		/** @type {{ count: number }} */
 		const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
 		pairing = createPairing({ db: runtime.db });
 		const pairingCode = existing.count === 0 ? pairing.issue(name) : null;

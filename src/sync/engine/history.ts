@@ -16,7 +16,7 @@ interface EngineHistoryContext {
 	getSettings(): Pick<SyncSettings, 'ignorePatterns'>;
 	getManifest(): LocalManifestView;
 	shouldIgnore: (path: string) => boolean;
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 	hasPendingMutations(): boolean;
 	canCheckpoint(): boolean;
 	runExclusive<T>(operation: () => Promise<T>): Promise<T>;
@@ -33,7 +33,7 @@ export function createEngineHistory(context: EngineHistoryContext) {
 		async compare(checkpoint: string): Promise<HistoryComparison> {
 			const scope = JSON.stringify(context.getSettings().ignorePatterns);
 			const verify = () => {
-				context.throwIfDestroyed();
+				context.signal.throwIfAborted();
 				if (scope !== JSON.stringify(context.getSettings().ignorePatterns)) throw new Error('Sync exclusions changed. Refresh the comparison.');
 			};
 			verify();
@@ -70,7 +70,7 @@ export function createEngineHistory(context: EngineHistoryContext) {
 			return context.runExclusive(async () => {
 				const scope = JSON.stringify(context.getSettings().ignorePatterns);
 				const verify = () => {
-					context.throwIfDestroyed();
+					context.signal.throwIfAborted();
 					if (scope !== JSON.stringify(context.getSettings().ignorePatterns)) throw new Error('Sync exclusions changed. Review the restore again.');
 					if (context.hasPendingMutations()) throw new Error('Finish pending uploads, file restores, and conflict reviews before returning to this state.');
 				};

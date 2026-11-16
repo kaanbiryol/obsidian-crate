@@ -5,6 +5,26 @@ import { isIP } from 'node:net';
 import { join, resolve } from 'node:path';
 import { runProcess, startProcess, tunnelEnvironment } from './local-server-process.mjs';
 
+/**
+ * Saved remote access settings (`remote.json` beside the data directory). `mode` is
+ * absent for a named Cloudflare Tunnel, which alone has `name`, `ready` and
+ * `tunnelId`; a Quick Tunnel has no `hostname`.
+ * @typedef {object} RemoteSettings
+ * @property {1} format
+ * @property {'quick' | 'tailscale'} [mode]
+ * @property {number} port
+ * @property {string} [hostname]
+ * @property {string} [name]
+ * @property {boolean} [ready]
+ * @property {string} [tunnelId]
+ */
+
+/**
+ * The credentials file `cloudflared tunnel create` writes (`tunnel.json`).
+ * @typedef {{ TunnelID: string, AccountTag: string, TunnelSecret: string }} TunnelCredentials
+ */
+
+/** @param {string | undefined} value @returns {string} */
 export function normalizeTunnelHostname(value) {
 	const hostname = value?.trim().toLowerCase();
 	if (!hostname || hostname.length > 253 || !hostname.includes('.') || isIP(hostname)
@@ -15,6 +35,7 @@ export function normalizeTunnelHostname(value) {
 	return hostname;
 }
 
+/** @param {string} dataDir */
 export function remotePaths(dataDir) {
 	const directory = `${resolve(dataDir)}.remote`;
 	return { directory, settings: join(directory, 'remote.json'), credentials: join(directory, 'tunnel.json'), config: join(directory, 'config.yml') };
@@ -22,6 +43,7 @@ export function remotePaths(dataDir) {
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** @param {string} path @returns {Promise<any>} The parsed file, or undefined when it is missing. */
 async function readJson(path) {
 	let text;
 	try { text = await readFile(path, 'utf8'); }
@@ -30,8 +52,10 @@ async function readJson(path) {
 	catch { throw new Error(`Invalid JSON in ${path}. Restore this file before continuing.`); }
 }
 
+/** @param {string} dataDir @returns {Promise<RemoteSettings | null>} */
 export async function readRemoteSettings(dataDir) {
 	const paths = remotePaths(dataDir);
+	/** @type {RemoteSettings | undefined} */
 	const settings = await readJson(paths.settings);
 	if (settings === undefined) {
 		const contents = await readdir(paths.directory).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
@@ -58,6 +82,7 @@ export async function readRemoteSettings(dataDir) {
 	return settings;
 }
 
+/** @param {string} dataDir @param {number} port */
 export async function saveQuickSettings(dataDir, port) {
 	const existing = await readRemoteSettings(dataDir);
 	if (existing && existing.mode !== 'quick') throw new Error('This directory uses a saved stable address. Keep that setup or choose another data directory.');
@@ -66,7 +91,8 @@ export async function saveQuickSettings(dataDir, port) {
 	await writePrivate(paths.settings, { format: 1, mode: 'quick', port });
 }
 
-/** A Funnel address belongs to this computer's Tailscale name, so it is saved once and then reused. */
+/** A Funnel address belongs to this computer's Tailscale name, so it is saved once and then reused.
+ * @param {string} dataDir @param {string} hostname @param {number} port */
 export async function saveTailscaleSettings(dataDir, hostname, port) {
 	const existing = await readRemoteSettings(dataDir);
 	if (existing && existing.mode !== 'tailscale') throw new Error('This directory already uses another remote access setup. Keep it or choose another data directory.');
@@ -76,11 +102,13 @@ export async function saveTailscaleSettings(dataDir, hostname, port) {
 	const paths = remotePaths(dataDir);
 	await mkdir(paths.directory, { recursive: true, mode: 0o700 });
 	await chmod(paths.directory, 0o700);
+	/** @type {RemoteSettings} */
 	const settings = { format: 1, mode: 'tailscale', hostname, port };
 	await writePrivate(paths.settings, settings);
 	return settings;
 }
 
+/** @param {string} path @param {unknown} value */
 async function writePrivate(path, value) {
 	const temporary = `${path}.${randomUUID()}.tmp`;
 	try {
@@ -90,7 +118,9 @@ async function writePrivate(path, value) {
 		await rename(temporary, path);
 	} finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
+/** @param {string} path @param {RemoteSettings} settings @returns {Promise<TunnelCredentials>} */
 async function readCredentials(path, settings) {
+	/** @type {TunnelCredentials | undefined} */
 	const credentials = await readJson(path);
 	if (!credentials || !uuid.test(credentials.TunnelID) || typeof credentials.AccountTag !== 'string'
 		|| !credentials.AccountTag || typeof credentials.TunnelSecret !== 'string'
@@ -102,6 +132,7 @@ async function readCredentials(path, settings) {
 	return credentials;
 }
 
+/** @param {{ signal?: AbortSignal, run?: typeof runProcess, platform?: NodeJS.Platform }} [options] */
 export async function ensureCloudflared({ signal, run = runProcess, platform = process.platform } = {}) {
 	try { await run('cloudflared', ['--version'], { signal, stdio: 'ignore' }); }
 	catch (error) {
@@ -117,6 +148,7 @@ export async function ensureCloudflared({ signal, run = runProcess, platform = p
 
 // Caller holds the server data lock throughout setup. Persist each completed
 // step so a failed DNS request can resume without creating another tunnel.
+/** @param {{ dataDir: string, hostname?: string, port?: number, signal?: AbortSignal, run?: typeof runProcess }} options */
 export async function setupRemoteAccess({ dataDir, hostname, port, signal, run = runProcess }) {
 	const paths = remotePaths(dataDir);
 	let settings = await readRemoteSettings(dataDir);
@@ -132,7 +164,7 @@ export async function setupRemoteAccess({ dataDir, hostname, port, signal, run =
 		settings = { format: 1, hostname, port, name: `crate-${randomUUID()}`, ready: false };
 		await writePrivate(paths.settings, settings);
 	}
-	const cf = args => run('cloudflared', ['tunnel', '--config', paths.config, ...args], { signal, env: tunnelEnvironment() });
+	const cf = (/** @type {string[]} */ args) => run('cloudflared', ['tunnel', '--config', paths.config, ...args], { signal, env: tunnelEnvironment() });
 	// An explicit config prevents an unrelated ~/.cloudflared/config.yml from
 	// changing provisioning behavior. JSON is valid YAML for cloudflared.
 	if (!settings.ready) {
@@ -144,7 +176,7 @@ export async function setupRemoteAccess({ dataDir, hostname, port, signal, run =
 		}
 		if (!(await stat(paths.credentials).catch(error => { if (error.code === 'ENOENT') return null; throw error; }))) {
 			if (settings.tunnelId) throw new Error('Saved tunnel credentials are missing. Restore the remote configuration directory.');
-			await cf(['create', '--credentials-file', paths.credentials, settings.name]);
+			await cf(['create', '--credentials-file', paths.credentials, /** @type {string} */ (settings.name)]);
 		}
 		const credentials = await readCredentials(paths.credentials, settings);
 		settings.tunnelId = credentials.TunnelID;
@@ -161,11 +193,13 @@ export async function setupRemoteAccess({ dataDir, hostname, port, signal, run =
 	return settings;
 }
 
+/** @param {ReturnType<typeof remotePaths>} paths @param {RemoteSettings} settings */
 async function writeTunnelConfig(paths, settings) {
 	await writePrivate(paths.config, { tunnel: settings.tunnelId, 'credentials-file': paths.credentials,
 		ingress: [{ hostname: settings.hostname, service: `http://127.0.0.1:${settings.port}` }, { service: 'http_status:404' }] });
 }
 
+/** @param {string} dataDir @param {RemoteSettings} settings @param {AbortSignal} [signal] */
 export async function startTunnel(dataDir, settings, signal) {
 	if (!settings.ready || !settings.tunnelId) throw new Error('Remote setup is incomplete. Run npm run server -- setup again.');
 	const paths = remotePaths(dataDir);

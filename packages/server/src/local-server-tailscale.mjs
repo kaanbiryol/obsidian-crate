@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile);
 // The Mac app ships its CLI inside the bundle and does not always add it to PATH.
 const MAC_APP_CLI = '/Applications/Tailscale.app/Contents/MacOS/Tailscale';
 
+/** @param {{ platform?: NodeJS.Platform, run?: (command: string, args: string[]) => Promise<{ stdout: string }> }} [options] */
 export async function findTailscale({ platform = process.platform, run = execFileAsync } = {}) {
 	for (const command of ['tailscale', ...(platform === 'darwin' ? [MAC_APP_CLI] : [])]) {
 		try { await run(command, ['version']); return command; }
@@ -17,11 +18,18 @@ export async function findTailscale({ platform = process.platform, run = execFil
 	throw new Error('Install Tailscale and sign in, then rerun setup: https://tailscale.com/download');
 }
 
+/**
+ * The `tailscale status --json` fields Crate reads.
+ * @typedef {{ BackendState?: string, AuthURL?: string, Self?: { DNSName?: unknown } }} TailscaleStatus
+ */
+
+/** @param {string} text @returns {TailscaleStatus} */
 function parseStatus(text) {
 	try { return JSON.parse(text); }
 	catch { throw new Error('Could not read Tailscale status. Update Tailscale, then retry.'); }
 }
 
+/** @param {TailscaleStatus | null} status */
 function hostnameFromStatus(status) {
 	if (status?.BackendState !== 'Running') throw new Error('Tailscale is not connected. Open Tailscale or run tailscale up, sign in, then retry.');
 	const name = typeof status.Self?.DNSName === 'string' ? status.Self.DNSName.replace(/\.$/, '') : '';
@@ -29,7 +37,9 @@ function hostnameFromStatus(status) {
 	return normalizeTunnelHostname(name);
 }
 
-/** This machine's stable public name, from the signed-in Tailscale client. */
+/** This machine's stable public name, from the signed-in Tailscale client.
+ * @param {string} command
+ * @param {{ run?: (command: string, args: string[]) => Promise<{ stdout: string }> }} [options] */
 export async function tailscaleHostname(command, { run = execFileAsync } = {}) {
 	return hostnameFromStatus(parseStatus((await run(command, ['status', '--json'])).stdout));
 }
@@ -38,6 +48,7 @@ export async function tailscaleHostname(command, { run = execFileAsync } = {}) {
  * name over the LocalAPI socket the two containers share. */
 export const tailscaleSocket = () => process.env.CRATE_TAILSCALE_SOCKET || null;
 
+/** @param {string} socketPath @returns {Promise<string>} */
 function localApiStatus(socketPath) {
 	return new Promise((resolve, reject) => {
 		const call = request({ socketPath, path: '/localapi/v0/status', headers: { Host: 'local-tailscaled.sock' }, timeout: 5000 }, response => {
@@ -51,7 +62,9 @@ function localApiStatus(socketPath) {
 	});
 }
 
-/** Waits while the Tailscale container starts or waits for sign-in, showing its login link once. */
+/** Waits while the Tailscale container starts or waits for sign-in, showing its login link once.
+ * @param {string} socketPath
+ * @param {{ signal?: AbortSignal, interval?: number, log?: (message: string) => void, status?: (socketPath: string) => Promise<string> }} [options] */
 export async function socketTailscaleHostname(socketPath, { signal, interval = 2000, log = console.log, status = localApiStatus } = {}) {
 	let announced = '';
 	for (;;) {
@@ -66,21 +79,27 @@ export async function socketTailscaleHostname(socketPath, { signal, interval = 2
 	}
 }
 
-/** The saved name, read from the CLI or, in Docker, the shared socket. */
+/** The saved name, read from the CLI or, in Docker, the shared socket.
+ * @param {AbortSignal} [signal] */
 export async function currentTailscaleHostname(signal) {
 	const socket = tailscaleSocket();
 	return socket ? socketTailscaleHostname(socket, { signal }) : tailscaleHostname(await findTailscale());
 }
 
 /** Runs Funnel in the foreground, so stopping Crate also takes its public address offline.
- * The first run prints a Tailscale link to approve Funnel for this tailnet. */
+ * The first run prints a Tailscale link to approve Funnel for this tailnet.
+ * @param {import('./local-server-tunnel.mjs').RemoteSettings} settings
+ * @param {AbortSignal} [signal]
+ * @param {{ run?: (command: string, args: string[]) => Promise<{ stdout: string }>, platform?: NodeJS.Platform,
+ * 	start?: typeof startProcess, socket?: string | null }} [options]
+ * @returns {Promise<import('./local-server-process.mjs').StartedProcess>} */
 export async function startTailscaleFunnel(settings, signal, { run = execFileAsync, platform = process.platform, start = startProcess, socket = tailscaleSocket() } = {}) {
 	const command = socket ? null : await findTailscale({ platform, run });
-	const hostname = socket ? await socketTailscaleHostname(socket, { signal }) : await tailscaleHostname(command, { run });
+	const hostname = socket ? await socketTailscaleHostname(socket, { signal }) : await tailscaleHostname(/** @type {string} */ (command), { run });
 	if (hostname !== settings.hostname) {
 		throw new Error(`This server was set up for https://${settings.hostname}, but Tailscale now names this computer ${hostname}. Rename the computer back in Tailscale; a new address requires reconnecting every device and PWA.`);
 	}
 	// The Tailscale container's serve configuration publishes Funnel; it outlives Crate restarts.
 	if (socket) return { exited: new Promise(() => {}), async stop() {} };
-	return start(command, ['funnel', '--https=443', `http://127.0.0.1:${settings.port}`], { signal });
+	return start(/** @type {string} */ (command), ['funnel', '--https=443', `http://127.0.0.1:${settings.port}`], { signal });
 }

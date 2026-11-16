@@ -196,6 +196,33 @@ describe('reminderIndex', () => {
 		expect(listener).toHaveBeenCalledTimes(1);
 	});
 
+	it('advances its version before each change notification', async () => {
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [makeReminder({ id: 'r1', content: 'Original task', project: 'Work' })],
+			filesScanned: 1,
+			totalLines: 1,
+			issues: [],
+			scanDurationMs: 5,
+			discoveredProjects: ['Work'],
+		});
+
+		const index = createReminderIndex(app, 'Reminders');
+		const seen: number[] = [];
+		index.onIndexChange(() => seen.push(index.getVersion()));
+		const initial = index.getVersion();
+		await index.load();
+		const loaded = index.getVersion();
+		expect(loaded).toBeGreaterThan(initial);
+		expect(seen.at(-1)).toBe(loaded);
+
+		// Reads do not change it; each notification does.
+		index.getAll();
+		expect(index.getVersion()).toBe(loaded);
+		index.applyOptimisticUpdate('r1', { content: 'Optimistic task' });
+		expect(index.getVersion()).toBe(loaded + 1);
+		expect(seen.at(-1)).toBe(loaded + 1);
+	});
+
 	it('merges optimistic create, update, and delete state into queries', async () => {
 		const baseReminder = makeReminder({ id: 'r1', content: 'Task', project: 'Work' });
 		const scanResult: ScanResult = {

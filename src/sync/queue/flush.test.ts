@@ -8,7 +8,8 @@ import { Notice } from '../../test/mocks/obsidian';
 import { describe, expect, it, vi } from 'vitest';
 import { processPendingChanges } from './flush';
 import { OVERSIZED_LOCAL_FILE_MESSAGE, SkippedFileError } from '../issues';
-import type { PreparedUpload, SyncState } from '../types';
+import type { SyncState } from '../types';
+import type { PreparedUpload } from '../transfer/types';
 import { HttpError } from '../worker-api/client';
 import { LocalFilePresentError } from '../local/local-absence';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
@@ -96,7 +97,7 @@ function createFlushHarness(overrides: Partial<{
 					batchUpload: async files => ({ success: true, results: await Promise.all(files.map(file => uploadFile({ ...file, content: base64ToArrayBuffer(file.content) }))) }),
 				},
 				localManifest: { setEntry }, getModifiedIso,
-				runConcurrent: (tasks, concurrency) => runConcurrentTasks(tasks, concurrency, () => false),
+				runConcurrent: (tasks, concurrency) => runConcurrentTasks(tasks, concurrency),
 				retryWithBackoff: fn => fn(),
 			}, prepared, result, options)) satisfies QueueFlushContext['uploadPreparedFiles'],
 			deleteRemoteFiles: ((files, result, options) => deleteRemoteFiles({
@@ -138,7 +139,7 @@ function createFlushHarness(overrides: Partial<{
 			updateState,
 			setLastSync,
 			reconnectNotice: new ReconnectNotice(),
-			isDestroyed: () => false,
+			signal: new AbortController().signal,
 			getStatus: () => state.status,
 			prepareUploadFromPath,
 			assertLocalFileAbsent: harnessContext.assertLocalFileAbsent,

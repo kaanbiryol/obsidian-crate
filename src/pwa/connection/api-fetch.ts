@@ -1,35 +1,32 @@
 import { CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol/server-info';
 import { capturePwaSession } from './session-generation';
 import { ConnectionError } from './issues';
-import { CRATE_WEB_SESSION_NAME_HEADER, REMINDERS_FOLDER_CHANGED } from '@/protocol/web-session';
-import { adoptReminderFolder } from '../config';
+import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '@/protocol/http-headers';
 import { detectWebSessionName } from './session-label';
-import { prepareReminderEncryption } from '../reminders/encryption-session';
 import type { FeatureKeys } from '../encryption/encryption-keys';
 import { checkEncryptionSignals, retryAfterEncryptionChange } from '../encryption/encryption-retry';
+import { encryptionOffDispatch, noteEncryptionReport, trustsEncryptionOff } from '../encryption/encryption-off-trust';
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_STATE_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encryption/server-state';
 import { crateProtocol, forgetRefusedProtocol } from './request-headers';
-import { EncryptedReminderApi } from '../reminders/encrypted-reminder-api';
+import type { ApiFetch } from '../types';
 
-// The token and session whose latest authenticated response said the vault is not
-// encrypted, and when that request was sent. Shared so the app's client trusts the
-// startup probe instead of repeating it.
-let encryptionOff: { token: string; current: () => boolean; at: number } | null = null;
-// Bumped whenever that verdict is dropped, so a response already in flight cannot restore it.
-let encryptionOffResets = 0;
-/** How long that verdict lets a change skip the probe before sending plaintext. */
-const ENCRYPTION_OFF_TRUST_MS = 30_000;
-function forgetEncryptionOff(): void {
-	encryptionOff = null;
-	encryptionOffResets++;
+/** The feature that checks this credential's encryption and answers its encrypted requests;
+ * Reminders supplies it (`pwa/reminders/reminder-transport.ts`). */
+export interface ApiFetchEncryption {
+	/** Checks the server's encryption state and unlocks keys; null when the vault is not encrypted. */
+	prepare(token: string, rawFetch: ApiFetch, refresh: boolean): Promise<FeatureKeys | null>;
+	/** The client for unlocked keys. It answers the requests it serves, or null to send one as is. */
+	router(keys: FeatureKeys, rawFetch: ApiFetch): { handle(path: string, init: RequestInit): Promise<Response | null> };
+	/** Sees each response before its caller and may throw instead; `refresh` checks encryption again. */
+	inspect(path: string, response: Response, session: { encrypted(): boolean; refresh(): Promise<void> }): Promise<void>;
 }
 
-export function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
+export function makeApiFetch(authToken: string | null, onUnauthorized: () => void, encryption: ApiFetchEncryption) {
 	const sessionCurrent = capturePwaSession();
 	const clientSession = crypto.randomUUID();
 	let keys: FeatureKeys | null = null;
-	let encrypted: EncryptedReminderApi | null = null;
+	let encrypted: ReturnType<ApiFetchEncryption['router']> | null = null;
 	let preparing: Promise<void> | undefined;
 	async function rawFetch(path: string, init: RequestInit = {}, unverified = false): Promise<Response> {
 		if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
@@ -55,16 +52,13 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		}
 		if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
 
-		const dispatched = { at: performance.now(), resets: encryptionOffResets };
+		const dispatched = encryptionOffDispatch();
 		const response = await fetch(path, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(30_000) });
 		if (!sessionCurrent() && !revokingSession) {
 			throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		}
 		const encryptionState = response.headers.get(ENCRYPTION_STATE_HEADER);
-		// A refusal may mean another device turned encryption on and revoked or locked this credential.
-		if (encryptionState === 'on' || [401, 403, 423, 428].includes(response.status)) forgetEncryptionOff();
-		// A read sent before the startup check must not let that check be skipped.
-		else if (encryptionState === 'off' && !unverified && dispatched.resets === encryptionOffResets) encryptionOff = { token: authToken, current: sessionCurrent, at: dispatched.at };
+		noteEncryptionReport(response, dispatched, { token: authToken, current: sessionCurrent, unverified });
 		if (response.status === 401 && sessionCurrent()) {
 			onUnauthorized();
 			throw new ConnectionError('reconnect', 'Session expired. Open a fresh link from Crate.');
@@ -72,29 +66,19 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		await forgetRefusedProtocol(response);
 		// Without keys, a 428 from a newly encrypted vault retries after a fresh probe.
 		checkEncryptionSignals(response, path, { probePath: '/encryption', message: 'The vault encryption changed.', encrypted: Boolean(keys) || encryptionState === 'on' });
-		if (response.status === 403 && path.startsWith('/reminders/')) await followFolderChange(response);
+		await encryption.inspect(path, response, { encrypted: () => Boolean(keys), refresh: () => ready(true) });
 		return response;
-	}
-	/** Obsidian changed the reminders folder and the server moved this session with it. */
-	async function followFolderChange(response: Response): Promise<void> {
-		const body = await response.clone().json().catch(() => null) as { code?: unknown; folderPath?: unknown } | null;
-		if (body?.code !== REMINDERS_FOLDER_CHANGED || typeof body.folderPath !== 'string' || !body.folderPath) return;
-		// An encrypted folder's name comes from its sealed label, which the refresh opens.
-		if (keys) await ready(true);
-		else adoptReminderFolder(body.folderPath);
-		throw new ConnectionError('unavailable', 'The reminders folder changed in Obsidian. Showing the new folder.');
 	}
 	/** `beforeChange` trusts only a recent unencrypted verdict before a request sends plaintext. */
 	function ready(refresh = false, beforeChange = false): Promise<void> {
 		if (!authToken) return Promise.resolve();
 		// Unencrypted vaults skip the probe while responses confirm it stays off.
-		if (!refresh && !keys && encryptionOff?.token === authToken && encryptionOff.current()
-			&& (!beforeChange || performance.now() - encryptionOff.at < ENCRYPTION_OFF_TRUST_MS)) return Promise.resolve();
+		if (!refresh && !keys && trustsEncryptionOff(authToken, beforeChange)) return Promise.resolve();
 		if (refresh) preparing = undefined;
-		return preparing ??= prepareReminderEncryption(authToken, rawFetch, refresh).then(value => {
+		return preparing ??= encryption.prepare(authToken, rawFetch, refresh).then(value => {
 			if (!sessionCurrent()) throw new ConnectionError('reconnect', 'Session changed before unlocking');
 			keys = value;
-			encrypted = keys ? new EncryptedReminderApi(keys, rawFetch) : null;
+			encrypted = keys ? encryption.router(keys, rawFetch) : null;
 		}).finally(() => { if (!keys) preparing = undefined; });
 	}
 	async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {

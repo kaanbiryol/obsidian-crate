@@ -5,14 +5,32 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { assertLocalMigrationPath } from './local-server-migrations.mjs';
 import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocalRuntime } from './local-server-runtime.mjs';
 
+/**
+ * One backed-up file, relative to its directory.
+ * @typedef {{ path: string, size: number, sha256: string }} BackupFile
+ */
+
+/**
+ * A verified backup's inventory (`backup.json`).
+ * @typedef {object} BackupManifest
+ * @property {number} format
+ * @property {string} createdAt
+ * @property {import('./local-server-runtime.mjs').ServerMetadata} metadata
+ * @property {BackupFile[]} data
+ * @property {BackupFile[]} remote
+ */
+
 const ephemeral = new Set(['server.lock', 'control.json', 'control.sock', 'status.json', '.DS_Store']);
-const inside = (parent, child) => { const path = relative(parent, child); return path === '' || (!path.startsWith('..') && !isAbsolute(path)); };
+const inside = (/** @type {string} */ parent, /** @type {string} */ child) => { const path = relative(parent, child); return path === '' || (!path.startsWith('..') && !isAbsolute(path)); };
+/** @param {string} path */
 async function digest(path) {
 	const hash = createHash('sha256');
 	for await (const chunk of createReadStream(path)) hash.update(chunk);
 	return hash.digest('hex');
 }
+/** @param {string} directory @param {string} [prefix] @returns {Promise<BackupFile[]>} */
 async function inventory(directory, prefix = '') {
+	/** @type {BackupFile[]} */
 	const files = [];
 	for (const name of (await readdir(join(directory, prefix))).sort()) {
 		const path = prefix ? `${prefix}/${name}` : name;
@@ -24,6 +42,7 @@ async function inventory(directory, prefix = '') {
 	}
 	return files;
 }
+/** @param {string} source @param {string} target @param {BackupFile[]} files */
 async function copyInventory(source, target, files) {
 	for (const file of files) {
 		await mkdir(dirname(join(target, file.path)), { recursive: true, mode: 0o700 });
@@ -31,7 +50,9 @@ async function copyInventory(source, target, files) {
 	}
 }
 
+/** @param {string} dataDir */
 export async function checkLocalUpgrade(dataDir) {
+	/** @type {import('./local-server-runtime.mjs').ServerMetadata} */
 	const current = JSON.parse(await readFile(join(dataDir, 'server.json'), 'utf8'));
 	const next = await localBuildInfo();
 	const migration = current?.schemaHash !== next.schemaHash;
@@ -40,6 +61,7 @@ export async function checkLocalUpgrade(dataDir) {
 	return { from: current.serverRevision, to: next.serverRevision, runtime: next.runtimeVersion, requiresMigration: migration };
 }
 
+/** @param {string} dataDir @param {string} output @param {boolean} [alreadyLocked] @returns {Promise<string>} The backup directory. */
 export async function backupLocalServer(dataDir, output, alreadyLocked = false) {
 	dataDir = await realpath(dataDir);
 	output = resolve(output);
@@ -50,6 +72,7 @@ export async function backupLocalServer(dataDir, output, alreadyLocked = false) 
 	const unlock = alreadyLocked ? async () => {} : await lockLocalData(dataDir);
 	const staging = `${output}.tmp-${randomUUID()}`;
 	try {
+		/** @type {import('./local-server-runtime.mjs').ServerMetadata} */
 		const metadata = JSON.parse(await readFile(join(dataDir, 'server.json'), 'utf8'));
 		const data = await inventory(dataDir);
 		const remote = await inventory(`${dataDir}.remote`).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
@@ -67,14 +90,16 @@ export async function backupLocalServer(dataDir, output, alreadyLocked = false) 
 	} finally { await rm(staging, { recursive: true, force: true }); await unlock(); }
 }
 
+/** @param {string} dataDir @param {string} backup */
 export async function restoreLocalServer(dataDir, backup) {
 	dataDir = resolve(dataDir);
 	backup = await realpath(backup);
 	if (inside(dataDir, backup) || inside(backup, dataDir)) throw new Error('Choose a restore directory separate from the backup.');
+	/** @type {BackupManifest} */
 	const manifest = JSON.parse(await readFile(join(backup, 'backup.json'), 'utf8'));
 	if (manifest.format !== 1 || !Array.isArray(manifest.data) || !Array.isArray(manifest.remote)) throw new Error('Unsupported backup format.');
 	assertCompatibleLocalMetadata(manifest.metadata, await localBuildInfo());
-	for (const key of ['data', 'remote']) {
+	for (const key of /** @type {const} */ (['data', 'remote'])) {
 		for (const file of manifest[key]) {
 			if (typeof file.path !== 'string' || !file.path || file.path.includes('\\')
 				|| file.path.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('Invalid backup file path.');

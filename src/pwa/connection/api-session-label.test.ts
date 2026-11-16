@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../../protocol/web-session';
 import { exchangeEnrollmentToken } from './enrollment-exchange';
 import { makeApiFetch } from './api-fetch';
+import { reminderTransport } from '../reminders/reminder-transport';
 
 vi.mock('../reminders/encryption-session', () => ({ prepareReminderEncryption: async () => null, reminderEncryptionSnapshot: () => ({ status: 'unencrypted' }) }));
 vi.mock('./server-compatibility', () => ({ requireCompatibleProtocol: vi.fn().mockResolvedValue(1) }));
@@ -23,7 +24,7 @@ it.each([false, true])('reports a session label during enrollment and existing-s
 		body: JSON.stringify({ token: 'enrollment-grant', deviceName: name }),
 	}));
 	// Existing sessions can report the label without another enrollment.
-	await makeApiFetch('existing-session', vi.fn())('/reminders/list?folderPath=Reminders');
+	await makeApiFetch('existing-session', vi.fn(), reminderTransport)('/reminders/list?folderPath=Reminders');
 	const request = network.mock.calls.at(-1)!;
 	const headers = new Headers(request[1]?.headers);
 	expect(headers.get(CRATE_WEB_SESSION_NAME_HEADER)).toBe(encodeURIComponent(name));

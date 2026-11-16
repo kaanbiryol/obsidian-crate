@@ -19,8 +19,7 @@ interface ConflictTrackingContext {
 	queue: Pick<SyncQueueController, 'restorePendingKeys'>;
 	ignore: Pick<SyncIgnoreMatcher, 'configuredMatcher'>;
 	trackWork: <T>(operation: () => Promise<T>) => Promise<T>;
-	isDestroyed: () => boolean;
-	throwIfDestroyed: () => void;
+	signal: AbortSignal;
 	updateConflictCount: (count: number) => void;
 }
 
@@ -50,7 +49,7 @@ export class ConflictTracking {
 
 	/** Recovers copies the store does not list, once the vault has loaded. */
 	scheduleRecovery(): void {
-		if (this.context.isDestroyed() || this.recoveryTimer !== null) return;
+		if (this.context.signal.aborted || this.recoveryTimer !== null) return;
 		this.recoveryTimer = setTimeout(() => {
 			this.recoveryTimer = null;
 			this.recoverInBackground();
@@ -66,16 +65,16 @@ export class ConflictTracking {
 	 * Publication remains in the ordinary durable upload/CAS pipeline. */
 	async acceptIncomingBaseline(record: ConflictRecord): Promise<void> {
 		if (record.copySide !== 'remote') return;
-		const { api, manifest, queue, throwIfDestroyed } = this.context;
-		throwIfDestroyed();
+		const { api, manifest, queue, signal } = this.context;
+		signal.throwIfAborted();
 		const remote = (await api.getFileMetadata([record.originalPath])).files[record.originalPath];
 		if (!record.remoteHash || !remote || remote.hash !== record.remoteHash) {
 			throw new Error('The server file changed. Sync again and review the latest incoming copy. Both versions were kept.');
 		}
-		throwIfDestroyed();
+		signal.throwIfAborted();
 		manifest.setEntry(record.originalPath, { ...remote, modified: UNVERIFIED_MODIFIED });
 		await manifest.save();
-		throwIfDestroyed();
+		signal.throwIfAborted();
 		queue.restorePendingKeys([pendingChangeKey('upload', record.originalPath)]);
 	}
 
@@ -85,11 +84,11 @@ export class ConflictTracking {
 	}
 
 	private recoverInBackground(): void {
-		if (this.context.isDestroyed()) return;
+		if (this.context.signal.aborted) return;
 		const ignoreConfigured = this.context.ignore.configuredMatcher();
 		void this.context.trackWork(() => this.context.store.recoverFromVault(
 			ignoreConfigured,
-			() => this.context.isDestroyed(),
+			() => this.context.signal.aborted,
 			this.baselineRevision,
 		)).catch((error) => {
 			logger.warn('Conflict recovery failed:', errorMessage(error));

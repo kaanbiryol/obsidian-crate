@@ -385,7 +385,7 @@ it('reports every file across concurrent download batches', async () => {
 	expect(onProcessed).toHaveBeenCalledTimes(51);
 });
 
-const runConcurrent = <T>(tasks: Array<() => Promise<T>>, concurrency: number) => runConcurrentTasks(tasks, concurrency, () => false);
+const runConcurrent = <T>(tasks: Array<() => Promise<T>>, concurrency: number) => runConcurrentTasks(tasks, concurrency);
 
 it.each([
 	['a timeout', () => new SyncTransportError('Request timed out after 120000ms')],

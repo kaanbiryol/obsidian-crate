@@ -63,3 +63,15 @@ it('asks for one restart when a sync rewrites Obsidian settings, not for notes o
 	emit({ success: true, downloadedPaths: ['.obsidian/themes/Minimal/theme.css'] });
 	expect(notices).toEqual([RESTART_NOTICE]);
 });
+
+it('reports the conflicts of every published result, manual or automatic', () => {
+	const { emit } = setup(false);
+	emit({ success: true });
+	expect(notices).toEqual([]);
+	emit({ success: true, conflicts: ['Notes/a.md'] });
+	emit({ success: true, conflicts: ['Notes/b.md', 'Notes/c.md'] });
+	expect(notices).toEqual([
+		'Sync conflict: Notes/a.md\nReview the affected file; a local version may have been saved as a conflict copy.',
+		'2 sync conflicts detected.\nReview the affected files and any conflict copies.',
+	]);
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BatchUploadFile } from '../../protocol/sync-types';
-import type { PreparedUpload } from '../types';
+import type { PreparedUpload } from './types';
 import { HttpError, SyncTransportError } from '../worker-api/client';
 import { runConcurrentTasks } from '../concurrency';
 import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
@@ -214,7 +214,7 @@ it.each([
 		{ path: 'large.bin', content: new ArrayBuffer(1), hash: 'h', size: BATCH_FILE_SIZE_LIMIT },
 	];
 	const result = emptyResult();
-	const runConcurrent = <T>(tasks: Array<() => Promise<T>>, concurrency: number) => runConcurrentTasks(tasks, concurrency, () => false);
+	const runConcurrent = <T>(tasks: Array<() => Promise<T>>, concurrency: number) => runConcurrentTasks(tasks, concurrency);
 	await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { retry: false, onProcessed, onFailure });
 	// Only the batches already in flight were sent.
 	expect(harness.api.batchUpload).toHaveBeenCalledTimes(getBatchUploadConcurrency());

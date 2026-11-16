@@ -15,8 +15,18 @@ interface NoticeHost {
 
 export const RESTART_NOTICE = 'Obsidian settings changed on another device. Restart Obsidian to apply them.';
 
+/** A persistent notice (duration 0) summarizing the conflicts one sync created. */
+function notifyConflicts(conflictPaths: string[]): void {
+	if (conflictPaths.length === 0) return;
+	const message = conflictPaths.length === 1
+		? `Sync conflict: ${conflictPaths[0]}\nReview the affected file; a local version may have been saved as a conflict copy.`
+		: `${conflictPaths.length} sync conflicts detected.\nReview the affected files and any conflict copies.`;
+	new Notice(message, 0);
+}
+
 /**
- * Sync results the person may not see: mobile has no status bar, so a failed
+ * Sync results the person may not see. Every published result, manual or
+ * automatic, reports the conflicts it created. Mobile has no status bar, so a failed
  * background sync gets one notice until a sync succeeds again. Obsidian reads
  * most configuration only at launch, so changed settings ask for one restart.
  */
@@ -24,6 +34,7 @@ export function registerSyncResultNotices(host: NoticeHost, runtime: NoticeRunti
 	let failing = false, restartShown = false;
 	const configPrefix = `${host.configDir}/`;
 	const listener = (result: SyncResult) => {
+		notifyConflicts(result.conflicts);
 		// A Crate update shows its own notice once it is installed.
 		const changedConfig = [...result.downloadedPaths, ...result.mergedPaths]
 			.some(path => path.startsWith(configPrefix) && !isCrateUpdatePath(path, host.configDir));

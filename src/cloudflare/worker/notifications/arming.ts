@@ -1,4 +1,4 @@
-import { createsNotificationWork } from '../sync/staging/staged-upload-dispatch';
+import { createsNotificationWork, readCommitFolders } from '../sync/staging/commit-context';
 import { parseJsonObject, sanitizePath } from '../http/request-validation';
 
 /** When a coordinated route that can queue notification or Reading work arms the pass:
@@ -23,8 +23,5 @@ export async function notificationArming(request: Request, path: string, method:
 		: Array.isArray(parsed.value.files) ? parsed.value.files.map(file => (file as { path?: unknown } | null)?.path) : [];
 	const paths = named.flatMap(value => typeof value === 'string' && sanitizePath(value) ? [value] : []);
 	if (!paths.length) return 'none';
-	const folders = await db.prepare(`SELECT p.folder_path, r.folder_path AS reading_folder
-    FROM (SELECT 1) LEFT JOIN notification_policy p ON p.id = 1 LEFT JOIN reading_policy r ON r.id = 1`)
-		.first<{ folder_path: string | null; reading_folder: string | null }>();
-	return createsNotificationWork(paths, folders?.folder_path ?? null, folders?.reading_folder ?? null) ? 'now' : 'none';
+	return createsNotificationWork(paths, await readCommitFolders(db)) ? 'now' : 'none';
 }

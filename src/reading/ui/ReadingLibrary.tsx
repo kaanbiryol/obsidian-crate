@@ -1,7 +1,7 @@
 import { ReadingDuplicates } from './ReadingDuplicates';
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { TextField } from '../../ui/shared/TextField';
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ViewHeader } from '../../ui/shared/ViewHeader';
@@ -12,13 +12,13 @@ import { FloatingActionButton } from '../../ui/shared/FloatingActionButton';
 import { EmptyState } from '../../ui/shared/EmptyState';
 import type { ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
-import { filterReadingHighlights, filterReadingItems, groupReadingItems, readingSections, readingSource, readingTitle, settledHighlights, type ReadingSection } from '../core/reading-presentation';
+import { groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { HighlightList } from './HighlightList';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
-import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
-import { highlightsMatch, titleMatches, normalizedTag, searchableQuery } from '../core/search-terms';
+import type { ReadingLibrarySource } from './useLibraryPages';
+import { useReadingLibraryQuery } from './useReadingLibraryQuery';
 import { ReadingTagFilter } from './ReadingTagFilter';
 
 export interface ReadingLibraryProps {
@@ -99,38 +99,13 @@ export function ReadingLibraryPanel({
 		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 1000);
 		return () => window.clearTimeout(timer);
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
-	// Filter on a deferred query so typing never waits for the list to re-render.
-	const deferredQuery = useDeferredValue(query);
-	// A server library searches from three characters, so the first letters send no request.
-	const listQuery = source ? searchableQuery(deferredQuery) : deferredQuery;
-	// A server library lists pages the server matched; local changes then move or hide items.
-	const pages = useLibraryPages(source, section, listQuery, tag);
-	const present = source?.present;
-	const loaded = useMemo(() => present ? present(pages.items) : snapshot.items, [present, pages.items, snapshot.items]);
-	const items = useMemo(() => present
-		? filterReadingItems(loaded, section, '', null).filter(item => (!listQuery.trim() || (section === 'highlights' ? highlightsMatch(item, listQuery) : titleMatches(item.title, listQuery)))
-			&& (!tag || item.tags.some(value => normalizedTag(value) === normalizedTag(tag))))
-		: filterReadingItems(snapshot.items, section, listQuery, tag), [present, loaded, snapshot.items, section, listQuery, tag]);
-	const morePages = !!pages.cursor;
-	const excerpts = useMemo(() => {
-		const rows = filterReadingHighlights(items, listQuery, !!present);
-		return present && section === 'highlights' && morePages ? settledHighlights(rows, pages.items) : rows;
-	}, [items, listQuery, present, section, morePages, pages.items]);
-	const count = section === 'highlights' ? excerpts.length : items.length;
+	const { listQuery, items, excerpts, count, loadTags, loading, more, pageLoading, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
-	// A server library lists every tag; a local one holds them all already.
-	const snapshotItems = snapshot.items;
-	const loadLocalTags = useCallback(async () => [...new Set(snapshotItems.flatMap(item => item.tags))].sort((a, b) => a.localeCompare(b)), [snapshotItems]);
-	const loadTags = source?.loadTags ?? loadLocalTags;
 	// Removing a local library's last use of the selected tag clears the filter.
+	const snapshotItems = snapshot.items;
 	useEffect(() => {
 		if (!source && tag && !snapshotItems.some(item => item.tags.includes(tag))) { setTag(null); setVisible(PAGE_SIZE); }
 	}, [source, tag, snapshotItems]);
-	// Previous results narrowed to the new filter stay up while the server answers; only an
-	// empty narrowing waits on the (delayed) spinner rather than flashing the empty state.
-	const loading = source ? pages.loading && count === 0 : snapshot.loading;
-	const more = source ? !!pages.cursor : false;
-	const { loadMore } = pages, pageLoading = !!source && pages.loading, pageError = pages.error;
 	// Near the end, reveal the next rows already loaded, or ask the server for its next page.
 	// Runs after each render too, so a list shorter than its scroller keeps filling.
 	const loadNearEnd = useCallback(() => {
@@ -185,7 +160,7 @@ export function ReadingLibraryPanel({
 					{notice}
 					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, section))}
 						onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
-					{(error || snapshot.error || pages.error) && <p className="crate-reading__notice" role="alert">{error || snapshot.error || pages.error}{' '}
+					{(error || snapshot.error || pageError) && <p className="crate-reading__notice" role="alert">{error || snapshot.error || pageError}{' '}
 						<Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <ReadingIssues issues={snapshot.issues} />}
 					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" /> : <>

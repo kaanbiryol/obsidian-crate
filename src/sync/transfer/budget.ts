@@ -1,4 +1,4 @@
-import type { PreparedUpload } from '../types';
+import type { PreparedUpload } from './types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { Platform } from 'obsidian';
 import { PREPARE_CONCURRENCY } from './constants';

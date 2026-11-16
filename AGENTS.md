@@ -48,7 +48,7 @@ Use npm with the Node version in `.nvmrc` and `package.json` `engines`. `package
 
 - `npm run dev` watches and installs builds into `test-vault/` (create it with `npm run vault:setup`)
 - `npm run build` builds the Worker, type-checks and bundles the plugin into `dist/`
-- `npm run lint`, `npm run typecheck`, `npm run typecheck:worker`, `npm run typecheck:service-worker`, `npm run deadcode`
+- `npm run lint`, `npm run typecheck`, `npm run typecheck:worker`, `npm run typecheck:service-worker`, `npm run typecheck:server`, `npm run deadcode`
 - `npm test` or `npx vitest run <file>` for unit tests
 - `npm run test:worker-runtime` for Worker behavior against local D1/R2/Durable Objects
 - `npm run test:pwa-browser`, `npm run test:visual`, `npm run test:reading` for browser coverage

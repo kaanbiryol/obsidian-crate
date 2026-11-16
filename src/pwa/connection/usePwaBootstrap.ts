@@ -16,6 +16,7 @@ import { isStandaloneApp } from '../shell/device';
 import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from './install-enrollment';
 import { exchangeEnrollmentToken } from './enrollment-exchange';
 import { makeApiFetch } from './api-fetch';
+import { reminderTransport } from '../reminders/reminder-transport';
 import type { ShowToast, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({
@@ -129,7 +130,7 @@ export function usePwaBootstrap({
 				setEnrolled(true);
 
 				if (!nextToken) return;
-				await makeApiFetch(nextToken, () => { void suspendLocalSession(); reportError(SESSION_RECOVERY_ISSUE); }).ready();
+				await makeApiFetch(nextToken, () => { void suspendLocalSession(); reportError(SESSION_RECOVERY_ISSUE); }, reminderTransport).ready();
 				if (cancelled || !sessionCurrent()) return;
 
 			} catch (bootstrapError) {

@@ -20,8 +20,7 @@ interface EnginePendingChangesContext {
 	cache: Pick<MarkdownBaseCache, 'readBase'>;
 	queue: Pick<SyncQueueController, 'getPendingKeys' | 'snapshotPendingRevisions' | 'settleSyncResult' | 'settleKeys'>;
 	backupRoot: string;
-	throwIfDestroyed(): void;
-	isDestroyed(): boolean;
+	signal: AbortSignal;
 	beforeBinaryReplace(path: string): Promise<void>;
 }
 
@@ -54,7 +53,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 				readBase: async (path, baseline) => await context.cache.readBase(path, baseline.hash)
 					?? loadRemotePendingBase(context.api, path, baseline, MAX_FILE_SIZE_BYTES),
 				backupRoot: context.backupRoot,
-				verify: () => context.throwIfDestroyed(),
+				verify: () => context.signal.throwIfAborted(),
 				beforeBinaryReplace: path => context.beforeBinaryReplace(path),
 				applied: async (path, remote, content) => {
 					if (remote && content) {
@@ -73,7 +72,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 		},
 
 		async settleSynced(result: SyncResult, revisions: ReadonlyMap<string, number>): Promise<void> {
-			if (context.isDestroyed()) return;
+			if (context.signal.aborted) return;
 			context.queue.settleSyncResult(result, revisions);
 			if (!result.success) return;
 			// Applying remote bytes emits vault events too. Verify those events against
@@ -88,7 +87,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 			const snapshot = context.queue.snapshotPendingRevisions();
 			const settled: PendingKey[] = [];
 			for (const key of context.queue.getPendingKeys()) {
-				if (context.isDestroyed()) return;
+				if (context.signal.aborted) return;
 				const path = decodePendingChange(key).path;
 				if (!applied.has(path)) continue;
 				const baseline = context.manifest.getEntry(path);
@@ -97,7 +96,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 						// Applying the bytes verified them together with this modification
 						// time, so an unchanged stat settles the event without rereading.
 						const stat = await context.vault.adapter.stat(path);
-						if (context.isDestroyed()) return;
+						if (context.signal.aborted) return;
 						if (context.manifest.getEntry(path) !== baseline) continue;
 						if (stat?.type === 'file' && stat.size === baseline.size
 							&& new Date(stat.mtime).toISOString() === baseline.modified) {
@@ -106,7 +105,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 						}
 					}
 					const local = await readLocalFileEntry(context.vault, path);
-					if (context.isDestroyed()) return;
+					if (context.signal.aborted) return;
 					if (context.manifest.getEntry(path) !== baseline) continue;
 					if (local?.hash === baseline?.hash) settled.push(key);
 				} catch {

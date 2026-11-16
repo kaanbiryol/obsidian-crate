@@ -48,7 +48,7 @@ function harness() {
 			sync: { getSnapshot: () => ({ reminders: [reminder], projects: ['Inbox'] }), beginLocalMutation: () => () => {},
 				invalidateReads: () => {}, commitReminderState: vi.fn(), loadReminders: vi.fn() } });
 		useFeatureSettings('reminders', { ...feature, config, push: { phase: 'unsupported', status: null },
-			onEnablePush: vi.fn(async () => {}), recovery: null, unsynced: changes.length > 0,
+			onEnablePush: vi.fn(async () => {}), recoveryChanges: [], quarantinedChanges: [], onRemoveQuarantined: vi.fn(async () => true), unsynced: changes.length > 0,
 			updateReady: !mutations.isPreparingMutation(), canApplyUpdate: () => !mutations.isPreparingMutation() });
 		return mutations;
 	}, undefined, children => createElement(SettingsContext.Provider, { value: store }, children));

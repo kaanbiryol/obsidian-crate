@@ -1,5 +1,5 @@
 import { readingUpdateReadiness } from '../update/update-readiness';
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useSyncFailureToast } from '../hooks/useSyncFailureToast';
 import { useSharedFeatures } from '../shared-features';
 import { useSyncFeedback } from '../sync/SyncFeedback';
@@ -23,7 +23,7 @@ function useReadingController() {
 	const app = useAppConnection();
 	const connection = useReadingSession(app.reading);
 	const { session, lockedSession, ready, connecting, cache, pending, error, recovery, connectionState,
-		adding, connect, resetSession } = connection;
+		adding, connect, resetSession, refreshRecovery, publishPending } = connection;
 	useConnectionReset(resetSession);
 	const { refresh, refreshManually, syncing, syncedSession, isOffline, retryAt } = useReadingSync(connection, enabled);
 	const { saving, preparingChange, canApplyUpdate, queueChange, saveLink, updateItem, retryArticle, deleteItem } = useReadingMutations(connection, { refresh, showToast });
@@ -43,6 +43,10 @@ function useReadingController() {
 	const confirmed = Boolean(session && sameReadingSession(syncedSession, session));
 	const syncStatus = readingSyncStatus({ pending, isOffline, loading: !cache, refreshing: syncing, confirmed, error, recovery });
 	const readingDisabled = !session && connectionState !== 'available';
+	// Rebuilt only when their inputs change, so an unchanged model publishes nothing.
+	const shortcut = useMemo(() => session ? <ShortcutSetup session={session} /> : null, [session]);
+	const issues = useMemo(() => <ReadingSettingsIssues connection={{ session, pending, recovery, refreshRecovery, publishPending }} />,
+		[session, pending, recovery, refreshRecovery, publishPending]);
 	useFeatureSettings('reading', {
 		ready: ready && !connecting, connected: Boolean(session), enabled, pendingCount: pending.length,
 		encryption: lockedSession ? { status: 'locked', folderPath: lockedSession.folderPath }
@@ -58,8 +62,8 @@ function useReadingController() {
 		onExport: pending.length || recovery ? exportReadingData : undefined,
 		clearView: resetSession,
 		onLogout: app.logOut,
-		shortcut: session ? <ShortcutSetup session={session} /> : null,
-		issues: <ReadingSettingsIssues connection={connection} />,
+		shortcut,
+		issues,
 	});
 
 	return { connection, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, claimFailure, saving, queueChange, saveLink, updateItem, retryArticle, deleteItem };

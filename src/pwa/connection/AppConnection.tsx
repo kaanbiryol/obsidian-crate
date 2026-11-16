@@ -5,6 +5,7 @@ import { onConnectionExpired } from './expiration';
 import type { ConnectionIssue } from './issues';
 import { AUTH_TOKEN_KEY, PWA_FOLDER_CHANGED_EVENT, loadStoredConfig, parseStartTab } from '../config';
 import { reminderEncryptionSnapshot, subscribeReminderEncryption } from '../reminders/encryption-session';
+import { reminderTransport } from '../reminders/reminder-transport';
 import { usePwaBootstrap } from './usePwaBootstrap';
 import { usePwaSessionLifecycle } from './usePwaSessionLifecycle';
 import { usePwaPreferences } from '../settings/usePwaPreferences';
@@ -41,7 +42,7 @@ function useConnection() {
 	}, []);
 	const disablePushNotifications = useCallback(() => pushCleanup.current(), []);
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
-	const apiFetch = useMemo(() => makeApiFetch(authority.token, () => handleUnauthorizedRef.current()), [authority]);
+	const apiFetch = useMemo(() => makeApiFetch(authority.token, () => handleUnauthorizedRef.current(), reminderTransport), [authority]);
 	const lifecycle = usePwaSessionLifecycle({ apiFetch, resetView, disablePushNotifications, handleUnauthorizedRef,
 		setAuthToken, setConfig, reportError, setSettingsOpen, showToast });
 	usePwaBootstrap({ authToken: authority.token, suspendLocalSession: lifecycle.suspendLocalSession,

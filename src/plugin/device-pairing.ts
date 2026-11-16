@@ -15,8 +15,7 @@ import { openConfirmationModal } from '../ui/plugin/confirmation-modal';
 import { DeviceKeyPairingModal } from '../ui/settings/device-key-pairing-modal';
 import { errorMessage } from '../platform/logger';
 import { ConnectionSetupError } from '../sync/connection/connection-errors';
-
-const pairing = new WeakSet<CratePlugin>();
+import { beginConnectionOperation, runningConnectionOperation } from './connection-operation';
 
 /** Joins this vault to the server that issued the code, as a Cloudflare device without a Cloudflare login. */
 export async function redeemDevicePairing(plugin: CratePlugin, target: { origin: string; code: string }): Promise<{ encrypted: boolean; synced: boolean }> {
@@ -46,8 +45,12 @@ export async function redeemDevicePairing(plugin: CratePlugin, target: { origin:
 
 export async function startDevicePairing(plugin: CratePlugin, target: { origin: string; code: string } | null): Promise<void> {
 	if (!target) { new Notice('This pairing link is invalid. Create a new one in Crate settings on your desktop.'); return; }
-	if (pairing.has(plugin)) return;
-	pairing.add(plugin);
+	const release = beginConnectionOperation(plugin, 'pairing');
+	if (!release) {
+		// A repeated link for the pairing already open needs no answer.
+		if (runningConnectionOperation(plugin) !== 'pairing') new Notice('Wait for the connection to your server to finish, then open the link again.');
+		return;
+	}
 	try {
 		if (!await openConfirmationModal(plugin.app, {
 			title: 'Connect this vault',
@@ -67,7 +70,7 @@ export async function startDevicePairing(plugin: CratePlugin, target: { origin: 
 	} catch (error) {
 		if (error instanceof ConnectionSetupError && error.code === 'replace-cancelled') new Notice(error.message);
 		else if (!getPluginLifecycleSignal(plugin).aborted) new Notice(`Could not connect: ${errorMessage(error)}`);
-	} finally { pairing.delete(plugin); }
+	} finally { release(); }
 }
 
 export function handleDevicePairingProtocol(plugin: CratePlugin, params: Record<string, string>): Promise<void> {

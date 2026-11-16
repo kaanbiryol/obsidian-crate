@@ -67,10 +67,10 @@ it.each(['selected', 'full', 'incremental', 'automatic', 'force'] as const)('sha
 	for (const path of uploads) { h.disk.write(path, content); h.engine.onFileChange({ path } as never); }
 	for (const path of deletes) h.engine.onFileDelete({ path } as never);
 	const labels: string[] = [];
-	h.engine.setStateChangeCallback(state => { if (state.work) labels.push(formatSyncProgress(null, state.work)); });
+	h.hooks.onStateChange = state => { if (state.work) labels.push(formatSyncProgress(null, state.work)); };
 	if (mode === 'automatic') {
 		const completed = createDeferred<SyncResult>();
-		h.engine.setAutomaticSyncResultCallback(result => { completed.resolve(result); });
+		h.hooks.onAutomaticSyncResult = result => { completed.resolve(result); };
 		await vi.advanceTimersByTimeAsync(10_000);
 		expect(await completed.promise).toMatchObject({ success: true, uploaded: uploads.length, deleted: deletes.length });
 	}

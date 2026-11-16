@@ -19,9 +19,9 @@ export async function getLocalDeletes(
 		.filter((path) => !context.shouldIgnore(path) && !discoveredPaths.has(path));
 
 	const tasks = candidates.map((path) => async () => {
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		const exists = await withSyncFileContext(path, () => localPathExists(context.vault, path));
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		return exists ? null : path;
 	});
 
@@ -35,9 +35,9 @@ export async function getLocalChanges(
 	onUnchanged?: (path: string) => void,
 ): Promise<LocalChangeScan> {
 	const changes: Array<{ path: string; hash: string }> = [];
-	const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.throwIfDestroyed());
+	const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.signal.throwIfAborted());
 	await context.verifyContent(allFiles);
-	context.throwIfDestroyed();
+	context.signal.throwIfAborted();
 
 	// Skipped files stay discovered (never local deletes) but are not changes:
 	// each would fail every sync and hold back the changelog cursor.
@@ -47,11 +47,11 @@ export async function getLocalChanges(
 		|| hasLocalMetadataChange(file, context.localManifest.getEntry(file.path)));
 
 	const tasks = candidates.map((file) => async () => {
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		const content = await withSyncFileContext(file.path, () => context.vault.adapter.readBinary(file.path));
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		const hash = await sha256Hex(content);
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 			context.plannedContent?.remember(file.path, content, hash);
 		const existing = context.localManifest.getEntry(file.path);
 		if (!existing || existing.hash !== hash) {

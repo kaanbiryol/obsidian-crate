@@ -1,7 +1,8 @@
 import type { PlannedContent } from './planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, FileEntry, MutationFailure } from '../../protocol/sync-types';
-import type { DownloadDiff, FileDiff, PreparedUpload, SyncIssue, SyncResult, SyncWork, UploadDiff } from '../types';
+import type { SyncIssue, SyncResult, SyncWork } from '../types';
+import type { PreparedUpload } from '../transfer/types';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
 import type { PendingKey } from '../pending/pending-change';
@@ -10,6 +11,52 @@ import type { VaultFile } from '../local/file-discovery';
 import type { InitialConfigPull } from '../manifest/initial-config-pull';
 import type { LocalManifestView } from '../manifest/manifest';
 import type { SyncSettings } from '../settings';
+
+/** What reconciliation decided for one path. */
+interface ReconcileDecisionBase {
+	path: string;
+	remoteRevision?: string;
+}
+
+export type FileDiff =
+	| (ReconcileDecisionBase & {
+		action: 'upload';
+		localHash: string;
+		remoteHash?: string;
+		cause: 'local-created' | 'local-edited' | 'remote-deleted';
+	})
+	| (ReconcileDecisionBase & {
+		action: 'download';
+		localHash?: string;
+		remoteHash: string;
+		cause: 'remote-created' | 'remote-edited' | 'local-deleted';
+	})
+	| (ReconcileDecisionBase & {
+		action: 'conflict';
+		localHash: string;
+		remoteHash: string;
+		cause: 'concurrent-create' | 'concurrent-edit';
+	})
+	| (ReconcileDecisionBase & {
+		action: 'delete';
+		remoteHash: string;
+		cause: 'local-deleted';
+	})
+	| (ReconcileDecisionBase & {
+		action: 'delete-local';
+		localHash: string;
+		cause: 'remote-deleted';
+	});
+
+export type UploadDiff = Extract<FileDiff, { action: 'upload' }>;
+export type DownloadDiff = Extract<FileDiff, { action: 'download' }>;
+export type ConflictDiff = Extract<FileDiff, { action: 'conflict' }>;
+
+/** The server files one plan reconciles against, and the changelog cursor they match. */
+export interface RemoteManifest {
+	files: Record<string, FileEntry>;
+	lastSeq?: number;
+}
 
 interface PlannerManifest {
 	getEntry(path: string): Readonly<FileEntry> | undefined;
@@ -45,7 +92,7 @@ export interface LocalChangeScan {
 }
 
 export interface LocalDiffPlannerContext {
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 	pendingKeys?: ReadonlySet<string>;
 	plannedContent?: PlannedContent;
 	vault: Vault;
@@ -59,7 +106,7 @@ export interface LocalDiffPlannerContext {
 
 export interface IncrementalSyncPlannerContext {
 	reportWork?(work: SyncWork): void;
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 	settings: Readonly<Pick<SyncSettings, 'lastSeq'>>;
 	setLastSeq(value: number): void;
 	/** Saves sync settings now, such as a cursor reset that must survive a restart mid-sync. */
@@ -99,7 +146,7 @@ export interface FullSyncPlannerContext {
 		get(): InitialConfigPull | undefined;
 		save(state: InitialConfigPull): Promise<void>;
 	};
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 	plannedContent?: PlannedContent;
 	vault: Vault;
 	localManifest: PlannerManifest;

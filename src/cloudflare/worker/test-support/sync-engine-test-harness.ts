@@ -1,7 +1,7 @@
 import type { Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../../plugin/settings-types';
 import { SyncApiClient } from '../../../sync/worker-api/client';
-import { SyncEngine } from '../../../sync/engine/engine';
+import { SyncEngine, type SyncEngineHooks } from '../../../sync/engine/engine';
 import { createEngineFileOperations, type EngineFileOperations } from '../../../sync/engine/file-operations';
 import type { ApiHttpTransport } from '../../../sync/worker-api/http';
 import type { FileManifest } from '../../../protocol/sync-types';
@@ -26,6 +26,8 @@ export class SyncTestDevice {
 	private pause: PausedResponse | null = null;
 	api!: SyncApiClient;
 	engine!: SyncEngine;
+	/** Each open() starts with fresh hooks; tests replace one by assigning it. */
+	hooks!: SyncEngineHooks;
 	files!: EngineFileOperations;
 
 	constructor(readonly id: string, private readonly runtimeEnv: Env, disk: { caseInsensitive?: boolean } = {}) {
@@ -40,10 +42,11 @@ export class SyncTestDevice {
 
 	async open(): Promise<void> {
 		this.api = new SyncApiClient(this.settings.workerUrl, this.id, this.transport);
+		this.hooks = { persistSettings: async () => {} };
 		this.engine = new SyncEngine({
 			manifest: { dir: TEST_PLUGIN_DIR },
 			app: { vault: this.disk.vault, fileManager: {}, workspace: { onLayoutReady: () => {} } },
-		} as unknown as Plugin, this.api, this.settings, {
+		} as unknown as Plugin, this.api, this.settings, this.hooks, {
 			// Retain the real engine boundary for scenario fault injection, without private-field casts.
 			createFiles: (...args) => (this.files = createEngineFileOperations(...args)),
 		});

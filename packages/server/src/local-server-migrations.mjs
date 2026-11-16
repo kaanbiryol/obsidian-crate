@@ -4,16 +4,23 @@ import { pathToFileURL } from 'node:url';
 import { serverAssetPath, upgradeRulesPath } from './assets.mjs';
 
 // The Cloudflare provisioner's manifest, history and transaction rules.
+/** @type {typeof import('../../../src/cloudflare/deployment/database-upgrade-rules.ts')} */
 const { migrationTransactionSql, planDatabaseUpgrade, validateMigrationHistory } = await import(pathToFileURL(upgradeRulesPath).href);
-const readMigration = file => readFile(serverAssetPath(`migrations/${file}`), 'utf8');
+const readMigration = (/** @type {string} */ file) => readFile(serverAssetPath(`migrations/${file}`), 'utf8');
 
 // server.json records the schema version beside its hash, like crate_release on
 // Cloudflare. A changed schema needs an older version with a registered path.
+/** @param {number} schemaVersion @param {import('./local-server-runtime.mjs').ServerRelease} release */
 export function assertLocalMigrationPath(schemaVersion, release) {
   if (!Number.isSafeInteger(schemaVersion) || schemaVersion >= release.schemaVersion) throw new Error('No tested migration exists for this data directory.');
   planDatabaseUpgrade(schemaVersion, release);
 }
 
+/**
+ * @param {import('./local-server-runtime.mjs').LocalD1Database} db
+ * @param {import('./local-server-runtime.mjs').ServerRelease} release
+ * @param {(file: string) => Promise<string>} [readSql]
+ */
 export async function migrateLocalDatabase(db, release, readSql = readMigration) {
   const verify = async () => {
     const marker = await db.prepare('SELECT version, created_version FROM crate_schema WHERE id=1').first();

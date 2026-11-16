@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { capturePwaSession } from '../connection/session-generation';
 import { EncryptionKeyRequiredError } from '../encryption/encryption-onboarding';
@@ -14,11 +14,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { responseError } from '../connection/response-error';
 import type { ApiFetch, DataMode, StoredConfig } from '../types';
 import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue, ReminderSyncHost } from './types';
-
-interface ConfirmedReminderSnapshot {
-	reminders: ReminderRecord[];
-	projects: string[];
-}
+import { initialReminderSyncState, reduceReminderSync, type ConfirmedReminderSnapshot } from './reminder-sync-state';
 
 export interface ReminderSyncState extends ReminderSyncHost {
 	reminders: ReminderRecord[];
@@ -41,7 +37,6 @@ export interface ReminderSyncState extends ReminderSyncHost {
 	persistReminderState: () => Promise<void>;
 	resetReminderState: () => void;
 	refreshPresentation: () => void;
-	reportError: (message: string | null) => void;
 }
 
 export function useReminderSync({
@@ -73,22 +68,11 @@ export function useReminderSync({
 }): ReminderSyncState {
 	const enabledRef = useRef(enabled);
 	enabledRef.current = enabled;
-	const [snapshot, setSnapshot] = useState<ConfirmedReminderSnapshot>({ reminders: [], projects: [] });
-	const { reminders, projects } = snapshot;
-	const [loading, setLoading] = useState(true);
-	const [refreshing, setRefreshing] = useState(false);
-	const [indexingProgress, setIndexingProgress] = useState<ReminderIndexingProgress | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const [dataMode, setDataMode] = useState<DataMode>('live');
-	const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
-	// A confirmed response shows the server is reachable while the browser still reports
-	// offline, until the browser's next online or offline event.
-	const [answered, setAnswered] = useState(false);
-	const isOffline = !useOnlineStatus(() => setAnswered(false)) && !answered;
-	const [issues, setIssues] = useState<ReminderSourceIssue[]>([]);
-	const [hydratedAuthority, setHydratedAuthority] = useState<object | null>(null);
+	const [state, dispatch] = useReducer(reduceReminderSync, undefined, initialReminderSyncState);
+	const { snapshot: { reminders, projects }, loading, refreshing, indexingProgress, error, issues, dataMode, lastUpdatedAt } = state;
+	const isOffline = !useOnlineStatus(() => dispatch({ type: 'connectivity-changed' })) && !state.answered;
 	const issuesRef = useRef<ReminderSourceIssue[]>([]);
-	const snapshotRef = useRef(snapshot);
+	const snapshotRef = useRef(state.snapshot);
 	const hydratedCacheRef = useRef(false);
 	const requestCoordinatorRef = useRef(createReminderRequestCoordinator());
 	const [cursor] = useState(createReminderListCursor);
@@ -107,7 +91,7 @@ export function useReminderSync({
 	useEffect(() => {
 		const lifetime = { active: true };
 		lifetimeRef.current = lifetime;
-		setIndexingProgress(null);
+		dispatch({ type: 'reads-detached' });
 		return () => {
 			lifetime.active = false;
 			activeReadRef.current = null;
@@ -115,24 +99,25 @@ export function useReminderSync({
 	}, [apiFetch, authToken, config.folderPath]);
 
 	const getSnapshot = useCallback(() => snapshotRef.current, []);
-	const publishSnapshot = useCallback((reminders: ReminderRecord[], projects = snapshotRef.current.projects) => {
+	/** Updates the confirmed snapshot for synchronous readers; the caller's event renders it. */
+	const publishSnapshot = useCallback((reminders: ReminderRecord[], projects = snapshotRef.current.projects): ConfirmedReminderSnapshot => {
 		snapshotRef.current = { reminders, projects };
-		setSnapshot(snapshotRef.current);
 		setSelectedProject(current => current && !projects.includes(current) ? null : current);
+		return snapshotRef.current;
 	}, [setSelectedProject]);
 	const hasHydratedCache = useCallback(() => hydratedCacheRef.current, []);
-	const refreshPresentation = useCallback(() => publishSnapshot([...snapshotRef.current.reminders]), [publishSnapshot]);
+	const refreshPresentation = useCallback(() => {
+		dispatch({ type: 'presented', snapshot: publishSnapshot([...snapshotRef.current.reminders]) });
+	}, [publishSnapshot]);
 
 	// Confirmed state committed with persist: 'later' that the offline copy does not hold yet.
 	const unsavedRef = useRef<{ folderPath: string; savedAt: number } | null>(null);
 	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects,
 		{ etag, deltaBase, persist = true }: { etag?: string; deltaBase?: string; persist?: boolean | 'later' } = {}) => {
 		const savedAt = Date.now();
-		publishSnapshot(nextReminders, nextProjects);
+		const snapshot = publishSnapshot(nextReminders, nextProjects);
 		cursor.confirmed({ etag, deltaBase }, savedAt);
-		setLastUpdatedAt(savedAt);
-		setDataMode('live');
-		setAnswered(true);
+		dispatch({ type: 'confirmed', snapshot, savedAt });
 		if (persist === 'later') { unsavedRef.current = { folderPath: config.folderPath, savedAt }; return; }
 		if (!persist) return;
 		unsavedRef.current = null;
@@ -168,13 +153,10 @@ export function useReminderSync({
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
 		hydratedCacheRef.current = true;
 		unsavedRef.current = null;
-		setLoading(false);
-		publishSnapshot(snapshot.reminders, snapshot.projects);
+		const published = publishSnapshot(snapshot.reminders, snapshot.projects);
 		issuesRef.current = snapshot.issues ?? [];
-		setIssues(issuesRef.current);
 		cursor.hydrate(snapshot);
-		setLastUpdatedAt(snapshot.savedAt);
-		setDataMode('cached');
+		dispatch({ type: 'cache-hydrated', snapshot: published, issues: issuesRef.current, savedAt: snapshot.savedAt });
 	}, [cursor, publishSnapshot]);
 
 	const takeStartupRead = useCallback((key: string, path: string, headers: Headers): Promise<Response | undefined> => {
@@ -199,10 +181,7 @@ export function useReminderSync({
 			const readToken = requestCoordinatorRef.current.beginRead();
 			// A local change, an invalidation or a newer read leaves this one unusable for good.
 			const readApplies = () => sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken);
-			if (options.silent) setRefreshing(true);
-			else setLoading(true);
-			setError(null);
-			setIndexingProgress(null);
+			dispatch({ type: 'read-started', silent: Boolean(options.silent) });
 			try {
 				const { path, headers, since } = cursor.request(config.folderPath, issuesRef.current.length === 0);
 				const response = await fetchReadyReminderList(
@@ -210,7 +189,7 @@ export function useReminderSync({
 					path,
 					headers,
 					(remaining, total) => {
-						if (readApplies()) setIndexingProgress({ indexedFiles: Math.max(0, total - remaining), totalFiles: total });
+						if (readApplies()) dispatch({ type: 'indexing', progress: { indexedFiles: Math.max(0, total - remaining), totalFiles: total } });
 					},
 					// Only the first read after startup waits here; others dispatch at once.
 					startupRef.current ? await takeStartupRead(requestKey, path, headers) : undefined,
@@ -224,9 +203,7 @@ export function useReminderSync({
 				if (outcome.kind === 'not-modified') {
 					const savedAt = Date.now();
 					cursor.notModified(response.headers, savedAt);
-					setLastUpdatedAt(savedAt);
-					setDataMode('live');
-					setAnswered(true);
+					dispatch({ type: 'confirmed', savedAt });
 					void refreshCachedReminderSnapshot(
 						config.folderPath,
 						savedAt,
@@ -236,29 +213,21 @@ export function useReminderSync({
 				}
 				if (outcome.dropDeltaBase) cursor.dropDeltaBase();
 				if (outcome.kind === 'invalid') {
-					setError(outcome.message);
-					if (outcome.showErrorState) setDataMode('error');
+					dispatch({ type: 'list-rejected', message: outcome.message, showErrorState: outcome.showErrorState });
 					return;
 				}
-				setError(null);
 				issuesRef.current = outcome.result.issues;
-				setIssues(outcome.result.issues);
+				dispatch({ type: 'list-received', issues: outcome.result.issues });
 				void commitConfirmedSnapshot(outcome.result.reminders, outcome.result.projects, { etag: outcome.etag, deltaBase: outcome.deltaBase });
 			} catch (loadError) {
 				if (!readApplies()) return;
 				const cached = needsDiskFallback(cursor.lastCheckedAt) ? await loadCachedReminderSnapshot(config.folderPath) : undefined;
 				if (!readApplies()) return;
 				const outcome = decideReminderListFailure(loadError, { lastCheckedAt: cursor.lastCheckedAt, cached });
-				if (outcome.kind === 'keep-stale') setDataMode('cached');
-				else if (outcome.kind === 'hydrate-cache') hydrateCachedSnapshot(outcome.cached);
-				else setDataMode('error');
-				setError(outcome.message);
+				if (outcome.kind === 'hydrate-cache') hydrateCachedSnapshot(outcome.cached);
+				dispatch({ type: 'read-failed', outcome: outcome.kind, message: outcome.message });
 			} finally {
-				if (sessionCurrent() && requestCoordinatorRef.current.isLatestRead(readToken)) {
-					setIndexingProgress(null);
-					setRefreshing(false);
-					setLoading(false);
-				}
+				if (sessionCurrent() && requestCoordinatorRef.current.isLatestRead(readToken)) dispatch({ type: 'read-settled' });
 			}
 		})();
 
@@ -282,14 +251,14 @@ export function useReminderSync({
 	const invalidateReads = useCallback(() => {
 		requestCoordinatorRef.current.invalidateReads();
 		activeReadRef.current = null;
-		setIndexingProgress(null);
+		dispatch({ type: 'reads-detached' });
 	}, []);
 
 	const beginLocalMutation = useCallback(() => {
 		const coordinator = requestCoordinatorRef.current;
 		const finish = coordinator.beginMutation();
 		activeReadRef.current = null;
-		setIndexingProgress(null);
+		dispatch({ type: 'reads-detached' });
 		return () => {
 			finish();
 			// A refresh after acknowledgement must not join a read invalidated by this write.
@@ -302,15 +271,11 @@ export function useReminderSync({
 		requestCoordinatorRef.current = createReminderRequestCoordinator();
 		unsavedRef.current = null;
 		startupRef.current = null;
-		publishSnapshot([], []);
+		const snapshot = publishSnapshot([], []);
 		issuesRef.current = [];
-		setIssues([]);
 		hydratedCacheRef.current = false;
 		activeReadRef.current = null;
-		setLoading(false);
-		setRefreshing(false);
-		setIndexingProgress(null);
-		setLastUpdatedAt(null);
+		dispatch({ type: 'reset', snapshot });
 		cursor.reset();
 	}, [cursor, publishSnapshot]);
 
@@ -330,8 +295,8 @@ export function useReminderSync({
 				const cached = await (startup?.cached ?? loadCachedReminderSnapshot(config.folderPath));
 				if (!cancelled && current() && cached) hydrateCachedSnapshot(cached);
 			} catch (cause) {
-				if (!cancelled && current() && !(cause instanceof EncryptionKeyRequiredError)) setError(cause instanceof Error ? cause.message : String(cause));
-			} finally { if (!cancelled) setHydratedAuthority(authority); }
+				if (!cancelled && current() && !(cause instanceof EncryptionKeyRequiredError)) dispatch({ type: 'error', message: cause instanceof Error ? cause.message : String(cause) });
+			} finally { if (!cancelled) dispatch({ type: 'hydration-finished', authority }); }
 		})();
 		return () => { cancelled = true; };
 	}, [bootstrapped, authority, authToken, prepareSession, config.folderPath, hydrateCachedSnapshot, onSignedOut, resetReminderState]);
@@ -347,7 +312,7 @@ export function useReminderSync({
 		dataMode,
 		lastUpdatedAt,
 		isOffline,
-		hydrated: hydratedAuthority === authority,
+		hydrated: state.hydratedAuthority === authority,
 		getSnapshot,
 		hasHydratedCache,
 		hydrateCachedSnapshot,
@@ -359,6 +324,5 @@ export function useReminderSync({
 		persistReminderState,
 		resetReminderState,
 		refreshPresentation,
-		reportError: setError,
 	};
 }

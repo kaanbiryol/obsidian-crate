@@ -1,10 +1,10 @@
-import type { RegisteredDevice } from '../protocol/sync-types';
-import type { SyncApiClient } from '../sync/worker-api/client';
-import type { DiagnosticResult } from '../sync/diagnostics/checks';
-import type { EncryptionServerState } from '../encryption/server-state';
-import type { NotificationPolicy } from '../protocol/notification-policy';
-import type { CrateSettings } from './settings-types';
-import type CratePlugin from './CratePlugin';
+import type { RegisteredDevice } from '../../protocol/sync-types';
+import type { SyncApiClient } from '../../sync/worker-api/client';
+import type { DiagnosticResult } from '../../sync/diagnostics/checks';
+import type { EncryptionServerState } from '../../encryption/server-state';
+import type { NotificationPolicy } from '../../protocol/notification-policy';
+import type { CrateSettings } from '../../plugin/settings-types';
+import type CratePlugin from '../../plugin/CratePlugin';
 
 interface CachedDiagnosticsState {
 	key: string;

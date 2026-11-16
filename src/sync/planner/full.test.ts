@@ -78,7 +78,7 @@ describe('createFullSyncPlan', () => {
 					}),
 					removeEntry,
 				} as never,
-				throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith('ignored/'),
+				signal: new AbortController().signal, shouldIgnore: (path: string) => path.startsWith('ignored/'),
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
 			},
@@ -120,7 +120,7 @@ describe('createFullSyncPlan', () => {
 					getManifest: () => ({ version: 1, files: { 'notes/video.md': baseline } }),
 					removeEntry: vi.fn(), setEntry,
 				} as never,
-				throwIfDestroyed: () => {}, shouldIgnore: () => false,
+				signal: new AbortController().signal, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
 			},
@@ -171,7 +171,7 @@ describe('createFullSyncPlan', () => {
 					getManifest: () => ({ version: 1, files: {} }),
 					removeEntry: vi.fn(),
 				} as never,
-				throwIfDestroyed: () => {}, shouldIgnore: () => false,
+				signal: new AbortController().signal, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
 			},
@@ -220,7 +220,7 @@ describe('createFullSyncPlan', () => {
 					getManifest: () => ({ version: 1, files: {} }),
 					removeEntry: vi.fn(),
 				} as never,
-				throwIfDestroyed: () => {}, shouldIgnore: () => false,
+				signal: new AbortController().signal, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
 			},
@@ -248,7 +248,7 @@ describe('createFullSyncPlan', () => {
 		const plan = createFullSyncPlan({
 			vault: { adapter: { readBinary } } as never,
 			localManifest: { getEntry: () => undefined, getManifest: () => ({ version: 1, files: {} }) } as never,
-			throwIfDestroyed: () => {}, shouldIgnore: () => false,
+			signal: new AbortController().signal, shouldIgnore: () => false,
 			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => {
 				const results: T[] = [];
 				for (const task of tasks) results.push(await task());

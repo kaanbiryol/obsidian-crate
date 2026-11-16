@@ -9,10 +9,14 @@ const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 // the client sent. Each passes the other's header through, so trust only its own.
 // Tailscale serve and Funnel drop inbound X-Forwarded-* and set X-Forwarded-For to
 // the single source address.
+/** @typedef {'cloudflare' | 'tailscale'} ManagedTunnel */
+/** @type {Record<ManagedTunnel, string>} */
 const FORWARDED_ADDRESS = { cloudflare: 'cf-connecting-ip', tailscale: 'x-forwarded-for' };
 
 /** A managed tunnel ('cloudflare' or 'tailscale') connects from loopback and forwards
- * each client's address, so per-address admission limits stay per client. */
+ * each client's address, so per-address admission limits stay per client.
+ * @param {import('node:http').IncomingMessage} request
+ * @param {ManagedTunnel | null} [tunnel] */
 export function clientAddress(request, tunnel) {
 	const peer = request.socket.remoteAddress ?? '127.0.0.1';
 	const forwarded = tunnel ? request.headers[FORWARDED_ADDRESS[tunnel]] : undefined;
@@ -21,6 +25,16 @@ export function clientAddress(request, tunnel) {
 
 // Expose only the application fetch handler. Miniflare's development HTTP
 // endpoints and inspector stay on their own private loopback listener.
+/**
+ * @param {import('./local-server-runtime.mjs').LocalRuntime | (() => import('./local-server-runtime.mjs').LocalRuntime | null | undefined)} runtime
+ * The runtime, or a getter that returns none while the server starts.
+ * @param {object} [options]
+ * @param {string} [options.host]
+ * @param {number} [options.port]
+ * @param {{ exchange(code: unknown): Promise<{ token: string } | null> }} [options.pairing]
+ * @param {string} [options.instance] Answers the public readiness probe.
+ * @param {ManagedTunnel | null} [options.tunnel]
+ */
 export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 8787, pairing, instance, tunnel = null } = {}) {
 	const server = createServer(async (request, response) => {
 		try {
@@ -59,7 +73,7 @@ export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 87
 			response.on('close', () => { if (!response.writableFinished) abort.abort(); });
 			const result = await active.mf.dispatchFetch(url.href, {
 				method: request.method, headers, redirect: 'manual', signal: abort.signal,
-				...(['GET', 'HEAD'].includes(request.method) ? {} : { body: Readable.toWeb(request), duplex: 'half' }),
+				...(['GET', 'HEAD'].includes(/** @type {string} */ (request.method)) ? {} : { body: Readable.toWeb(request), duplex: 'half' }),
 			});
 			const responseHeaders = new Headers(result.headers);
 			// dispatchFetch transparently decodes upstream compression.
@@ -74,6 +88,6 @@ export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 87
 		}
 	});
 	server.requestTimeout = 120_000;
-	await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
+	await /** @type {Promise<void>} */ (new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); }));
 	return server;
 }

@@ -1,4 +1,5 @@
-import type { PreparedUpload, SyncResult, SyncWork } from '../types';
+import type { SyncResult, SyncWork } from '../types';
+import type { PreparedUpload } from './types';
 import { getBatchUploadConcurrency, pipelineUploadChunks } from './budget';
 import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import type { UploadPreparedFilesOptions } from './upload';

@@ -1,7 +1,9 @@
-import type { ReactNode, SetStateAction } from 'react';
+import { isValidElement, type ReactNode, type SetStateAction } from 'react';
 import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 import type { StoredConfig } from '../types';
 import type { PushState } from '../reminders/types';
+import type { PendingReminderChange } from '../reminders/outbox/reminder-outbox-types';
+import type { QuarantinedReminderEntry } from '../reminders/outbox/reminder-outbox-storage';
 
 interface FeatureSettings {
 	enabled?: boolean;
@@ -29,12 +31,17 @@ export interface RemindersSettings extends FeatureSettings {
 	config: StoredConfig;
 	push: PushState;
 	onEnablePush: () => Promise<void>;
-	recovery: ReactNode;
+	/** Saved changes from earlier sessions and damaged entries, which the sheet lists for review. */
+	recoveryChanges: PendingReminderChange[];
+	quarantinedChanges: QuarantinedReminderEntry[];
+	onResumeRecovery?: () => void;
+	onRemoveQuarantined: (entries: QuarantinedReminderEntry[]) => Promise<boolean>;
 }
 
 interface ReadingSettings extends FeatureSettings {
 	unavailable?: string;
 	encryption?: { status: 'ready' | 'unencrypted' | 'locked'; folderPath: string };
+	/** Memoized by the feature, so an unchanged model keeps the same elements. */
 	shortcut: ReactNode;
 	issues: ReactNode;
 }
@@ -44,6 +51,25 @@ export interface SettingsSnapshot {
 	syncRequested: boolean;
 	reminders: RemindersSettings | null;
 	reading: ReadingSettings | null;
+}
+
+/** Whether two values have the same own fields, compared with `same` (identity by default). */
+export function shallowEqual<T>(a: T, b: T, same: (x: unknown, y: unknown) => boolean = Object.is): boolean {
+	if (Object.is(a, b)) return true;
+	if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) return false;
+	const keys = Object.keys(a);
+	return keys.length === Object.keys(b).length
+		&& keys.every(key => Object.hasOwn(b, key) && same((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]));
+}
+
+const isPlainValue = (value: unknown): value is object => typeof value === 'object' && value !== null && !isValidElement(value)
+	&& (Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype);
+
+/** Runtimes rebuild their model on every render: a status object or an empty list
+ * compares by its fields, so an unchanged model wakes no subscriber. */
+function sameFeature(a: unknown, b: unknown): boolean {
+	return shallowEqual(a, b, (x, y) => Object.is(x, y)
+		|| (isPlainValue(x) && isPlainValue(y) && Array.isArray(x) === Array.isArray(y) && shallowEqual(x, y)));
 }
 
 /** Feature runtimes publish to the sheet without rerendering each other. */
@@ -60,6 +86,8 @@ export function createSettingsStore(initiallyOpen = false) {
 			const open = typeof next === 'function' ? next(snapshot.open) : next;
 			if (open !== snapshot.open) publish({ ...snapshot, open, syncRequested: false });
 		},
-		setFeature: <K extends 'reading' | 'reminders'>(feature: K, value: SettingsSnapshot[K]) => publish({ ...snapshot, [feature]: value }),
+		setFeature: <K extends 'reading' | 'reminders'>(feature: K, value: SettingsSnapshot[K]) => {
+			if (!sameFeature(snapshot[feature], value)) publish({ ...snapshot, [feature]: value });
+		},
 	};
 }

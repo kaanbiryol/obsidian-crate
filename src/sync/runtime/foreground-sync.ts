@@ -1,4 +1,3 @@
-import { notifyConflicts } from '../conflict/conflict';
 import { createLogger } from '../logger';
 import type { SyncResult } from '../types';
 
@@ -46,8 +45,7 @@ export class ForegroundSyncScheduler {
 		this.recordSync();
 		logger.info(`Foreground sync triggered: ${reason}`);
 		try {
-			const result = await this.context.sync();
-			if (result.outcome !== 'cancelled') notifyConflicts(result.conflicts);
+			await this.context.sync();
 		} catch (error) {
 			logger.warn('Foreground sync failed:', error);
 		}

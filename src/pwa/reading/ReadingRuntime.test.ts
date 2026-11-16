@@ -56,7 +56,7 @@ async function harness() {
 	store.setFeature('reminders', { ready: true, connected: true, updateReady: true, updateContentReady: true,
 		canApplyUpdate: () => true, status: { state: 'synced', label: 'Synced' }, attention: null, unsynced: false,
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 },
-		push: { phase: 'unsupported', status: null }, onRefresh: vi.fn(), onLogout: vi.fn(), onEnablePush: vi.fn(), recovery: null });
+		push: { phase: 'unsupported', status: null }, onRefresh: vi.fn(), onLogout: vi.fn(), onEnablePush: vi.fn(), recoveryChanges: [], quarantinedChanges: [], onRemoveQuarantined: vi.fn() });
 	const hook = renderHook(useReadingRuntime, undefined, children =>
 		createElement(SettingsContext.Provider, { value: store }, createElement(ReadingRuntimeProvider, { children })));
 	await act(async () => {}); // Let the real session hook hydrate the mocked storage.

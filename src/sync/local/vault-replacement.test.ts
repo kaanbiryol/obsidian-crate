@@ -12,7 +12,7 @@ async function fixture() {
 
 it('moves everything except the trash and the Crate plugin folder, including hidden, settings and ignored files', async () => {
 	const disk = await fixture();
-	await moveVaultToTrash(disk.vault, TEST_PLUGIN_DIR, () => {});
+	await moveVaultToTrash(disk.vault, TEST_PLUGIN_DIR, new AbortController().signal);
 	expect([...disk.trash.keys()].sort()).toEqual(['.git/HEAD', '.gitignore', '.obsidian/app.json',
 		'.obsidian/plugins/dataview/main.js', 'Notes/a.md', 'root.md']);
 	expect(disk.has(`${TEST_PLUGIN_DIR}/data.json`)).toBe(true);
@@ -22,10 +22,16 @@ it('moves everything except the trash and the Crate plugin folder, including hid
 
 it('continues with what is left after an interruption', async () => {
 	const disk = await fixture();
-	let checks = 0;
-	await expect(moveVaultToTrash(disk.vault, TEST_PLUGIN_DIR, () => { if (++checks === 3) throw new Error('stopped'); })).rejects.toThrow('stopped');
+	// Stop after the first entry moves, so the next check throws.
+	const controller = new AbortController();
+	const lookup = disk.vault.getAbstractFileByPath.bind(disk.vault);
+	vi.spyOn(disk.vault, 'getAbstractFileByPath').mockImplementationOnce(path => {
+		controller.abort(new Error('stopped'));
+		return lookup(path);
+	});
+	await expect(moveVaultToTrash(disk.vault, TEST_PLUGIN_DIR, controller.signal)).rejects.toThrow('stopped');
 	expect(disk.has('root.md')).toBe(true);
-	await moveVaultToTrash(disk.vault, TEST_PLUGIN_DIR, () => {});
+	await moveVaultToTrash(disk.vault, TEST_PLUGIN_DIR, new AbortController().signal);
 	expect(disk.has('root.md')).toBe(false);
 	expect(disk.trash.has('root.md')).toBe(true);
 	expect(disk.has(`${TEST_PLUGIN_DIR}/data.json`)).toBe(true);
@@ -37,7 +43,7 @@ describe('replaceVaultBeforeFirstSync', () => {
 		const reportWork = vi.fn();
 		const getManifest = vi.fn(() => ({ files }));
 		await replaceVaultBeforeFirstSync({
-			settings, manifest: { getManifest }, vault: disk.vault, pluginDir: TEST_PLUGIN_DIR, reportWork, throwIfDestroyed: () => {},
+			settings, manifest: { getManifest }, vault: disk.vault, pluginDir: TEST_PLUGIN_DIR, reportWork, signal: new AbortController().signal,
 		});
 		return { disk, reportWork, getManifest };
 	}

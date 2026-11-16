@@ -16,7 +16,6 @@ import { isInitialPwaContentReady } from './initial-content-readiness';
 import { useSharedFeatures } from '../shared-features';
 import { toSharedReminder } from './outbox/reminder-list-state';
 import { useFeatureSettings, useSettingsOpen } from '../settings/settings-context';
-import { ReminderRecoveryNotices } from './notices/ReminderRecoveryNotices';
 import { reminderFeatureStatus, reminderSyncStatus } from '../sync/reminder-status';
 import { reminderNeedsAttention, reminderRetryAt } from './outbox/reminder-outbox';
 import type { PendingReminderChange } from './outbox/reminder-outbox-types';
@@ -173,8 +172,9 @@ function useRemindersController() {
 		onEnablePush: enablePushNotifications,
 		onLogout: logOut,
 		clearView: resetView,
-		recovery: <ReminderRecoveryNotices recoveryChanges={recoveryChanges} quarantinedChanges={quarantinedChanges} folderPath={config.folderPath}
-			onResume={enabled ? recoverChanges : undefined} onRemove={removeQuarantinedChanges} />,
+		recoveryChanges, quarantinedChanges,
+		onResumeRecovery: enabled ? recoverChanges : undefined,
+		onRemoveQuarantined: removeQuarantinedChanges,
 	});
 
 	return {

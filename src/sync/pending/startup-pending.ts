@@ -12,17 +12,17 @@ export async function findStartupPendingPaths(context: {
 	vault: Vault;
 	baseline: LocalManifestView['files'];
 	shouldIgnore(path: string): boolean;
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 	verifyContent(files: VaultFile[]): Promise<unknown>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 }, concurrency: number): Promise<string[]> {
-	const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
+	const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.signal.throwIfAborted());
 	// The rotating check marks same-metadata edits unverified, so the metadata
 	// shortcut below re-reads them instead of hashing the whole vault on startup.
 	await context.verifyContent(files);
-	context.throwIfDestroyed();
+	context.signal.throwIfAborted();
 	const changes = await context.runConcurrent(files.map(file => async () => {
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		const entry = getPathEntry(context.baseline, file.path);
 		if (isOversizedSyncFile(file)) return null;
 		if (!entry) return pendingChangeKey('upload', file.path);
@@ -34,9 +34,9 @@ export async function findStartupPendingPaths(context: {
 	const missing = Object.keys(context.baseline).filter(path => !context.shouldIgnore(path)
 		&& !present.has(path));
 	const deletions = await context.runConcurrent(missing.map(path => async () => {
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		return await localPathExists(context.vault, path) ? null : pendingChangeKey('delete', path);
 	}), concurrency);
-	context.throwIfDestroyed();
+	context.signal.throwIfAborted();
 	return [...changes, ...deletions].filter((path): path is string => path !== null);
 }

@@ -42,7 +42,7 @@ describe('planner local diff helpers', () => {
 				localManifest: {
 					getAllPaths: () => ['notes/present.md', 'notes/missing.md', 'notes/unindexed.md', 'notes/todo.md', '.trash/ignore.md'],
 				} as never,
-				throwIfDestroyed: () => {}, shouldIgnore: (path: string) => path.startsWith('.trash/'),
+				signal: new AbortController().signal, shouldIgnore: (path: string) => path.startsWith('.trash/'),
 				verifyContent: async () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
@@ -94,7 +94,7 @@ describe('planner local diff helpers', () => {
 						entries[path] = entry;
 					},
 				} as never,
-				throwIfDestroyed: () => {}, shouldIgnore: () => false,
+				signal: new AbortController().signal, shouldIgnore: () => false,
 				verifyContent: async () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,

@@ -7,7 +7,7 @@ import {
 	noticeMessages,
 	resetObsidianUiMocks,
 } from '../../test/fakes/obsidian-ui';
-import { createSettingsUiState } from '../../plugin/settings-ui-state';
+import { createSettingsUiState } from './settings-ui-state';
 
 let lastQrCodeData: string | null = null;
 const openExternalBrowserModal = vi.fn();

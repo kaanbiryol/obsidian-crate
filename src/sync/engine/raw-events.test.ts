@@ -26,7 +26,7 @@ async function trackedFile(candidate = path, bytes = toArrayBuffer('same bytes')
 it.each([path, '.vault-config/plugins/example/main.js', '.vault-config/app.json', '.hidden/file.txt'])(
 	'queues an unindexed file change: %s', async changedPath => {
 		const stateChanged = vi.fn();
-		harness.engine.setStateChangeCallback(stateChanged);
+		harness.hooks.onStateChange = stateChanged;
 		await harness.engine.onRawFileChange(changedPath);
 		expect(harness.engine.getPendingKeys()).toEqual([changedPath]);
 		expect(stateChanged).toHaveBeenLastCalledWith(expect.objectContaining({ pendingChanges: 1 }));
@@ -89,7 +89,7 @@ it('never publishes touched configuration files when their contents match the la
 		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: bytes.byteLength, mtime: 50 });
 		harness.vault.adapter.readBinary.mockResolvedValue(bytes);
 		const stateChanged = vi.fn();
-		harness.engine.setStateChangeCallback(stateChanged);
+		harness.hooks.onStateChange = stateChanged;
 		for (let i = 0; i < 3; i++) {
 			await harness.engine.onRawFileChange(path);
 			expect(harness.engine.getPendingKeys()).toEqual([]);
@@ -110,7 +110,7 @@ it('checks settings and binary theme assets without publishing startup noise', a
 	const paths = ['.vault-config/app.json', '.vault-config/themes/example/theme.css', '.hidden/image.png'];
 	for (const candidate of paths) await trackedFile(candidate, new Uint8Array([255, 0, 128]).buffer);
 	const stateChanged = vi.fn();
-	harness.engine.setStateChangeCallback(stateChanged);
+	harness.hooks.onStateChange = stateChanged;
 	await Promise.all(paths.map(candidate => harness.engine.onRawFileChange(candidate)));
 	expect(harness.engine.getPendingKeys()).toEqual([]);
 	expect(stateChanged).not.toHaveBeenCalled();

@@ -2,12 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FakeElement, MockSetting, createObsidianUiModule, noticeMessages, resetObsidianUiMocks } from '../../../test/fakes/obsidian-ui';
 import type { SyncState } from '../../../sync/types';
 import { showSyncErrorNotice } from '../../sync-error-notice';
-import { notifyConflicts } from '../../../sync/conflict/conflict';
 
 vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('../../activity/activity-modal', () => ({ ActivityModal: vi.fn() }));
 vi.mock('../../sync-error-notice', () => ({ showSyncErrorNotice: vi.fn() }));
-vi.mock('../../../sync/conflict/conflict', () => ({ notifyConflicts: vi.fn() }));
 import { renderConnectionStatus } from './connection-status';
 
 afterEach(() => { resetObsidianUiMocks(); vi.clearAllMocks(); });
@@ -26,7 +24,6 @@ describe('connection status', () => {
 		await vi.waitFor(() => expect(button.buttonEl.classNames.has('is-disabled')).toBe(false));
 		expect(sync).toHaveBeenCalledOnce();
 		expect(showSyncErrorNotice).not.toHaveBeenCalled();
-		expect(notifyConflicts).not.toHaveBeenCalled();
 		expect(noticeMessages).toEqual([]);
 		cleanup();
 	});

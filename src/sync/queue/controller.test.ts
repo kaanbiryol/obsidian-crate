@@ -4,6 +4,7 @@ import { createEmptySyncResult } from '../sync-result';
 import { ReconnectNotice } from '../sync-outcome';
 import type { SyncResult } from '../types';
 import { SyncQueueController } from './controller';
+import { createAbortError } from '../abort';
 
 function createController(options: Partial<{
 	automaticSync: boolean;
@@ -26,7 +27,7 @@ function createController(options: Partial<{
 		updateState,
 		setLastSync: vi.fn(),
 		reconnectNotice: new ReconnectNotice(),
-		isDestroyed: () => options.destroyed ?? false,
+		signal: options.destroyed ? AbortSignal.abort(createAbortError('Sync engine destroyed')) : new AbortController().signal,
 		getStatus: () => 'idle',
 		verifyPendingPaths: async () => [],
 		prepareUploadFromPath: async () => null,
@@ -321,7 +322,7 @@ describe('exclusion changes', () => {
 			updateState: vi.fn(),
 			setLastSync: vi.fn(),
 			reconnectNotice: new ReconnectNotice(),
-			isDestroyed: () => false,
+			signal: new AbortController().signal,
 			getStatus: () => 'idle',
 			verifyPendingPaths: async () => [],
 			prepareUploadFromPath: async path => { prepared.push(path); return null; },
@@ -389,7 +390,7 @@ describe('large upload pacing', () => {
 			updateState: vi.fn(),
 			setLastSync: vi.fn(),
 			reconnectNotice: new ReconnectNotice(),
-			isDestroyed: () => false,
+			signal: new AbortController().signal,
 			getStatus: () => 'idle',
 			verifyPendingPaths: async () => [],
 			prepareUploadFromPath: async (path: string) => { prepared.push(path); return null; },

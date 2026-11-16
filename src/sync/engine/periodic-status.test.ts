@@ -8,7 +8,7 @@ import { AUTH_ERROR_MESSAGE } from '../sync-outcome';
 function fixture() {
 	const h = createHarness({ lastSync: '2026-09-08T10:00:00.000Z', syncInterval: 0 });
 	const states = vi.fn();
-	h.engine.setStateChangeCallback(states);
+	h.hooks.onStateChange = states;
 	h.vault.getFiles.mockReturnValue([]);
 	h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
 	h.api.checkForChanges.mockResolvedValue({ hasChanges: false });
@@ -19,7 +19,7 @@ describe('periodic sync status', () => {
 	it('retries reminder settings during periodic checks even when no files changed', async () => {
 		const h = fixture();
 		const prepare = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
-		h.engine.setReminderScopePreparation(prepare);
+		h.hooks.prepareReminderScope = prepare;
 		await runPeriodicCheck(h.engine);
 		expect(h.api.checkForChanges).toHaveBeenCalledOnce();
 		expect(h.engine.getState()).toMatchObject({ status: 'idle', lastError: null });
@@ -32,7 +32,7 @@ describe('periodic sync status', () => {
 		const h = fixture();
 		const pending = createDeferred<void>();
 		const prepare = vi.fn(() => pending.promise);
-		h.engine.setReminderScopePreparation(prepare);
+		h.hooks.prepareReminderScope = prepare;
 		try {
 			await runPeriodicCheck(h.engine);
 			expect(prepare).toHaveBeenCalledOnce();

@@ -21,7 +21,7 @@ import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from '../types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../../protocol/sync-types';
 import { SyncApiClient, type NoteProjectionFactory } from '../worker-api/client';
-import { SyncEngine } from '../engine/engine';
+import { SyncEngine, type SyncEngineHooks } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
 import { deleteManifestFile, type ApplyInfrastructureConfigInput } from './config';
 import { recordSyncHistory, SharedCheckpointSchedule } from './sync-activity';
@@ -38,6 +38,17 @@ const logger = createLogger('SyncRuntime');
 const NOT_CONFIGURED = 'Sync is not configured.';
 const FILE_HISTORY_CHANGED = 'Sync configuration changed. Reopen file history.';
 const HISTORY_CHANGED = 'Sync connection changed. Reopen history.';
+
+export interface SyncRuntimeOptions {
+	prepareReminderScope?: () => Promise<void>;
+	/** The public data each note carries in an encrypted vault; none by default. */
+	createNoteProjection?: NoteProjectionFactory;
+	/** Runs when a first upload starts, before it lists vault files. */
+	prepareInitialUpload?: () => Promise<void>;
+	/** Tests substitute the client or engine an initialization builds. */
+	createApiClient?: (workerUrl: string, authToken: string) => SyncApiClient;
+	createEngine?: (plugin: Plugin, api: SyncApiClient, settings: SyncRuntimeSettings, hooks: SyncEngineHooks) => SyncEngine;
+}
 
 /** Transition authority stays with the runtime across stopping and initialization. */
 export interface RuntimeConfigurationTransition {
@@ -69,18 +80,16 @@ export class SyncRuntime {
 	});
 	private readonly serverStatus: RuntimeServerStatus;
 	private readonly checkpoints = new SharedCheckpointSchedule();
+	private readonly createNoteProjection: NoteProjectionFactory;
 
 	constructor(
 		private plugin: Plugin,
 		private settings: SyncRuntimeSettings,
 		private secretStorage: SecretStorageService,
 		private persistSettings: (update?: Partial<SyncSettings>) => Promise<void>,
-		private prepareReminderScope?: () => Promise<void>,
-		/** The public data each note carries in an encrypted vault; none by default. */
-		private createNoteProjection: NoteProjectionFactory = async () => async () => null,
-		/** Runs when a first upload starts, before it lists vault files. */
-		private prepareInitialUpload?: () => Promise<void>,
+		private readonly options: SyncRuntimeOptions = {},
 	) {
+		this.createNoteProjection = options.createNoteProjection ?? (async () => async () => null);
 		this.initializing = this.isConfigured();
 		this.serverStatus = new RuntimeServerStatus({
 			settings,
@@ -94,6 +103,11 @@ export class SyncRuntime {
 			},
 			onIssueChange: () => this.emitCurrentState(),
 		});
+	}
+
+	/** A reset that began on this device must finish in Manage encryption before sync resumes. */
+	private encryptionResetUnfinished(): boolean {
+		return Boolean(this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET));
 	}
 
 	private requireEngine(): SyncEngine {
@@ -301,16 +315,16 @@ export class SyncRuntime {
 
 		await this.stoppingWork;
 		if (this.initializationRevision !== initializationRevision) return;
-		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET) && !options.resumeEncryptionReset) {
+		if (this.encryptionResetUnfinished() && !options.resumeEncryptionReset) {
 			this.apiClient = null;
 			this.initializationError = 'Encryption reset is unfinished. Open Manage encryption to resume on this device.';
 			this.emitCurrentState();
 			return;
 		}
 
-		this.apiClient = new SyncApiClient(
+		this.apiClient = (this.options.createApiClient ?? ((url, token) => new SyncApiClient(url, token)))(
 			this.settings.workerUrl,
-			this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || ''
+			this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '',
 		);
 		try {
 			await configureClientEncryption(this.apiClient, {
@@ -327,41 +341,43 @@ export class SyncRuntime {
 		if (this.initializationRevision !== initializationRevision) return;
 		// A resumed encryption reset has already saved automatic sync as off. The engine
 		// shares these settings so the reset upload's progress is persisted with them.
-		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
-		const syncEngine = this.syncEngine;
-		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
-		syncEngine.setSettingsPersistence(() => this.persistSettings());
-		syncEngine.setReminderScopePreparation(this.prepareReminderScope);
-		syncEngine.setInitialUploadPreparation(this.prepareInitialUpload);
+		// Hooks run only after construction, once `syncEngine` is assigned.
+		let syncEngine!: SyncEngine;
+		const hooks: SyncEngineHooks = {
+			persistSettings: () => this.persistSettings(),
+			onAutomaticSyncResult: result => this.recordAutomaticSyncResult(syncEngine, result),
+			onStateChange: (state: SyncState) => {
+				if (this.syncEngine !== syncEngine) return;
+				if (state.status === 'syncing') this.serverStatus.clearIssue();
+				this.emitCurrentState();
+			},
+			prepareReminderScope: this.options.prepareReminderScope,
+			prepareInitialUpload: this.options.prepareInitialUpload,
+		};
+		syncEngine = (this.options.createEngine ?? ((plugin, api, settings, engineHooks) => new SyncEngine(plugin, api, settings, engineHooks)))(
+			this.plugin, this.apiClient, this.settings, hooks);
+		this.syncEngine = syncEngine;
 
 		this.emitCurrentState();
-
-		this.syncEngine.setStateChangeCallback((state: SyncState) => {
-			if (this.syncEngine !== syncEngine || this.initializationRevision !== initializationRevision) return;
-			if (state.status === 'syncing') this.serverStatus.clearIssue();
-			this.emitCurrentState();
-		});
 
 		try {
 			await syncEngine.initialize();
 		} catch (error) {
-			if (this.initializationRevision !== initializationRevision || this.syncEngine !== syncEngine) return;
+			if (this.syncEngine !== syncEngine) return;
 			this.initializationError = errorMessage(error);
 			this.stopEngine();
 			this.apiClient = null;
 			this.emitCurrentState();
 			throw error;
 		}
-		if (this.initializationRevision !== initializationRevision || this.syncEngine !== syncEngine) {
-			return;
-		}
+		if (this.syncEngine !== syncEngine) return;
 		this.emitCurrentState();
 
 		if (this.settings.automaticSync && !options.skipStartupSync) {
 			this.vaultEvents.recordForStartupSync();
 			this.startupSyncTask = runStartupSync({
 				sync: () => this.sync(),
-				isCurrent: () => this.initializationRevision === initializationRevision && this.syncEngine === syncEngine,
+				isCurrent: () => this.syncEngine === syncEngine,
 				finish: () => {
 					this.vaultEvents.openAfterStartupSync(syncEngine);
 					this.initializing = false;
@@ -550,7 +566,7 @@ export class SyncRuntime {
 	}
 
 	updateSyncSettings(): void {
-		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) return;
+		if (this.encryptionResetUnfinished()) return;
 		this.syncEngine?.updateSettings(this.settings);
 		if (this.settings.automaticSync) this.serverStatus.cancelCheck();
 		else this.scheduleServerCheck();
@@ -620,7 +636,7 @@ export class SyncRuntime {
 		progressCallback?: (current: number, total: number) => void,
 		logMessage?: string,
 	): Promise<SyncResult> {
-		if (this.secretStorage.get(SECRET_KEYS.ENCRYPTION_RESET)) return createSyncFailureResult('Open Manage encryption to finish the reset before syncing.');
+		if (this.encryptionResetUnfinished()) return createSyncFailureResult('Open Manage encryption to finish the reset before syncing.');
 		if (this.stopSyncTask) return createSyncFailureResult('Sync is stopping. Try again when it finishes.');
 		if (!this.syncEngine) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
 

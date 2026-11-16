@@ -4,7 +4,7 @@ import { findAllMatches } from '../core/grammar/richTextMatchers';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { formatLocalDateKey, isReminderOverdue, isStoredReminderDate, isStoredReminderDatetime, parseReminderDateValue } from '../core/dates/reminderDate';
 import { formatDueDate } from '../ui/format/dateFormatting';
-import { inlineDescription } from './inline-description';
+import { inlineDescription } from '../data/inline-description';
 
 /**
  * How a reminder line's schedule shows in a note, relative to the line's start:

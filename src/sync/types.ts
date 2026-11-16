@@ -1,4 +1,3 @@
-import type { FileEntry } from '../protocol/sync-types';
 
 export interface ConnectionTestResult {
 	success: boolean;
@@ -111,65 +110,11 @@ export interface SyncHistoryEntry {
 	deletedPaths?: string[];
 }
 
-interface ReconcileDecisionBase {
-	path: string;
-	remoteRevision?: string;
-}
-
-export type FileDiff =
-	| (ReconcileDecisionBase & {
-		action: 'upload';
-		localHash: string;
-		remoteHash?: string;
-		cause: 'local-created' | 'local-edited' | 'remote-deleted';
-	})
-	| (ReconcileDecisionBase & {
-		action: 'download';
-		localHash?: string;
-		remoteHash: string;
-		cause: 'remote-created' | 'remote-edited' | 'local-deleted';
-	})
-	| (ReconcileDecisionBase & {
-		action: 'conflict';
-		localHash: string;
-		remoteHash: string;
-		cause: 'concurrent-create' | 'concurrent-edit';
-	})
-	| (ReconcileDecisionBase & {
-		action: 'delete';
-		remoteHash: string;
-		cause: 'local-deleted';
-	})
-	| (ReconcileDecisionBase & {
-		action: 'delete-local';
-		localHash: string;
-		cause: 'remote-deleted';
-	});
-
-export type UploadDiff = Extract<FileDiff, { action: 'upload' }>;
-export type DownloadDiff = Extract<FileDiff, { action: 'download' }>;
-export type ConflictDiff = Extract<FileDiff, { action: 'conflict' }>;
-
-export interface PreparedUpload {
-	path: string;
-	content: ArrayBuffer;
-	hash: string;
-	size: number;
-	mtime?: number;
-	contentType?: string;
-	expectedHash?: string | null;
-}
-
 export interface SyncActivityProgress {
 	type: Exclude<SyncHistoryEntry['type'], 'initial'>;
 	current: number;
 	total: number;
 	work?: SyncWork;
-}
-
-export interface RemoteManifest {
-	files: Record<string, FileEntry>;
-	lastSeq?: number;
 }
 
 /** A vault file or folder as sync sees it; the runtime converts Obsidian's objects once. */

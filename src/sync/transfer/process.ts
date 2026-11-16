@@ -9,7 +9,8 @@ import { awaitingReview, downloadAndSaveFile, validateDownloadedContent } from "
 import { prepareUploadFromPath } from "./prepare";
 import { acknowledgeUpload } from "./upload";
 import type { DiffApplyOutcome, TransferContext } from "./types";
-import type { ConflictDiff, FileDiff, SyncResult } from '../types';
+import type { SyncResult } from '../types';
+import type { ConflictDiff, FileDiff } from '../planner/types';
 import type { FileEntry, MutationFailure, UploadResult } from '../../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';

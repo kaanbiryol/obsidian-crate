@@ -10,6 +10,7 @@ import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, MAX_PREVIEW_BYTES } from
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { requestFileVersions } from './version-contract';
 import { parseChanges, parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
+import { parseBatchDelete, parseBatchDownload, parseBatchUpload, parseUploadResult } from './mutation-contracts';
 import { errorMessage } from '../../platform/logger';
 import { refusedUploadResult } from '../failures';
 import { runConcurrentTasks } from '../concurrency';
@@ -244,7 +245,7 @@ export class SyncWorkerApi {
 		this.assertWireContentType(contentType);
 		operationId ??= await this.newUploadOperationId();
 		const encodedPath = encodeURIComponent(path);
-		return this.http.requestJson<UploadResult>(`/sync/upload?path=${encodedPath}`, {
+		return parseUploadResult(await this.http.requestJson<unknown>(`/sync/upload?path=${encodedPath}`, {
 			method: 'PUT',
 			body: content,
 			headers: {
@@ -254,7 +255,7 @@ export class SyncWorkerApi {
 				[FILE_SIZE_HEADER]: String(size),
 				[EXPECTED_HASH_HEADER]: expectedHash === null ? 'absent' : expectedHash,
 			},
-		}, transferTimeout(content.byteLength));
+		}, transferTimeout(content.byteLength)));
 	}
 
 	private async newUploadOperationId(): Promise<string> {
@@ -348,21 +349,21 @@ export class SyncWorkerApi {
 		const bulkNew = files.every(file => file.expectedHash === null);
 
 		const body = JSON.stringify({ files, ...(bulkNew ? { bulkNewFiles: true } : {}) });
-		return this.http.requestJson<BatchUploadResponse>('/sync/batch-upload', {
+		return parseBatchUpload(await this.http.requestJson<unknown>('/sync/batch-upload', {
 			method: 'POST',
 			body,
 			headers: { [UPLOAD_OPERATIONS_HEADER]: files.map(file => file.operationId).join(',') },
-		}, transferTimeout(body.length));
+		}, transferTimeout(body.length)));
 	}
 
 	async batchDownload(paths: string[]): Promise<DownloadedBatch> {
 		let response: BatchDownloadResponse;
 		const wires = await Promise.all(paths.map(path => this.wireFor(path)));
 		const plainByWire = new Map(wires.map((wire, index) => [wire, paths[index]!]));
-		try { response = await this.http.requestJson<BatchDownloadResponse>('/sync/batch-download', {
+		try { response = parseBatchDownload(await this.http.requestJson<unknown>('/sync/batch-download', {
 			method: 'POST',
 			body: JSON.stringify({ paths: wires }),
-		}, TRANSFER_TIMEOUT_MS); }
+		}, TRANSFER_TIMEOUT_MS)); }
 		catch (error) {
 			if (!this.encryption || !(error instanceof HttpError) || error.status !== 413) throw error;
 			const files: DownloadedBatchFile[] = [];
@@ -379,7 +380,7 @@ export class SyncWorkerApi {
 			if (file.error) return { ...file, path, content };
 			const opened = await encryption.download(file.path, base64ToArrayBuffer(content), { check: file, expected: path });
 			return { ...file, ...opened.metadata, path, verifiedContent: opened.content };
-		}), DECRYPT_CONCURRENCY, () => false);
+		}), DECRYPT_CONCURRENCY);
 		return { files };
 	}
 
@@ -397,14 +398,14 @@ export class SyncWorkerApi {
 			if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
 			return { path, expectedHash, expectedRevision };
 		});
-		if (!this.encryption) return this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files }) });
+		if (!this.encryption) return parseBatchDelete(await this.http.requestJson<unknown>('/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files }) }));
 		const hashes = await this.encryption.expectedHashes(files.map(file => ({ path: file.path, expected: file.expectedHash, revision: file.expectedRevision })));
 		const wires = await Promise.all(files.map(file => this.wireFor(file.path)));
 		const plain = (wire: string) => paths[wires.indexOf(wire)] ?? wire;
-		const response = await this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
+		const response = parseBatchDelete(await this.http.requestJson<unknown>('/sync/batch-delete', {
 			method: 'POST',
 			body: JSON.stringify({ files: files.map((file, index) => ({ ...file, path: wires[index]!, expectedHash: hashes[index]! })) }),
-		});
+		}));
 		return { ...response, deleted: response.deleted.map(plain),
 			...(response.results ? { results: response.results.map(result => ({ ...result, path: plain(result.path) })) } : {}),
 			...(response.errors ? { errors: response.errors.map(error => ({ ...error, path: plain(error.path) })) } : {}) };
@@ -435,10 +436,10 @@ export class SyncWorkerApi {
 	}
 
 	async restoreFileVersion(request: RestoreFileRequest): Promise<UploadResult> {
-		return this.http.requestJson('/sync/restore-version', {
+		return parseUploadResult(await this.http.requestJson<unknown>('/sync/restore-version', {
 			method: 'POST',
 			body: JSON.stringify(request),
 			headers: { [UPLOAD_OPERATION_HEADER]: request.operationId },
-		});
+		}));
 	}
 }

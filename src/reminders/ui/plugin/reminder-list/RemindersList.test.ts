@@ -9,7 +9,6 @@ vi.mock('@/reminders/ui/plugin/ReminderCardWrapper', () => ({
 }));
 vi.mock('@/reminders/ui/plugin/hooks/useObsidianDarkMode', () => ({ useObsidianDarkMode: () => false }));
 vi.mock('@/ui/shared/useReducedMotion', () => ({ useReducedMotion: () => true }));
-vi.mock('@/reminders/ui/plugin/hooks/useIndexRefresh', () => ({ useIndexRefresh: () => ({ refreshToken: 0, triggerRefresh: () => {} }) }));
 vi.mock('@/reminders/settings', () => ({ useRemindersSettingsStore: (select: (state: { enabled: boolean; upcomingDaysDefault: number }) => unknown) => select({ enabled: true, upcomingDaysDefault: 7 }) }));
 vi.mock('@/ui/obsidian-icon', () => ({ ObsidianIcon: () => null }));
 vi.mock('./styles.scss', () => ({}));
@@ -30,7 +29,7 @@ const reminders: Reminder[] = Array.from({ length: 450 }, (_, i) => ({
 
 function mount(props: React.ComponentProps<typeof RemindersList>) {
 	const repository = { getActive: vi.fn(() => reminders), getAll: vi.fn(() => reminders), getTodayReminders: vi.fn(() => reminders), getProjects: vi.fn(() => []) };
-	const plugin = { reminders: { repository, index: { isInitialLoadComplete: true } }, remindersSettings: {} } as unknown as CratePlugin;
+	const plugin = { reminders: { repository, index: { isInitialLoadComplete: true, onIndexChange: () => () => {}, getVersion: () => 0 } }, remindersSettings: {} } as unknown as CratePlugin;
 	renderHook(() => null, () => {
 		for (const name of ['Node', 'Element', 'HTMLElement', 'HTMLButtonElement']) vi.stubGlobal(name, (window as unknown as Record<string, unknown>)[name]);
 		Object.assign(window, { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });

@@ -3,7 +3,7 @@ import { afterEach } from 'vitest';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings-types';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
 import { SyncApiClient } from '../worker-api/client';
-import { SyncEngine } from './engine';
+import { SyncEngine, type SyncEngineHooks } from './engine';
 import { LocalManifest } from '../manifest/manifest';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import type { ApiHttpTransport } from '../worker-api/http';
@@ -24,8 +24,9 @@ export async function createPersistentEngineHarness(transport: ApiHttpTransport,
 		app: { vault: disk.vault, fileManager: {}, workspace: { onLayoutReady: () => {} } },
 	} as unknown as Plugin;
 	const localManifest = new LocalManifest(plugin.app, plugin.manifest, getCheckpointAuthority(settings) || 'unconfigured');
-	const engine = new SyncEngine(plugin, api, settings, { localManifest });
+	const hooks: SyncEngineHooks = { persistSettings: async () => {} };
+	const engine = new SyncEngine(plugin, api, settings, hooks, { localManifest });
 	engines.add(engine);
 	await engine.initialize();
-	return { disk, engine, api, settings, localManifest, vault: disk.vault };
+	return { disk, engine, hooks, api, settings, localManifest, vault: disk.vault };
 }

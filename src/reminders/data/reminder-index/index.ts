@@ -48,6 +48,8 @@ export interface ReminderIndex {
 
 	isReminderFile(filePath: string): boolean;
 	onIndexChange(listener: IndexChangeListener): () => void;
+	/** Advances before each change notification, so a view can tell whether to read again. */
+	getVersion(): number;
 
 	applyOptimisticCreate(reminder: IndexedReminder): void;
 	applyOptimisticUpdate(id: string, updates: Partial<IndexedReminder>): void;
@@ -82,6 +84,7 @@ export function createReminderIndex(
 	let sourceIssues = new Map<string, ReminderSourceIssue>();
 
 	const listeners = new Set<IndexChangeListener>();
+	let version = 0;
 	const lookupStore = createReminderLookupStore();
 	const optimisticState = createReminderOptimisticState();
 	let scanQueue: Promise<unknown> = Promise.resolve();
@@ -106,6 +109,7 @@ export function createReminderIndex(
 	signal?.addEventListener('abort', () => { deferredPaths.clear(); deferredLoad = false; }, { once: true });
 
 	function notifyListeners(): void {
+		version++;
 		for (const listener of listeners) {
 			try {
 				listener();
@@ -360,6 +364,8 @@ export function createReminderIndex(
 				listeners.delete(listener);
 			};
 		},
+
+		getVersion: () => version,
 
 		applyOptimisticCreate(reminder: IndexedReminder) {
 			optimisticState.applyCreate(reminder);

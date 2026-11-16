@@ -1,6 +1,6 @@
 import { afterEach, expect, vi } from 'vitest';
 import { TFolder } from 'obsidian';
-import { SyncEngine } from '../engine/engine';
+import { SyncEngine, type SyncEngineHooks } from '../engine/engine';
 import type { SyncApiClient } from '../worker-api/client';
 import { SyncRuntime } from './runtime';
 import type { CrateSettings } from '../../plugin/settings-types';
@@ -93,12 +93,26 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 	};
 	const persistSettings = vi.fn(async () => {});
 
-	const runtime = new SyncRuntime(plugin as never, settings, secretStorage as never, persistSettings, prepareReminderScope);
+	// The hooks each initialization handed its engine, so tests can drive them as the engine would.
+	const engineHooks: SyncEngineHooks[] = [];
+	const runtime = new SyncRuntime(plugin as never, settings, secretStorage as never, persistSettings, {
+		prepareReminderScope,
+		createEngine: (host, api, engineSettings, hooks) => {
+			engineHooks.push(hooks);
+			return new SyncEngine(host, api, engineSettings, hooks);
+		},
+	});
 	runtimes.add(runtime);
 
 	return {
 		plugin,
 		runtime,
+		/** The hooks of the most recently built engine. */
+		engineHooks: () => {
+			const hooks = engineHooks.at(-1);
+			if (!hooks) throw new Error('Initialize the runtime before reading its engine hooks');
+			return hooks;
+		},
 		persistSettings,
 		secretStorage,
 		settings,

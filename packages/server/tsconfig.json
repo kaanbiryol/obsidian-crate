@@ -1,0 +1,21 @@
+{
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"noEmit": true,
+		"strict": true,
+		"useUnknownInCatchVariables": false,
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"target": "esnext",
+		"lib": ["esnext"],
+		"types": ["node"],
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true
+	},
+	"include": [
+		"src/**/*.mjs",
+		"../../src/cloudflare/worker/cloudflare-env.d.ts"
+	]
+}

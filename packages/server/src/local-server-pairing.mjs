@@ -5,12 +5,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { issueLocalDevice, listLocalDevices, readResetGeneration, revokeLocalDevice } from './local-server-runtime.mjs';
 
-const hash = value => createHash('sha256').update(value).digest('hex');
+const hash = (/** @type {string} */ value) => createHash('sha256').update(value).digest('hex');
 const codePattern = /^crate-pair-[a-f0-9]{64}$/;
 // sun_path holds 104 bytes on macOS (108 on Linux), including the terminating NUL.
 const socketPathLimit = 103;
 
+/**
+ * Single-use pairing codes, kept only in memory and only as hashes.
+ * @param {object} options
+ * @param {import('./local-server-runtime.mjs').LocalD1Database} options.db
+ * @param {() => number} [options.now]
+ * @param {number} [options.lifetime] Milliseconds a code stays valid.
+ */
 export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
+	/** @type {Map<string, { name: string, expiresAt: number, resetGeneration: Promise<string | undefined> }>} */
 	const codes = new Map();
 	return {
 		issue(name = 'Obsidian device') {
@@ -24,6 +32,7 @@ export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
 			codes.set(hash(code), entry);
 			return { code, expiresAt: entry.expiresAt };
 		},
+		/** @param {unknown} code */
 		async exchange(code) {
 			if (typeof code !== 'string' || !codePattern.test(code)) return null;
 			const key = hash(code);
@@ -39,11 +48,15 @@ export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
 	};
 }
 
+/** @typedef {ReturnType<typeof createPairing>} LocalPairing */
+
+/** @param {import('node:http').ServerResponse} response @param {number} status @param {unknown} value */
 export function sendJson(response, status, value) {
 	response.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
 	response.end(JSON.stringify(value));
 }
 
+/** @param {import('node:http').IncomingMessage} request @param {number} [limit] Maximum characters. */
 export async function readSmallJson(request, limit = 2048) {
 	let body = '';
 	for await (const chunk of request) {
@@ -54,7 +67,12 @@ export async function readSmallJson(request, limit = 2048) {
 }
 
 /** Administration stays on a private local socket and additionally requires a
- * random secret stored in the owner's private data directory. Never proxied. */
+ * random secret stored in the owner's private data directory. Never proxied.
+ * @param {object} options
+ * @param {string} options.dataDir
+ * @param {Pick<LocalPairing, 'issue'>} options.pairing
+ * @param {string} options.origin
+ * @param {import('./local-server-runtime.mjs').LocalRuntime} options.runtime */
 export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 	const file = join(dataDir, 'control.json');
 	const id = randomBytes(16).toString('hex');
@@ -87,7 +105,7 @@ export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 		} catch { sendJson(response, 400, { error: 'Could not create a pairing code. Check the device name or wait for pending codes to expire.' }); }
 	});
 	server.requestTimeout = 5000;
-	await new Promise((resolve, reject) => { server.once('error', reject); server.listen(socket, resolve); });
+	await /** @type {Promise<void>} */ (new Promise((resolve, reject) => { server.once('error', reject); server.listen(socket, resolve); }));
 	try {
 		if (process.platform !== 'win32') await chmod(socket, 0o600);
 		await writeFile(file, JSON.stringify({ socket, secret }), { mode: 0o600 });
@@ -100,9 +118,15 @@ export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 	} };
 }
 
+/** The running server's control socket and secret (`control.json`).
+ * @typedef {{ socket: string, secret: string }} LocalControlFile */
+
 /** Sends one request to the running server's private control socket. Rejects with
- * code ENOENT when no server is running for this data directory. */
+ * code ENOENT when no server is running for this data directory.
+ * @param {string} dataDir @param {string} method @param {string} path @param {unknown} [body]
+ * @returns {Promise<any>} The parsed JSON response. */
 export async function requestLocalControl(dataDir, method, path, body) {
+	/** @type {LocalControlFile} */
 	const { socket, secret } = JSON.parse(await readFile(join(dataDir, 'control.json'), 'utf8'));
 	return new Promise((resolve, reject) => {
 		const request = httpRequest({ socketPath: socket, path, method,
@@ -120,6 +144,8 @@ export async function requestLocalControl(dataDir, method, path, body) {
 	});
 }
 
+/** @param {string} dataDir @param {string | undefined} name
+ * @returns {Promise<{ code: string, expiresAt: number, origin: string }>} */
 export async function requestLocalPairing(dataDir, name) {
 	try { return await requestLocalControl(dataDir, 'POST', '/pair', { name }); }
 	catch { throw new Error('Could not create a pairing code. Keep Crate running, check the data directory and device name, then try again.'); }

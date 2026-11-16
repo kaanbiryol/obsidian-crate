@@ -22,7 +22,7 @@ export interface MarkdownBaseCacheManifest {
 }
 
 export interface MarkdownBaseCacheSeedOptions {
-	isDestroyed(): boolean;
+	signal: AbortSignal;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 }
 
@@ -114,7 +114,7 @@ export class MarkdownBaseCache {
 			});
 
 		const seed = (path: string) => async () => {
-			if (options.isDestroyed()) {
+			if (options.signal.aborted) {
 				return;
 			}
 
@@ -143,20 +143,20 @@ export class MarkdownBaseCache {
 		let batch: Array<() => Promise<void>> = [];
 		let bytes = 0;
 		for (const path of paths) {
-			if (options.isDestroyed()) return;
+			if (options.signal.aborted) return;
 			const size = manifest.getEntry(path)?.size ?? 0;
 			if (batch.length && (batch.length >= SEED_BATCH_FILES || bytes + size > SEED_BATCH_BYTES)) {
 				await options.runConcurrent(batch, SEED_CONCURRENCY);
 				batch = [];
 				bytes = 0;
 				await new Promise<void>(resolve => setTimeout(resolve, 0));
-				if (options.isDestroyed()) return;
+				if (options.signal.aborted) return;
 			}
 			batch.push(seed(path));
 			bytes += size;
 		}
 		await options.runConcurrent(batch, SEED_CONCURRENCY);
-		if (!options.isDestroyed()) await this.removeUnreferenced(listing, getReferencedMarkdownHashes(manifest));
+		if (!options.signal.aborted) await this.removeUnreferenced(listing, getReferencedMarkdownHashes(manifest));
 	}
 
 	async pruneReferencedHashes(referencedHashes: Set<string>): Promise<void> {

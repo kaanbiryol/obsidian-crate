@@ -75,6 +75,9 @@ jobs:
       - name: Type-check the service worker
         if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run typecheck:service-worker
+      - name: Type-check the server package
+        if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
+        run: npm run typecheck:server
       - name: Check for dead code
         if: ${{ !cancelled() && inputs.reuse-run-id == '' }}
         run: npm run deadcode

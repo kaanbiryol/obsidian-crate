@@ -10,7 +10,7 @@ import {
 /** The engine supplies the flush members; the controller adds its batch and scheduling ones. */
 export interface SyncQueueControllerContext extends Pick<QueueFlushContext,
 	| 'finishInitialSetup' | 'uploadPreparedFiles' | 'deleteRemoteFiles' | 'recoverUploads' | 'apiConfigured' | 'localManifest'
-	| 'updateState' | 'setLastSync' | 'reconnectNotice' | 'isDestroyed' | 'getStatus' | 'prepareUploadFromPath'> {
+	| 'updateState' | 'setLastSync' | 'reconnectNotice' | 'signal' | 'getStatus' | 'prepareUploadFromPath'> {
 	automaticSyncEnabled?(): boolean;
 	shouldIgnore(path: string): boolean;
 	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean, replayed?: ReadonlySet<string>): Promise<string[]>;
@@ -215,7 +215,7 @@ export class SyncQueueController {
 	/** Restarts the quiet-period timer; once `maxWaitMs` has passed since the first
 	 * scheduled flush, flushes immediately instead. */
 	private scheduleFlush(debounceDelayMs: number, maxWaitMs?: number): void {
-		if (this.context.isDestroyed()) return;
+		if (this.context.signal.aborted) return;
 
 		const existingTimer = this.debounceTimer;
 
@@ -299,7 +299,7 @@ export class SyncQueueController {
 
 	private schedulePendingVerification(): void {
 		if (!this.verificationKeys.size || this.verificationTimer !== null || this.verificationTask
-			|| this.context.isDestroyed() || this.context.getStatus() === 'syncing') return;
+			|| this.context.signal.aborted || this.context.getStatus() === 'syncing') return;
 		// Coalesce bursts independently of the automatic network-sync preference.
 		this.verificationTimer = setTimeout(() => {
 			this.verificationTimer = null;
@@ -315,23 +315,23 @@ export class SyncQueueController {
 	}
 
 	private async verifyPendingChanges(): Promise<void> {
-		if (this.context.isDestroyed() || this.context.getStatus() === 'syncing') return;
+		if (this.context.signal.aborted || this.context.getStatus() === 'syncing') return;
 		const keys = [...this.verificationKeys];
 		this.verificationKeys.clear();
 		const replayed = new Set(keys.filter(key => this.replayedKeys.delete(key)));
 		const revisions = this.snapshotPendingRevisions();
-		const isCurrent = (key: string) => !this.context.isDestroyed()
+		const isCurrent = (key: string) => !this.context.signal.aborted
 			&& this.context.getStatus() !== 'syncing' && this.pending.isUnchangedSince(key, revisions);
 		this.settleKeys(await this.context.verifyPendingPaths(keys, isCurrent, replayed), revisions);
 	}
 
 	private requestReconciliation(queueKeys: string[]): void {
 		for (const queueKey of queueKeys) this.reconciliationKeys.add(queueKey);
-		if (this.reconciliationScheduled || this.context.isDestroyed()) return;
+		if (this.reconciliationScheduled || this.context.signal.aborted) return;
 		this.reconciliationScheduled = true;
 		queueMicrotask(() => {
 			this.reconciliationScheduled = false;
-			if (this.context.isDestroyed() || this.context.automaticSyncEnabled?.() === false) return;
+			if (this.context.signal.aborted || this.context.automaticSyncEnabled?.() === false) return;
 			const paths = [...this.reconciliationKeys];
 			this.reconciliationKeys.clear();
 			void this.context.reconcile(paths).catch(() => {

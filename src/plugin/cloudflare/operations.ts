@@ -13,7 +13,7 @@ import { CloudflareReauthorizationRequired } from '../../cloudflare/oauth/client
 import type CratePlugin from '../CratePlugin';
 import { getPluginLifecycleSignal } from '../lifecycle-state';
 import { configureCloudflareAuthorizedDevice } from './connection';
-import { isSelfHostedConnectionPending } from '../self-hosted-connection';
+import { beginConnectionOperation, runningConnectionOperation } from '../connection-operation';
 import { offerFeatureChoice } from '../feature-settings';
 import { startVaultReplacement } from '../sync-integration';
 import { readServerEncryption } from '../../sync/encryption/server-encryption';
@@ -28,7 +28,9 @@ import { stableJson } from '../../platform/stable-json';
 import { changesServer, DESKTOP_ONLY_SERVER_CHANGE } from '../../cloudflare/deployment/server-changes';
 
 export async function startCloudflareDeployment(plugin: CratePlugin, intent?: Exclude<DeploymentIntent, 'connect'>): Promise<void> {
-	if (isSelfHostedConnectionPending(plugin)) {
+	// A running Cloudflare operation is revealed below instead.
+	const other = runningConnectionOperation(plugin);
+	if (other && other !== 'cloudflare') {
 		new Notice('Wait for the connection to your server to finish.');
 		return;
 	}
@@ -67,15 +69,17 @@ export async function handleCloudflareOAuthProtocol(
 	await runCloudflareOperation(plugin, params);
 }
 
-const runningOperations = new WeakSet<CratePlugin>();
-
 async function runCloudflareOperation(
 	plugin: CratePlugin, params: Record<string, string>, savedIntent?: SavedDeploymentIntent,
 ): Promise<void> {
-	if (runningOperations.has(plugin)) return;
-	runningOperations.add(plugin);
+	const release = beginConnectionOperation(plugin, 'cloudflare');
+	if (!release) {
+		// A repeated callback for the running operation needs no answer.
+		if (runningConnectionOperation(plugin) !== 'cloudflare') new Notice('Wait for the connection to your server to finish, then try again.');
+		return;
+	}
 	try { await executeCloudflareOperation(plugin, params, savedIntent); }
-	finally { runningOperations.delete(plugin); }
+	finally { release(); }
 }
 
 /** Everything one Cloudflare operation decides up front and its steps share. */

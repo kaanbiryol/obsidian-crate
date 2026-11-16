@@ -31,25 +31,17 @@ export interface ReadingRouteOptions {
 	forward?: () => Promise<Response>;
 }
 
-/** Dispatches `/reading/` routes. Each charges its own action budget once its authority
- * is known. */
+/** Dispatches `/reading/` routes. Three kinds of caller reach them, each charged once
+ * its authority is known: a library session for the encrypted routes, a one-use grant
+ * (a Shortcut exchange or a handoff) that names its own authority, and a bearer for the
+ * rest. Grant redemption runs before authentication, so the shared encryption guards
+ * never see it and the plaintext checks stay here. */
 export async function handleReadingRoute(request: Request, env: Env, principal?: AuthPrincipal, { state, encryption: authenticatedEncryption, featurePolicy: featurePolicyValue, forward }: ReadingRouteOptions = {}): Promise<Response> {
 	const url = new URL(request.url), path = url.pathname;
 	// Authentication loads the encryption state with the token.
 	const encryption = authenticatedEncryption !== undefined ? authenticatedEncryption : await readEncryptionState(env.DB);
 	const shortcut = shortcutTransport(request);
-	if (path.startsWith('/reading/encrypted-')) {
-		if (!principal || principal.scope === 'reading_capture') throw new ReadingError('Library access is required.', 403);
-		const current = await authority(env.DB, principal, featurePolicyValue);
-		const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
-		if (path === '/reading/encrypted-extract' && request.method === 'POST') {
-			if (!encryption) throw new ReadingError('Article downloads here are only for encrypted Reading folders.', 409);
-			// As in unencrypted vaults, the web app then saves the link as a bookmark.
-			if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before downloading articles.', 403, 'reading_fetching_off');
-			return await extractForEncryptedReading(request, env);
-		}
-		return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
-	}
+	if (path.startsWith('/reading/encrypted-')) return await handleEncryptedLibraryRoute(request, env, path, principal, featurePolicyValue, encryption);
 	// Save to Crate cannot hash search terms or encrypt, so encrypted vaults do not offer it.
 	if (encryption && (shortcut || path === '/reading/shortcut-pairing')) throw new ReadingError('Save to Crate is not available in encrypted vaults. Save links in the Crate app or Obsidian.', 409, 'shortcut_encrypted_vault');
 	if (encryption && PLAINTEXT_ONLY_PATHS.includes(path)) throw new ReadingError('Use an unlocked, updated Reading app for this encrypted vault.', 428);
@@ -62,6 +54,7 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
 	if (shortcut) validateShortcutBody(body, shortcut.kind);
+	// One-use grants: the code or handoff, not a bearer, names the authority.
 	if (shortcut?.kind === 'exchange') return await exchangeShortcutPairing(env.DB, body, request);
 	if (path === '/reading/handoff' && request.method === 'POST') {
 		const handoff = await handoffAuthority(env.DB, request);
@@ -71,6 +64,28 @@ export async function handleReadingRoute(request: Request, env: Env, principal?:
 	}
 	if (!principal) throw new ReadingError('Reading access is required.', 401);
 	const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
+	return await handleBearerReadingRoute(request, env, url, principal, body, { state, encryption, featurePolicy: featurePolicyValue, forward }, shortcut);
+}
+
+/** Encrypted library files and article downloads, for library sessions only. */
+async function handleEncryptedLibraryRoute(request: Request, env: Env, path: string, principal: AuthPrincipal | undefined, featurePolicyValue: string | null | undefined, encryption: EncryptionServerState | null): Promise<Response> {
+	if (!principal || principal.scope === 'reading_capture') throw new ReadingError('Library access is required.', 403);
+	const current = await authority(env.DB, principal, featurePolicyValue);
+	const limited = await chargeRouteAction(request, env.DB, principal.tokenId); if (limited) return limited;
+	if (path === '/reading/encrypted-extract' && request.method === 'POST') {
+		if (!encryption) throw new ReadingError('Article downloads here are only for encrypted Reading folders.', 409);
+		// As in unencrypted vaults, the web app then saves the link as a bookmark.
+		if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before downloading articles.', 403, 'reading_fetching_off');
+		return await extractForEncryptedReading(request, env);
+	}
+	return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
+}
+
+/** Routes a charged bearer reaches: setup, capture, the library and its session. */
+async function handleBearerReadingRoute(request: Request, env: Env, url: URL, principal: AuthPrincipal, body: Record<string, unknown>,
+	{ state, encryption, featurePolicy: featurePolicyValue, forward }: ReadingRouteOptions & { encryption: EncryptionServerState | null },
+	shortcut: ReturnType<typeof shortcutTransport>): Promise<Response> {
+	const path = url.pathname;
 	if (path === '/reading/policy') {
 		if (principal.scope !== 'vault') throw new ReadingError('Open Crate settings in Obsidian to change Reading setup.', 403);
 		if (request.method === 'GET') return readingResponse({ policy: await labelledPolicy(env.DB, await policy(env.DB), encryption) });

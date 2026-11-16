@@ -1,11 +1,12 @@
 import { pwaSyncState } from '../sync/state';
-import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { usePwaUpdate } from './usePwaUpdate';
 import { useToast } from '../hooks/useToast';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { PwaToast } from '../components/PwaToast';
-import { useSettingsOpen, useSettingsStore } from '../settings/settings-context';
+import { useSettingsOpen, useSettingsSelector, useSettingsStore } from '../settings/settings-context';
+import { shallowEqual } from '../settings/settings-store';
 import { startUpdateChecks, fetchPwaAssetVersion } from './update-checker';
 import type { CrateSection } from '../navigation/feature-navigation';
 import type { ToastState } from '../types';
@@ -29,7 +30,11 @@ export function useAppUpdate() {
 export function PwaUpdateProvider({ activeSection, children }: { activeSection: CrateSection; children: ReactNode }) {
 	const store = useSettingsStore();
 	const [settingsOpen] = useSettingsOpen();
-	const models = useSyncExternalStore(store.subscribe, store.getSnapshot);
+	const sync = useSettingsSelector(snapshot => {
+		const { ready, canUpdate, updateBlocked } = pwaSyncState(snapshot);
+		const model = snapshot[activeSection];
+		return { ready, canUpdate, updateBlocked, contentReady: Boolean(model?.updateContentReady ?? model?.ready) };
+	}, shallowEqual);
 	const [version, setVersion] = useState<string | null>(null);
 	const [checkComplete, setCheckComplete] = useState(false);
 	const online = useOnlineStatus();
@@ -50,16 +55,16 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 			&& pwaSyncState(current).canUpdate
 			&& !document.querySelector('.pwa-modal-sheet--reminder, .pwa-reading-sheet, [role="alertdialog"]');
 	};
-	const { updating, update, launchPending } = usePwaUpdate(showToast, Boolean(models[activeSection]?.updateContentReady ?? models[activeSection]?.ready), {
+	const { updating, update, launchPending } = usePwaUpdate(showToast, sync.contentReady, {
 		version, checkComplete,
 		// Preserve automatic updates behind the Reminders launch splash only.
 		canApply: () => activeSection === 'reminders' && Boolean(store.getSnapshot().reminders?.connected) && !store.getOpen() && canApply(),
-		blocked: pwaSyncState(models).updateBlocked,
+		blocked: sync.updateBlocked,
 		canManuallyApply: canApply,
 	});
 	const blockedReason = !online ? 'Connect to the internet to update.'
-		: !pwaSyncState(models).ready ? 'Checking saved changes…'
-		: !pwaSyncState(models).canUpdate ? 'Finish editing or syncing before updating.' : null;
+		: !sync.ready ? 'Checking saved changes…'
+		: !sync.canUpdate ? 'Finish editing or syncing before updating.' : null;
 	const value = useMemo(() => ({ version, updating, update, launchPending, blockedReason, feedback: toast }), [version, updating, update, launchPending, blockedReason, toast]);
 	return <UpdateContext.Provider value={value}>
 		{children}

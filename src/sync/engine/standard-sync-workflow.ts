@@ -2,7 +2,8 @@ import type { DeleteRemoteFiles } from '../transfer/delete';
 import { createEmptySyncResult, finalizeSyncResult } from '../sync-result';
 import type { FullSyncUploadContext } from './full-sync-upload';
 import { createLogger } from '../logger';
-import type { FileDiff, RemoteManifest, SyncResult } from '../types';
+import type { SyncResult } from '../types';
+import type { FileDiff, RemoteManifest } from '../planner/types';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { DownloadRequest } from '../transfer/download';
 import type { DiffApplyOutcome } from '../transfer/types';
@@ -34,7 +35,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext, WorkflowComp
 		progressCallback?: (current: number, total: number) => void,
 		onFailure?: (failure: MutationFailure) => void,
 	): Promise<SyncResult | null>;
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 	createFullSyncPlan(
 		remoteFiles: Record<string, FileEntry> | Promise<Record<string, FileEntry>>,
 		concurrency: number,
@@ -78,7 +79,7 @@ export async function runSyncWorkflow(
 			return imported;
 		}
 		context.updateState({ work: { phase: 'server' } });
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		recovering = context.hasSyncCursor();
 		fullSyncRequest = context.fullSyncRequest?.() ?? null;
 		const incrementalFailures: MutationFailure[] = [];

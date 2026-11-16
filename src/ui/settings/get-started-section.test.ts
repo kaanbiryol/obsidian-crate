@@ -17,12 +17,11 @@ async function load() {
 		constructor(containerEl: FakeElement) { super(containerEl); buttons.push(this); }
 	} }));
 	vi.doMock('../../plugin/sync-connection', () => ({ writeSyncSettings }));
-	vi.doMock('../../plugin/settings-ui-state', () => ({ loadConnectedDevices }));
+	vi.doMock('./settings-ui-state', () => ({ loadConnectedDevices }));
 	vi.doMock('./add-device-modal', () => ({ AddDeviceModal: class { open = vi.fn(); }, canAddDeviceWithCode: () => true }));
 	vi.doMock('./reminders-web-app', () => ({ showWebAppCode: vi.fn() }));
 	vi.doMock('../activity/activity-modal', () => ({ ActivityModal: class { open() { openActivity(); } } }));
 	vi.doMock('../sync-error-notice', () => ({ showSyncErrorNotice: vi.fn() }));
-	vi.doMock('../../sync/conflict/conflict', () => ({ notifyConflicts: vi.fn() }));
 	return import('./get-started-section');
 }
 

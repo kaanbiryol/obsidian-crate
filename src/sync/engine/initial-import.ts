@@ -2,7 +2,8 @@ import { recordSyncError, SyncIssueError, withSyncFileContext } from '../issues'
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import type { SyncApiClient } from '../worker-api/client';
-import type { PreparedUpload, SyncResult, SyncWork } from '../types';
+import type { SyncResult, SyncWork } from '../types';
+import type { PreparedUpload } from '../transfer/types';
 import type { TransferContext } from '../transfer/types';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { partitionSkippedUploads } from '../local/local-file-changes';
@@ -24,7 +25,7 @@ interface ImportContext {
 	transfer: TransferContext;
 	api: SyncApiClient;
 	shouldIgnore(path: string): boolean;
-	throwIfDestroyed(): void;
+	signal: AbortSignal;
 	save(): Promise<void>;
 	setLastSeq(seq: number): void;
 	report(work: SyncWork): void;
@@ -55,7 +56,7 @@ function importBatches(prepared: PreparedUpload[]): PreparedUpload[][] {
 }
 
 export async function runInitialImport(context: ImportContext, result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null> {
-	context.throwIfDestroyed();
+	context.signal.throwIfAborted();
 	context.report({ phase: 'server' });
 	const session = await context.api.initialImport?.begin();
 	if (!session) return null;
@@ -65,9 +66,9 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	}
 	const transfer = context.transfer;
 	await context.beforeUpload?.();
-	context.throwIfDestroyed();
+	context.signal.throwIfAborted();
 	context.report({ phase: 'scanning' });
-	const local = await getAllVaultFiles(transfer.vault, path => context.shouldIgnore(path), () => context.throwIfDestroyed());
+	const local = await getAllVaultFiles(transfer.vault, path => context.shouldIgnore(path), () => context.signal.throwIfAborted());
 	const remote = await context.api.getManifest();
 	// Only the device that started an import prunes or replaces its files. Without the
 	// token, an import is this device's only while it holds every server file's revision:
@@ -98,7 +99,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 		// Bytes of prepared files that wait for or are in an upload request.
 		let retained = 0;
 		const source = prepareUploadChunks(files, async file => {
-			context.throwIfDestroyed();
+			context.signal.throwIfAborted();
 			const upload = await prepareUploadFromVaultFile(transfer, file, { force: true, expectedHash: remote.files[file.path]?.hash ?? null });
 			if (!upload) throw new Error(`Could not prepare ${file.path}`);
 			const existing = remote.files[file.path];
@@ -136,7 +137,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 			if (exhausted || failure) wake();
 		});
 		const uploadBatch = (batch: PreparedUpload[]) => withSyncFileContext(batch.map(file => file.path), async () => {
-			context.throwIfDestroyed();
+			context.signal.throwIfAborted();
 			context.report({ phase: 'uploading', current: completed, total: files.length });
 			// An encrypted import names the server copy an upload replaces by its revision.
 			const response = await context.api.initialImport.upload(session.token, batch.map(file => ({ ...file, expectedRevision: remote.files[file.path]?.revision })));
@@ -189,14 +190,14 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 		}
 		if (failure) throw failure.error;
 		if (result.errors.length) return result;
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		progress?.(completed, files.length);
 		context.report({ phase: 'saving' });
 		await context.save();
 		// Establish the selected folder before sealing creates the reminder-readiness marker.
 		context.report({ phase: 'reminders' });
 		await context.prepareReminderScope?.();
-		context.throwIfDestroyed();
+		context.signal.throwIfAborted();
 		context.report({ phase: 'saving' });
 		context.setLastSeq(await context.api.initialImport.finish(session.token, inventory));
 		context.setImportToken(undefined);

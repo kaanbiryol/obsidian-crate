@@ -3,7 +3,7 @@ import type { SyncApiClient } from '../sync/worker-api/client';
 import type { NotificationPolicy } from '../protocol/notification-policy';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { captureSyncApiConnection } from '../plugin/server-request';
-import { cachedSettingsRequest } from '../plugin/settings-ui-state';
+import { cachedSettingsRequest } from '../ui/settings/settings-ui-state';
 import { errorMessage } from '../platform/logger';
 import { createLogger } from './logger';
 

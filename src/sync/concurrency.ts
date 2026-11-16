@@ -9,7 +9,7 @@ const MAX_SERVER_RETRY_DELAY_MS = 60_000;
 export async function runConcurrentTasks<T>(
 	tasks: Array<() => Promise<T>>,
 	concurrency: number,
-	isDestroyed: () => boolean
+	signal?: AbortSignal,
 ): Promise<T[]> {
 	const results: T[] = [];
 	let index = 0;
@@ -19,7 +19,7 @@ export async function runConcurrentTasks<T>(
 		while (index < tasks.length) {
 			if (failed) break;
 			// Started tasks drain, but a caller must not treat unstarted ones as done.
-			if (isDestroyed()) throw createAbortError('Sync engine destroyed');
+			signal?.throwIfAborted();
 			const currentIndex = index++;
 			const task = tasks[currentIndex];
 			if (!task) break;
@@ -46,14 +46,14 @@ export async function retryWithBackoff<T>(
 	options: {
 		maxRetries: number;
 		baseDelayMs: number;
-		isDestroyed: () => boolean;
+		signal: AbortSignal;
 	}
 ): Promise<T> {
 	for (let attempt = 0; attempt <= options.maxRetries; attempt++) {
 		try {
 			return await fn();
 		} catch (error) {
-			if (isAbortError(error) || options.isDestroyed()) throw error;
+			if (isAbortError(error) || options.signal.aborted) throw error;
 			if (!isRetryableSyncError(error)) throw error;
 			if (attempt === options.maxRetries) throw error;
 			let delay: number;
@@ -66,7 +66,7 @@ export async function retryWithBackoff<T>(
 			logger.warn(`Retry ${attempt + 1}/${options.maxRetries} after ${delay}ms`);
 			let remaining = delay;
 			while (remaining > 0) {
-				if (options.isDestroyed()) throw createAbortError('Sync retry aborted');
+				if (options.signal.aborted) throw createAbortError('Sync retry aborted');
 				const interval = Math.min(remaining, 250);
 				await new Promise(resolve => setTimeout(resolve, interval));
 				remaining -= interval;

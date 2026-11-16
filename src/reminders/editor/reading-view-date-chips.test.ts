@@ -1,7 +1,7 @@
 import { DOMParser } from 'linkedom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MarkdownPostProcessorContext } from 'obsidian';
-import { createReadingDateChips } from './reading-date-chips';
+import { createReadingDateChips } from './reading-view-date-chips';
 
 const source = [
 	'- [ ] Book a table 2026-11-20T09:30:00.000Z <!-- crate-id:a -->',

@@ -1,7 +1,7 @@
 import { useRemindersSettingsStore } from '@/reminders/settings';
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback } from "react";
 import { TFile } from 'obsidian';
-import { useIndexRefresh } from "@/reminders/ui/plugin/hooks/useIndexRefresh";
+import { useReminderRepository } from "@/reminders/ui/plugin/hooks/useReminderRepository";
 import { useObsidianDarkMode } from "@/reminders/ui/plugin/hooks/useObsidianDarkMode";
 import type { TabId } from "@/reminders/ui/shared/layoutConstants";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminder-modal/reminderEditorModals";
@@ -11,7 +11,7 @@ import { PluginContext } from "@/ui/plugin/plugin-context";
 import { PluginRemindersAppShell } from "@/reminders/ui/plugin/PluginRemindersAppShell";
 import type { ReminderCardRenderer } from "@/reminders/ui/shared/useRemindersShellModel";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
-import { requireReminderBackend } from "@/reminders/runtime";
+import { requireReminderBackend, type ReminderBackend } from "@/reminders/runtime";
 import { PluginReminderSourceNotice } from './PluginReminderSourceNotice';
 import { RemindersLoading } from "./RemindersLoading";
 import "./styles/reminders-view.scss";
@@ -30,56 +30,45 @@ interface RemindersViewContentProps {
 	renderHeader?: React.ComponentProps<typeof PluginRemindersAppShell>['renderHeader'];
 }
 
+// Startup sync can defer the index scan even after the view is registered.
+// Select readiness with its reminders so no render sees a stale empty list.
+const selectView = (backend: ReminderBackend | undefined) => ({
+	reminders: backend?.repository.getAll() ?? [],
+	isInitialLoadComplete: backend?.index.isInitialLoadComplete ?? false,
+	sourceIssues: backend?.index.sourceIssues ?? [],
+});
+
 export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ isFullScreen = false, onClose, isModal = Boolean(onClose), initialTab, initialProject, hideTabBar = false, renderHeader, activeTab, onTabChange, renderNavigation }) => {
 	const plugin = PluginContext.use();
 	const listStyle = useRemindersSettingsStore(state => state.listStyle);
 	const upcomingDays = useRemindersSettingsStore(state => state.upcomingDaysDefault);
 	const isDarkMode = useObsidianDarkMode();
-	// Startup sync can defer the index scan even after the view is registered.
-	// Publish readiness with its reminders so no render sees a stale empty list.
-	const readSnapshot = useCallback(() => ({
-		reminders: plugin.reminders?.repository.getAll() ?? [],
-		isInitialLoadComplete: plugin.reminders?.index.isInitialLoadComplete ?? false,
-	}), [plugin]);
-	const [{ reminders, isInitialLoadComplete }, setSnapshot] = useState(readSnapshot);
-
-	// Subscribe to index changes for automatic refresh (replaces 5-second polling)
-	const { refreshToken, triggerRefresh } = useIndexRefresh();
-
-	// Get all reminders from the repository.
-	const updateReminders = useCallback(() => {
-		setSnapshot(readSnapshot());
-	}, [readSnapshot]);
-
-	// Load reminders when index changes
-	useEffect(() => {
-		updateReminders();
-	}, [updateReminders, refreshToken]);
+	const [{ reminders, isInitialLoadComplete, sourceIssues }, refresh] = useReminderRepository(selectView);
 
 	const handleAdd = useCallback((defaultProject: string) => {
-		openReminderCreationModal(plugin, defaultProject, updateReminders);
-	}, [plugin, updateReminders]);
+		openReminderCreationModal(plugin, defaultProject, refresh);
+	}, [plugin, refresh]);
 
 	const renderCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (
 		<ReminderCardWrapper
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}
-			onUpdate={triggerRefresh}
+			onUpdate={refresh}
 			index={index}
 			hideProject={hideProject}
 			colorScheme={isDarkMode ? "dark" : "light"}
 		/>
-	), [isDarkMode, triggerRefresh]);
+	), [isDarkMode, refresh]);
 
 	const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
 		await persistReminderOrder(
 			requireReminderBackend(plugin).repository,
 			project,
 			orderedIds,
-			updateReminders,
+			refresh,
 		);
-		updateReminders();
-	}, [plugin, updateReminders]);
+		refresh();
+	}, [plugin, refresh]);
 
 	return (
 		// Large folders render in pages, matching the web app.
@@ -104,7 +93,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ isFu
 			onAdd={handleAdd}
 			onReorder={handleReorder}
 			belowHeaderContent={<PluginReminderSourceNotice
-				issues={plugin.reminders?.index.sourceIssues ?? []}
+				issues={sourceIssues}
 				onRefresh={() => requireReminderBackend(plugin).index.load()}
 				onOpenNote={async path => {
 					const file = plugin.app.vault.getAbstractFileByPath(path);

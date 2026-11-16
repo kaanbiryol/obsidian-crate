@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { formatLocalDateKey } from '../core/dates/reminderDate';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { EditorSelection, EditorState } from '@codemirror/state';
-import { editableDatePhrase, reminderDateDisplay } from './reminder-date-display';
+import { editableDatePhrase, reminderDateDisplay } from '../editor/reminder-date-display';
 import { createReminderDateChips, datePhraseField, leavePhrase, openDateChip } from '../editor/editor-date-chips';
 
 /** A minute in local time within three years of `now`, including DST changes, month ends and leap days. */

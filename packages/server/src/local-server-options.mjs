@@ -1,11 +1,49 @@
 // Command-line option rules for the local server CLI. These checks run before any
-// data directory, tunnel or listener is opened; local-server.mjs owns the rest.
+// data directory, tunnel or listener is opened; local-server.mjs and commands/ own the rest.
+
+/**
+ * The parsed command-line options.
+ * @typedef {object} CommandOptions
+ * @property {string} [data-dir]
+ * @property {string} [port]
+ * @property {string} [host]
+ * @property {string} [origin]
+ * @property {string} [output]
+ * @property {string} [backup]
+ * @property {string} [hostname]
+ * @property {string} [name]
+ * @property {string} [id]
+ * @property {boolean} [local]
+ * @property {boolean} [quick]
+ * @property {boolean} [tailscale]
+ * @property {boolean} [help]
+ */
+
+/**
+ * What the CLI entry passes each command.
+ * @typedef {object} CommandContext
+ * @property {string} command
+ * @property {CommandOptions} values
+ * @property {string} dataDir
+ * @property {boolean} docker Runs in the Crate container.
+ * @property {AbortSignal} signal Aborts on SIGINT, SIGTERM or SIGHUP.
+ * @property {Promise<unknown>} stopped Settles once `signal` aborts.
+ */
+
+/**
+ * A command records each resource in `resources` as soon as it opens, so the entry
+ * closes whatever opened, in order, even after a failure.
+ * @typedef {(context: CommandContext, resources: import('./local-server-lifecycle.mjs').CommandResources) => Promise<void>} Command
+ */
 
 const COMMANDS = ['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'backup', 'restore', 'check-upgrade', 'upgrade'];
 const LOOPBACK_HOSTS = ['127.0.0.1', '::1', 'localhost'];
 
 /** Rejects an unknown command or conflicting options. `dockerWithoutTailscale` reports a
- * container that cannot reach a Tailscale daemon; it runs only for --tailscale. */
+ * container that cannot reach a Tailscale daemon; it runs only for --tailscale.
+ * @param {string[]} positionals
+ * @param {CommandOptions} values
+ * @param {{ dockerWithoutTailscale?: () => boolean }} [checks] */
 export function validateCommandOptions(positionals, values, { dockerWithoutTailscale = () => false } = {}) {
 	const command = positionals[0];
 	if (positionals.length !== 1 || !COMMANDS.includes(command)) throw new Error('Unknown command. Use --help for usage.');
@@ -19,7 +57,10 @@ export function validateCommandOptions(positionals, values, { dockerWithoutTails
 }
 
 /** Chooses a Quick Tunnel, Tailscale Funnel, saved named tunnel or local listener from the
- * options and the directory's saved remote settings (`remote` is null with --local or add-device). */
+ * options and the directory's saved remote settings (`remote` is null with --local or add-device).
+ * @param {string} command
+ * @param {CommandOptions} values
+ * @param {import('./local-server-tunnel.mjs').RemoteSettings | null} remote */
 export function resolveStartMode(command, values, remote) {
 	const quick = values.quick || remote?.mode === 'quick' || (command === 'setup' && !remote && !values.hostname && !values.tailscale);
 	if (values.tailscale && remote && remote.mode !== 'tailscale') throw new Error('This directory already uses another remote access setup. Keep it or choose another data directory.');
@@ -36,7 +77,14 @@ export function resolveStartMode(command, values, remote) {
 }
 
 /** The server's public origin once any setup has saved `remote`. A listener beyond
- * localhost needs an HTTPS origin. */
+ * localhost needs an HTTPS origin.
+ * @param {object} options
+ * @param {import('./local-server-tunnel.mjs').RemoteSettings | null} options.remote
+ * @param {boolean} options.tailscale
+ * @param {string} [options.origin]
+ * @param {number} options.port
+ * @param {string} options.host
+ * @returns {string} */
 export function resolveServerOrigin({ remote, tailscale, origin, port, host }) {
 	if (remote && !tailscale && !remote.ready) throw new Error('Remote setup is incomplete. Run npm run server -- setup again.');
 	const resolved = remote ? `https://${remote.hostname}` : origin ?? `http://localhost:${port}`;

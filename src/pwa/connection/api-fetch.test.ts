@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api-fetch';
+import { reminderTransport } from '../reminders/reminder-transport';
 import { prepareReminderEncryption } from '../reminders/encryption-session';
 import { invalidatePwaSession } from './session-generation';
 import type { ApiFetch } from '../types';
@@ -28,7 +29,7 @@ it('probes encryption once while server responses confirm the vault is unencrypt
 	vi.stubGlobal('fetch', vi.fn(async (path: string) => path === '/encryption' || !enabled
 		? Response.json({ encryption: null, reminders: [] }, { headers: headers() })
 		: Response.json({ error: 'Unlock this vault', code: 'encryption_required' }, { status: 428, headers: headers() })));
-	const api = makeApiFetch('session', vi.fn());
+	const api = makeApiFetch('session', vi.fn(), reminderTransport);
 	for (let read = 0; read < 3; read++) expect((await api('/reminders/list?folderPath=Reminders')).status).toBe(200);
 	// Before: one /encryption probe per request in an unencrypted vault.
 	expect(prepareReminderEncryption).toHaveBeenCalledOnce();
@@ -42,14 +43,14 @@ it('reuses the startup probe in the app client instead of probing again', async 
 	const fetchMock = vi.fn(async (_path: string) => Response.json({ encryption: null, reminders: [] }, { headers: { 'X-Crate-Encryption-State': 'off' } }));
 	vi.stubGlobal('fetch', fetchMock);
 	vi.stubGlobal('localStorage', { getItem: () => 'startup' });
-	await makeApiFetch('startup', vi.fn()).ready();
-	const app = makeApiFetch('startup', vi.fn());
+	await makeApiFetch('startup', vi.fn(), reminderTransport).ready();
+	const app = makeApiFetch('startup', vi.fn(), reminderTransport);
 	expect((await app('/reminders/list?folderPath=Reminders')).status).toBe(200);
 	// Before: bootstrap and app clients each probed, adding a serial round trip.
 	expect(prepareReminderEncryption).toHaveBeenCalledOnce();
 	expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(['/encryption', '/reminders/list?folderPath=Reminders']);
 	// Another credential never inherits this confirmation.
-	await makeApiFetch('other', vi.fn())('/reminders/list?folderPath=Reminders');
+	await makeApiFetch('other', vi.fn(), reminderTransport)('/reminders/list?folderPath=Reminders');
 	expect(prepareReminderEncryption).toHaveBeenCalledTimes(2);
 });
 
@@ -59,7 +60,7 @@ it.each([401, 403, 423, 428])('probes again after a %i instead of trusting an ea
 		? Response.json({ error: 'Refused' }, { status: refused })
 		: Response.json({ encryption: null, success: true }, { headers: { 'X-Crate-Encryption-State': 'off' } }));
 	vi.stubGlobal('fetch', fetchMock);
-	const api = makeApiFetch('session', vi.fn());
+	const api = makeApiFetch('session', vi.fn(), reminderTransport);
 	await api('/reminders/update', { method: 'POST', body: 'Plain' });
 	// Another device turned encryption on and revoked or locked this credential.
 	refused = status;
@@ -77,7 +78,7 @@ it('trusts an unencrypted response only briefly before sending a change', async 
 	const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
 	const fetchMock = vi.fn(async (_path: string, _init?: RequestInit) => Response.json({ encryption: null, reminders: [] }, { headers: { 'X-Crate-Encryption-State': 'off' } }));
 	vi.stubGlobal('fetch', fetchMock);
-	const api = makeApiFetch('session', vi.fn());
+	const api = makeApiFetch('session', vi.fn(), reminderTransport);
 	await api('/reminders/update', { method: 'POST', body: 'Plain' });
 	now += 29_000;
 	await api('/reminders/update', { method: 'POST', body: 'Recent' });
@@ -103,7 +104,7 @@ it('does not let a response already in flight restore a dropped unencrypted verd
 		return Response.json({ encryption: null, success: true }, { headers: { 'X-Crate-Encryption-State': 'off' } });
 	});
 	vi.stubGlobal('fetch', fetchMock);
-	const api = makeApiFetch('session', vi.fn());
+	const api = makeApiFetch('session', vi.fn(), reminderTransport);
 	await api('/reminders/update', { method: 'POST', body: 'Plain' });
 	const slowChange = api('/reminders/update', { method: 'POST', body: 'Slow' });
 	await vi.waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.body === 'Slow')).toBe(true));
@@ -120,7 +121,7 @@ it('switches to the folder the server moved this session to', async () => {
 	vi.stubGlobal('fetch', vi.fn(async (path: string) => path === '/encryption' ? Response.json({ encryption: null }, { headers: off })
 		: path.includes('Private') ? Response.json({ error: 'Forbidden' }, { status: 403, headers: off })
 			: Response.json({ error: 'The reminders folder changed', code: 'reminders_folder_changed', folderPath: 'Tasks' }, { status: 403, headers: off })));
-	const api = makeApiFetch('moved-session', vi.fn());
+	const api = makeApiFetch('moved-session', vi.fn(), reminderTransport);
 	await expect(api('/reminders/list?folderPath=Reminders')).rejects.toThrow('reminders folder changed in Obsidian');
 	expect(adoptReminderFolder).toHaveBeenCalledWith('Tasks');
 	// Other refusals reach the caller unchanged.

@@ -6,7 +6,7 @@ import { ReminderMotionRow } from "@/reminders/ui/shared/ReminderMotionRow";
 
 import type { Reminder } from "@/reminders/types/reminder";
 import { PluginContext } from "@/ui/plugin/plugin-context";
-import { useIndexRefresh } from "@/reminders/ui/plugin/hooks/useIndexRefresh";
+import { useReminderRepository } from "@/reminders/ui/plugin/hooks/useReminderRepository";
 import { useObsidianDarkMode } from "@/reminders/ui/plugin/hooks/useObsidianDarkMode";
 import { useReducedMotion } from "@/ui/shared/useReducedMotion";
 import { ReminderCardWrapper } from "@/reminders/ui/plugin/ReminderCardWrapper";
@@ -17,7 +17,7 @@ import { ShadowDOMButton } from "@/reminders/ui/plugin/ShadowDOMButton";
 import { ObsidianIcon } from "@/ui/obsidian-icon";
 import { openReminderCreationModal } from "@/reminders/ui/plugin/reminder-modal/reminderEditorModals";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
-import { requireReminderBackend } from "@/reminders/runtime";
+import { requireReminderBackend, type ReminderBackend } from "@/reminders/runtime";
 import {
 	buildRemindersListPresentation,
 	loadRemindersListData,
@@ -58,20 +58,16 @@ const ActiveRemindersList: React.FC<Props> = ({
 	const effectiveDays = useRemindersSettingsStore(state => state.upcomingDaysDefault);
 	const [showCompletedState, setShowCompletedState] = useState(showCompleted);
 
-	// Subscribe to index changes for automatic refresh
-	const { refreshToken, triggerRefresh } = useIndexRefresh();
-
 	const clock = useReminderClock();
 	// Only Today and Upcoming queries depend on the current time.
 	const loadClock = showToday || showUpcoming ? clock : null;
 
-	// The index answers synchronously; its change token and the clock mark when to query again.
-	const { rawReminders, isInitialLoadComplete } = useMemo(() => plugin.reminders ? {
-		rawReminders: loadRemindersListData({ repository: plugin.reminders.repository, showToday, showUpcoming, showCompleted: showCompletedState, effectiveDays }),
-		isInitialLoadComplete: plugin.reminders.index.isInitialLoadComplete,
-	} : { rawReminders: [], isInitialLoadComplete: false },
-	// eslint-disable-next-line react-hooks/exhaustive-deps -- The token and clock mark index and time changes.
-	[plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, loadClock]);
+	// The index answers synchronously; its changes and the clock mark when to query again.
+	const selectList = useCallback((backend: ReminderBackend | undefined) => backend ? {
+		rawReminders: loadRemindersListData({ repository: backend.repository, showToday, showUpcoming, showCompleted: showCompletedState, effectiveDays }),
+		isInitialLoadComplete: backend.index.isInitialLoadComplete,
+	} : { rawReminders: [], isInitialLoadComplete: false }, [showToday, showUpcoming, effectiveDays, showCompletedState]);
+	const [{ rawReminders, isInitialLoadComplete }, refresh] = useReminderRepository(selectList, loadClock);
 	// Due times in the whole result, not only rendered cards, can change the overdue count.
 	useReminderClock(rawReminders);
 
@@ -91,9 +87,9 @@ const ActiveRemindersList: React.FC<Props> = ({
 	}, [showCompleted]);
 
 	const handleReorderCommit = useCallback(async (orderedIds: string[]) => {
-		await persistReminderOrder(requireReminderBackend(plugin).repository, presentation.effectiveProject, orderedIds, triggerRefresh);
-		triggerRefresh();
-	}, [plugin, presentation.effectiveProject, triggerRefresh]);
+		await persistReminderOrder(requireReminderBackend(plugin).repository, presentation.effectiveProject, orderedIds, refresh);
+		refresh();
+	}, [plugin, presentation.effectiveProject, refresh]);
 	const order = useReminderOrder(presentation.activeReminders, handleReorderCommit);
 	const pagination = useReminderPagination(presentation.reminders);
 	const pagedDateGroups = useMemo(() => showUpcoming ? groupRemindersByDate(pagination.items) : null, [showUpcoming, pagination.items]);
@@ -104,17 +100,17 @@ const ActiveRemindersList: React.FC<Props> = ({
 		<ReminderCardWrapper
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}
-			onUpdate={triggerRefresh}
+			onUpdate={refresh}
 			colorScheme={colorScheme}
 		/>
-	), [colorScheme, triggerRefresh]);
+	), [colorScheme, refresh]);
 
 	const handleAdd = () => {
 		void openReminderCreationModal(
 			plugin,
 			presentation.effectiveProject,
 			() => {
-				triggerRefresh();
+				refresh();
 			}
 		);
 	};
@@ -191,7 +187,7 @@ const ActiveRemindersList: React.FC<Props> = ({
 										>
 											<ReminderCardWrapper
 												reminder={reminder}
-												onUpdate={triggerRefresh}
+												onUpdate={refresh}
 												colorScheme={colorScheme}
 											/>
 										</ReminderMotionRow>
@@ -217,7 +213,7 @@ const ActiveRemindersList: React.FC<Props> = ({
 								<ReminderCardWrapper
 									key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 									reminder={reminder}
-									onUpdate={triggerRefresh}
+									onUpdate={refresh}
 									colorScheme={colorScheme}
 								/>
 							))}
@@ -229,7 +225,7 @@ const ActiveRemindersList: React.FC<Props> = ({
 								<ReminderCardWrapper
 									key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 									reminder={reminder}
-									onUpdate={triggerRefresh}
+									onUpdate={refresh}
 									colorScheme={colorScheme}
 								/>
 							))}

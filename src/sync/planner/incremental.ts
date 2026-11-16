@@ -35,7 +35,7 @@ export async function runIncrementalSync(
 	let changelogRead = false;
 	try {
 		context.reportWork?.({ phase: 'server' });
-		const changelog = await readIncrementalChangelog(context.files, context.settings.lastSeq, () => context.throwIfDestroyed());
+		const changelog = await readIncrementalChangelog(context.files, context.settings.lastSeq, () => context.signal.throwIfAborted());
 		if (!changelog) {
 			logger.warn("Changelog cursor expired - pruned entries detected, falling back to full sync");
 			return null;
@@ -131,7 +131,7 @@ export async function runIncrementalSync(
 		};
 		await uploadPipelined(context, localOnlyChanges, result, {
 			prepare: async (file) => {
-				context.throwIfDestroyed();
+				context.signal.throwIfAborted();
 				try {
 					const uploadFile = await context.prepareUploadFromPath(file.path);
 					if (uploadFile) {
@@ -153,7 +153,7 @@ export async function runIncrementalSync(
 			onFailure: options.onFailure,
 			onVersionConflicts: (keys, syncResult) => context.reconcileVersionConflicts(keys, syncResult),
 			beforeChunk: () => {
-				context.throwIfDestroyed();
+				context.signal.throwIfAborted();
 				context.reportWork?.({ phase: 'uploading', current: uploadsProcessed, total: localOnlyChanges.length });
 			},
 			onProcessed: reportUploads,

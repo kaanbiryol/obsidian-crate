@@ -11,7 +11,7 @@ import { CRATE_ICON_ID, CRATE_ICON_SVG } from '../ui/crate-icon';
 import { createReminderLineLeaveExtension } from './editor/reminder-line-leave';
 import { createReminderMarkerHiding } from './editor/reminder-marker-hiding';
 import { createReminderDateChips } from './editor/editor-date-chips';
-import { createReadingDateChips } from './data/reading-date-chips';
+import { createReadingDateChips } from './editor/reading-view-date-chips';
 import { openReminderEditModal } from './ui/plugin/reminder-modal/reminderEditorModals';
 
 const remindersLogger = createLogger('Reminders');

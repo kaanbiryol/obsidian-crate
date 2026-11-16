@@ -3,7 +3,7 @@ import type { RegisteredDevice } from '../../protocol/sync-types';
 import { errorMessage } from '../../platform/logger';
 import { writeSyncSettings } from '../../plugin/sync-connection';
 import { AddDeviceModal, canAddDeviceWithCode } from './add-device-modal';
-import { loadConnectedDevices } from '../../plugin/settings-ui-state';
+import { loadConnectedDevices } from './settings-ui-state';
 import { showWebAppCode } from './reminders-web-app';
 import { openSyncActivity, runSyncNow } from '../../plugin/sync-integration';
 import type { SettingsSectionContext } from './section-helpers';

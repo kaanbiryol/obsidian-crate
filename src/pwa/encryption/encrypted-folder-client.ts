@@ -89,7 +89,7 @@ export type EncryptedCommitOutcome =
 	| { kind: 'failed'; response: Response; answer?: CommitAnswer };
 
 /** Sends one stored attempt to `${prefix}/encrypted-commit`. Each feature keeps its own
- * attempt storage and decides when a conflicting attempt is rebuilt. */
+ * attempt storage; `commitEncryptedAttempt` rebuilds a conflicting attempt. */
 export async function postEncryptedCommit(send: (path: string, body: string) => Promise<Response>, prefix: EncryptedFolderPrefix, body: string): Promise<EncryptedCommitOutcome> {
 	const response = await send(`${prefix}/encrypted-commit`, body);
 	if (response.status === 409) {
@@ -101,4 +101,38 @@ export async function postEncryptedCommit(send: (path: string, body: string) => 
 	if (!response.ok) return { kind: 'failed', response };
 	const answer = await response.json() as CommitAnswer;
 	return typeof answer.encrypted === 'string' ? { kind: 'committed', encrypted: answer.encrypted } : { kind: 'failed', response, answer };
+}
+
+/** A feature's stored attempt: the exact commit body, marked `rejected` once the Worker refused it. */
+interface StoredCommitAttempt { body: string; rejected?: boolean }
+/** What `commitEncryptedAttempt` needs from a feature, which keeps its own planning, sealing and storage. */
+export interface EncryptedCommitSteps<A extends StoredCommitAttempt, T> {
+	/** Builds and persists exact ciphertext against current files, or answers without committing. */
+	build(previous: A | undefined): Promise<{ attempt: A } | { response: T }>;
+	/** Persists `rejected`, the copy of `previous` the Worker refused with `version_conflict`. */
+	reject(rejected: A, previous: A): Promise<void>;
+	/** Answers a committed or failed outcome, or a conflict left after the rebuild. */
+	settle(outcome: EncryptedCommitOutcome, attempt: A): Promise<T>;
+}
+
+/** Commits `attempt`, building one first when there is none or it was rejected. A conflict
+ * means the immutable attempt never committed, so it is marked rejected and rebuilt once
+ * against current files under the same operation ID; a second conflict goes to `settle`. */
+export async function commitEncryptedAttempt<A extends StoredCommitAttempt, T>(send: (path: string, body: string) => Promise<Response>, prefix: EncryptedFolderPrefix,
+	attempt: A | undefined, steps: EncryptedCommitSteps<A, T>): Promise<T> {
+	for (let retried = false; ; retried = true) {
+		if (!attempt || attempt.rejected) {
+			const built = await steps.build(attempt);
+			if ('response' in built) return built.response;
+			attempt = built.attempt;
+		}
+		const outcome = await postEncryptedCommit(send, prefix, attempt.body);
+		if (outcome.kind === 'conflict') {
+			const rejected = { ...attempt, rejected: true };
+			await steps.reject(rejected, attempt);
+			attempt = rejected;
+			if (!retried) continue;
+		}
+		return steps.settle(outcome, attempt);
+	}
 }

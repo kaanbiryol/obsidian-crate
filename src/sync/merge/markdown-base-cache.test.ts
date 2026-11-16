@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MarkdownBaseCache, PRUNE_INTERVAL_MS } from './markdown-base-cache';
 import type { FileEntry } from '../../protocol/sync-types';
 import { sha256Hex } from '../../platform/sha256';
+import { createAbortError } from '../abort';
 
 const PLUGIN_DIR = '.vault-config/plugins/crate';
 
@@ -57,7 +58,7 @@ describe('MarkdownBaseCache', () => {
 		const hash = await sha256Hex(content);
 		files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, content);
 		await cache.seedFromManifest(createManifest({ 'a.md': { hash, size: content.byteLength, modified: '2026-01-01' } }), {
-			isDestroyed: () => false,
+			signal: new AbortController().signal,
 			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 		});
 		expect(adapter.readBinary).not.toHaveBeenCalled();
@@ -69,14 +70,14 @@ describe('MarkdownBaseCache', () => {
 		const { cache, adapter } = createCacheHarness();
 		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-01-01' };
 		const entries = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`${i}.md`, entry]));
-		let destroyed = false;
+		const controller = new AbortController();
 		const runConcurrent = vi.fn(async <T>(tasks: Array<() => Promise<T>>) => {
 			expect(tasks.length).toBeLessThanOrEqual(32);
-			destroyed = true;
+			controller.abort(createAbortError('Sync engine destroyed'));
 			return [] as T[];
 		});
 		await cache.seedFromManifest(createManifest(entries), {
-			isDestroyed: () => destroyed,
+			signal: controller.signal,
 			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => { await runConcurrent(tasks); return [] as T[]; },
 		});
 		expect(runConcurrent).toHaveBeenCalledOnce();
@@ -100,7 +101,7 @@ describe('MarkdownBaseCache', () => {
 		await cache.seedFromManifest(createManifest({
 			'notes/a.md': { hash, size: content.byteLength, modified: '2026-01-01T00:00:00.000Z' },
 		}), {
-			isDestroyed: () => false,
+			signal: new AbortController().signal,
 			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map((task) => task())),
 		});
 		expect(await cache.readBase('notes/a.md', hash)).toEqual(content);
@@ -155,7 +156,7 @@ describe('MarkdownBaseCache', () => {
 				modified: '2026-01-01T00:00:00.000Z',
 			},
 		}), {
-			isDestroyed: () => false,
+			signal: new AbortController().signal,
 			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map((task) => task())),
 		});
 
@@ -215,7 +216,7 @@ it('checks a complete cache with one listing instead of an exists call per note'
 		files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, toArrayBuffer('base'));
 	}
 	await cache.seedFromManifest(createManifest(entries), {
-		isDestroyed: () => false,
+		signal: new AbortController().signal,
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 	});
 	// Before: 1,000 exists() calls plus a second listing for the prune.

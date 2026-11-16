@@ -1,6 +1,11 @@
-// Credential revocation shared by the Worker and the local server package. Node loads
-// this file directly through type stripping, and the server package ships a transpiled
-// copy, so keep it free of imports and use only erasable TypeScript syntax.
+// Credential rules shared by the Worker and the local server package. Node loads this file directly through type stripping, and the server
+// package ships a transpiled copy, so keep it free of imports and use only erasable
+// TypeScript syntax.
+
+/** The current encryption reset generation, or '' before any reset. A device credential
+ * issued from a code or a read made before a reset compares against it, since a reset
+ * replaces every credential and must void what was authorized before it. */
+export const RESET_GENERATION_SQL = "COALESCE((SELECT reset_generation FROM server_state WHERE id = 1), '')";
 
 /** Revokes the credentials that the SQL `ids` selects, with their push subscriptions and
  * the Shortcut capture credentials they paired. Those record their issuer in `device_id`,

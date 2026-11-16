@@ -24,7 +24,7 @@ import { isSyncPath } from '@/protocol/sync-validation';
 import { REMINDER_OUTBOX_LOCK } from '@/pwa/reminders/private-storage';
 import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
-import { downloadEncryptedNotes, encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
+import { commitEncryptedAttempt, downloadEncryptedNotes, encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote } from '../encryption/encrypted-folder-client';
 import { compareCodePoints } from '@/protocol/portable-path';
 
 const NOTE_CONCURRENCY = 6;
@@ -285,16 +285,21 @@ export class EncryptedReminderApi {
 		const key = this.attemptKey(body.operationId);
 		const semanticHash = await sha256Hex(new TextEncoder().encode(JSON.stringify([action, source])).buffer);
 		let attempt = await this.store.loadAttempt(key);
+		// A rejected attempt never committed, so unlike Reading a changed request may replace it.
 		if (attempt && attempt.semanticHash !== semanticHash && !attempt.rejected) throw new Error('The original encrypted save is still unresolved. Retry it before changing the request.');
 		const movedAttempt = attempt && attempt.generation !== this.keys.generation;
+		// Unlike Reading, a committed save keeps its acknowledgment here, so a retry needs no server.
 		if (attempt?.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.vault, this.context(body.operationId)));
 		if (attempt && movedAttempt) {
 			// Other keys can no longer publish, so this immutable attempt never committed; retain its semantic ID.
+			// Unlike Reading, it is persisted: the store only replaces the attempt it holds.
 			const rejected = { ...attempt, rejected: true };
 			await this.store.saveAttempt(key, rejected, attempt, this.current); attempt = rejected;
 		}
-		for (let retry = 0; retry < 2; retry++) {
-			if (!attempt || attempt.rejected) {
+		// The session must still hold before each commit.
+		const send = (path: string, commit: string) => { this.assertCurrent(); return this.fetch(path, { method: 'POST', body: commit }); };
+		return commitEncryptedAttempt<Attempt, Response>(send, '/reminders', attempt, {
+			build: async previous => {
 				// Without a token to send, the inventory always lists the files.
 				const inventory = await this.inventory();
 				// Reminder notes are always created by key holders, so each lives at its name's tag.
@@ -316,25 +321,22 @@ export class EncryptedReminderApi {
 				const acknowledgment = await encryptJson(command.response, this.keys.vault, this.context(body.operationId));
 				const next: Attempt = { semanticHash, generation: this.keys.generation, body: JSON.stringify({ folderPath: this.keys.wireFolder, operationId: body.operationId,
 					files: replacements, acknowledgment, ...(command.createdId ? { createdId: command.createdId } : {}) }) };
-				await this.store.saveAttempt(key, next, attempt, this.current); attempt = next;
-			}
-			this.assertCurrent();
-			if (attempt.acknowledgment) return Response.json(await decryptJson(attempt.acknowledgment, this.keys.vault, this.context(body.operationId)));
-			const outcome = await postEncryptedCommit((path, commit) => this.fetch(path, { method: 'POST', body: commit }), '/reminders', attempt.body);
-			if (outcome.kind === 'conflict') {
-				const rejected = { ...attempt, rejected: true };
-				await this.store.saveAttempt(key, rejected, attempt, this.current); attempt = rejected;
-				if (retry === 0) continue;
-			}
-			if (outcome.kind !== 'committed') {
-				if (!outcome.response.ok) return outcome.response;
-				throw new Error('The server did not confirm the encrypted save');
-			}
-			const result = await decryptJson(outcome.encrypted, this.keys.vault, this.context(body.operationId));
-			// A retry answers from the acknowledgment, so the sealed notes are no longer needed.
-			await this.store.saveAttempt(key, { ...attempt, body: '', acknowledgment: outcome.encrypted }, attempt, this.current);
-			return Response.json(result);
-		}
-		throw new Error('Encrypted save could not converge');
+				await this.store.saveAttempt(key, next, previous, this.current);
+				return { attempt: next };
+			},
+			reject: (rejected, previous) => this.store.saveAttempt(key, rejected, previous, this.current),
+			// Unlike Reading, this router answers as the Worker does, so a refusal (a second conflict
+			// included) reaches the outbox as the server's response.
+			settle: async (outcome, sent) => {
+				if (outcome.kind !== 'committed') {
+					if (!outcome.response.ok) return outcome.response;
+					throw new Error('The server did not confirm the encrypted save');
+				}
+				const result = await decryptJson(outcome.encrypted, this.keys.vault, this.context(body.operationId));
+				// A retry answers from the acknowledgment, so the sealed notes are no longer needed.
+				await this.store.saveAttempt(key, { ...sent, body: '', acknowledgment: outcome.encrypted }, sent, this.current);
+				return Response.json(result);
+			},
+		});
 	}
 }

@@ -5,7 +5,6 @@ import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, Platform, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { SyncRuntime } from '../sync/runtime/runtime';
-import { notifyConflicts } from '../sync/conflict/conflict';
 import { ActivityModal } from '../ui/activity/activity-modal';
 import type { ActivityTab } from '../ui/activity/ActivityTabs';
 import { errorMessage } from '../platform/logger';
@@ -22,10 +21,12 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		plugin.settings,
 		plugin.secretStorage,
 		update => update ? plugin.writeSettings(update) : plugin.saveSettings(),
-	() => ensureReminderNotificationPolicy(plugin, true),
-		createNoteProjection(() => [plugin.remindersSettings.remindersFolderPath],
-			() => plugin.settings.reading?.enabled ? plugin.settings.reading.folderPath : null),
-		() => prepareRemindersForFirstUpload(plugin),
+		{
+			prepareReminderScope: () => ensureReminderNotificationPolicy(plugin, true),
+			createNoteProjection: createNoteProjection(() => [plugin.remindersSettings.remindersFolderPath],
+				() => plugin.settings.reading?.enabled ? plugin.settings.reading.folderPath : null),
+			prepareInitialUpload: () => prepareRemindersForFirstUpload(plugin),
+		},
 	);
 	registerSyncStatus(plugin, plugin.syncRuntime, () => openSyncActivity(plugin));
 	registerSyncResultNotices({
@@ -122,7 +123,7 @@ export function startVaultReplacement(plugin: CratePlugin): boolean {
 	return true;
 }
 
-/** A sync the user started: reports errors and conflicts instead of throwing. */
+/** A sync the user started: reports errors instead of throwing. Conflicts notify through the sync result listener. */
 export async function runSyncNow(plugin: CratePlugin): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	try {
@@ -134,7 +135,6 @@ export async function runSyncNow(plugin: CratePlugin): Promise<void> {
 		if (!result.success) {
 			showSyncError(plugin, 'Sync completed with errors.');
 		}
-		notifyConflicts(result.conflicts);
 	} catch (error) {
 		new Notice(`Sync failed: ${errorMessage(error)}`);
 	}

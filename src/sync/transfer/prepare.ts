@@ -3,7 +3,7 @@ import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "../local/f
 import { isVaultTFileLike } from '../local/local-delete';
 import { skippedUploadIssue } from '../local/local-file-changes';
 import type { VaultFile } from "../local/file-discovery";
-import type { PreparedUpload } from '../types';
+import type { PreparedUpload } from './types';
 import {
 	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,
 	BATCH_UPLOAD_MAX_FILES,

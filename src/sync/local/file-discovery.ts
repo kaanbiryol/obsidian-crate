@@ -178,7 +178,7 @@ async function addStatFiles(
 	assertActive?: () => void,
 ): Promise<void> {
 	const candidates = [...new Set(filePaths)].filter(filePath => !seen.has(filePath) && !shouldIgnore(filePath));
-	const stats = await runConcurrentTasks(candidates.map(filePath => () => safeStat(vault, filePath, assertActive)), STAT_CONCURRENCY, () => false);
+	const stats = await runConcurrentTasks(candidates.map(filePath => () => safeStat(vault, filePath, assertActive)), STAT_CONCURRENCY);
 	candidates.forEach((filePath, index) => {
 		const stat = stats[index];
 		if (!stat || stat.type !== 'file') return;

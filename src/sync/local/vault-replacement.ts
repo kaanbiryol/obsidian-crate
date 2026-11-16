@@ -8,10 +8,10 @@ const TRASH_FOLDER = '.trash';
  * a joined server adopts its contents. Hidden files, settings and ignored paths
  * move too; only the trash itself and Crate's own plugin folder stay. Each entry
  * moves whole, so a rerun after an interruption continues with what is left. */
-export async function moveVaultToTrash(vault: Vault, pluginDir: string, throwIfDestroyed: () => void): Promise<void> {
+export async function moveVaultToTrash(vault: Vault, pluginDir: string, signal: AbortSignal): Promise<void> {
 	const kept = [TRASH_FOLDER, pluginDir];
 	const moveChildren = async (folder: string): Promise<void> => {
-		throwIfDestroyed();
+		signal.throwIfAborted();
 		const { files, folders } = await vault.adapter.list(folder);
 		for (const path of [...folders, ...files]) {
 			if (kept.includes(path)) continue;
@@ -19,7 +19,7 @@ export async function moveVaultToTrash(vault: Vault, pluginDir: string, throwIfD
 				await moveChildren(path);
 				continue;
 			}
-			throwIfDestroyed();
+			signal.throwIfAborted();
 			const entry = vault.getAbstractFileByPath(path);
 			// Like sync deletes, never honor a permanent-delete preference: the old contents must stay recoverable.
 			if (entry) await vault.trash(entry, false);
@@ -33,18 +33,18 @@ export async function moveVaultToTrash(vault: Vault, pluginDir: string, throwIfD
  * then clears the confirmation; the caller saves the cleared flag. Once a file has
  * synced, moving the vault again would trash the server's copies, so a vault with a
  * file baseline or a changelog cursor keeps its files. */
-export async function replaceVaultBeforeFirstSync({ settings, manifest, vault, pluginDir, reportWork, throwIfDestroyed }: {
+export async function replaceVaultBeforeFirstSync({ settings, manifest, vault, pluginDir, reportWork, signal }: {
 	settings: Pick<SyncSettings, 'replaceVault' | 'lastSeq'>;
 	manifest: { getManifest(): { readonly files: Readonly<Record<string, unknown>> } };
 	vault: Vault;
 	pluginDir: string;
 	reportWork: (work: SyncWork) => void;
-	throwIfDestroyed: () => void;
+	signal: AbortSignal;
 }): Promise<void> {
 	if (!settings.replaceVault) return;
 	if (settings.lastSeq === 0 && !Object.keys(manifest.getManifest().files).length) {
 		reportWork({ phase: 'applying' });
-		await moveVaultToTrash(vault, pluginDir, throwIfDestroyed);
+		await moveVaultToTrash(vault, pluginDir, signal);
 	}
 	settings.replaceVault = false;
 }

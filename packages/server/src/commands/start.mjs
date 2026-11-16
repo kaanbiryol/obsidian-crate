@@ -1,0 +1,91 @@
+// The setup and start commands: serve the data directory through a Quick Tunnel, a
+// saved stable address or a local listener until a signal or the tunnel stops it.
+import { randomUUID } from 'node:crypto';
+import { hostname as computerName } from 'node:os';
+import { listenLocalServer } from '../local-server-http.mjs';
+import { resolveServerOrigin, resolveStartMode } from '../local-server-options.mjs';
+import { createPairing, startLocalControl } from '../local-server-pairing.mjs';
+import { startQuickServer } from '../local-server-quick.mjs';
+import { monitorPublicReadiness } from '../local-server-readiness.mjs';
+import { openLocalRuntime } from '../local-server-runtime.mjs';
+import { startTailscaleFunnel } from '../local-server-tailscale.mjs';
+import { readRemoteSettings, saveQuickSettings, startTunnel } from '../local-server-tunnel.mjs';
+import { printPairing } from './devices.mjs';
+import { buildIfSource, setupNamedTunnel, setupTailscale } from './setup.mjs';
+
+/** @typedef {import('../local-server-options.mjs').Command} Command */
+/** @typedef {import('../local-server-options.mjs').CommandContext} CommandContext */
+/** @typedef {import('../local-server-lifecycle.mjs').CommandResources} CommandResources */
+/** @typedef {import('../local-server-tunnel.mjs').RemoteSettings} RemoteSettings */
+
+/** @param {boolean} docker */
+function pairCommand(docker) {
+	return docker ? 'docker compose exec crate crate pair --name "My phone"'
+		: process.argv[1].endsWith('crate-server.mjs') ? 'npx @kaanbiryol/crate-server pair --name "My phone"' : 'npm run server -- pair --name "My phone"';
+}
+
+/** @param {boolean} ready */
+function readinessChanged(ready) {
+	console.log(ready ? 'Ready: the public HTTPS address reaches this Crate server.'
+		: 'Waiting for public access: checking the tunnel and DNS. The local server is running; keep it running while this check retries.');
+}
+
+/** Runs setup and start. Setup first saves a stable address when one is asked for or
+ * already saved; both then serve until stopped. @type {Command} */
+export async function start(context, resources) {
+	const { command, values, dataDir } = context;
+	let remote = !values.local ? await readRemoteSettings(dataDir) : null;
+	const { quick, tailscale, port, host } = resolveStartMode(command, values, remote);
+	if (quick) {
+		await serveQuickTunnel(context, port, resources);
+		return;
+	}
+	if (command === 'setup') {
+		remote = tailscale ? await setupTailscale(context, remote, port, resources) : await setupNamedTunnel(context, remote, port, resources);
+	}
+	await serve(context, { remote, tailscale, port, host }, resources);
+}
+
+/** @param {CommandContext} context @param {number} port @param {CommandResources} resources */
+async function serveQuickTunnel({ command, values, dataDir, docker, signal, stopped }, port, resources) {
+	console.log('Starting Crate with a Cloudflare Quick Tunnel. Files stay on this computer; public HTTPS traffic passes through Cloudflare.');
+	console.log('This temporary address changes on restart. Keep the server computer awake and online.');
+	if (command === 'setup') await buildIfSource(signal);
+	const quickServer = resources.quickServer = await startQuickServer({ dataDir, port, name: values.name, signal, onReadiness: readinessChanged });
+	await saveQuickSettings(dataDir, port);
+	console.log(`Server address to paste into Obsidian: ${quickServer.runtime.origin}\nInternal listener (diagnostics only): 127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (quickServer.server.address()).port}\nData: ${dataDir}`);
+	if (quickServer.pairingCode) printPairing(quickServer.pairingCode);
+	else console.log('Existing device tokens remain valid. Update the server address in Crate to the URL above.');
+	console.log(`Connect in Obsidian → Settings → Crate → Connect to your server, then select Sync now.\nUse Copy setup link or Show QR code in Crate to enroll the PWA. A new tunnel address requires fresh PWA enrollment.\nAdd a device without restarting: ${pairCommand(docker)}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Keep this terminal open. Press Ctrl+C to stop safely.'}`);
+	const result = await Promise.race([stopped.then(() => null), quickServer.tunnel.exited]);
+	if (result && !signal.aborted) throw new Error(`Cloudflare Quick Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Restart Crate to get a new address.`);
+}
+
+/** Serves through the saved Tailscale Funnel or named tunnel, or locally without one.
+ * @param {CommandContext} context
+ * @param {{ remote: RemoteSettings | null, tailscale: boolean, port: number, host: string }} mode
+ * @param {CommandResources} resources */
+async function serve({ values, dataDir, docker, signal, stopped }, { remote, tailscale, port, host }, resources) {
+	signal.throwIfAborted();
+	const origin = resolveServerOrigin({ remote, tailscale, origin: values.origin, port, host });
+	const runtime = resources.runtime = await openLocalRuntime({ dataDir, origin, administrative: false, handleSignals: false });
+	signal.throwIfAborted();
+	const instance = randomUUID();
+	const pairing = createPairing({ db: runtime.db });
+	resources.server = await listenLocalServer(runtime, { host, port, pairing, instance, tunnel: remote ? (tailscale ? 'tailscale' : 'cloudflare') : null });
+	resources.control = await startLocalControl({ dataDir, pairing, origin, runtime });
+	/** @type {{ count: number }} */
+	const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
+	if (existing.count === 0) printPairing(pairing.issue(values.name?.trim() || computerName().slice(0, 128)));
+	signal.throwIfAborted();
+	/** @type {import('../local-server-process.mjs').StartedProcess | undefined} */
+	let tunnel;
+	if (remote) tunnel = resources.tunnel = tailscale ? await startTailscaleFunnel(remote, signal) : await startTunnel(dataDir, remote, signal);
+	console.log(`Server address to paste into Obsidian: ${runtime.origin}\nInternal listener (diagnostics only): ${host}:${port}\nData: ${runtime.dataDir}\nAdd a device without restarting: ${pairCommand(docker)}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Press Ctrl+C to stop safely.'}`);
+	if (origin.startsWith('https://')) resources.readiness = monitorPublicReadiness({ origin, instance, signal, onChange: readinessChanged });
+	if (remote) console.log(`${tailscale ? 'Tailscale Funnel is starting; the first time, approve Funnel at the link Tailscale prints. A new public name can take up to 10 minutes to resolve.' : 'Tunnel is starting; initial DNS/certificate propagation may take a few minutes.'}\nUse this HTTPS server address in Obsidian, then Copy setup link or Show QR code to enroll the PWA.`);
+	const result = await Promise.race([stopped.then(() => null), ...(tunnel ? [tunnel.exited] : [])]);
+	if (result && !signal.aborted) throw new Error(tailscale
+		? `Tailscale Funnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check the Tailscale output above. On Linux, allow your user once with: sudo tailscale set --operator=$USER`
+		: `Cloudflare Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check cloudflared output and restart.`);
+}

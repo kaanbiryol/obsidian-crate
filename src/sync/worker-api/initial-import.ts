@@ -3,7 +3,7 @@ import { normalizeSyncIssues, SyncIssueError } from '../issues';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { transferTimeout, type WorkerApiHttpClient } from './http';
 import { arrayBufferToBase64 } from '../encoding';
-import type { PreparedUpload } from '../types';
+import type { PreparedUpload } from '../transfer/types';
 import { BATCH_FILE_SIZE_LIMIT } from '@/protocol/sync-limits';
 import { FILE_HASH_HEADER, EXPECTED_HASH_HEADER, INITIAL_IMPORT_HEADER } from '@/protocol/http-headers';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '@/encryption/file-format';
@@ -144,22 +144,22 @@ export class InitialImportApi {
 
 	isPreparingReminders(): boolean { return this.pendingSetup?.workerUrl === this.http.getWorkerUrl(); }
 
-	async finishReminderSetup(throwIfDestroyed: () => void, onProgress?: (progress: ReminderSetupProgress) => void): Promise<void> {
-		if (this.pendingSetup && this.isPreparingReminders()) await this.waitUntilReady(this.pendingSetup.token, throwIfDestroyed, onProgress);
+	async finishReminderSetup(signal: AbortSignal, onProgress?: (progress: ReminderSetupProgress) => void): Promise<void> {
+		if (this.pendingSetup && this.isPreparingReminders()) await this.waitUntilReady(this.pendingSetup.token, signal, onProgress);
 	}
 
-	async waitUntilReady(token: string, throwIfDestroyed: () => void, onProgress?: (progress: ReminderSetupProgress) => void): Promise<void> {
+	async waitUntilReady(token: string, signal: AbortSignal, onProgress?: (progress: ReminderSetupProgress) => void): Promise<void> {
 		const workerUrl = this.http.getWorkerUrl();
 		// Bound a foreground wait; the durable marker survives a timeout, close or restart.
 		const started = Date.now();
 		const deadline = started + 3 * 60 * 60 * 1000;
 		while (Date.now() < deadline) {
-			throwIfDestroyed();
+			signal.throwIfAborted();
 			if (this.http.getWorkerUrl() !== workerUrl) throw new Error('Sync connection changed during reminder setup');
 			const status = await this.http.requestJson<ReminderSetupStatus>('/sync/import/readiness', {
 				method: 'POST', body: JSON.stringify({ token }),
 			});
-			throwIfDestroyed();
+			signal.throwIfAborted();
 			if (this.http.getWorkerUrl() !== workerUrl) throw new Error('Sync connection changed during reminder setup');
 			if (status.ready === true) {
 				this.establishedAt = workerUrl;
@@ -182,7 +182,7 @@ export class InitialImportApi {
 			// for the first minute, then every 5 s, still noticing cancellation each second.
 			const seconds = Date.now() - started < 60_000 ? 1 : 5;
 			for (let waited = 0; waited < seconds; waited++) {
-				if (waited) throwIfDestroyed();
+				if (waited) signal.throwIfAborted();
 				await new Promise(resolve => setTimeout(resolve, 1000));
 			}
 		}

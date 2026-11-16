@@ -1,5 +1,5 @@
 import { EditorSelection, Transaction, type ChangeSpec, type Line, type SelectionRange, type Text, type TransactionSpec } from '@codemirror/state';
-import { reminderLineDisplays } from '../data/reminder-date-display';
+import { reminderLineDisplays } from './reminder-date-display';
 import { TEXT_START, editableDescription, editableDescriptionAt, endMarker, hiddenTail, onlyMarkers, tailEndingAt, wholeReminderEnd } from './reminder-hidden-ranges';
 
 /**

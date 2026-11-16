@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { cachedSettingsRequest, clearSettingsRequests, clearSettingsUiState, createSettingsUiState, loadConnectedDevices } from './settings-ui-state';
-import type { SyncApiClient } from '../sync/worker-api/client';
+import type { SyncApiClient } from '../../sync/worker-api/client';
 
 const client = {} as SyncApiClient, other = {} as SyncApiClient;
 

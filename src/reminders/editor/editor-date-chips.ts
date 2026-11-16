@@ -3,7 +3,7 @@ import { invertedEffects, isolateHistory, undo } from '@codemirror/commands';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { extractReminderId } from '../core/reminderIdentity';
-import { createReminderDateChip, editableDatePhrase, reminderLineDisplays, type ReminderDateDisplay } from '../data/reminder-date-display';
+import { createReminderDateChip, editableDatePhrase, reminderLineDisplays, type ReminderDateDisplay } from './reminder-date-display';
 import { DescriptionBreakWidget, DescriptionMarkerWidget } from './description-widgets';
 import { endMarker } from './reminder-hidden-ranges';
 

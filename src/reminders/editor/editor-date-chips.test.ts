@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { createReminderDateChips, datePhraseField, editDateChip, leavePhrase, openDateChip, reminderDateRanges } from './editor-date-chips';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
-import { reminderLineDisplays } from '../data/reminder-date-display';
+import { reminderLineDisplays } from './reminder-date-display';
 
 const now = new Date('2026-11-14T12:00:00.000Z');
 

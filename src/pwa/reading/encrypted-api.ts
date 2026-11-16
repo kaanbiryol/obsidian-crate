@@ -8,7 +8,7 @@ import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/c
 import { MAX_READING_BYTES, readingUrl, readingUrlIdentity, type ReadingItem } from '../../reading/core/model';
 import { readingCapturePath, retitledCapturePath } from '../../reading/core/filename';
 import { READING_DUPLICATE_ID_ISSUE } from '../../reading/core/inventory';
-import { highlightsMatch, normalizedTag, titleMatches } from '../../reading/core/search-terms';
+import { matchesReadingQuery } from '../../reading/core/search-terms';
 import { openReadingCard, openReadingTagName, sameReadingCardFields, type ReadingCardFields, type ReadingTagName } from '../../reading/core/reading-card';
 import { readingUploadCard } from '../../reading/core/reading-card-upload';
 import { hashedQueryTerms } from '@/encryption/reading-search';
@@ -17,7 +17,7 @@ import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
 import { responseError } from '@/pwa/connection/response-error';
 import type { PathTags } from '@/encryption/path-tags';
-import { encryptedFilePath, encryptedOperationContext, openEncryptedNote, postEncryptedCommit } from '../encryption/encrypted-folder-client';
+import { commitEncryptedAttempt, encryptedFilePath, encryptedOperationContext, openEncryptedNote } from '../encryption/encrypted-folder-client';
 
 /** `hash` is the authenticated plaintext hash. */
 interface Source { file: WireFile; content: string; item: ReadingItem; hash: string }
@@ -114,8 +114,7 @@ export class EncryptedReadingApi {
 				if (!sameReadingCardFields(item, fields ?? {})) throw new Error();
 			} catch { issues.push({ path: file.path, message: 'This Reading card is unreadable. Open the note in Obsidian.' }); continue; }
 			// The Highlights tab matches highlight text and notes as well as the title.
-			if (q && !(highlights ? highlightsMatch(item, q) : titleMatches(item.title, q))) continue;
-			if (tag && !item.tags.some(value => normalizedTag(value) === normalizedTag(tag))) continue;
+			if (!matchesReadingQuery(item, { query: q, tag, highlights })) continue;
 			if (url) { try { if (!item.source_url || readingUrlIdentity(item.source_url) !== readingUrlIdentity(url)) continue; } catch { continue; } }
 			if (id && item.crate_reading_id !== id) continue;
 			ids.set(item.crate_reading_id, (ids.get(item.crate_reading_id) ?? 0) + 1);
@@ -151,40 +150,36 @@ export class EncryptedReadingApi {
 		if (typeof id !== 'string') throw new Error('A saved Reading operation ID is required.');
 		const requestHash = await sha256Hex(JSON.stringify({ action, body }));
 		const saved = await this.options.readAttempt(id) as Attempt | undefined;
+		// Unlike Reminders, which lets a changed request replace a rejected attempt, an operation ID names one change for good.
 		if (saved && (saved.requestHash !== requestHash || typeof saved.body !== 'string')) throw new Error('This encrypted Reading attempt belongs to a different change.');
 		let attempt = saved;
 		// Other keys can no longer publish, so this attempt never committed. Rebuild it
-		// against current files, preserving the operation ID.
+		// against current files, preserving the operation ID. Unlike Reminders, it is only
+		// dropped here: writing an attempt replaces whatever is stored.
 		if (attempt && attempt.generation !== this.options.generation) attempt = undefined;
-		for (let rebuilt = false; ; rebuilt = true) {
-			if (!attempt || attempt.rejected) {
-				const prepared = await this.prepare(action, body, id, rawBody, requestHash);
-				if ('response' in prepared) return prepared.response;
-				attempt = prepared.attempt;
-			}
-			const outcome = await postEncryptedCommit((path, body) => this.options.request(path, body), '/reading', attempt.body);
-			if (outcome.kind === 'conflict') {
-				// The immutable attempt never committed. Rebuild it once against the current
-				// note under the same operation ID; a second conflict needs review.
-				attempt = { ...attempt, rejected: true };
-				await this.options.writeAttempt(id, attempt);
-				if (rebuilt) throw this.options.error(outcome.answer.error ?? 'A note changed. Refresh before retrying.', outcome.response.status, outcome.answer.code);
-				continue;
-			}
-			if (outcome.kind === 'failed') {
-				const { message, code } = outcome.answer
-					? { message: outcome.answer.error ?? 'Reading request failed.', code: outcome.answer.code }
-					: await responseError(outcome.response, 'Reading request failed.');
-				throw this.options.error(message, outcome.response.status, code);
-			}
-			const receipt = await decryptJson(outcome.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
-			if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');
-			// Other decrypted notes stay valid; `sameInventoryFile` rejects any that changed elsewhere.
-			const committed = JSON.parse(attempt.body) as { files: Array<{ path: string }>; remove?: Array<{ path: string }> };
-			for (const file of [...committed.files, ...committed.remove ?? []]) this.sources.delete(file.path);
-			for (const [itemId, listed] of this.listed) if (committed.files.concat(committed.remove ?? []).some(file => file.path === listed.file.path)) this.listed.delete(itemId);
-			return receipt.response;
-		}
+		return commitEncryptedAttempt<Attempt, unknown>((path, body) => this.options.request(path, body), '/reading', attempt, {
+			build: () => this.prepare(action, body, id, rawBody, requestHash),
+			reject: rejected => this.options.writeAttempt(id, rejected),
+			// Unlike Reminders, this client answers with values and raises refusals as feature
+			// errors, and a second conflict needs review. It keeps no acknowledgment: the Worker
+			// replays the receipt, which must name this change.
+			settle: async (outcome, sent) => {
+				if (outcome.kind === 'conflict') throw this.options.error(outcome.answer.error ?? 'A note changed. Refresh before retrying.', outcome.response.status, outcome.answer.code);
+				if (outcome.kind === 'failed') {
+					const { message, code } = outcome.answer
+						? { message: outcome.answer.error ?? 'Reading request failed.', code: outcome.answer.code }
+						: await responseError(outcome.response, 'Reading request failed.');
+					throw this.options.error(message, outcome.response.status, code);
+				}
+				const receipt = await decryptJson(outcome.encrypted, this.options.authority.key, this.context(id)) as { requestHash: string; response: unknown };
+				if (receipt.requestHash !== requestHash) throw new Error('The encrypted Reading acknowledgment does not match this change.');
+				// Other decrypted notes stay valid; `sameInventoryFile` rejects any that changed elsewhere.
+				const committed = JSON.parse(sent.body) as { files: Array<{ path: string }>; remove?: Array<{ path: string }> };
+				for (const file of [...committed.files, ...committed.remove ?? []]) this.sources.delete(file.path);
+				for (const [itemId, listed] of this.listed) if (committed.files.concat(committed.remove ?? []).some(file => file.path === listed.file.path)) this.listed.delete(itemId);
+				return receipt.response;
+			},
+		});
 	}
 	/** One article and its revision ETag, derived from its file. With `savedEtag`, resolves
 	 * to null without downloading while that revision is current. */
