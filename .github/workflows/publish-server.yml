@@ -110,8 +110,16 @@ jobs:
             exit 0
           fi
           # Publishing an older release keeps latest on the newest version.
-          latest="$(npm view @kaanbiryol/crate-server dist-tags.latest)"
-          older="$(node -e 'const [v, l] = process.argv.slice(1).map(s => { if (!/^\d+\.\d+\.\d+$/.test(s)) throw new Error(`Not a release version: ${s}`); return s.split(".").map(Number); }); const i = v.findIndex((n, k) => n !== l[k]); console.log(i >= 0 && v[i] < l[i])' "$VERSION" "$latest")"
+          # The first publish finds no package; any other lookup failure stops the job.
+          if latest="$(npm view @kaanbiryol/crate-server dist-tags.latest 2>npm-view.log)"; then
+            older="$(node -e 'const [v, l] = process.argv.slice(1).map(s => { if (!/^\d+\.\d+\.\d+$/.test(s)) throw new Error(`Not a release version: ${s}`); return s.split(".").map(Number); }); const i = v.findIndex((n, k) => n !== l[k]); console.log(i >= 0 && v[i] < l[i])' "$VERSION" "$latest")"
+          elif grep -q E404 npm-view.log; then
+            latest=none
+            older=false
+          else
+            cat npm-view.log
+            exit 1
+          fi
           tag=latest
           if [ "$older" = "true" ]; then tag=previous; fi
           echo "Publishing $VERSION with tag $tag (latest is $latest)."
