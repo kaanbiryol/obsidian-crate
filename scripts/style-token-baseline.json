@@ -88,7 +88,7 @@
 	"spacing": {
 		"src/pwa/reading/web.scss": 5,
 		"src/pwa/styles/_settings.scss": 2,
-		"src/pwa/styles/host/base.scss": 12,
+		"src/pwa/styles/host/base.scss": 11,
 		"src/pwa/styles/host/editor.scss": 4,
 		"src/pwa/styles/host/reminders-view.scss": 5,
 		"src/pwa/styles/host/responsive.scss": 2,
