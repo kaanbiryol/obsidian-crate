@@ -4,7 +4,8 @@
 // quadratically over long whitespace runs.
 const REMINDER_ID_MARKERS_REGEX = /<!--\s*crate-id:([A-Za-z0-9_-]+)\s*-->/g;
 
-function reminderIdMarkers(value: string) {
+/** Every ID marker in a line, each with the whitespace before it. */
+export function reminderIdMarkers(value: string) {
 	return [...value.matchAll(REMINDER_ID_MARKERS_REGEX)].map(match => {
 		let from = match.index;
 		while (from > 0 && /\s/.test(value[from - 1]!)) from--;

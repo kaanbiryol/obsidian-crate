@@ -2,7 +2,7 @@ import { Transaction, type ChangeSpec, type EditorState, type Line, type Text, t
 import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { normalizeReminderIds } from '../core/normalizeReminderIds';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
-import { extractReminderId } from '../core/reminderIdentity';
+import { extractReminderId, reminderIdMarkers, stripReminderIdMarker } from '../core/reminderIdentity';
 import { inlineDescriptionChanges } from '../data/inline-description';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
 import { TASK_WITH_TEXT } from './reminder-hidden-ranges';
@@ -60,6 +60,32 @@ function reminderIdChanges(doc: Text, lineNumbers: readonly number[]): ChangeSpe
 }
 
 /**
+ * IDs that undo or redo left on a line besides the line's own. IDs are added
+ * outside the undo history, so undoing a new reminder's text leaves its ID where
+ * that text was: after the line's own ID, which is the first of the markers
+ * ending it, or before the next line's text.
+ */
+export function strayIdChanges(doc: Text, lineNumbers: Iterable<number>): ChangeSpec[] {
+	return [...new Set(lineNumbers)].flatMap(number => {
+		const line = doc.line(number), markers = reminderIdMarkers(line.text);
+		// The markers ending the line, with only spaces and rule markers between them.
+		let first = markers.length;
+		if (first && !line.text.slice(markers[first - 1]!.to).trim()) {
+			first--;
+			while (first > 0 && !line.text.slice(markers[first - 1]!.to, markers[first]!.from).replace(RULE_MARKER, '').trim()) first--;
+		}
+		const task = TASK_WITH_TEXT.test(line.text);
+		// A description's comment line, which ends at its closer, never names a reminder.
+		const own = !task && stripReminderIdMarker(line.text).trimEnd().endsWith('-->') ? undefined : markers[first];
+		// Without an ID ending it, only a line that is no reminder loses its IDs; the scan repairs a reminder's.
+		if (!own && task) return [];
+		return markers.filter(marker => marker !== own).map(marker => ({ from: line.from + marker.from, to: line.from + marker.to }));
+	});
+}
+
+const RULE_MARKER = /<!-- crate-rule:[^>]*? -->/g;
+
+/**
  * Identifies reminder lines the cursor just left, so a new reminder gets its ID
  * when the user moves on instead of after the next save and scan. The scan still
  * owns collision repair and lines edited outside an editor.
@@ -74,6 +100,17 @@ export function reminderIdChangesForLeftLines(leave: LineLeave): ChangeSpec[] {
  */
 export function createReminderLineLeaveExtension(canAssign: (state: EditorState) => boolean) {
 	return EditorView.updateListener.of(update => {
+		if (update.docChanged && canAssign(update.state) && update.transactions.some(transaction => transaction.isUserEvent('undo') || transaction.isUserEvent('redo'))) {
+			const touched: number[] = [], { doc } = update.state;
+			update.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+				for (let number = doc.lineAt(fromB).number; number <= doc.lineAt(toB).number; number++) touched.push(number);
+			});
+			const stray = strayIdChanges(doc, touched);
+			// Outside the history too, like the IDs themselves; a redo's text gets a new ID when the cursor leaves it.
+			if (stray.length) queueMicrotask(() => {
+				if (update.view.state.doc === doc) update.view.dispatch({ changes: stray, annotations: Transaction.addToHistory.of(false) });
+			});
+		}
 		// Obsidian's Enter in a list sets no selection, so a document change can leave a line too.
 		if (!update.docChanged && !update.selectionSet && !update.focusChanged) return;
 		const isFocused = update.view.hasFocus;

@@ -284,6 +284,46 @@ for (const engine of [chromium, webkit]) {
 		await settle(page);
 		assert.match(await page.evaluate(() => window.view.state.doc.line(2).text), /^- \[ \] Pay rent tomorrow 12:00 <!-- crate-id:[0-9a-f-]{36} -->$/, `${name}: phrase after joining back`);
 		assert.equal(await page.evaluate(() => window.head()), '# Errands\n- [ ] Pay rent tomorrow 12:00'.length, `${name}: cursor at the phrase's end`);
+		// Passing through a saved date's phrase leaves undo as it was: undo takes back the save, not part of it.
+		await mount('# Errands\n\nOutro', 10);
+		await page.keyboard.type('- [ ] Pay rent tomorrow 12:00');
+		await page.keyboard.press('ArrowDown');
+		await settle(page);
+		await page.keyboard.press('ArrowUp');
+		await page.keyboard.press('End');
+		await settle(page);
+		await page.keyboard.press('ArrowDown');
+		await settle(page);
+		await page.keyboard.press('ControlOrMeta+z');
+		await settle(page);
+		assert.match(await page.evaluate(() => window.view.state.doc.line(2).text), /^- \[ \] Pay rent tomorrow 12:00 <!-- crate-id:[0-9a-f-]{36} -->$/, `${name}: undo after passing through a phrase`);
+		await checkClean(page, `${name}: undo after passing through a phrase`);
+		// Undoing an edited date steps back through the edit to the stored date, never leaving part of either.
+		await mount();
+		await page.mouse.click(buy.x, buy.y);
+		await settle(page);
+		for (let step = 0; step < 2; step++) await page.keyboard.press('Backspace');
+		await page.keyboard.type('25');
+		await page.keyboard.press('ArrowDown');
+		await settle(page);
+		for (let step = 0; step < 4; step++) {
+			await page.keyboard.press('ControlOrMeta+z');
+			await settle(page);
+			assert.match(await page.evaluate(() => window.view.state.doc.line(2).text), /^- \[ \] Buy milk (Nov \d*|2026-11-2[05]) <!-- crate-id:a -->$/, `${name}: undo ${step} of an edited date`);
+		}
+		assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Buy milk 2026-11-20 <!-- crate-id:a -->', `${name}: undo back to the stored date`);
+		// Undoing a new reminder takes its ID too, which would otherwise stay on the reminder above it.
+		await mount('# Errands\n- [ ] Plain <!-- crate-id:c -->\nOutro', 0);
+		await page.evaluate(() => window.place('# Errands\n- [ ] Plain'.length));
+		await page.keyboard.press('Enter');
+		await page.keyboard.type('- [ ] New');
+		await page.keyboard.press('ArrowDown');
+		await settle(page);
+		assert.match(await doc(), /\n- \[ \] New <!-- crate-id:[0-9a-f-]{36} -->\n/, `${name}: new reminder identified`);
+		for (let step = 0; step < 3; step++) await page.keyboard.press('ControlOrMeta+z');
+		await settle(page);
+		assert.equal(await doc(), '# Errands\n- [ ] Plain <!-- crate-id:c -->\nOutro', `${name}: undo removes the new reminder's ID`);
+		await checkClean(page, `${name}: after undoing a new reminder`);
 
 		// Writing a new reminder with a date and a description in one line.
 		await mount();

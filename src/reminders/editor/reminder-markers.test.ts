@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EditorSelection, EditorState, Transaction, type TransactionSpec } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
-import { createReminderLineLeaveExtension, reminderIdChangesForLeftLines } from './reminder-line-leave';
+import { createReminderLineLeaveExtension, reminderIdChangesForLeftLines, strayIdChanges } from './reminder-line-leave';
 import { hiddenDescriptionRanges, hiddenReminderMarkerRanges, reminderClipboard } from './reminder-hidden-ranges';
 import { protectReminderIdMarker } from './reminder-marker-protection';
 import { createReminderMarkerHiding } from './reminder-marker-hiding';
@@ -88,7 +88,7 @@ describe('reminder IDs on line leave', () => {
 		const enter = typing.state.update({ changes: { from: typed.length, to: typed.length + 1, insert: 'k\n- [ ] ' }, userEvent: 'input.type' });
 		const dispatch = vi.fn<(spec: TransactionSpec) => void>();
 		const view = { hasFocus: true, state: enter.state, dispatch };
-		const update = { view, state: enter.state, startState: typing.state, changes: enter.changes, docChanged: true, selectionSet: false, focusChanged: false } as unknown as ViewUpdate;
+		const update = { view, state: enter.state, startState: typing.state, changes: enter.changes, docChanged: true, selectionSet: false, focusChanged: false, transactions: [enter] } as unknown as ViewUpdate;
 		vi.mocked(normalizeReminderIds).mockClear();
 		for (const listener of startState.facet(EditorView.updateListener)) listener(update);
 		await Promise.resolve();
@@ -104,6 +104,19 @@ describe('reminder IDs on line leave', () => {
 		// History maps its inverted steps through changes kept out of it; a whole-line rewrite would swallow the typing's inverse.
 		const undo = typing.changes.compose(enter.changes).invert(startState.doc).map(written.changes);
 		expect(undo.apply(written.state.doc).toString()).toMatch(/^- \[ \] Buy mil <!-- crate-id:[0-9a-f-]{36} -->$/);
+	});
+
+	it('drops the IDs undo leaves where a new reminder was, keeping each line\'s own', () => {
+		const stray = (text: string) => {
+			const state = EditorState.create({ doc: text });
+			return state.update({ changes: strayIdChanges(state.doc, [1]) }).state.doc.toString();
+		};
+		expect(stray('- [ ] Plain <!-- crate-id:c --> <!-- crate-id:n -->')).toBe('- [ ] Plain <!-- crate-id:c -->');
+		expect(stray(' <!-- crate-id:n -->- [ ] Plain <!-- crate-id:c -->')).toBe('- [ ] Plain <!-- crate-id:c -->');
+		expect(stray(' <!-- crate-id:n -->Outro')).toBe('Outro');
+		expect(stray('<!-- crate-desc:note --> <!-- crate-id:n -->')).toBe('<!-- crate-desc:note -->');
+		// A line's own markers, one whose checkbox is being edited away, and a reminder the scan repairs stay.
+		for (const kept of ['- [ ] Plain <!-- crate-rule:x --> <!-- crate-id:c -->', 'Plain <!-- crate-id:c -->', '- [ ] A <!-- crate-id:c -->B']) expect(stray(kept)).toBe(kept);
 	});
 
 	it('does nothing for an editor that was not focused', () => {
@@ -361,6 +374,16 @@ describe('reminder ID marker protection', () => {
 		expect(edit(`${line}\nNext`, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' })).toEqual({ text: joined, cursor: end });
 		expect(edit(`${line}\nNext`, line.length + 1, { changes: { from: line.length, to: line.length + 1 }, userEvent: 'delete.backward' }).text).toBe(joined);
 		expect(edit(line, end, { changes: { from: end, to: line.length }, userEvent: 'delete.forward' }).text).toBe(line);
+	});
+
+	it('keeps a space between a date ending the title and the line joined after it', () => {
+		// Joined text would read as part of the stored date, which then shows as text or saves another date.
+		for (const date of ['2026-11-20T08:00:00.000Z', '2026-11-20', 'tomorrow']) {
+			const dated = `- [ ] Pay ${date} <!-- crate-id:a -->`, at = dated.indexOf(' <!--');
+			expect(edit(`${dated}\nOutro`, dated.length + 1, { changes: { from: dated.length, to: dated.length + 1 }, userEvent: 'delete.backward' }))
+				.toEqual({ text: `- [ ] Pay ${date} Outro <!-- crate-id:a -->`, cursor: at + 1 });
+			expect(edit(`${dated}\nOutro`, at, { changes: { from: at, to: dated.length }, userEvent: 'delete.forward' }).text).toBe(`- [ ] Pay ${date} Outro <!-- crate-id:a -->`);
+		}
 	});
 
 	it('merges a joined reminder into this one, dropping its hidden marker and keeping its description', () => {

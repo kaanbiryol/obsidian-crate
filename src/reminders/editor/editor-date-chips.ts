@@ -1,4 +1,5 @@
-import { EditorSelection, EditorState, StateEffect, StateField, Transaction, type ChangeSpec, type TransactionSpec } from '@codemirror/state';
+import { Annotation, EditorSelection, EditorState, StateEffect, StateField, Transaction, type ChangeSpec, type TransactionSpec } from '@codemirror/state';
+import { invertedEffects, isolateHistory, undo } from '@codemirror/commands';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { extractReminderId } from '../core/reminderIdentity';
@@ -78,9 +79,16 @@ interface DatePhrase {
 	to: number;
 	phrase: string;
 	stored: string;
+	/** No change undo records has followed the opening, so undoing it takes back exactly the opening. */
+	clean: boolean;
 }
 
-const setDatePhrase = StateEffect.define<DatePhrase | null>();
+/** Puts the cursor back after taking the opening off the undo history, which is not a move by the user. */
+const keepCursor = Annotation.define<true>();
+
+const setDatePhrase = StateEffect.define<DatePhrase | null>({
+	map: (value, mapping) => value && { ...value, from: mapping.mapPos(value.from, -1), to: mapping.mapPos(value.to, 1) },
+});
 
 /** Exported for tests. */
 export const datePhraseField = StateField.define<DatePhrase | null>({
@@ -88,9 +96,12 @@ export const datePhraseField = StateField.define<DatePhrase | null>({
 	update(value, transaction) {
 		for (const effect of transaction.effects) if (effect.is(setDatePhrase)) return effect.value;
 		// Typing at either end of the phrase extends it.
-		return value && transaction.docChanged
-			? { ...value, from: transaction.changes.mapPos(value.from, -1), to: transaction.changes.mapPos(value.to, 1) }
-			: value;
+		return value && transaction.docChanged ? {
+			...value,
+			from: transaction.changes.mapPos(value.from, -1),
+			to: transaction.changes.mapPos(value.to, 1),
+			clean: value.clean && transaction.annotation(Transaction.addToHistory) === false,
+		} : value;
 	},
 });
 
@@ -99,9 +110,10 @@ function showPhrase(from: number, to: number, stored: string, phrase: string, at
 	return {
 		changes: { from, to, insert: phrase },
 		selection: { anchor: atEnd ? from + phrase.length : from },
-		effects: setDatePhrase.of({ from, to: from + phrase.length, phrase, stored }),
-		// Leaving the line restores or saves the date, so undo skips this step.
-		annotations: Transaction.addToHistory.of(false),
+		effects: setDatePhrase.of({ from, to: from + phrase.length, phrase, stored, clean: true }),
+		// Its own undo step: a change undo never saw would lose the stored date's place in the history, so undoing
+		// an earlier save would leave the date behind. Leaving the line unchanged takes the step back off.
+		annotations: isolateHistory.of('full'),
 		...userEvent ? { userEvent } : {},
 	};
 }
@@ -274,13 +286,19 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 		EditorState.transactionFilter.of(transaction => isReminderEditor(transaction.startState)
 			? editDateChip(transaction) ?? transaction : transaction),
 		datePhraseField,
+		// Undoing an opening or a save brings back the phrase as it was edited, and redo the reverse.
+		invertedEffects.of(transaction => transaction.docChanged && transaction.effects.some(effect => effect.is(setDatePhrase))
+			? [setDatePhrase.of(transaction.startState.field(datePhraseField, false) ?? null)] : []),
 		EditorView.updateListener.of(update => {
+			// Undo and redo set the phrase themselves; leaving or opening here would undo them again.
+			if (update.transactions.some(transaction => transaction.isUserEvent('undo') || transaction.isUserEvent('redo'))) return;
 			const phrase = update.state.field(datePhraseField, false), { doc } = update.state;
 			// Deleting the line break below a reminder, as Backspace on the empty line after it does, brings the cursor next to its chip too.
 			const joined = update.docChanged && update.state.doc.lines < update.startState.doc.lines
 				&& update.transactions.some(transaction => transaction.isUserEvent('delete'));
 			// Obsidian's line start and end keys, Home, End and Cmd+arrows, move the cursor without a user event.
-			const keyed = (transaction: Transaction) => transaction.isUserEvent('select') || !transaction.annotation(Transaction.userEvent);
+			const keyed = (transaction: Transaction) => transaction.isUserEvent('select')
+				|| (!transaction.annotation(Transaction.userEvent) && !transaction.annotation(keepCursor));
 			const moved = update.selectionSet && update.view.hasFocus && isReminderEditor(update.state)
 				&& (joined || (!update.docChanged && update.transactions.some(keyed)));
 			if (!phrase) {
@@ -297,14 +315,21 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 			const { changes, restored } = leavePhrase(update.state, phrase);
 			// A view cannot dispatch during its own update; skip if the text moved on meanwhile.
 			queueMicrotask(() => {
-				if (update.view.state.doc !== update.state.doc) return;
-				// Restoring undoes the phrase, which undo never saw; a saved edit is undone like the typing before it.
-				// Typing rules would treat a save as typing at the line's end; it is not.
-				const left = update.view.state.update({ changes, effects: setDatePhrase.of(null), filter: false, ...restored ? { annotations: Transaction.addToHistory.of(false) } : { userEvent: 'input.date' } });
-				update.view.dispatch(left);
+				const { view } = update;
+				if (view.state.doc !== update.state.doc) return;
+				let left: Transaction | null = null;
+				// Unchanged with nothing since: undo takes the opening back off the history, which keeps it as it was.
+				if (restored && phrase.clean) undo({ state: view.state, dispatch: transaction => { left = transaction; view.dispatch(transaction); } });
+				if (left) {
+					view.dispatch({ selection: update.state.selection.map((left as Transaction).changes), annotations: [keepCursor.of(true), Transaction.addToHistory.of(false)] });
+				} else {
+					// Its own undo step, which brings the phrase back; typing rules would treat a save as typing at the line's end.
+					left = view.state.update({ changes, effects: setDatePhrase.of(null), filter: false, userEvent: 'input.date' });
+					view.dispatch(left);
+				}
 				// Moving from one date's phrase straight next to another date's chip opens that one.
-				const open = moved ? openDateChip(update.view.state, update.startState.selection.map(update.changes).map(left.changes)) : null;
-				if (open) update.view.dispatch(open);
+				const open = moved ? openDateChip(view.state, update.startState.selection.map(update.changes).map(left.changes)) : null;
+				if (open) view.dispatch(open);
 			});
 		}),
 	];

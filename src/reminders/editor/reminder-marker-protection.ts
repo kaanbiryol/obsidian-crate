@@ -1,4 +1,5 @@
 import { EditorSelection, Transaction, type ChangeSpec, type Line, type SelectionRange, type Text, type TransactionSpec } from '@codemirror/state';
+import { reminderLineDisplays } from '../data/reminder-date-display';
 import { TEXT_START, editableDescription, editableDescriptionAt, endMarker, hiddenTail, onlyMarkers, tailEndingAt, wholeReminderEnd } from './reminder-hidden-ranges';
 
 /**
@@ -181,8 +182,11 @@ function editAtTail(transaction: Transaction, changes: readonly ChangedRange[], 
 		const join = (tail: { from: number; to: number; description: boolean }) => {
 			const next = doc.lineAt(tail.to + 1), nextTail = hiddenTail(doc, next);
 			if (nextTail?.description && tail.description) return [];
-			const text = nextTail ? doc.sliceString(next.from, nextTail.from) : next.text;
-			return spec([{ from: tail.from, insert: text }, { from: tail.to, to: nextTail?.description ? next.to : nextTail?.to ?? next.to }], tail.from);
+			const joined = nextTail ? doc.sliceString(next.from, nextTail.from) : next.text, title = doc.lineAt(tail.from);
+			// Text right after a date would read as part of it, so a space keeps them apart.
+			const afterDate = /^\S/.test(joined) && reminderLineDisplays(title.text).some(display => (display.kind === 'chip' || display.kind === 'phrase') && title.from + display.to === tail.from);
+			const text = afterDate ? ` ${joined}` : joined;
+			return spec([{ from: tail.from, insert: text }, { from: tail.to, to: nextTail?.description ? next.to : nextTail?.to ?? next.to }], tail.from + (afterDate ? 1 : 0));
 		};
 		const line = change && changes.length === 1 ? doc.lineAt(change.fromA) : null;
 		const found = line ? hiddenTail(doc, line) : null;
