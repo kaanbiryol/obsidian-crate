@@ -92,7 +92,7 @@ export function renderRemindersSettings(context: SettingsSectionContext): () => 
 			dropdown.addOption('inbox', 'Inbox');
 			dropdown.addOption('today', 'Today');
 			dropdown.addOption('upcoming', 'Upcoming');
-			dropdown.addOption('browse', 'Browse');
+			dropdown.addOption('browse', 'Projects');
 			dropdown.setValue(settings.sidebarDefaultTab)
 				.onChange(async (value) => {
 					await persistSettings({
