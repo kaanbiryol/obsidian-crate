@@ -8,6 +8,7 @@ import { renderExclusionsSetting } from './exclusions-setting';
 import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
 import { MAX_TIMER_SECONDS } from '../../protocol/shared-settings';
 import { writeSyncSettings } from '../../plugin/sync-connection';
+import { addHistoryRetentionDropdown } from './history-retention-setting';
 import type { SettingsSectionContext } from './section-helpers';
 
 export function renderSyncSection(context: SettingsSectionContext): () => void {
@@ -67,5 +68,9 @@ export function renderSyncSection(context: SettingsSectionContext): () => void {
 	renderExclusionsSetting(options, plugin, async ignorePatterns => {
 		await persistSettings({ ignorePatterns });
 	});
+
+	addHistoryRetentionDropdown(new Setting(options)
+		.setName('Keep history for')
+		.setDesc('All devices · how long your server keeps previous file versions and saved vault states. Longer periods use more storage on your server.'), plugin);
 	return cleanup;
 }

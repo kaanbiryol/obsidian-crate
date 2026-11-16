@@ -1,9 +1,9 @@
 import { Notice, type Setting } from 'obsidian';
-import type CratePlugin from '../../../plugin/CratePlugin';
-import { serverRequest } from '../../../plugin/server-request';
-import { HISTORY_RETENTION_DAYS, parseHistoryRetention, type HistoryRetentionDays } from '../../../protocol/history-retention';
-import { openConfirmationModal } from '../../plugin/confirmation-modal';
-import { errorMessage } from '../../../platform/logger';
+import type CratePlugin from '../../plugin/CratePlugin';
+import { serverRequest } from '../../plugin/server-request';
+import { HISTORY_RETENTION_DAYS, parseHistoryRetention, type HistoryRetentionDays } from '../../protocol/history-retention';
+import { openConfirmationModal } from '../plugin/confirmation-modal';
+import { errorMessage } from '../../platform/logger';
 
 type RetentionHost = Pick<CratePlugin, 'app' | 'settings' | 'secretStorage'>;
 

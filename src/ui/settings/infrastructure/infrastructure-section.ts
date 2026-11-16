@@ -7,7 +7,6 @@ import { createSettingsDisclosure } from '../../plugin/settings-disclosure';
 import { createSettingsSubsectionHeading } from '../section-helpers';
 import { renderTroubleshootingSettings } from '../troubleshooting-section';
 import { Setting } from 'obsidian';
-import { addHistoryRetentionDropdown } from './history-retention-setting';
 
 export function renderInfrastructureSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin } = context;
@@ -18,7 +17,11 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 		const recoveryEl = recoverySection;
 		const history = new Setting(recoveryEl)
 			.setName('File history')
-			.setDesc('How long your server keeps previous file versions and saved vault states. Shorter periods use less storage. Open a file’s context menu and select ');
+			.setDesc('Previous versions are kept for the period in ');
+		history.descEl.createEl('strong', { text: 'Sync options' });
+		history.descEl.appendText(' → ');
+		history.descEl.createEl('strong', { text: 'Keep history for' });
+		history.descEl.appendText('. Open a file’s context menu and select ');
 		history.descEl.createEl('strong', { text: 'File history' });
 		history.descEl.appendText(', or use ');
 		history.descEl.createEl('strong', { text: 'Show file history' });
@@ -29,7 +32,6 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 		history.descEl.appendText(' → ');
 		history.descEl.createEl('strong', { text: 'File history' });
 		history.descEl.appendText('.');
-		addHistoryRetentionDropdown(history, plugin);
 
 	}
 	const troubleshootingEl = recoverySection;
