@@ -225,6 +225,8 @@
         transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
         @media (hover: hover) and (pointer: fine) { &:hover:enabled { background: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary)); } }
         &:active:enabled { background: color-mix(in srgb, var(--text-normal) 14%, var(--background-primary)); }
+        min-width: 0;
+        .crate-browser-sync-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         &.is-syncing {
             position: relative;
             overflow: hidden;

@@ -30,7 +30,7 @@ export function formatSyncProgress(progress?: SyncActivityProgress | null, work?
 		if (work.total !== undefined && work.total > 0 && work.current !== undefined) {
 			if (work.phase === 'uploading' || work.phase === 'downloading' || work.phase === 'deleting') {
 				const action = { uploading: 'Uploading', downloading: 'Downloading', deleting: 'Deleting' }[work.phase];
-				return `${action} ${work.current.toLocaleString()} of ${work.total.toLocaleString()} files`;
+				return `${action} ${work.current.toLocaleString()} of ${work.total.toLocaleString()} ${work.total === 1 ? 'file' : 'files'}`;
 			}
 			return `${label}: ${work.current}/${work.total}`;
 		}

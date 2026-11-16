@@ -20,7 +20,7 @@ export function createPendingActions(
 	const count = heading.createSpan({ cls: 'crate-browser-selection-count', attr: { role: 'status' } });
 	const footer = sidebar.createDiv({ cls: 'crate-browser-actions' });
 	const sync = footer.createEl('button', { cls: 'crate-browser-sync', attr: { type: 'button' } });
-	const syncLabel = sync.createSpan({ text: 'Sync files' });
+	const syncLabel = sync.createSpan({ cls: 'crate-browser-sync-label', text: 'Sync files' });
 	const status = footer.createDiv({ cls: 'crate-browser-action-status', attr: { role: 'status', 'aria-live': 'polite' } });
 	const checkboxes = new Map<string, HTMLInputElement>();
 	let busy = false;
@@ -38,6 +38,7 @@ export function createPendingActions(
 		const label = progress ? progress.label : busy ? 'Syncing…' : selected.length ? `Sync ${selected.length} ${selected.length === 1 ? 'file' : 'files'}` : 'Sync files';
 		syncLabel.textContent = label;
 		sync.setAttribute('aria-label', label);
+		sync.title = label;
 		sync.disabled = locked() || selected.length === 0;
 		sync.toggleClass('is-syncing', locked());
 		sync.setCssProps({ '--crate-sync-progress': progress?.fraction === undefined ? '0' : String(progress.fraction) });

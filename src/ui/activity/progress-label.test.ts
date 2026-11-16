@@ -21,6 +21,9 @@ it('shows deletion-specific progress independently of completed uploads', () => 
 	expect(formatSyncProgress({ type: 'sync', current: 36, total: 60 }, { phase: 'deleting', current: 4, total: 24 }))
 		.toBe('Deleting 4 of 24 files');
 });
+it('names a single file in the singular', () => {
+	expect(formatSyncProgress(null, { phase: 'deleting', current: 1, total: 1 })).toBe('Deleting 1 of 1 file');
+});
 
 it('shows remaining scheduling work without reusing upload counts', () => {
 	expect(formatSyncProgress({ type: 'sync', current: 400, total: 400 }, {

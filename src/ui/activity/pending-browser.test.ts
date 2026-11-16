@@ -110,6 +110,7 @@ it('locks the selection and shows sync progress in the footer, then restores it'
 	checks.setSyncProgress({ label: 'Uploading 1 of 2 files', fraction: 0.5 });
 	expect(panel.querySelector('.crate-pending-browser')?.classList.contains('is-syncing')).toBe(true);
 	expect(sync.textContent).toBe('Uploading 1 of 2 files');
+	expect(sync.title).toBe('Uploading 1 of 2 files');
 	expect(sync.disabled).toBe(true);
 	expect(sync.style.getPropertyValue('--crate-sync-progress')).toBe('0.5');
 	expect(boxes().every(box => box.disabled)).toBe(true);
