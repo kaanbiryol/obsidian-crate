@@ -100,6 +100,10 @@ export function editableDatePhrase(text: string, now = new Date()): { from: numb
 	const stored = text.slice(display.from, display.to), hasTime = isStoredReminderDatetime(stored);
 	const date = parseReminderDateValue(stored, hasTime);
 	if (!date) return null;
+	// A time saved with seconds, as relative times like "in 5 minutes" are, opens at its minute:
+	// no phrase gives the seconds back, and leaving the phrase unchanged restores the stored time.
+	const seconds = hasTime ? date.getTime() % 60_000 : 0;
+	const target = seconds ? text.slice(0, display.from) + new Date(date.getTime() - seconds).toISOString() + text.slice(display.to) : text;
 	// Saving moves a typed description under the reminder first, so a phrase must give the date without it too.
 	const withoutDescription = (line: string) => {
 		const typed = inlineDescription(line);
@@ -108,7 +112,7 @@ export function editableDatePhrase(text: string, now = new Date()): { from: numb
 	for (const phrase of datePhrases(date, hasTime, now)) {
 		const edited = text.slice(0, display.from) + phrase + text.slice(display.to), bare = withoutDescription(edited);
 		try {
-			if (normalizeReminderScheduleLine(edited) === text && (bare === edited || normalizeReminderScheduleLine(bare) === withoutDescription(text))) {
+			if (normalizeReminderScheduleLine(edited) === target && (bare === edited || normalizeReminderScheduleLine(bare) === withoutDescription(target))) {
 				return { from: display.from, to: display.to, phrase };
 			}
 		} catch { /* Not a phrase the parser takes; try a longer one. */ }

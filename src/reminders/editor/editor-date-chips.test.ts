@@ -47,6 +47,22 @@ describe('reminder dates in the editor', () => {
 		}
 	});
 
+	it('opens a time saved with seconds at its minute, and restores the seconds when left unchanged', () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(now);
+		try {
+			const stored = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12, 0, 3, 852).toISOString();
+			const doc = `- [ ] Call Mia ${stored} <!-- crate-id:a -->`;
+			const from = doc.indexOf(stored);
+			const state = EditorState.create({ doc, selection: { anchor: from }, extensions: createReminderDateChips(() => true, () => undefined) });
+			const opened = state.update(openDateChip(state, EditorSelection.single(from - 1), now)!).state;
+			expect(opened.doc.toString()).toBe('- [ ] Call Mia tomorrow 12:00 <!-- crate-id:a -->');
+			expect(opened.update({ changes: leavePhrase(opened, opened.field(datePhraseField)!).changes }).state.doc.toString()).toBe(doc);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('turns a saved date into a phrase when the cursor moves next to its chip', () => {
 		vi.useFakeTimers({ toFake: ['Date'] });
 		vi.setSystemTime(now);
@@ -116,8 +132,8 @@ describe('reminder dates in the editor', () => {
 	});
 
 	it('deletes a date whole when no phrase gives it back', () => {
-		// Phrases name minutes, so a time with seconds has none that saves back to it.
-		const stored = '2026-12-01T09:00:30.000Z', doc = `- [ ] Pay rent ${stored} <!-- crate-id:a -->`;
+		// Saving writes UTC, so a time stored with its own offset has no phrase that saves back to it.
+		const stored = '2026-12-01T09:00:00+05:30', doc = `- [ ] Pay rent ${stored} <!-- crate-id:a -->`;
 		const state = EditorState.create({ doc });
 		const end = doc.indexOf(stored) + stored.length;
 		const spec = editDateChip(state.update({ changes: { from: end - 1, to: end }, userEvent: 'delete.backward' }), now);
