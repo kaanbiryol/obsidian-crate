@@ -59,9 +59,9 @@ it('keeps new versions for the chosen period', async () => {
 	await deleteFile('short.md');
 	expect(await expiry('short.md')).toBeGreaterThanOrEqual(started + 7 * DAY_MS);
 	expect(await expiry('short.md')).toBeLessThan(Date.now() + 7 * DAY_MS + 2_000);
-	await setRetention(365);
+	await setRetention(60);
 	await deleteFile('long.md');
-	expect(await expiry('long.md')).toBeGreaterThanOrEqual(started + 365 * DAY_MS);
+	expect(await expiry('long.md')).toBeGreaterThanOrEqual(started + 60 * DAY_MS);
 });
 
 it('re-times kept versions when the period changes, without reviving expired ones', async () => {

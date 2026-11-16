@@ -19,7 +19,7 @@ export async function handleHistoryRetention(request: Request, db: D1Database): 
 	const parsed = await parseJsonObject(request);
 	if (!parsed.ok) return parsed.response;
 	const { days } = parsed.value;
-	if (!isHistoryRetentionDays(days)) return corsResponse({ error: 'Choose 7, 30, 90 or 365 days.' }, 400);
+	if (!isHistoryRetentionDays(days)) return corsResponse({ error: 'Choose 7, 30, 60 or 90 days.' }, 400);
 	const kept = `(CAST(unixepoch(created_at) AS INTEGER) + 1) * 1000 + ${days * DAY_MS}`;
 	await db.batch([
 		db.prepare(`INSERT INTO server_state(id, history_retention_days) VALUES (1, ?)

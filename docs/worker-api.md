@@ -616,7 +616,7 @@ operations, saved content, library identity, and scoped credentials are retained
 
 ### History retention
 
-`GET /history-retention` returns `{ days }`, one of 7, 30, 90 or 365 (30 until changed).
+`GET /history-retention` returns `{ days }`, one of 7, 30, 60 or 90 (30 until changed).
 Only vault credentials can read it or POST `{ days }` to change it; other values return
 400. Writes run in the coordinator, store the value in `server_state` and re-time kept
 file versions in the same batch. See [history retention](sync-pipeline.md#history-retention).

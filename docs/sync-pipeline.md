@@ -590,7 +590,7 @@ and a mismatching final inventory is never reported as a successful restore.
 
 ## History retention
 
-One server-wide setting, `server_state.history_retention_days` (7, 30, 90 or 365; NULL
+One server-wide setting, `server_state.history_retention_days` (7, 30, 60 or 90; NULL
 means 30), sets how long replaced and deleted versions and shared checkpoints are kept.
 Vault credentials read it with `GET /history-retention` and change it with
 `POST /history-retention { days }`; the plugin shows it under **Sync options** →

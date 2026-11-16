@@ -120,7 +120,7 @@ wait or the three-hour foreground wait bound leaves all progress intact.
 ## Shared history checkpoints
 
 Protocol 1 includes `shared-history-checkpoints-v1`. Server-authored inventories are stored in R2 with a conditional shared
-index, capped at 20 states and the server's history period (at most 365 days). Creation rejects a changing inventory;
+index, capped at 20 states and the server's history period (at most 90 days). Creation rejects a changing inventory;
 publication retries deduplicate by monotonic server generation. No database schema
 change or duplicate file-content storage is introduced. Retained-version expiry is
 computed no earlier than the history period after the D1 commit, preventing an older request

@@ -26,7 +26,7 @@ The web app and scheduled notifications talk to your server directly, so Obsidia
 | 1 MB per reminder note in the web app | Bigger notes, or notes with a very large number of reminders, are left out with an explanation. Split them into smaller project notes to edit and schedule them in the web app again. |
 | Web app search matches article titles | Each word you type matches the start of a word in a title. With [encryption](/docs/features/encryption/), short words of one or two letters match only whole words. Search notes, authors and highlights in Obsidian. |
 | No iPhone shortcut with encryption | **Save to Crate** can't encrypt notes, so encrypted vaults don't offer it. Save links in the web app or in Obsidian. |
-| 30 days of server history for replaced or deleted files by default (7, 90 or 365 days available), about one version every 10 minutes while editing (every hour for files of 1 MB or more) | Recover promptly. Files that only ever existed on one device may have no server history. |
+| 30 days of server history for replaced or deleted files by default (7, 60 or 90 days available), about one version every 10 minutes while editing (every hour for files of 1 MB or more) | Recover promptly. Files that only ever existed on one device may have no server history. |
 | Latest 20 checkpoints, for up to your history period | Checkpoints are saved states of your whole vault you can return to. They cover recent syncs, not an unlimited backup archive. |
 
 Sizes are rounded down, so a file under the listed size always fits. The Reading and reminder limits can apply even when a note is small enough to sync.

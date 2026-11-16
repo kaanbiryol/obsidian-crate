@@ -1,7 +1,7 @@
 import { isRecord } from '../platform/validation';
 
 /** How long the server keeps replaced and deleted file versions and shared checkpoints. */
-export const HISTORY_RETENTION_DAYS = [7, 30, 90, 365] as const;
+export const HISTORY_RETENTION_DAYS = [7, 30, 60, 90] as const;
 export type HistoryRetentionDays = typeof HISTORY_RETENTION_DAYS[number];
 export const DEFAULT_HISTORY_RETENTION_DAYS: HistoryRetentionDays = 30;
 export const DAY_MS = 24 * 60 * 60 * 1000;

@@ -7,7 +7,7 @@ import { errorMessage } from '../../platform/logger';
 
 type RetentionHost = Pick<CratePlugin, 'app' | 'settings' | 'secretStorage'>;
 
-const label = (days: number) => days === 365 ? '1 year' : `${days} days`;
+const label = (days: number) => `${days} days`;
 
 async function requestRetention(plugin: RetentionHost, body?: { days: HistoryRetentionDays }): Promise<HistoryRetentionDays> {
 	const retention = parseHistoryRetention(await serverRequest<unknown>(plugin, '/history-retention', body, { timeout: 10_000 }));

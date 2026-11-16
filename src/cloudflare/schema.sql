@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS server_state (
 	settings TEXT,
 	settings_version TEXT,
 	-- Days replaced and deleted versions and shared checkpoints are kept. NULL means 30.
-	history_retention_days INTEGER CHECK (history_retention_days IN (7, 30, 90, 365))
+	history_retention_days INTEGER CHECK (history_retention_days IN (7, 30, 60, 90))
 );
 
 CREATE TABLE IF NOT EXISTS reminder_file_cache (

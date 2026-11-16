@@ -7,7 +7,7 @@ Lost a change? There's a good chance Crate still has it. Start with the smallest
 
 ## Get back an earlier version of a file
 
-Your server keeps replaced and deleted files for 30 days by default. To change this, open Crate settings and select **Sync options** → **Keep history for**, then choose 7 days, 30 days, 90 days or 1 year. Shorter periods use less storage; choosing a shorter one removes older history for good. While you keep editing a file, it keeps the version from before you started and then about one version every 10 minutes, or every hour for files of 1 MB or more, so not every save is kept.
+Your server keeps replaced and deleted files for 30 days by default. To change this, open Crate settings and select **Sync options** → **Keep history for**, then choose 7, 30, 60 or 90 days. Shorter periods use less storage; choosing a shorter one removes older history for good. While you keep editing a file, it keeps the version from before you started and then about one version every 10 minutes, or every hour for files of 1 MB or more, so not every save is kept.
 
 1. In Obsidian, open the file's menu and select **File history**, or run **Crate: Show file sync history** for the open file.
 2. Pick an earlier version and compare it with what you have now.
