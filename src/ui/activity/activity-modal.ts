@@ -7,7 +7,7 @@ import { BaseUiModal } from '../plugin/BaseUiModal';
 import { getPendingFileActions } from './file-actions';
 import type { PendingDiscardReview } from '../../sync/pending/pending-discard';
 import { PendingDiscardModal } from './pending-discard-modal';
-import { formatSyncProgress } from './progress-label';
+import { formatSyncProgress, syncProgressFraction } from './progress-label';
 import type { ConflictReview } from '../../sync/conflict/review';
 import { ConflictReviewModal } from './conflict-review-modal';
 import { Notice, Platform, type App } from 'obsidian';
@@ -121,12 +121,21 @@ export class ActivityModal extends BaseUiModal {
 			loadingLabel.setAttribute('title', text);
 			return;
 		}
+		const syncing = state.status === 'syncing' || !!progress;
+		// A sync started from the file browser keeps it in view, locked, with progress in its footer.
+		if (syncing && this.pendingChecks && this.pendingPanel.querySelector('.crate-pending-browser')) {
+			const work = progress?.work ?? state.work;
+			this.pendingChecks.setSyncProgress({ label: formatSyncProgress(progress, state.work), fraction: syncProgressFraction(work) });
+			this.header.updateSyncBtn();
+			return;
+		}
 		const paths = this.deps.getPendingKeys();
 		// Rebuilding the file browser discards its comparisons; keep it while the pending set is unchanged.
 		const showsBrowser = paths.length > 0 && !isActivityBusy(state, progress);
 		const rendered = this.renderedBrowserPaths;
 		if (showsBrowser && rendered?.length === paths.length && rendered.every((key, index) => key === paths[index])
 			&& this.pendingPanel.querySelector('.crate-pending-browser')) {
+			this.pendingChecks?.setSyncProgress();
 			this.header.updateSyncBtn();
 			return;
 		}

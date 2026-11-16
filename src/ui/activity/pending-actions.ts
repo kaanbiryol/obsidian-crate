@@ -24,25 +24,30 @@ export function createPendingActions(
 	const status = footer.createDiv({ cls: 'crate-browser-action-status', attr: { role: 'status', 'aria-live': 'polite' } });
 	const checkboxes = new Map<string, HTMLInputElement>();
 	let busy = false;
+	// A running sync, from this button or Sync vault, locks the selection and shows its progress here.
+	let progress: { label: string; fraction?: number } | undefined;
+	const locked = () => busy || !!progress;
 	const checked = () => keys.filter(key => !excluded.has(key));
 	const update = () => {
 		const selected = checked();
 		all.checked = selected.length === keys.length;
 		all.indeterminate = selected.length > 0 && selected.length < keys.length;
-		all.disabled = busy;
-		for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = busy; }
+		all.disabled = locked();
+		for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = locked(); }
 		count.textContent = `${selected.length} of ${keys.length} files selected`;
-		const label = busy ? 'Syncing…' : selected.length ? `Sync ${selected.length} ${selected.length === 1 ? 'file' : 'files'}` : 'Sync files';
+		const label = progress ? progress.label : busy ? 'Syncing…' : selected.length ? `Sync ${selected.length} ${selected.length === 1 ? 'file' : 'files'}` : 'Sync files';
 		syncLabel.textContent = label;
 		sync.setAttribute('aria-label', label);
-		sync.disabled = busy || selected.length === 0;
+		sync.disabled = locked() || selected.length === 0;
+		sync.toggleClass('is-syncing', locked());
+		sync.setCssProps({ '--crate-sync-progress': progress?.fraction === undefined ? '0' : String(progress.fraction) });
 	};
 	all.addEventListener('change', () => {
 		for (const key of keys) { if (all.checked) excluded.delete(key); else excluded.add(key); }
 		update();
 	});
 	sync.addEventListener('click', () => {
-		if (busy || !checked().length) return;
+		if (locked() || !checked().length) return;
 		const selected = checked();
 		busy = true; status.textContent = ''; update();
 		void actions.syncSelected(selected).catch((error: unknown) => {
@@ -60,11 +65,12 @@ export function createPendingActions(
 		if (fileActions.length) menu.addSeparator();
 		if (targets.length) menu.addItem(item => item
 			.setTitle(`Discard ${targets.length} item${targets.length === 1 ? '' : 's'}…`)
-			.setIcon('undo-2').setDisabled(busy).onClick(() => actions.discard(targets)));
+			.setIcon('undo-2').setDisabled(locked()).onClick(() => actions.discard(targets)));
 		return menu;
 	};
 	update();
 	return {
+		setProgress: (next?: { label: string; fraction?: number }) => { progress = next; update(); },
 		toggleChecked: (key: string) => { checkboxes.get(key)?.click(); },
 		removeRow: (key: string) => { checkboxes.delete(key); },
 		addCheckbox: (row: HTMLElement, key: string) => {

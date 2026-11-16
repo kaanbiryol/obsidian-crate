@@ -99,6 +99,29 @@ it('renders only rows near the viewport while selection, navigation and sync cov
 	checks.dispose();
 });
 
+it('locks the selection and shows sync progress in the footer, then restores it', async () => {
+	const { renderPendingBrowser } = await import('./pending-browser');
+	const panel = document.createElement('div');
+	document.body.replaceChildren(panel);
+	const checks = renderPendingBrowser(panel, ['a.md', 'b.md'], vi.fn(async () => modified), {}, { syncSelected: vi.fn(async () => {}), discard: vi.fn() });
+	const sync = panel.querySelector('.crate-browser-sync') as HTMLButtonElement;
+	const boxes = () => [...panel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+
+	checks.setSyncProgress({ label: 'Uploading 1 of 2 files', fraction: 0.5 });
+	expect(panel.querySelector('.crate-pending-browser')?.classList.contains('is-syncing')).toBe(true);
+	expect(sync.textContent).toBe('Uploading 1 of 2 files');
+	expect(sync.disabled).toBe(true);
+	expect(sync.style.getPropertyValue('--crate-sync-progress')).toBe('0.5');
+	expect(boxes().every(box => box.disabled)).toBe(true);
+	expect(panel.querySelector('.crate-browser-file-name')?.textContent).toBe('a.md');
+
+	checks.setSyncProgress();
+	expect(sync.textContent).toBe('Sync 2 files');
+	expect(sync.disabled).toBe(false);
+	expect(boxes().some(box => box.disabled)).toBe(false);
+	checks.dispose();
+});
+
 it('shows a Crate update bundle as an update listing its files, without diffing it', async () => {
 	const { renderPendingBrowser } = await import('./pending-browser');
 	const { pendingChangeKey } = await import('../../sync/pending/pending-change');

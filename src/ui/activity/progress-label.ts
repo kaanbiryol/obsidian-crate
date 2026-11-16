@@ -42,3 +42,9 @@ export function formatSyncProgress(progress?: SyncActivityProgress | null, work?
 	if (progress && progress.total > 0) return `Processing changes: ${progress.current}/${progress.total}`;
 	return 'Starting sync…';
 }
+
+/** Share of files done in a counted transfer phase, for a progress bar. */
+export function syncProgressFraction(work?: SyncWork): number | undefined {
+	if (!work || !['uploading', 'downloading', 'deleting'].includes(work.phase) || !work.total || work.current === undefined) return undefined;
+	return Math.min(1, Math.max(0, work.current / work.total));
+}

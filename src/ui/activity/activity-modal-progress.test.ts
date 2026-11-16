@@ -39,7 +39,7 @@ function createModal(settings: CrateSettings, deps: ActivityModalDeps,
 /** ActivityTabs mounts these panels and the runtime calls these handlers; React is mocked here. */
 interface ModalInternals {
 	pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
-	header: ActivityHeader; pendingChecks?: { start(): void; pause(): void; dispose(): void };
+	header: ActivityHeader; pendingChecks?: { start(): void; pause(): void; dispose(): void; setSyncProgress(progress?: { label: string; fraction?: number }): void };
 	onProgress(): void; onStateChange(): void; refresh(): void; renderPending(): void;
 	createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
 }
@@ -141,7 +141,7 @@ it('keeps the pending file browser and its comparisons while the pending set is 
 	const browser = internal.pendingPanel.querySelector('.crate-pending-browser');
 	expect(browser).toBeTruthy();
 	const dispose = vi.fn();
-	internal.pendingChecks = { start: vi.fn(), pause: vi.fn(), dispose };
+	internal.pendingChecks = { start: vi.fn(), pause: vi.fn(), dispose, setSyncProgress: vi.fn() };
 
 	internal.renderPending();
 	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBe(browser);
@@ -151,6 +151,34 @@ it('keeps the pending file browser and its comparisons while the pending set is 
 	internal.renderPending();
 	expect(dispose).toHaveBeenCalledOnce();
 	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).not.toBe(browser);
+});
+
+it('keeps the file browser in view during a sync and shows progress in its footer', () => {
+	let pending = ['a.md', 'b.md'];
+	let state = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 2, conflictCount: 0 } as SyncState;
+	const modal = createModal(DEFAULT_SETTINGS, runtime({ getState: () => state, getPendingKeys: () => [...pending] }));
+	const internal = internals(modal);
+	internal.pendingPanel = new FakeElement('div');
+	internal.header = internal.createHeader(new FakeElement('div'), new FakeElement('div'));
+	internal.renderPending();
+	const browser = internal.pendingPanel.querySelector('.crate-pending-browser');
+	const setSyncProgress = vi.fn();
+	internal.pendingChecks = { start: vi.fn(), pause: vi.fn(), dispose: vi.fn(), setSyncProgress };
+
+	// Before: a sync replaced the list and diff with a loading label.
+	state = { ...state, status: 'syncing', work: { phase: 'uploading', current: 1, total: 2 } };
+	pending = ['b.md'];
+	internal.renderPending();
+	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBe(browser);
+	expect(internal.pendingPanel.querySelector('.crate-activity-loading-label')).toBeNull();
+	expect(setSyncProgress).toHaveBeenLastCalledWith({ label: 'Uploading 1 of 2 files', fraction: 0.5 });
+
+	// A failed sync leaves the same files pending; the browser unlocks in place.
+	state = { ...state, status: 'error', work: undefined };
+	pending = ['a.md', 'b.md'];
+	internal.renderPending();
+	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBe(browser);
+	expect(setSyncProgress).toHaveBeenLastCalledWith();
 });
 
 it('keeps the conflicts panel and its focusable buttons across unrelated state events', () => {

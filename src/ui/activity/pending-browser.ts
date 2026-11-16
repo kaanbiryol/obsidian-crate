@@ -28,6 +28,8 @@ export interface PendingChecks {
 	start(): void;
 	pause(): void;
 	dispose(): void;
+	/** Locks the list and shows sync progress in its footer; no argument clears it. */
+	setSyncProgress(progress?: { label: string; fraction?: number }): void;
 }
 
 let nextBrowserId = 0;
@@ -271,6 +273,10 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		start: () => { renderWindow(); comparisons.start(); },
 		pause: () => comparisons.pause(),
 		dispose: () => { resize.disconnect(); comparisons.dispose(); },
+		setSyncProgress: progress => {
+			browser.classList.toggle('is-syncing', !!progress);
+			selection?.setProgress(progress);
+		},
 	};
 }
 
