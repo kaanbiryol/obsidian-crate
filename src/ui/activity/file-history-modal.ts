@@ -53,7 +53,7 @@ class FileHistoryModal extends SharedModal {
 		this.bodyEl.addClass('crate-file-history');
 		const context = this.bodyEl.createDiv({ cls: 'crate-history-file-context' });
 		context.createEl('h3', { text: this.selectedPath });
-		context.createEl('p', { cls: 'crate-history-description', text: 'Versions are kept for 30 days.' });
+		context.createEl('p', { cls: 'crate-history-description', text: 'Versions are kept for the history period set in Crate settings.' });
 		this.workspaceEl = this.bodyEl.createDiv({ cls: 'crate-history-workspace' });
 		this.listEl = this.workspaceEl.createEl('nav', { cls: 'crate-history-list-pane', attr: { 'aria-label': 'File versions' } });
 		this.previewEl = this.workspaceEl.createEl('section', { cls: 'crate-history-preview-pane', attr: { 'aria-label': 'File preview' } });

@@ -30,7 +30,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 					message: 'Overwrite the remote vault with local files?',
 						details: [
 							'Remote-only files will be deleted.',
-							'Deleted and replaced remote files remain recoverable for 30 days.',
+							'Deleted and replaced remote files remain recoverable for the server’s history period.',
 					],
 					confirmText: 'Replace server files',
 					warning: true,

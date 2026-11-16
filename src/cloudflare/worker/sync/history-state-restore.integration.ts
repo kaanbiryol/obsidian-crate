@@ -256,7 +256,7 @@ it('creates and streams a checkpoint above the former 20,000-file limit', async 
 	const created = await createSharedCheckpoint(env.BUCKET, env.DB);
 	expect(created.status, await created.clone().text()).toBe(200);
 	const { checkpoint } = await created.json() as { checkpoint: { id: string } };
-	const streamed = await getSharedCheckpoint(new Request(`https://test/sync/checkpoint?id=${checkpoint.id}`), env.BUCKET);
+	const streamed = await getSharedCheckpoint(new Request(`https://test/sync/checkpoint?id=${checkpoint.id}`), env.BUCKET, env.DB);
 	const document = parseSharedCheckpointDocument(await streamed.json());
 	expect(document.checkpoint.fileCount).toBe(count);
 	expect(document.files['n/7.md']).toMatchObject({ size: 7, revision: '__crate__/files/k7' });

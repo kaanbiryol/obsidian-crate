@@ -1,5 +1,5 @@
 import { fileRevisionGuard, fileRevisionsGuard } from './file-identity';
-import { FILE_VERSION_EXPIRES_AT_SQL, FILE_VERSION_RETENTION_MS, LAST_SEQ_SQL, nextChangelogSeqSql, type FileStorageRow } from './storage';
+import { FILE_VERSION_EXPIRES_AT_SQL, LAST_SEQ_SQL, nextChangelogSeqSql, type FileStorageRow } from './storage';
 
 interface PublishedRevision {
 	path: string;
@@ -28,7 +28,7 @@ export function deletedFileStatements(db: D1Database, where: string, args: reado
 			SELECT storage_key, path, hash, size, 'deleted', ?, ?, descriptor, ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${where}
 			ON CONFLICT(storage_key) DO UPDATE SET reason = 'deleted', deletion_revision = excluded.deletion_revision,
 				request_id = excluded.request_id, expires_at = excluded.expires_at`)
-			.bind(revision, requestId, Date.now() + FILE_VERSION_RETENTION_MS, ...args),
+			.bind(revision, requestId, Date.now(), ...args),
 	];
 }
 
@@ -66,7 +66,7 @@ export function retainReplacedVersionStatements(
 			SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_EXPIRES_AT_SQL}
 			FROM (SELECT ? AS storage_key, ? AS path, ? AS hash, ? AS size, ? AS modified, ? AS descriptor) AS previous
 			WHERE ${guard.sql} AND ${keepReplacedVersionSql('previous')}`)
-			.bind(Date.now() + FILE_VERSION_RETENTION_MS, previous.storageKey, previous.path, previous.hash, previous.size,
+			.bind(Date.now(), previous.storageKey, previous.path, previous.hash, previous.size,
 				previous.modified, previous.descriptor ?? null, ...guard.args),
 		// Runs after the insert, so it sees whether the copy was kept.
 		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)

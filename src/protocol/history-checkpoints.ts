@@ -1,10 +1,10 @@
 import { isRecord } from '../platform/validation';
 import { isSyncDate, isSyncSequence, parseSyncFiles } from './sync-validation';
 import type { FileEntry } from './sync-types';
+import { MAX_HISTORY_RETENTION_MS } from './history-retention';
 
 export const SHARED_CHECKPOINT_CAPABILITY = 'shared-history-checkpoints-v1';
 export const MAX_SHARED_CHECKPOINTS = 20;
-export const CHECKPOINT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const MAX_CHECKPOINT_FILES = 100_000;
 export const MAX_CHECKPOINT_BYTES = 32 * 1024 * 1024;
 /** Encrypted documents expand the plaintext by base64url and envelope overhead. */
@@ -28,7 +28,7 @@ export function parseSharedCheckpoint(value: unknown): SharedCheckpoint {
 	if (!isRecord(value) || !isCheckpointId(value.id) || !isSyncSequence(value.sequence)
 		|| !isSyncDate(value.timestamp) || !isSyncSequence(value.expiresAt)
 		|| !isSyncSequence(value.fileCount) || value.fileCount > MAX_CHECKPOINT_FILES
-		|| value.expiresAt <= Date.parse(value.timestamp) || value.expiresAt > Date.parse(value.timestamp) + CHECKPOINT_RETENTION_MS) {
+		|| value.expiresAt <= Date.parse(value.timestamp) || value.expiresAt > Date.parse(value.timestamp) + MAX_HISTORY_RETENTION_MS) {
 		throw new Error('Invalid shared checkpoint metadata');
 	}
 	return { id: value.id, sequence: value.sequence, timestamp: value.timestamp, expiresAt: value.expiresAt, fileCount: value.fileCount };

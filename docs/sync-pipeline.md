@@ -473,7 +473,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Revoked access:** a 401 shows the reconnect message in the status bar and Activity on every sync path. Full, incremental and forced syncs, queue flushes and queue reconciliation treat a 401 reported for one downloaded, uploaded or deleted file the same way. Its notice appears once until a sync succeeds or the connection changes, so background flushes that keep failing do not repeat it
 - **Queue retry:** retryable flush failures are re-added to `pendingKeys`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
 - **Large files:** local files > 25 MB are reported as skipped issues, not failures. They never become pending changes or local deletes, settle in the queue without failing their batch, and do not hold back the changelog cursor or an initial import. If a file grows past the limit while initial import or force full sync reads it, that run stops with an error. A remote change to such a path still fails until the local file is reduced. A remote file over 25 MB is likewise reported as a skipped issue: it is not downloaded, the path keeps its existing baseline, and the changelog cursor still advances past it
-- **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap. Deleted copies are always kept. Replaced copies are coalesced so that frequent saves do not keep a full copy each: a replaced copy is kept if it was the live version for at least 10 minutes, if it was live when the latest shared checkpoint was created, or if its path has no version kept in the last 10 minutes (60 minutes for files of 1 MiB or more). This always keeps the state from before an editing session and about one version per window while editing; a drawing saved every 30 seconds keeps about 6 copies an hour instead of 120. A version restored from file history always keeps the copy it replaces. Copies that are not kept go to the reference-aware cleanup queue in the same D1 transaction. Intermediate saves within a window are therefore not recoverable, and an uncached merge base or pending-change preview for such a save is unavailable
+- **Remote recovery:** replaced and deleted R2 objects are retained for the server's history period (see [history retention](#history-retention)), integrity-checked, and restorable with an expected-hash compare-and-swap. Deleted copies are always kept. Replaced copies are coalesced so that frequent saves do not keep a full copy each: a replaced copy is kept if it was the live version for at least 10 minutes, if it was live when the latest shared checkpoint was created, or if its path has no version kept in the last 10 minutes (60 minutes for files of 1 MiB or more). This always keeps the state from before an editing session and about one version per window while editing; a drawing saved every 30 seconds keeps about 6 copies an hour instead of 120. A version restored from file history always keeps the copy it replaces. Copies that are not kept go to the reference-aware cleanup queue in the same D1 transaction. Intermediate saves within a window are therefore not recoverable, and an uncached merge base or pending-change preview for such a save is unavailable
 - **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action
 
 ## Pending change previews
@@ -512,7 +512,7 @@ the server (`shared-history-checkpoints-v1`) to save a complete server file
 inventory. R2 holds the inventories and an ETag-protected index; no file contents
 are duplicated. Checkpoints are visible on
 all connected devices, including devices without local activity history. The index
-keeps the newest 20 distinct server generations for at most 30 days. Repeated or
+keeps the newest 20 distinct server generations for at most the history period. Repeated or
 concurrent saves of the same generation resolve to the same checkpoint. Initial and
 full syncs always save one; ordinary syncs wait 360 ms per tracked file since the
 last checkpoint (one hour at 10,000 files, ten hours at 100,000), keeping inventory
@@ -532,7 +532,7 @@ retain their possible committed objects. A cursor-based maintenance sweep remove
 remaining unreferenced inventories after a one-day grace period, 1,000 objects per pass,
 and requests further passes while a page finds some and more remain.
 
-Expiry uses server time. Kept replaced/deleted versions retain at least 30 days from the
+Expiry uses server time. Kept replaced/deleted versions retain at least the history period from the
 D1 commit time, so a checkpoint expires no later than those retained bytes. Coalescing
 keeps every copy that was live at the latest checkpoint. A checkpoint file download for a
 revision that is no longer kept returns 410 with `code: "version_unavailable"`.
@@ -587,3 +587,19 @@ restored. Automatic sync remains off on failure, including after restart; reopen
 the checkpoint to review and finish, or recover original bytes using the saved
 `recovery.json` inventory. Concurrent edits are preserved or surfaced for review,
 and a mismatching final inventory is never reported as a successful restore.
+
+## History retention
+
+One server-wide setting, `server_state.history_retention_days` (7, 30, 90 or 365; NULL
+means 30), sets how long replaced and deleted versions and shared checkpoints are kept.
+Vault credentials read it with `GET /history-retention` and change it with
+`POST /history-retention { days }`; the plugin shows it under **Troubleshooting** →
+**File history** and confirms before shortening it. Statements that keep a version read
+the setting in the same statement, so a version is kept for the period in force when it
+was committed. Changing the period re-times kept versions to their commit time plus the
+new period in the same D1 batch: a shorter period lets maintenance remove older history,
+and a longer one extends only versions that have not expired yet, because an expired row
+may already have lost its object. Checkpoints keep the expiry they were saved with, which
+their stored metadata repeats, and are also hidden and pruned once they are older than
+the current period. Both use the same commit-time rule, so a checkpoint never outlives
+the versions it references.

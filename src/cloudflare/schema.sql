@@ -127,7 +127,9 @@ CREATE TABLE IF NOT EXISTS server_state (
 	import_snapshot_seq INTEGER NOT NULL DEFAULT 0,
 	-- Shared settings JSON, sealed in an encrypted vault, and the version a write compares.
 	settings TEXT,
-	settings_version TEXT
+	settings_version TEXT,
+	-- Days replaced and deleted versions and shared checkpoints are kept. NULL means 30.
+	history_retention_days INTEGER CHECK (history_retention_days IN (7, 30, 90, 365))
 );
 
 CREATE TABLE IF NOT EXISTS reminder_file_cache (

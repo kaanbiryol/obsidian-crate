@@ -4,7 +4,7 @@ import type { SyncApiClient } from '../worker-api/client';
 /** The server no longer keeps the exact saved version of a file. */
 export class HistoryVersionUnavailableError extends Error {
 	constructor(readonly path: string) {
-		super(`${path}: this version is no longer available. Older versions are kept for 30 days. No files were changed.`);
+		super(`${path}: this version is no longer available. It may be older than the server's history period. No files were changed.`);
 		this.name = 'HistoryVersionUnavailableError';
 	}
 }

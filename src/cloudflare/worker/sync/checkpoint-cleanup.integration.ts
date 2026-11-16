@@ -74,7 +74,7 @@ it('answers 410 when an inventory is deleted after its reader found it in the in
 	await create();
 	const [entry] = await index();
 	await env.BUCKET.delete(`${HISTORY_CHECKPOINT_PREFIX}${entry!.id}.json`);
-	const response = await getSharedCheckpoint(new Request(`https://worker.test/sync/checkpoint?id=${entry!.id}`), env.BUCKET);
+	const response = await getSharedCheckpoint(new Request(`https://worker.test/sync/checkpoint?id=${entry!.id}`), env.BUCKET, env.DB);
 	expect(response.status).toBe(410);
 });
 

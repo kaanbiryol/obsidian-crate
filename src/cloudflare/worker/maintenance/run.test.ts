@@ -9,7 +9,8 @@ function createStatement(sql: string) {
 			statement.args = args;
 			return statement;
 		}),
-		first: vi.fn(async () => null),
+		// A real D1 always answers the retention read with one row.
+		first: vi.fn(async () => sql.includes('history_retention_days') ? { ms: 30 * 86_400_000 } : null),
 	all: vi.fn(async () => ({
 			results: sql.startsWith('SELECT storage_key, file_path FROM object_cleanup_queue')
 				? [{ storage_key: 'queued-object', file_path: 'queued.md' }]

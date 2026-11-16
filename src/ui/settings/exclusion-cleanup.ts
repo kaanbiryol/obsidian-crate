@@ -26,7 +26,7 @@ export function renderExclusionCleanup(containerEl: HTMLElement, plugin: CratePl
 							details: [
 								...paths.slice(0, 5),
 								...(paths.length > 5 ? [`…and ${paths.length - 5} more`] : []),
-								'Deleted files remain recoverable for 30 days.',
+								'Deleted files remain recoverable for the server’s history period.',
 							],
 							confirmText: 'Remove remote copies',
 							warning: true,

@@ -65,6 +65,8 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'PUT /settings': { scopes: VAULT, execution: COORDINATOR_READ },
 	'GET /features': { scopes: LIBRARY, keylessEncryptedRead: true },
 	'POST /features': { scopes: VAULT, execution: COORDINATOR, rateLimit: 10 },
+	'GET /history-retention': { scopes: VAULT },
+	'POST /history-retention': { scopes: VAULT, execution: COORDINATOR_READ, rateLimit: 10 },
 	'GET /auth/tokens': { scopes: VAULT },
 	'DELETE /auth/tokens': { scopes: VAULT, execution: COORDINATOR_READ },
 	'DELETE /auth/session': { scopes: LIBRARY, execution: COORDINATOR_READ },

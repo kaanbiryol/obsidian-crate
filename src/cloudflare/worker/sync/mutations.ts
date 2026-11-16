@@ -18,7 +18,6 @@ import { fileDeletionReceiptStatement, findFileDeletionReceipt, type FileDeletio
 import type { MutationAuditContext } from '../http/request-diagnostics';
 import {
 	FILE_VERSION_EXPIRES_AT_SQL,
-	FILE_VERSION_RETENTION_MS,
 	getStoredFileRow,
 	readVerifiedBytes,
 	type ExpectedFileHash,
@@ -94,7 +93,7 @@ function retainReplacedUpload(db: D1Database, input: UploadMutationInput, always
 	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, descriptor, expires_at)
 		SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_EXPIRES_AT_SQL}
 		FROM files WHERE ${replaced.sql} AND storage_key != ?${always ? '' : ` AND ${keepReplacedVersionSql('files')}`}`)
-		.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...replaced.args, input.objectKey),
+		.bind(Date.now(), ...replaced.args, input.objectKey),
 	...queueReplacedUploadCleanup(db, input)];
 }
 

@@ -13,5 +13,5 @@ it('rejects incomplete inventories, missing revisions and unsafe paths', () => {
 });
 it('rejects duplicate IDs and invalid expiry', () => {
 	expect(() => parseSharedCheckpointList({ version: 1, checkpoints: [checkpoint, checkpoint] })).toThrow('Duplicate');
-	expect(() => parseSharedCheckpointList({ version: 1, checkpoints: [{ ...checkpoint, expiresAt: Date.parse('2027-01-01') }] })).toThrow();
+	expect(() => parseSharedCheckpointList({ version: 1, checkpoints: [{ ...checkpoint, expiresAt: Date.parse('2027-09-21') }] })).toThrow();
 });

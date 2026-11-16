@@ -70,7 +70,7 @@ export async function handleCoordinatorRequest(
 			await publishExtraction(env, await request.json() as Publication);
 			return new Response(null, { status: 204 });
 		}
-		if (path === TRANSFER_PATHS.historyCheckpoint && request.method === 'GET') return getSharedCheckpoint(request, env.BUCKET);
+		if (path === TRANSFER_PATHS.historyCheckpoint && request.method === 'GET') return getSharedCheckpoint(request, env.BUCKET, env.DB);
 		if (path === TRANSFER_PATHS.historyCheckpointFile && request.method === 'GET') return downloadCheckpointFile(request, env.BUCKET, env.DB);
 		if (path === TRANSFER_PATHS.batchDownload && request.method === 'POST') return handleBatchDownload(request, env.BUCKET, env.DB);
 		if (path === TRANSFER_PATHS.importUpload && ['POST', 'PUT'].includes(request.method)) {

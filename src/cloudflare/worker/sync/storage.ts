@@ -4,6 +4,7 @@ import { queryRows } from '../d1/db';
 import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
 import { D1_MAX_BOUND_PARAMETERS } from '../d1/platform-limits';
+import { DAY_MS, DEFAULT_HISTORY_RETENTION_DAYS } from '../../../protocol/history-retention';
 export {
 	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
 	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
@@ -12,10 +13,11 @@ export {
 	BATCH_UPLOAD_MAX_FILES as MAX_BATCH_UPLOAD_FILES,
 	MAX_FILE_SIZE_BYTES as MAX_FILE_BYTES,
 } from '../../../protocol/sync-limits';
-export const FILE_VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-/** A retained version's `expires_at`. Bind `Date.now() + FILE_VERSION_RETENTION_MS`;
+/** The server's history retention in milliseconds, read in the statement that uses it. */
+export const HISTORY_RETENTION_MS_SQL = `(COALESCE((SELECT history_retention_days FROM server_state WHERE id = 1), ${DEFAULT_HISTORY_RETENTION_DAYS}) * ${DAY_MS})`;
+/** A retained version's `expires_at`: its commit time plus the retention. Bind `Date.now()`;
  * the database clock, rounded up to the next second, wins when it is later. */
-export const FILE_VERSION_EXPIRES_AT_SQL = `MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000 + ${FILE_VERSION_RETENTION_MS})`;
+export const FILE_VERSION_EXPIRES_AT_SQL = `(MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000) + ${HISTORY_RETENTION_MS_SQL})`;
 
 export interface FileStorageRow {
 	hash: string;

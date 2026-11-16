@@ -26,8 +26,8 @@ The web app and scheduled notifications talk to your server directly, so Obsidia
 | 1 MB per reminder note in the web app | Bigger notes, or notes with a very large number of reminders, are left out with an explanation. Split them into smaller project notes to edit and schedule them in the web app again. |
 | Web app search matches article titles | Each word you type matches the start of a word in a title. With [encryption](/docs/features/encryption/), short words of one or two letters match only whole words. Search notes, authors and highlights in Obsidian. |
 | No iPhone shortcut with encryption | **Save to Crate** can't encrypt notes, so encrypted vaults don't offer it. Save links in the web app or in Obsidian. |
-| 30 days of server history for replaced or deleted files, about one version every 10 minutes while editing (every hour for files of 1 MB or more) | Recover promptly. Files that only ever existed on one device may have no server history. |
-| Latest 20 checkpoints, for up to 30 days | Checkpoints are saved states of your whole vault you can return to. They cover recent syncs, not an unlimited backup archive. |
+| 30 days of server history for replaced or deleted files by default (7, 90 or 365 days available), about one version every 10 minutes while editing (every hour for files of 1 MB or more) | Recover promptly. Files that only ever existed on one device may have no server history. |
+| Latest 20 checkpoints, for up to your history period | Checkpoints are saved states of your whole vault you can return to. They cover recent syncs, not an unlimited backup archive. |
 
 Sizes are rounded down, so a file under the listed size always fits. The Reading and reminder limits can apply even when a note is small enough to sync.
 
@@ -62,7 +62,7 @@ If that happens, sync stops with **Cloudflare’s free daily database limit stop
 
 As a guide, a vault of 50,000 notes and 5 GB of PDFs uploads within one day of the free limits, with or without encryption. Its first upload uses about two-thirds of the day's database writes and just over half of its reads. The number of files matters more than their size: about 90,000 files fit in a day, fewer when many of them are larger than 1 MB.
 
-File storage includes 10 GB a month for free. Your vault counts toward it, and so do the 30 days of server history. With encryption, stored files take about a third more space, so a 5 GB vault uses about 7 GB.
+File storage includes 10 GB a month for free. Your vault counts toward it, and so does server history. A shorter history period uses less. With encryption, stored files take about a third more space, so a 5 GB vault uses about 7 GB.
 
 To see where you stand, open **Settings → Crate → Server and usage → Cloudflare usage**. It compares your usage, including storage, with the free allowances. File storage beyond its free allowance is billed rather than stopped.
 
