@@ -224,7 +224,8 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 
     const expected = { schemaHash: digest(schema), runtimeVersion, serverRevision: release.revision };
     if (previousText !== null) {
-      if (!upgradeBackup) assertCompatibleLocalMetadata(previous, expected);
+      // Damaged metadata (`null` included) fails the same way with or without an upgrade.
+      if (!upgradeBackup || !previous) assertCompatibleLocalMetadata(previous, expected);
       else {
         const current = /** @type {ServerMetadata} */ (previous);
         if (current.schemaHash !== expected.schemaHash) assertLocalMigrationPath(current.schemaVersion, release);

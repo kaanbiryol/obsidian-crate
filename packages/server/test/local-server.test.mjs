@@ -59,6 +59,10 @@ test('damaged metadata and missing storage cannot silently create a fresh server
 		const metadata = await readFile(metadataPath, 'utf8');
 		await writeFile(metadataPath, 'null');
 		await assert.rejects(openLocalRuntime({ dataDir }), /matching schema\/runtime/);
+		// An upgrade reads the same metadata before it backs anything up.
+		const backup = `${dataDir}-upgrade-backup`;
+		await assert.rejects(openLocalRuntime({ dataDir, administrative: true, upgradeBackup: backup }), /matching schema\/runtime/);
+		assert.equal(await stat(backup).catch(() => null), null);
 		await rm(metadataPath);
 		await assert.rejects(openLocalRuntime({ dataDir }), /without server.json/);
 		await writeFile(metadataPath, metadata);
@@ -174,6 +178,29 @@ for (const administrative of [true, false]) test(`revoking a device ${administra
 	} finally {
 		await runtime.close();
 		await rm(dataDir, { recursive: true, force: true });
+	}
+});
+
+test('upgrade leaves interrupts to the CLI, so its ordered cleanup still runs', { timeout: 30_000 }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-upgrade-signals-'));
+	const output = `${dataDir}-backup`;
+	const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+	const count = () => Math.max(...signals.map(signal => process.listenerCount(signal)));
+	try {
+		await (await openLocalRuntime({ dataDir, administrative: true, handleSignals: false })).close();
+		const { upgrade } = await import('../src/commands/data.mjs');
+		// Miniflare's own handlers exit synchronously, skipping the drain and unlock.
+		const baseline = count();
+		let most = baseline;
+		const sampler = setInterval(() => { most = Math.max(most, count()); }, 1);
+		try { await upgrade(/** @type {never} */ ({ dataDir, values: { output } })); }
+		finally { clearInterval(sampler); }
+		assert.equal(most, baseline);
+		assert.ok(await stat(join(output, 'backup.json')));
+		assert.equal(await stat(join(dataDir, 'server.lock')).catch(() => null), null);
+	} finally {
+		await rm(dataDir, { recursive: true, force: true });
+		await rm(output, { recursive: true, force: true });
 	}
 });
 

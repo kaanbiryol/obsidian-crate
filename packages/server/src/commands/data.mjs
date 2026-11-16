@@ -14,7 +14,9 @@ export async function backup({ dataDir, values }) {
 /** @type {Command} */
 export async function upgrade({ dataDir, values }) {
 	if (!values.output) throw new Error('Stop the server and provide --output with a new backup directory.');
-	const upgraded = await openLocalRuntime({ dataDir, administrative: true, upgradeBackup: values.output });
+	// As for every other command, an interrupt waits for the upgrade to close the runtime
+	// and release the data directory instead of exiting mid-migration.
+	const upgraded = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false, upgradeBackup: values.output });
 	await upgraded.close();
 	console.log('Server data upgraded. The verified backup is at ' + resolve(values.output));
 }
