@@ -19,6 +19,7 @@
 	"scripts": {
 		"build:site": "npm run build:site:images && npm run build:site:crate-ui && npm run build:site:docs",
 		"build:site:images": "node scripts/build-site-images.mjs",
+		"build:site:videos": "node scripts/build-site-videos.mjs",
 		"build:site:docs": "npm --prefix docs-site run build",
 		"check:docs": "npm --prefix docs-site run check",
 		"dev:docs": "npm --prefix docs-site run dev",

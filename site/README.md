@@ -14,6 +14,22 @@ full-resolution WebP files as the previews.
 After replacing a PNG, rebuild and update its URL version in the homepage to
 invalidate cached images.
 
+## Homepage videos
+
+Put full-quality exports in `assets/videos/originals/` (ignored by Git), named
+after the file they replace, such as `plugin-sync.mp4`. Then run
+`npm run build:site:videos` (needs `ffmpeg` and `ffprobe`) and commit the
+encoded files in `assets/videos/`.
+
+The build keeps each recording's resolution and frame rate and encodes it as
+visually lossless H.264 (CRF 16) without audio. It limits reference frames so
+Safari and Chrome on macOS decode fades cleanly, and it fails if the size or
+frame count changes. GitHub Pages serves the committed files and does not run
+this step. Transparent `.webm` and `.mov` recordings are not handled.
+
+After encoding, update each changed video's URL version in the homepage to
+invalidate cached copies.
+
 ## iPhone shortcut downloads
 
 The public install page is `/shortcuts/v1/`. The Reading documentation and app
