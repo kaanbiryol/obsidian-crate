@@ -121,20 +121,21 @@ function showPhrase(from: number, to: number, stored: string, phrase: string, at
 /**
  * A cursor the user moved next to a saved date's chip, by click or key, turns
  * the date into a phrase to edit. Called with the settled selection, after
- * other filters moved it, and the one before the move. Arriving from after the chip keeps the cursor at the
+ * other filters moved it, and the one before the move, or null when the editor regains focus with the cursor
+ * already there. Arriving from after the chip keeps the cursor at the
  * phrase's end; arriving at its start from before keeps it at the start.
  * Selections leave chips alone, and a date no phrase reproduces stays a chip.
  */
-export function openDateChip(state: EditorState, previous: EditorSelection, now = new Date()): TransactionSpec | null {
+export function openDateChip(state: EditorState, previous: EditorSelection | null, now = new Date()): TransactionSpec | null {
 	const after = state.selection;
 	if (after.ranges.length !== 1 || !after.main.empty) return null;
-	const start = previous.main.head, head = after.main.head, line = state.doc.lineAt(head);
+	const head = after.main.head, start = previous?.main.head ?? head, line = state.doc.lineAt(head);
 	const editable = editableDatePhrase(line.text, now);
 	if (!editable) return null;
 	const from = line.from + editable.from, to = line.from + editable.to;
 	// The line's end, past the hidden ID that follows the date, shows right after the chip too.
 	const atEnd = (position: number) => position === to || (position === line.to && endMarker(line)?.from === to);
-	if ((head !== from && !atEnd(head)) || (previous.ranges.length === 1 && previous.main.empty && start === head)) return null;
+	if ((head !== from && !atEnd(head)) || (previous?.ranges.length === 1 && previous.main.empty && start === head)) return null;
 	return showPhrase(from, to, line.text.slice(editable.from, editable.to), editable.phrase, atEnd(head) || atEnd(start));
 }
 
@@ -301,8 +302,10 @@ export function createReminderDateChips(isReminderEditor: (state: EditorState) =
 				|| (!transaction.annotation(Transaction.userEvent) && !transaction.annotation(keepCursor));
 			const moved = update.selectionSet && update.view.hasFocus && isReminderEditor(update.state)
 				&& (joined || (!update.docChanged && update.transactions.some(keyed)));
+			// Leaving the editor saves the line under the cursor, which stays next to the date's chip when focus returns.
+			const refocused = update.focusChanged && update.view.hasFocus && !update.docChanged && isReminderEditor(update.state);
 			if (!phrase) {
-				const open = moved ? openDateChip(update.state, update.startState.selection) : null;
+				const open = moved ? openDateChip(update.state, update.startState.selection) : refocused ? openDateChip(update.state, null) : null;
 				// A click can send more updates that change nothing; skip only if the text or cursor moved on.
 				if (open) queueMicrotask(() => {
 					const { state } = update.view;

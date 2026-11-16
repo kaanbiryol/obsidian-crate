@@ -333,6 +333,23 @@ for (const engine of [chromium, webkit]) {
 		await settle(page);
 		assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Print photos 2026-11-15T11:00:00.000Z <!-- crate-id:p -->', `${name}: typed date saved on a reminder with an ID`);
 		assert.ok((await visible()).includes('- [ ] Print photos Tomorrow, 12:00'), `${name}: saved date shows as a chip at the line's start`);
+		// Leaving the editor saves the date under the cursor; focus coming back next to it opens it as its phrase again.
+		for (const [label, start, typed] of [['typed', '- [ ] Print photos', ' tomorrow 12:00'], ['opened', '- [ ] Print photos ', '']]) {
+			const text = typed ? '- [ ] Print photos <!-- crate-id:p -->' : '- [ ] Print photos 2026-11-15T11:00:00.000Z <!-- crate-id:p -->';
+			await mount(`# Errands\n${text}\nOutro`, 0);
+			await page.evaluate(anchor => window.place(anchor), `# Errands\n${start}`.length);
+			await page.keyboard.type(typed);
+			await settle(page);
+			await page.evaluate(() => window.view.contentDOM.blur());
+			await settle(page);
+			assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Print photos 2026-11-15T11:00:00.000Z <!-- crate-id:p -->', `${name}: ${label} date saved on leaving the editor`);
+			await page.evaluate(() => window.view.focus());
+			await settle(page);
+			assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Print photos tomorrow 12:00 <!-- crate-id:p -->', `${name}: ${label} date opens when focus returns`);
+			await outro(page);
+			await settle(page);
+			assert.equal(await page.evaluate(() => window.view.state.doc.line(2).text), '- [ ] Print photos 2026-11-15T11:00:00.000Z <!-- crate-id:p -->', `${name}: ${label} date restored after focus returns`);
+		}
 
 		// Writing a new reminder with a date and a description in one line.
 		await mount();
