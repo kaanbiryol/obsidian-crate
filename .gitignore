@@ -74,3 +74,6 @@ __pycache__/
 
 # Local Claude Code state (worktrees, recordings, local settings)
 /.claude/
+
+# Local engineering audit reports
+/docs/audits/
