@@ -1,0 +1,5 @@
+#!/bin/sh
+# Lints staged script files. Skip once with: git commit --no-verify
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' '*.mts' '*.js' '*.mjs')
+[ -z "$files" ] && exit 0
+echo "$files" | tr '\n' '\0' | xargs -0 npx --no-install eslint --no-warn-ignored

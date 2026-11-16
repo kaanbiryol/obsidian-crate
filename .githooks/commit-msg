@@ -1,0 +1,10 @@
+#!/bin/sh
+# Enforces lowercase Conventional Commits: <type>(<scope>): <description>
+subject=$(head -n 1 "$1")
+case "$subject" in Merge\ *|Revert\ *|fixup!\ *|squash!\ *) exit 0 ;; esac
+if ! printf '%s' "$subject" | grep -Eq '^(fix|feat|chore|refactor|perf|build|ci)(\([a-z0-9-]+\))?!?: [^A-Z]+$'; then
+	echo "Commit message must be lowercase Conventional Commits, for example:" >&2
+	echo "  fix(ios): resolve date parsing" >&2
+	echo "Types: fix, feat, chore, refactor, perf, build, ci" >&2
+	exit 1
+fi

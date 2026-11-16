@@ -26,6 +26,7 @@
 		"build:worker": "node scripts/build-worker.mjs",
 		"build:server": "npm run build:worker && node scripts/package-server.mjs",
 		"pack:server": "npm run build:server && npm pack ./dist/server --pack-destination ./dist",
+		"prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
 		"server": "node scripts/local-server.mjs",
 		"test:local-server": "npm run build:worker && node --test \"packages/server/test/*.test.mjs\"",
 		"test:server-package": "npm run build:server && node --test scripts/server-package.test.mjs",

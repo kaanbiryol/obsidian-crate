@@ -13,6 +13,8 @@ npm run vault:setup
 npm run dev
 ```
 
+`npm ci` also enables the Git hooks in `.githooks/`: staged files are linted before each commit, and commit messages must be lowercase [Conventional Commits](https://www.conventionalcommits.org/) such as `fix(ios): resolve date parsing`.
+
 Open the ignored `test-vault/` in Obsidian and enable Crate under **Settings → Community plugins**. The watcher installs each successful development build there. Use a disposable vault and, only for hosted testing, a disposable Cloudflare account. Local unit, Worker-runtime and PWA preview tests require no Cloudflare credentials. See [deployment setup](docs/deployment.md) for explicit hosted enrollment.
 
 ### Development configuration
