@@ -59,3 +59,21 @@ it('keeps the previous tag\'s list and count until the new tag answers, then sho
 		expect(hook.current).toMatchObject({ items: [systems], count: 1, loading: false });
 	} finally { vi.useRealTimers(); }
 });
+
+it('shows a loading state, not an empty library, until a server library\'s first page answers', async () => {
+	vi.useFakeTimers();
+	try {
+		let answer: () => void = () => {};
+		const load = vi.fn(async () => {
+			await new Promise<void>(resolve => { answer = resolve; });
+			return { items: [systems], cursor: null };
+		});
+		const source: ReadingLibrarySource = { load, loadTags: async () => [], revision: 1, present: items => items };
+		const hook = renderHook(() => useReadingLibraryQuery({ snapshot: { items: [], loading: false }, source, section: 'inbox', query: '', tag: null }));
+		// Before: the unanswered first page listed an empty inbox and offered to save a first link.
+		await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+		expect(hook.current).toMatchObject({ count: 0, loading: true });
+		await act(async () => { answer(); await vi.runAllTimersAsync(); });
+		expect(hook.current).toMatchObject({ items: [systems], count: 1, loading: false });
+	} finally { vi.useRealTimers(); }
+});

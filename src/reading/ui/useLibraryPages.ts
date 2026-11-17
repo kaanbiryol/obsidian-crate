@@ -114,7 +114,8 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		return () => window.clearTimeout(timer);
 	}, [settled, key]);
 	const loadMore = useCallback(() => { if (settled && pages.cursor && !pages.loading) void fetchPage(pages.cursor, false); }, [fetchPage, settled, pages.cursor, pages.loading]);
-	return { items: pages.items, shown: { section: pages.section, q: pages.q, tag: pages.tag }, tags: pages.tags,
+	// Until a first page answers, the empty initial state is not the library's answer.
+	return { items: pages.items, shown: { section: pages.section, q: pages.q, tag: pages.tag }, tags: pages.tags, answered: !!pages.key,
 		cursor: settled ? pages.cursor : null, loading: pages.loading || !settled, loadingMore: settled && pages.loading && !pages.reloading,
 		slow: !settled && slowKey === key, error: settled ? pages.error : null, loadMore };
 }

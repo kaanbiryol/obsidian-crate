@@ -17,7 +17,7 @@ interface ReadingLibraryQuery {
 /** What the library lists for one section, search and tag: a local library's matching
  * items, or a server library's matched pages with local changes shown over them. A server
  * library keeps listing the previous search or tag until the new one answers, then changes the
- * list, count and tags together; another section shows a loading state until it answers. */
+ * list, count and tags together; the first query and another section show a loading state until they answer. */
 export function useReadingLibraryQuery({ snapshot, source, section, query, tag }: ReadingLibraryQuery) {
 	// Filter on a deferred query so typing never waits for the list to re-render.
 	const deferredQuery = useDeferredValue(query);
@@ -42,7 +42,7 @@ export function useReadingLibraryQuery({ snapshot, source, section, query, tag }
 	const snapshotItems = snapshot.items;
 	const localTags = useMemo(() => source ? [] : countReadingTags(snapshotItems, section), [source, snapshotItems, section]);
 	const tags = source ? (otherSection ? [] : pages.tags) : localTags;
-	const loading = source ? otherSection || pages.slow : snapshot.loading;
+	const loading = source ? !pages.answered || otherSection || pages.slow : snapshot.loading;
 	const more = source ? !!pages.cursor : false;
 	return { listQuery, items, excerpts, count, tags, loading, more, pageLoading: !!source && pages.loading, loadingMore: !!source && pages.loadingMore, pageError: pages.error, loadMore: pages.loadMore };
 }
