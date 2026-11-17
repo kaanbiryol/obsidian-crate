@@ -44,5 +44,5 @@ export function useReadingLibraryQuery({ snapshot, source, section, query, tag }
 	const tags = source ? (otherSection ? [] : pages.tags) : localTags;
 	const loading = source ? !pages.answered || otherSection || pages.slow : snapshot.loading;
 	const more = source ? !!pages.cursor : false;
-	return { listQuery, items, excerpts, count, tags, loading, more, pageLoading: !!source && pages.loading, loadingMore: !!source && pages.loadingMore, pageError: pages.error, loadMore: pages.loadMore };
+	return { listQuery, shownTag: shown.tag, items, excerpts, count, tags, loading, more, pageLoading: !!source && pages.loading, loadingMore: !!source && pages.loadingMore, pageError: pages.error, loadMore: pages.loadMore };
 }

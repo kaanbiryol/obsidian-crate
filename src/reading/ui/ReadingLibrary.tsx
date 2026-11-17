@@ -1,7 +1,7 @@
 import { ReadingDuplicates } from './ReadingDuplicates';
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { TextField } from '../../ui/shared/TextField';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ViewHeader } from '../../ui/shared/ViewHeader';
@@ -15,6 +15,7 @@ import type { ReadingSnapshot } from '../data/library';
 import { groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { useContentReveal } from '@/ui/shared/useContentReveal';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { HighlightList } from './HighlightList';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
@@ -100,7 +101,7 @@ export function ReadingLibraryPanel({
 		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 1000);
 		return () => window.clearTimeout(timer);
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
-	const { listQuery, items, excerpts, count, tags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
+	const { listQuery, shownTag, items, excerpts, count, tags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	// A section that had to load fades its count, tags and list in instead of popping in.
 	useContentReveal(loading, () => {
@@ -108,6 +109,22 @@ export function ReadingLibraryPanel({
 		if (!list || !library) return undefined;
 		return [list, ...library.querySelectorAll<HTMLElement>(':scope > .crate-reading__header .view-header-meta, :scope > .crate-reading-tag-filter')];
 	});
+	// A tag swaps the list in place, so it fades in with the tab dissolve's timing once
+	// the tag's results show. Sections and loading states have their own transitions.
+	const reduceMotion = useReducedMotion();
+	const shownFilter = useRef<{ section: ReadingSection; tag: string | null } | null>(null);
+	useLayoutEffect(() => {
+		const previous = shownFilter.current;
+		shownFilter.current = loading ? null : { section, tag: shownTag };
+		if (!previous || loading || reduceMotion || previous.section !== section || previous.tag === shownTag) return;
+		const list = lists.current.get(section);
+		if (!list) return;
+		const style = (list.ownerDocument.defaultView ?? window).getComputedStyle(list);
+		const duration = parseFloat(style.getPropertyValue('--pwa-motion-tab-duration'));
+		if (!duration) return;
+		const animation = list.animate([{ opacity: 0 }, { opacity: 1 }], { duration, easing: style.getPropertyValue('--pwa-motion-tab-ease').trim() || 'ease-in-out' });
+		return () => animation.cancel();
+	}, [loading, section, shownTag, reduceMotion]);
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
 	useEffect(() => {
