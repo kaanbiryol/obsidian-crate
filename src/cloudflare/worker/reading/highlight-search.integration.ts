@@ -153,6 +153,18 @@ it('lists every tag once, reading about one row per tag', async () => {
 	expect(await get('tags')).toEqual({ tags });
 });
 
+it('lists a section\'s tags most used first with their note counts', async () => {
+	await seed('One', ['Systems', 'Design']);
+	await seed('Two', ['Systems']);
+	await seed('Three', ['Systems', 'Craft']);
+	await edit('Two', { highlights: [highlight('Attention is scarce.', '2026-02-01T00:00:00.000Z')] });
+	expect(await get('tags?section=inbox')).toEqual({ tags: ['systems', 'craft', 'design'], counts: [3, 1, 1] });
+	expect(await get('tags?section=highlights')).toEqual({ tags: ['systems'], counts: [1] });
+	expect(await get('tags?section=favorites')).toEqual({ tags: [], counts: [] });
+	const response = await handleReadingRoute(new Request('https://test/reading/tags?section=all'), env, principal);
+	expect(response.status).toBe(400);
+});
+
 it('searches an encrypted vault\'s highlights and lists its sealed tag names while a note has the tag', async () => {
 	const bundle = await createVaultKeyBundle(), key = await importEncryptionSecret(bundle.vault);
 	const keys = { vaultId: bundle.vaultId, key, keyGeneration: 1, searchKey: await deriveReadingSearchKey(bundle.vaultId, bundle.vault) };
@@ -182,6 +194,8 @@ it('searches an encrypted vault\'s highlights and lists its sealed tag names whi
 		return (await Promise.all(sealed.map(tag => openReadingTagName(tag, keys)))).sort();
 	};
 	expect(await names()).toEqual(['private', 'work']);
+	const counted = await route<{ sealed: Array<{ term: string; name: string; count: number }> }>('tags?section=inbox');
+	expect(await Promise.all(counted.sealed.map(async tag => [await openReadingTagName(tag, keys), tag.count]))).toEqual([['private', 2], ['work', 1]]);
 	expect(JSON.stringify((await env.DB.prepare('SELECT * FROM reading_tags').all()).results)).not.toContain('private');
 	await upload('bb', ['Private'], []);
 	expect(await names()).toEqual(['private']);

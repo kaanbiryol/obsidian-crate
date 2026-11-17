@@ -1,7 +1,7 @@
 import { armNotificationCoordinator } from '../notifications/lifecycle';
 import type { Env } from '../types';
 import { readingResponse, ReadingError, readStoredNote, policyStatement, readingItemId } from './common';
-import { parseReadingItemsQuery, readingItem, readingItemStatements, readingItems, readingTags, type ReadingItemRows } from './queries';
+import { parseReadingItemsQuery, readingItem, readingItemStatements, readingItems, readingTags, parseReadingTagsSection, type ReadingItemRows } from './queries';
 import { completeReadingIndex, ensureReadingIndex, readingIndexStatement, type ReadingIndexRow } from './library-index';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
@@ -36,7 +36,7 @@ export async function readLibrary(request: Request, env: Env, current: ReadingPo
 	// A rebuild step changed the rows read before it.
 	// One small page, so it is answered outside the lock.
 	if (path === '/reading/items') return readingResponse(await readingItems(env, current, encrypted, parseReadingItemsQuery(url.searchParams, encrypted)));
-	if (path === '/reading/tags') return readingResponse(await readingTags(env, encrypted));
+	if (path === '/reading/tags') return readingResponse(await readingTags(env, encrypted, parseReadingTagsSection(url.searchParams)));
 	if (path === '/reading/item') return await readingItem(env, current, url.searchParams.get('id'), request.headers.get('If-None-Match'), index.rebuilt ? undefined : loaded.item);
 	return readingResponse({ error: 'Not found' }, 404);
 }

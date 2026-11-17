@@ -6,6 +6,7 @@ import { cacheReadingArticle, readReadingArticle, removeRetiredReadingRecords, t
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
 import type { ReadingItem } from '@/reading/core/model';
+import type { ReadingSection, ReadingTag } from '@/reading/core/reading-presentation';
 import { ENCRYPTED_READING_ACTIONS, EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
 export { ReadingApiError } from './session/api-error';
@@ -94,12 +95,14 @@ export async function queryReadingItems(session: ReadingSession, query: ReadingI
 	return { items: page.items, issues: page.issues, cursor: page.cursor };
 }
 
-/** Every tag in the library, for the tags view. */
-export async function queryReadingTags(session: ReadingSession): Promise<string[]> {
-	const value = await readingRequest<unknown>('/reading/tags', session);
-	const tags = (value as { tags?: unknown } | null)?.tags;
+/** The tags of one section's notes, most used first with their counts. A server from before
+ * section counts answers every tag in the library, without counts. */
+export async function queryReadingTags(session: ReadingSession, section: ReadingSection): Promise<ReadingTag[]> {
+	const value = await readingRequest<unknown>(`/reading/tags?section=${section}`, session);
+	const { tags, counts } = (value ?? {}) as { tags?: unknown; counts?: unknown };
 	if (!Array.isArray(tags) || !tags.every(tag => typeof tag === 'string')) throw new Error('Reading tags response is unreadable.');
-	return tags;
+	const counted = Array.isArray(counts) && counts.length === tags.length && counts.every(count => Number.isSafeInteger(count) && count >= 0) ? counts as number[] : null;
+	return tags.map((name, index) => counted ? { name, count: counted[index]! } : { name });
 }
 
 /** The library's first inbox page and its issues, kept in memory. The library stays on the

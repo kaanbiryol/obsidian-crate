@@ -99,7 +99,7 @@ export function ReadingLibraryPanel({
 		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 1000);
 		return () => window.clearTimeout(timer);
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
-	const { listQuery, items, excerpts, count, loadTags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
+	const { listQuery, items, excerpts, count, tags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
@@ -154,7 +154,7 @@ export function ReadingLibraryPanel({
 					placeholder={section === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />}
 					value={query} onChange={event => { setQuery(event.target.value); resetList(); }}
 					trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
-				<ReadingTagFilter load={loadTags} selected={tag} onChange={value => { if (value === tag) return; setTag(value); resetList(); }} />
+				<ReadingTagFilter tags={tags} selected={tag} onChange={value => { if (value === tag) return; setTag(value); resetList(); }} />
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1} onScroll={loadNearEnd}>
 					{notice}

@@ -128,11 +128,16 @@ export class EncryptedReadingApi {
 		});
 		return { items: unique, issues, cursor: page.cursor };
 	}
-	/** Every tag name the server lists, opened here. A name sealed for another term is dropped. */
-	private async tags(): Promise<{ tags: string[] }> {
-		const { sealed } = await this.json<{ sealed: ReadingTagName[] }>('/reading/tags');
+	/** Every tag name the server lists, opened here. A name sealed for another term is dropped.
+	 * With a section, each name keeps its note count, in the server's most used order. */
+	private async tags(section: string | null): Promise<{ tags: string[]; counts?: number[] }> {
+		const { sealed } = await this.json<{ sealed: Array<ReadingTagName & { count?: number }> }>(section ? `/reading/tags?section=${encodeURIComponent(section)}` : '/reading/tags');
 		const names = await Promise.all(sealed.map(tag => openReadingTagName(tag, this.cardKeys)));
-		return { tags: [...new Set(names.filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b)) };
+		const counts = new Map<string, number | undefined>();
+		names.forEach((name, index) => { if (name && !counts.has(name)) counts.set(name, sealed[index]!.count); });
+		const opened = [...counts];
+		if (!section || !opened.every(([, count]) => typeof count === 'number')) return { tags: opened.map(([name]) => name).sort((a, b) => a.localeCompare(b)) };
+		return { tags: opened.map(([name]) => name), counts: opened.map(([, count]) => count!) };
 	}
 	/** The listed note with this Reading ID, read from the server when this client has not listed it. */
 	private async find(id: string): Promise<Listed | undefined> {
@@ -144,7 +149,7 @@ export class EncryptedReadingApi {
 		const url = new URL(path, 'https://crate.invalid'), action = url.pathname.slice('/reading/'.length);
 		if (action === 'items') return this.items(url.searchParams);
 		if (action === 'item') return (await this.item(url.searchParams.get('id') ?? ''))!.article;
-		if (action === 'tags') return await this.tags();
+		if (action === 'tags') return await this.tags(url.searchParams.get('section'));
 		if (!rawBody || !ENCRYPTED_READING_ACTIONS.includes(action)) throw new Error('Unsupported encrypted Reading request.');
 		const body = JSON.parse(rawBody) as Record<string, unknown>, id = body.operationId;
 		if (typeof id !== 'string') throw new Error('A saved Reading operation ID is required.');

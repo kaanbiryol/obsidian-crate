@@ -274,11 +274,39 @@ async function highlightPage(env: Env, encrypted: boolean, query: ReadingItemsQu
 /** Most tags the tag list returns. */
 const MAX_READING_TAGS = 5000;
 
+export type ReadingTagsResponse = { tags: string[]; counts?: number[] } | { sealed: Array<{ term: string; name: string; count?: number }> };
+
+/** The section a tag list counts its notes in, or null for the whole library. */
+export function parseReadingTagsSection(params: URLSearchParams): ReadingSection | null {
+	const section = params.get('section');
+	if (section === null) return null;
+	if (section === 'all' || (section !== 'highlights' && !(section in SECTION_FILTERS))) throw new ReadingError('Unknown Reading section.');
+	return section as ReadingSection;
+}
+
 /** Every tag in the library, for the tags view. An unencrypted vault steps through the distinct
  * `t:` terms in note_terms, one index seek per tag, so the list reads about one row per tag, not
  * one per tagged note. An encrypted vault lists the sealed names devices posted; the device
- * opens them. */
-export async function readingTags(env: Env, encrypted: boolean): Promise<{ tags: string[] } | { sealed: Array<{ term: string; name: string }> }> {
+ * opens them.
+ *
+ * With a `section`, only tags of notes listed there come back, most used first, each with its
+ * note count. That reads every tagged note entry once, plus its note. */
+export async function readingTags(env: Env, encrypted: boolean, section: ReadingSection | null = null): Promise<ReadingTagsResponse> {
+	if (section) {
+		const sectionFilter = section === 'highlights' ? 'highlighted = 1 AND status IS NOT NULL' : SECTION_FILTERS[section];
+		const visible = encrypted ? 'card IS NOT NULL' : 'metadata_json IS NOT NULL AND duplicate = 0';
+		const where = [sectionFilter, visible].map(clause => clause.replace(/\b(status|favorite|highlighted|card|metadata_json|duplicate)\b/g, 'i.$1')).join(' AND ');
+		if (encrypted) {
+			const { results } = await env.DB.prepare(`SELECT r.term, r.name, count(*) AS count FROM reading_tags r
+      CROSS JOIN note_terms t ON t.term = r.term CROSS JOIN reading_items i ON i.portable_path = t.portable_path
+      WHERE ${where} GROUP BY r.term ORDER BY count DESC, r.term LIMIT ${MAX_READING_TAGS}`).all<{ term: string; name: string; count: number }>();
+			return { sealed: results };
+		}
+		const { results } = await env.DB.prepare(`SELECT t.term, count(*) AS count FROM note_terms t
+      CROSS JOIN reading_items i ON i.portable_path = t.portable_path
+      WHERE t.term > 't:' AND t.term < 't;' AND ${where} GROUP BY t.term ORDER BY count DESC, t.term LIMIT ${MAX_READING_TAGS}`).all<{ term: string; count: number }>();
+		return { tags: results.map(row => row.term.slice(2)), counts: results.map(row => row.count) };
+	}
 	if (encrypted) {
 		const { results } = await env.DB.prepare(`SELECT term, name FROM reading_tags LIMIT ${MAX_READING_TAGS}`).all<{ term: string; name: string }>();
 		return { sealed: results };

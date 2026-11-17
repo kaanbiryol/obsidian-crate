@@ -71,7 +71,7 @@ function ReadingAppContent() {
 			const page = await queryReadingItems(session, { section, q, tag: tag ?? undefined, cursor: cursor ?? undefined });
 			return { items: page.items, cursor: page.cursor };
 		},
-		loadTags: () => queryReadingTags(session),
+		loadTags: section => queryReadingTags(session, section),
 		revision: cache, present: items => presentReadingItems(items, pending),
 	} : undefined, [session, savedOnly, cache, pending]);
 	// A shared link saves at once, like the iPhone shortcut. Its draft keeps it until

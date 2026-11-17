@@ -139,6 +139,13 @@ unencrypted vault answers `{ tags }`, lowercased, stepping through the distinct 
 one index seek each. An encrypted vault answers `{ sealed: [{ term, name }] }` from `reading_tags`,
 each name sealed by a device for its hashed term; the device opens them.
 
+`GET /reading/tags?section=inbox|favorites|archived|highlights` lists only the tags of notes in
+that section, most used first, with each tag's note count: `{ tags, counts }` unencrypted (the two
+arrays align), or `{ sealed: [{ term, name, count }] }` encrypted. It reads every tagged note entry
+once plus its note, so the web app asks once per section and keeps the answer until the library's
+next sync. Another section value receives HTTP 400. A client that receives no counts (a server
+from before section counts) shows the tags without them.
+
 In an encrypted vault, each Reading note's upload carries its card as the file's public data
 (`{ kind: 'reading-card', version: 1, card, terms, fields, highlighted_at, highlight_terms, tag_names }`), from Obsidian's sync and the web
 app's encrypted commits alike; the server validates it and lists the note from it in the commit's

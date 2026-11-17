@@ -25,6 +25,21 @@ export function filterReadingItems(items: ReadingItem[], section: ReadingSection
 	return filtered.every((item, index) => index === 0 || newestFirst(filtered[index - 1]!, item) <= 0) ? filtered : filtered.sort(newestFirst);
 }
 
+/** A tag in the filter, with how many of the section's notes have it when that is known. */
+export interface ReadingTag { name: string; count?: number }
+
+/** Most used first; tags without counts keep their names' order. */
+function rankReadingTags(tags: ReadingTag[]): ReadingTag[] {
+	return [...tags].sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name));
+}
+
+/** The tags of a section's notes, counted from a library held in memory. */
+export function countReadingTags(items: ReadingItem[], section: ReadingSection): ReadingTag[] {
+	const counts = new Map<string, number>();
+	for (const item of filterReadingItems(items, section, '', null)) for (const tag of new Set(item.tags)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+	return rankReadingTags([...counts].map(([name, count]) => ({ name, count })));
+}
+
 export function groupReadingItems(items: ReadingItem[], now = new Date()): { label: string; items: ReadingItem[] }[] {
 	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 	const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);

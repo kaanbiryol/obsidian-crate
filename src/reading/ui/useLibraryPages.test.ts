@@ -119,3 +119,57 @@ it('keeps unchanged rows and hides the next-page spinner while a refresh reloads
 	expect(hook.current.loadingMore).toBe(true);
 	await api.settle();
 });
+
+it('shows a first page only with its section\'s tags, and returns to a section read since the last revision without asking again', async () => {
+	vi.useFakeTimers();
+	try {
+		const tagAnswers: Array<() => void> = [];
+		const load = vi.fn(async ({ section }: { section: string }) => ({ items: section === 'inbox' ? [item] : [], cursor: null }));
+		const loadTags = vi.fn(async (section: string) => {
+			await new Promise<void>(resolve => tagAnswers.push(resolve));
+			return [{ name: section, count: 1 }];
+		});
+		let section: 'inbox' | 'archived' = 'inbox', revision = 1;
+		const hook = renderHook(() => useLibraryPages({ load, loadTags, revision, present: items => items }, section, '', null));
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+		// The page answered, but its tags have not: nothing shows yet.
+		expect(hook.current).toMatchObject({ items: [], tags: [], loading: true });
+		await act(async () => { tagAnswers.shift()!(); await vi.runAllTimersAsync(); });
+		expect(hook.current).toMatchObject({ items: [item], tags: [{ name: 'inbox', count: 1 }], loading: false });
+		section = 'archived';
+		hook.rerender();
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+		await act(async () => { tagAnswers.shift()!(); await vi.runAllTimersAsync(); });
+		expect(hook.current).toMatchObject({ items: [], tags: [{ name: 'archived', count: 1 }], shown: { section: 'archived' } });
+		section = 'inbox';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		expect(hook.current).toMatchObject({ items: [item], tags: [{ name: 'inbox', count: 1 }], loading: false });
+		expect(load).toHaveBeenCalledTimes(2);
+		expect(loadTags).toHaveBeenCalledTimes(2);
+		// A new revision reads the shown section again.
+		revision = 2;
+		hook.rerender();
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+		await act(async () => { tagAnswers.shift()!(); await vi.runAllTimersAsync(); });
+		expect(load).toHaveBeenCalledTimes(3);
+		expect(loadTags).toHaveBeenCalledTimes(3);
+	} finally { vi.useRealTimers(); }
+});
+
+it('reads a section\'s tags once for every tag and search in it', async () => {
+	vi.useFakeTimers();
+	try {
+		const load = vi.fn(async () => ({ items: [item], cursor: null }));
+		const loadTags = vi.fn(async () => [{ name: 'Work', count: 1 }]);
+		let tag: string | null = null;
+		const hook = renderHook(() => useLibraryPages({ load, loadTags, revision: 1, present: items => items }, 'inbox', '', tag));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		tag = 'Work';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		expect(hook.current).toMatchObject({ shown: { tag: 'Work' }, tags: [{ name: 'Work', count: 1 }] });
+		expect(load).toHaveBeenCalledTimes(2);
+		expect(loadTags).toHaveBeenCalledTimes(1);
+	} finally { vi.useRealTimers(); }
+});

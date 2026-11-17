@@ -45,3 +45,25 @@
 		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -4px; border-radius: tokens.$radius-pill; }
 	}
 }
+
+.crate-reminders-ui button.crate-reading-tag-filter__more {
+	gap: 4px; color: var(--text-normal);
+	svg { flex-shrink: 0; }
+}
+
+// Every tag in a sheet: a search field over one row per tag, its count at the end.
+.crate-reminders-ui .crate-reading-tag-list {
+	display: flex; flex-direction: column; gap: 8px; min-height: 0;
+	.crate-reading-tag-list__items { margin: 0; padding: 0; list-style: none; }
+	button.crate-reading-tag-list__item {
+		display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px;
+		margin: 0; padding: 0 4px; border: 0; border-bottom: 1px solid var(--crate-divider); border-radius: 0;
+		box-shadow: none; background: transparent; color: var(--text-normal); font: inherit; text-align: start;
+		&[data-press-active] { opacity: .65; }
+		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: -2px; }
+	}
+	li:last-child button.crate-reading-tag-list__item { border-bottom: 0; }
+	.crate-reading-tag-list__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+	.crate-reading-tag-list__count { color: var(--text-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+	.crate-reading-tag-list__empty { margin: 16px 0; color: var(--text-muted); text-align: center; }
+}
