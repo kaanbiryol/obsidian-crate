@@ -66,7 +66,7 @@
 }
 .crate-diff-number, .crate-diff-sign { color: var(--text-faint); text-align: center; user-select: none; }
 .crate-diff-number { font-size: 10px; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--background-primary) 94%, black); color: color-mix(in srgb, var(--text-faint) 75%, transparent); }
-.crate-diff-footnote { border: 0; font-size: 11px; padding: 6px 16px 0; }
+.crate-diff-footnote { border: 0; font-size: 11px; padding: 0 16px; }
 .crate-file-diff .crate-diff-gap > button,
 .crate-file-diff .crate-diff-message > button {
     height: auto;
