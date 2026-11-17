@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { isIosOrIpados } from '../shell/device';
+import { isIosOrIpados, isStandaloneApp } from '../shell/device';
 import {
 	claimDocumentScroll, documentScrollOwner, documentScrollSuspended, onDocumentScrollResume, releaseDocumentScroll,
 } from '../navigation/document-scroll';
@@ -37,6 +37,7 @@ export function useDocumentScrollScreens(): void {
 		const phone = window.matchMedia('(max-width: 759px)');
 		let touching = false;
 		let width = window.innerWidth;
+		let height = window.innerHeight;
 		let timer: number | undefined;
 
 		const target = () => {
@@ -63,10 +64,15 @@ export function useDocumentScrollScreens(): void {
 			if (!documentScrollOwner()) schedule();
 		};
 		const release = () => { releaseDocumentScroll(); schedule(); };
-		// Safari's collapsing toolbars resize the height while the document scrolls.
+		// Safari's collapsing toolbars resize the height while the document scrolls,
+		// so the browser re-measures only for width. A Home Screen app has no
+		// toolbars, but a cold launch can report a provisional height first; the
+		// dock pinned from it would sit below the screen until re-measured.
 		const resize = () => {
-			if (window.innerWidth === width) return;
+			const heightChanged = window.innerHeight !== height && isStandaloneApp();
+			if (window.innerWidth === width && !heightChanged) return;
 			width = window.innerWidth;
+			height = window.innerHeight;
 			release();
 		};
 		const touchStart = () => { touching = true; };
