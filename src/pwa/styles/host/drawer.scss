@@ -54,7 +54,9 @@
  .crate-reminders-ui .pwa-modal-sheet--card .pwa-sheet-surface>:is(.settings-sheet,.modal-card){border:0;border-radius:0;background:transparent;box-shadow:none}
  /* The card already floats above the closing keyboard; nothing to cover. */
  .pwa-modal-sheet--card .pwa-keyboard-motion-fill{display:none}
- .crate-reminders-ui .pwa-modal-sheet--page .pwa-sheet-surface{border:1px solid var(--pwa-sheet-card-border);border-bottom:0;border-radius:var(--pwa-sheet-card-radius) var(--pwa-sheet-card-radius) 0 0;box-shadow:var(--pwa-sheet-card-shadow)}
+ .crate-reminders-ui .pwa-modal-sheet--page .pwa-sheet-surface{border-radius:var(--pwa-sheet-card-radius) var(--pwa-sheet-card-radius) 0 0;box-shadow:var(--pwa-sheet-card-shadow)}
+ /* Overlay the hairline so it never takes height from the page's content. */
+ .crate-reminders-ui .pwa-modal-sheet--page .pwa-sheet-surface::before{content:"";position:absolute;z-index:2;inset:0;border:1px solid var(--pwa-sheet-card-border);border-bottom:0;border-radius:inherit;pointer-events:none}
 }
 @media(prefers-reduced-motion:reduce){
  .pwa-modal-sheet__container,.pwa-modal-sheet__backdrop,.pwa-reminder-sheet-stage{transition-duration:0ms!important}
