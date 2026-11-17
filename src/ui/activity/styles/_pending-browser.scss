@@ -226,6 +226,7 @@
         &:active:enabled { background: color-mix(in srgb, var(--text-normal) 14%, var(--background-primary)); }
         min-width: 0;
         .crate-browser-sync-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .crate-browser-sync-detail { flex-shrink: 0; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; &:empty { display: none; } }
         &.is-syncing {
             position: relative;
             overflow: hidden;
@@ -256,7 +257,6 @@ body.is-mobile .crate-pending-browser .crate-browser-actions button {
     .crate-pending-browser .crate-browser-actions .crate-browser-sync { height: 44px; min-height: 44px; }
 }
 
-.crate-browser-action-status { order: 3; flex-basis: 100%; min-width: 0; overflow: hidden; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; &:empty { display: none; } }
 .modal.crate-pending-discard-modal {
     .crate-modal-body {
         display: flex;

@@ -136,12 +136,13 @@ it('locks the selection and shows sync progress in the footer, then restores it'
 	const sync = panel.querySelector('.crate-browser-sync') as HTMLButtonElement;
 	const boxes = () => [...panel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
 
-	// The running sync's button stops it; its progress shows beside the bar.
+	// The running sync's button stops it and shows a short count; nothing renders below it.
 	action = { label: 'Stop sync', disabled: false, idle: false };
-	checks.setSyncProgress({ label: 'Uploading 1 of 2 files', fraction: 0.5 });
+	checks.setSyncProgress({ label: '1 / 2', fraction: 0.5 });
 	expect(panel.querySelector('.crate-pending-browser')?.classList.contains('is-syncing')).toBe(true);
-	expect(sync.textContent).toBe('Stop sync');
-	expect(panel.querySelector('.crate-browser-action-status')?.textContent).toBe('Uploading 1 of 2 files');
+	expect(sync.textContent).toBe('Stop sync1 / 2');
+	expect(sync.getAttribute('aria-label')).toBe('Stop sync, 1 / 2');
+	expect(panel.querySelector('.crate-browser-actions')?.children).toHaveLength(1);
 	expect(sync.disabled).toBe(false);
 	expect(sync.style.getPropertyValue('--crate-sync-progress')).toBe('0.5');
 	expect(boxes().every(box => box.disabled)).toBe(true);

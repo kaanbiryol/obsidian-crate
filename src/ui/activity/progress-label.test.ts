@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { formatSyncProgress } from './progress-label';
+import { formatShortSyncProgress, formatSyncProgress } from './progress-label';
 it('shows recovery progress instead of an unrelated transfer counter', () => {
 	expect(formatSyncProgress({ type: 'sync', current: 300, total: 8000 }, { phase: 'recovering', current: 16, total: 2000 }))
 		.toBe('Recovering uploads: 16/2000');
@@ -35,4 +35,15 @@ it('marks reminder setup counts that reached the server cap as a lower bound', (
 	expect(formatSyncProgress(undefined, {
 		phase: 'reminders', reminderSetup: { scanning: false, remainingFiles: 1000, remainingSchedules: 37 },
 	})).toBe(`Preparing reminders: ${(1000).toLocaleString()}+ files and 37 schedules remaining`);
+});
+
+it.each([
+	[{ phase: 'uploading', current: 12, total: 38 }, '12 / 38'],
+	[{ phase: 'downloading', current: 1200, total: 3400 }, '1,200 / 3,400'],
+	[{ phase: 'uploading' }, 'Uploading…'],
+	[{ phase: 'reminders', reminderSetup: { scanning: false, remainingFiles: 9, remainingSchedules: 0 } }, 'Reminders…'],
+	[{ phase: 'saving' }, 'Saving…'],
+	[undefined, ''],
+] as const)('keeps the Stop sync detail short for %j', (work, label) => {
+	expect(formatShortSyncProgress(null, work)).toBe(label);
 });

@@ -9,7 +9,6 @@
 	--crate-activity-control-hover-bg: var(--background-modifier-hover);
 	--crate-activity-control-active-bg: var(--background-modifier-active-hover, var(--background-modifier-hover));
 	--crate-activity-divider: var(--background-modifier-border);
-	--crate-activity-divider-strong: var(--background-modifier-border-hover, var(--background-modifier-border));
 	--crate-activity-focus-ring: var(--background-modifier-border-focus, var(--interactive-accent));
 	--crate-activity-radius-control: var(--input-radius, var(--radius-s, 4px));
 	--crate-activity-radius-card: var(--radius-m, 10px);
@@ -74,14 +73,13 @@
     justify-content: flex-end;
     gap: 8px;
     align-self: center;
-    flex: 0 0 220px;
-    width: 220px;
+    // Room for the running sync's phase, such as Preparing reminders; longer text ends in an ellipsis.
+    flex: 0 1 auto;
+    max-width: 340px;
     min-width: 0;
     margin-left: 0;
     position: relative;
-    padding: 0 12px 0 0;
     text-align: right;
-    border-right: 1px solid var(--crate-activity-divider-strong);
     font-size: var(--font-ui-smaller, 12px);
     line-height: 1.4;
     font-weight: 400;
@@ -94,6 +92,8 @@
     display: flex;
     align-items: center;
     flex: 0 0 auto;
+    // Last, at the header's edge, so it stays put while the status text changes length.
+    order: 1;
 }
 
 .crate-activity-subtitle-label {

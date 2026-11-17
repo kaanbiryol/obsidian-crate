@@ -1,5 +1,6 @@
 import type { SyncActivityProgress, SyncState } from '../../sync/types';
 import { formatTimeAgo } from '../shared/format';
+import { formatSyncProgress } from './progress-label';
 
 type SyncStatusKind = 'syncing' | 'error' | 'offline' | 'checking' | 'pending' | 'synced' | 'never';
 
@@ -37,13 +38,16 @@ export function describeActivityStatus(
 ) {
 	const syncing = state.status === 'syncing' || !!progress;
 	const status = describeSyncStatus(state, pending, syncing, now);
+	// The header names what the running sync is doing; the button below keeps a short form.
+	const work = state.work ?? progress?.work;
+	const text = syncing && work ? formatSyncProgress(progress, work) : status.text;
 	const needsAttention = state.status === 'error' || state.status === 'offline';
 	const checking = !!state.initializing && !syncing && !needsAttention;
 	const canStop = syncing && canStopSync;
 	const buttonLabel = stopping ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : checking ? 'Checking…' : 'Sync';
 	return {
 		lastSyncLabel: status.lastSyncLabel,
-		text: status.text,
+		text,
 		subtitleState: syncing || checking ? 'syncing' : needsAttention ? 'attention' : status.kind === 'pending' ? 'pending' : status.kind === 'synced' ? 'synced' : 'idle',
 		indicatorState: syncing ? { ...state, status: 'syncing' as const } : state,
 		checkingConflicts: checking || syncing && !['saving', 'reminders'].includes(state.work?.phase ?? ''),

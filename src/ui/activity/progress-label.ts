@@ -43,6 +43,30 @@ export function formatSyncProgress(progress?: SyncActivityProgress | null, work?
 	return 'Starting sync…';
 }
 
+const shortLabels: Record<SyncWork['phase'], string> = {
+	recovering: 'Recovering…',
+	server: 'Checking…',
+	scanning: 'Checking…',
+	preparing: 'Preparing…',
+	uploading: 'Uploading…',
+	downloading: 'Downloading…',
+	deleting: 'Deleting…',
+	applying: 'Applying…',
+	saving: 'Saving…',
+	reminders: 'Reminders…',
+};
+
+/** A few words for the running sync, beside Stop sync: a file count while files
+ * transfer, otherwise the phase. The full text from `formatSyncProgress` shows above. */
+export function formatShortSyncProgress(progress?: SyncActivityProgress | null, work?: SyncWork): string {
+	work ??= progress?.work;
+	if (!work) return '';
+	if (['uploading', 'downloading', 'deleting'].includes(work.phase) && work.total && work.current !== undefined) {
+		return `${work.current.toLocaleString()} / ${work.total.toLocaleString()}`;
+	}
+	return shortLabels[work.phase];
+}
+
 /** Share of files done in a counted transfer phase, for a progress bar. */
 export function syncProgressFraction(work?: SyncWork): number | undefined {
 	if (!work || !['uploading', 'downloading', 'deleting'].includes(work.phase) || !work.total || work.current === undefined) return undefined;

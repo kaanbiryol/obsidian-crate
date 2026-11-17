@@ -46,9 +46,10 @@ export function createPendingActions(
 	const footer = sidebar.createDiv({ cls: 'crate-browser-actions' });
 	const sync = footer.createEl('button', { cls: 'crate-browser-sync', attr: { type: 'button' } });
 	const syncLabel = sync.createSpan({ cls: 'crate-browser-sync-label', text: 'Sync' });
-	const status = footer.createDiv({ cls: 'crate-browser-action-status', attr: { role: 'status', 'aria-live': 'polite' } });
+	// A few words on the running sync, such as a file count; the header names the phase.
+	const syncDetail = sync.createSpan({ cls: 'crate-browser-sync-detail' });
 	const checkboxes = new Map<string, HTMLInputElement>();
-	// A running sync locks the selection and shows its progress here.
+	// A running sync locks the selection and shows its progress on the button.
 	let progress: { label: string; fraction?: number } | undefined;
 	const locked = () => !!progress || !actions.sync.describe().idle;
 	const checked = () => keys.filter(key => !excluded.has(key));
@@ -61,13 +62,15 @@ export function createPendingActions(
 		for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = locked(); }
 		count.textContent = `${selected.length} of ${keys.length} files selected`;
 		const { label, title } = action.idle ? describeSyncSelection(selected.length, keys.length) : { label: action.label, title: action.label };
+		// Only Stop sync carries the detail; Stopping… stands alone.
+		const detail = action.idle || action.disabled ? '' : progress?.label ?? '';
 		syncLabel.textContent = label;
-		sync.setAttribute('aria-label', label);
+		syncDetail.textContent = detail;
+		sync.setAttribute('aria-label', detail ? `${label}, ${detail}` : label);
 		sync.title = title;
 		sync.disabled = action.disabled;
 		sync.toggleClass('is-syncing', !!progress);
 		sync.setCssProps({ '--crate-sync-progress': progress?.fraction === undefined ? '0' : String(progress.fraction) });
-		status.textContent = progress?.label ?? '';
 	};
 	all.addEventListener('change', () => {
 		for (const key of keys) { if (all.checked) excluded.delete(key); else excluded.add(key); }

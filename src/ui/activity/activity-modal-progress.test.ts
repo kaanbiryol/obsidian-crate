@@ -171,7 +171,7 @@ it('keeps the file browser in view during a sync and shows progress in its foote
 	internal.renderPending();
 	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBe(browser);
 	expect(internal.pendingPanel.querySelector('.crate-activity-loading-label')).toBeNull();
-	expect(setSyncProgress).toHaveBeenLastCalledWith({ label: 'Uploading 1 of 2 files', fraction: 0.5 });
+	expect(setSyncProgress).toHaveBeenLastCalledWith({ label: '1 / 2', fraction: 0.5 });
 
 	// A failed sync leaves the same files pending; the browser unlocks in place.
 	state = { ...state, status: 'error', work: undefined };

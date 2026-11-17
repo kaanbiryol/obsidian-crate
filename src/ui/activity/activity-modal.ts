@@ -7,7 +7,7 @@ import { BaseUiModal } from '../plugin/BaseUiModal';
 import { getPendingFileActions } from './file-actions';
 import type { PendingDiscardReview } from '../../sync/pending/pending-discard';
 import { PendingDiscardModal } from './pending-discard-modal';
-import { formatSyncProgress, syncProgressFraction } from './progress-label';
+import { formatShortSyncProgress, formatSyncProgress, syncProgressFraction } from './progress-label';
 import type { ConflictReview } from '../../sync/conflict/review';
 import { ConflictReviewModal } from './conflict-review-modal';
 import { Platform, type App } from 'obsidian';
@@ -125,7 +125,7 @@ export class ActivityModal extends BaseUiModal {
 		// A sync started from the file browser keeps it in view, locked, with progress in its footer.
 		if (syncing && this.pendingChecks && this.pendingPanel.querySelector('.crate-pending-browser')) {
 			const work = progress?.work ?? state.work;
-			this.pendingChecks.setSyncProgress({ label: formatSyncProgress(progress, state.work), fraction: syncProgressFraction(work) });
+			this.pendingChecks.setSyncProgress({ label: formatShortSyncProgress(progress, state.work), fraction: syncProgressFraction(work) });
 			return;
 		}
 		const paths = this.deps.getPendingKeys();

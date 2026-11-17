@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import type { SyncActivityProgress, SyncState } from '../../sync/types';
 import { describeActivityStatus, describeSyncSelection, isActivityBusy } from './activity-status';
+import { formatSyncProgress } from './progress-label';
 
 const now = Date.parse('2026-01-01T12:00:00Z');
 const state: SyncState = { status: 'idle', lastSync: new Date(now).toISOString(), lastError: null, pendingChanges: 0, conflictCount: 0 };
@@ -45,7 +46,8 @@ it.each(['error', 'offline'] as const)('keeps %s visible during startup checks',
 it.each(['server', 'scanning', 'preparing', 'uploading', 'downloading', 'applying', 'saving', 'reminders'] as const)(
 	'keeps the header stable during %s and stops conflict checking after file transfer', phase => {
 		const status = describeActivityStatus({ ...state, status: 'syncing', work: { phase } }, null, 1, true, false, now);
-		expect(status).toMatchObject({ text: 'Syncing…', subtitleState: 'syncing', checkingConflicts: !['saving', 'reminders'].includes(phase) });
+		// The header names the phase, as the progress label does, instead of a generic Syncing….
+		expect(status).toMatchObject({ text: formatSyncProgress(null, { phase }), subtitleState: 'syncing', checkingConflicts: !['saving', 'reminders'].includes(phase) });
 	},
 );
 
