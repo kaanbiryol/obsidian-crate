@@ -559,9 +559,14 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await expect(page.getByRole('status', { name: 'Loading article', exact: true }).locator('.crate-content-loading__spinner')).toBeVisible();
   await expect(page.locator('.crate-reading-reader__header')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Back to reading' })).toBeEnabled();
+  // Article actions and the highlights button wait for the article.
+  await expect(page.locator('.crate-reading-reader__highlights-button')).toHaveCount(0);
+  for (const name of ['Archive article', 'Favorite article', 'More article actions']) await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
   const originalArticle = await page.locator('.crate-reading__reader-pane article').elementHandle();
   firstArticle.release();
   await articleShown(page);
+  await expect(page.locator('.crate-reading-reader__highlights-button')).toBeVisible();
+  for (const name of ['Archive article', 'Favorite article', 'More article actions']) await expect(page.getByRole('button', { name, exact: true })).toBeEnabled();
   // Reopening below shows this saved copy while the download is held.
   await saveForOffline(page);
   await page.getByText('Available offline', { exact: true }).waitFor();

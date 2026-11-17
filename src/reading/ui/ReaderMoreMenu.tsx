@@ -15,7 +15,7 @@ export interface ReaderMenuAction {
  * Secondary reader actions behind one top-bar button, like an iOS overflow menu.
  * Hand-rolled because Base UI's Menu would add its positioning engine to both bundles.
  */
-export function ReaderMoreMenu({ label, actions }: { label: string; actions: ReaderMenuAction[] }) {
+export function ReaderMoreMenu({ label, actions, disabled = false }: { label: string; actions: ReaderMenuAction[]; disabled?: boolean }) {
 	const [open, setOpen] = useState(false);
 	const root = useRef<HTMLSpanElement>(null), trigger = useRef<HTMLButtonElement>(null);
 	const menuId = useId();
@@ -47,7 +47,7 @@ export function ReaderMoreMenu({ label, actions }: { label: string; actions: Rea
 	</button>;
 	return <span ref={root} className="crate-reading-menu">
 		<Button ref={trigger} className="crate-icon-button" data-size="large" data-tone="neutral" data-variant="ghost" aria-label={label} title={label}
-			aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={() => setOpen(value => !value)}>
+			aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} disabled={disabled} onClick={() => setOpen(value => !value)}>
 			<ThemeIcon id="more-horizontal" size="m" aria-hidden="true" />
 		</Button>
 		{open && <div id={menuId} role="menu" aria-label={label} className="crate-reading-menu__popup" onKeyDown={onKeyDown}>

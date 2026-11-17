@@ -82,6 +82,8 @@ export function ReadingReader({
 	const [videoPinned, setVideoPinned] = useState(true);
 	const hasVideoNotes = useMemo(() => Boolean(videoId && markdown !== null && readingDocument(markdown).text.trim()), [videoId, markdown]);
 	const showHeader = !revealContentTogether || markdown !== null || Boolean(loadingError);
+	// Article actions wait for the article; Back stays available.
+	const loading = markdown === null && !loadingError;
 	useReaderNavigation(article, autoHideNavigation && (!segments.length || !videoPinned), item.crate_reading_id);
 	useEffect(() => {
 		if (article.current) readerScrollElement(article.current).scrollTo({ top: 0 }); (heading.current ?? article.current)?.focus({ preventScroll: true });
@@ -151,19 +153,20 @@ export function ReadingReader({
 	};
 	return <article ref={article} tabIndex={-1} className="crate-reading crate-reading-reader" data-serif={serif} style={{ '--reading-font-size': `${fontSize}px` } as React.CSSProperties}>
 		{floatingHighlights && (!videoId || hasVideoNotes) && <div className="crate-reading-reader__floating">
-			<Button variant="outline" size="touch" className="crate-reading-reader__highlights-button" aria-label={`Highlights (${item.highlights?.length ?? 0})`}
+			{/* The wrapper stays mounted for scroll hiding; the button arrives with the article. */}
+			{markdown !== null && <Button variant="outline" size="touch" className="crate-reading-reader__highlights-button" aria-label={`Highlights (${item.highlights?.length ?? 0})`}
 				aria-haspopup="dialog" aria-expanded={highlightsOpen} onClick={openHighlights}>
 				<ThemeIcon id="highlighter" size="m" aria-hidden="true" /><span>{item.highlights?.length ?? 0}</span>
-			</Button>
+			</Button>}
 		</div>}
 		<nav className="crate-reading-reader__nav crate-detail-navigation" aria-label={videoId ? 'Video actions' : 'Article actions'}>
 			<BackButton label="Back to reading" onClick={onBack} />
 			<div className="crate-reading-reader__quick-actions">{onUpdate && <>
 				<IconButton size="large" icon={item.reading_status === 'archived' ? 'archive-restore' : 'archive'} label={item.reading_status === 'archived' ? 'Move to inbox' : `Archive ${kind}`}
-					disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={toggleArchived} />
+					disabled={mutationPending || loading} aria-disabled={busy || mutationPending} onClick={toggleArchived} />
 				<IconButton size="large" icon="star" label={item.favorite ? 'Remove favorite' : `Favorite ${kind}`} aria-pressed={item.favorite} data-filled={item.favorite}
-					disabled={mutationPending} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ favorite: !item.favorite }))} />
-			</>}<ReaderMoreMenu label={`More ${kind} actions`} actions={moreActions} /></div>
+					disabled={mutationPending || loading} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ favorite: !item.favorite }))} />
+			</>}<ReaderMoreMenu label={`More ${kind} actions`} actions={moreActions} disabled={loading} /></div>
 		</nav>
 		<div className="crate-reading-reader__page">
 			{notice}
