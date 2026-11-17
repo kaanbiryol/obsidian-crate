@@ -3,20 +3,14 @@ import { AuthLayout } from '../components/AuthStates';
 import { HomeScreenInstallInstructions } from '../components/HomeScreenInstall';
 import { PwaButton as Button } from '../components/PwaButton';
 import { isIosOrIpados, isStandaloneApp } from '../shell/device';
+import { BROWSER_SETUP_CHOICE_KEY as CHOICE_KEY, browserSetupNeeded } from '../shell/browser-setup-gate';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
-
-const CHOICE_KEY = 'crate-browser-setup-choice';
 
 /** Keep the mobile setup landing visible across enrollment and page reloads. */
 export function needsBrowserSetup(): boolean {
-	if (isStandaloneApp() || (!isIosOrIpados() && !/Android/i.test(navigator.userAgent))) return false;
-	const params = new URLSearchParams(location.search);
-	const incoming = Boolean(params.get('token') || params.get('browserToken'));
-	try {
-		const choice = localStorage.getItem(CHOICE_KEY);
-		if (choice === 'web') return false;
-		return incoming || choice === 'choose';
-	} catch { return incoming; }
+	let choice: string | null = null;
+	try { choice = localStorage.getItem(CHOICE_KEY); } catch { /* Incoming links still show the choice. */ }
+	return browserSetupNeeded(location.search, navigator.userAgent, navigator.maxTouchPoints, isStandaloneApp(), choice);
 }
 
 export function BrowserSetup({ onContinue }: { onContinue: () => void }) {

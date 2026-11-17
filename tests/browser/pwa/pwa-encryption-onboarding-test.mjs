@@ -54,6 +54,13 @@ try {
       const safari = await contextFor(browser);
       let installCookies;
       try {
+        // The cached shell must not paint a feature skeleton before app.js shows the choice.
+        const shellOnly = await safari.newPage();
+        await shellOnly.route('**/notifications/app.js*', route => route.abort());
+        await shellOnly.goto(`${origin}/notifications?token=install-onboarding&tab=inbox`);
+        await expect(shellOnly.locator('.pwa-launch-splash')).toBeAttached();
+        await expect(shellOnly.locator('[data-pwa-static-shell], .pwa-opening-dock')).toHaveCount(0);
+        await shellOnly.close();
         const page = await safari.newPage();
         await page.goto(`${origin}/notifications?token=install-onboarding&browserToken=safari-onboarding&tab=inbox#${new URLSearchParams({ crateKey: recovery, crateReadingKey: recovery, crateFolder: 'Reminders' })}`);
         await expect(page.getByRole('heading', { name: 'Welcome to Crate', exact: true })).toBeVisible();

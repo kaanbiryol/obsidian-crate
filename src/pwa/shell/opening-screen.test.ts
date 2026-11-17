@@ -23,6 +23,7 @@ it.each([
 	const { document } = parseHTML(`<html><body><div class="pwa-launch-splash">${createPwaOpeningScreenHtml()}</div></body></html>`);
 	new Script(PWA_OPENING_DOCK_INIT_JS + PWA_OPENING_SCREEN_INIT_JS).runInNewContext({
 		document, URLSearchParams, location: { search }, localStorage: { getItem: () => saved },
+		navigator: { userAgent: 'Macintosh', maxTouchPoints: 0 }, matchMedia: () => ({ matches: false }),
 	});
 	expect(document.querySelector('h1')?.textContent).toBe(title);
 	expect(document.documentElement.dataset.pwaOpeningTab).toBe(tab);
@@ -37,6 +38,36 @@ it.each([
 	expect(document.querySelectorAll('.pwa-dock__tab > svg, .pwa-dock__add > svg')).toHaveLength(isProject ? 0 : 8);
 	expect(document.querySelectorAll('.crate-content-loading')).toHaveLength(1);
 	expect(document.querySelector('work')).toBeNull();
+});
+
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)';
+const paintShell = (search: string, { userAgent = IPHONE, standalone = false, choice = null as string | null } = {}) => {
+	const { document } = parseHTML(`<html><body><div class="pwa-launch-splash">${createPwaOpeningScreenHtml()}</div></body></html>`);
+	new Script(PWA_OPENING_DOCK_INIT_JS + PWA_OPENING_SCREEN_INIT_JS).runInNewContext({
+		document, URLSearchParams, location: { search },
+		localStorage: { getItem: (key: string) => key === 'crate-browser-setup-choice' ? choice : null },
+		navigator: { userAgent, maxTouchPoints: 5 }, matchMedia: () => ({ matches: standalone }),
+	});
+	return document.querySelector('.pwa-launch-splash')!;
+};
+
+it.each([
+	['?token=install', {}],
+	['?browserToken=enrollment', { userAgent: 'Mozilla/5.0 (Linux; Android 15)' }],
+	['', { choice: 'choose' }],
+])('skips the feature skeleton when a mobile browser opens on the setup choice: %s', (search, options) => {
+	const splash = paintShell(search, options);
+	expect(splash.innerHTML).toBe('');
+	expect(splash.getAttribute('class')).toBe('pwa-launch-splash');
+});
+
+it.each([
+	['?token=install', { standalone: true }],
+	['?token=install', { choice: 'web' }],
+	['?token=install', { userAgent: 'Mozilla/5.0 (Windows NT 10.0)' }],
+	['', {}],
+])('keeps the feature skeleton when no setup choice will show: %s', (search, options) => {
+	expect(paintShell(search, options).querySelector('[data-pwa-static-shell]')).not.toBeNull();
 });
 
 it('escapes a project title in the React bootstrap shell', () => {

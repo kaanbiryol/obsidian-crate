@@ -1,6 +1,7 @@
 import { SPINNER_SPOKES_HTML } from '../../ui/shared/spinner-spokes';
 import { createPwaOpeningDockHtml, openingIconSvg } from './opening-dock';
 import type { resolvePwaOpeningDestination } from '../navigation/opening-destination';
+import { BROWSER_SETUP_CHOICE_KEY, browserSetupNeeded } from './browser-setup-gate';
 
 // Match the shared React loading indicator before the app module is available.
 const loadingIndicator = (label: string) => `<div class="crate-content-loading" role="status" aria-label="${label}"><svg class="crate-content-loading__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">${SPINNER_SPOKES_HTML}</svg></div>`;
@@ -50,6 +51,8 @@ export function createPwaOpeningScreenHtml(destination?: ReturnType<typeof resol
 		.replace(createPwaOpeningDockHtml(), createPwaOpeningDockHtml(destination.tab, destination.tab === 'reading' ? destination.readingTab : undefined));
 }
 
+// A mobile browser visit from a setup link opens on the install-or-continue
+// choice, so it paints only the launch background instead of a feature skeleton.
 // The service worker caches generic HTML. Resolve this launch's labels before
 // the parser reaches the app module, without waiting for any network request.
-export const PWA_OPENING_SCREEN_INIT_JS = `(()=>{const root=document.documentElement;const splash=document.querySelector('.pwa-launch-splash');if(!splash)return;if(root.dataset.pwaOpeningTab==='reading')splash.innerHTML=${JSON.stringify(reading)};else if(root.dataset.pwaOpeningProject)splash.innerHTML=${JSON.stringify(project)};const title=splash.querySelector('[data-pwa-launch-title]');if(title)title.textContent=root.dataset.pwaOpeningTitle||'Reminders';const chips=splash.querySelector('[data-pwa-opening-schedule]');if(chips){const tab=root.dataset.pwaOpeningTab||'today';chips.hidden=tab!=='today'&&tab!=='upcoming';chips.dataset.value=tab;for(const chip of chips.querySelectorAll('[data-schedule-option]'))chip.setAttribute('aria-pressed',String(chip.dataset.scheduleOption===tab))}})();`;
+export const PWA_OPENING_SCREEN_INIT_JS = `(()=>{const root=document.documentElement;const splash=document.querySelector('.pwa-launch-splash');if(!splash)return;let choice=null;try{choice=localStorage.getItem(${JSON.stringify(BROWSER_SETUP_CHOICE_KEY)})}catch{}if((${browserSetupNeeded.toString()})(location.search,navigator.userAgent,navigator.maxTouchPoints,matchMedia('(display-mode: standalone)').matches||Boolean(navigator.standalone),choice)){splash.innerHTML='';return}if(root.dataset.pwaOpeningTab==='reading')splash.innerHTML=${JSON.stringify(reading)};else if(root.dataset.pwaOpeningProject)splash.innerHTML=${JSON.stringify(project)};const title=splash.querySelector('[data-pwa-launch-title]');if(title)title.textContent=root.dataset.pwaOpeningTitle||'Reminders';const chips=splash.querySelector('[data-pwa-opening-schedule]');if(chips){const tab=root.dataset.pwaOpeningTab||'today';chips.hidden=tab!=='today'&&tab!=='upcoming';chips.dataset.value=tab;for(const chip of chips.querySelectorAll('[data-schedule-option]'))chip.setAttribute('aria-pressed',String(chip.dataset.scheduleOption===tab))}})();`;
