@@ -1,11 +1,11 @@
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import { PWA_SURFACE_SPRING } from './motion';
+import { PWA_DOCK_EXPAND_SPRING, PWA_SURFACE_SPRING } from './motion';
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
-import { useMotionValue, useMotionValueEvent, useSpring } from 'motion/react';
+import { animate, useMotionValue, useMotionValueEvent } from 'motion/react';
 
 /** Retained feature docks paint the same surface through a navigation handoff. */
 export function useDockMorphState() {
-	const height = useSpring(60, PWA_SURFACE_SPRING);
+	const height = useMotionValue(60);
 	const expandedHeight = useMotionValue(158);
 	const owner = useRef<HTMLSpanElement | null>(null);
 	return useMemo(() => ({ height, expandedHeight, owner }), [height, expandedHeight]);
@@ -13,7 +13,7 @@ export function useDockMorphState() {
 
 export const DockMorphContext = createContext<ReturnType<typeof useDockMorphState> | null>(null);
 
-/** One damped spring preserves both shape and velocity when the target changes. */
+/** One animated height preserves both shape and velocity when the target changes. */
 export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) {
 	const surface = useRef<HTMLSpanElement>(null);
 	const collapsedHeight = useRef(60);
@@ -38,6 +38,8 @@ export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) 
 		dock?.style.setProperty('--dock-menu-inset', `${Math.max(0, menuSize - paintedHeight)}px`);
 		dock?.style.setProperty('--dock-menu-opacity', `${Math.max(0, Math.min(1, (progress - 0.1) / 0.55))}`);
 		dock?.style.setProperty('--dock-tabs-opacity', `${Math.max(0, 1 - progress * 5)}`);
+		// Labels and icons rise into place inside their stationary hit targets.
+		dock?.style.setProperty('--dock-menu-progress', `${progress}`);
 	}, [expandedHeight]);
 	useMotionValueEvent(height, 'change', paint);
 	useMotionValueEvent(expandedHeight, 'change', () => paint(height.get()));
@@ -49,7 +51,8 @@ export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) 
 		if (open && !inert) expandedHeight.set(menuHeight);
 		const target = open && !inert ? menuHeight : 60;
 		if (reduceMotion) height.jump(target);
-		else height.set(target);
+		// A new animation continues from the value's current velocity.
+		else animate(height, target, target > 60 ? PWA_DOCK_EXPAND_SPRING : PWA_SURFACE_SPRING);
 	}, [height, expandedHeight, owner, open, menuHeight, inert, reduceMotion]);
 	return useCallback((element: HTMLSpanElement | null) => {
 		surface.current = element;

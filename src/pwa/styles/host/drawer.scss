@@ -40,6 +40,22 @@
 /* Match Flutter's Cupertino grabber geometry: 5px above, 5px handle, 5px
    below before content. Include this inset in the measured editor header. */
 .pwa-modal-sheet{--pwa-sheet-header-top-padding:15px}
+/* iPhone sheet presentations share one surface look. A card fits its content
+   and floats 8px inside the screen edges and the keyboard over a lighter dim;
+   a page keeps its full height and spans the width with the same corners. */
+@media(max-width:640px){
+ .crate-reminders-ui .pwa-modal-sheet--card .pwa-modal-sheet__backdrop{background:rgba(0,0,0,.2)}
+ /* The surface keeps its full-width layout box and keyboard padding; transparent
+    borders hold the card off the edges and ::before paints it. The registered
+    keyboard inset does not inherit, so hand it to ::before. */
+ .crate-reminders-ui .pwa-modal-sheet--card .pwa-sheet-surface{--pwa-sheet-card-bottom:var(--pwa-keyboard-inset,0px);isolation:isolate;border:solid transparent;border-width:0 8px 8px;border-radius:0;background:transparent;box-shadow:none;overflow-clip-margin:80px}
+ .crate-reminders-ui .pwa-modal-sheet--card .pwa-sheet-surface::before{content:"";position:absolute;z-index:-1;inset:0 0 var(--pwa-sheet-card-bottom,0px);border:1px solid var(--pwa-sheet-card-border);border-radius:var(--pwa-sheet-card-radius);background:var(--pwa-sheet-surface);box-shadow:var(--pwa-sheet-card-shadow);pointer-events:none}
+ /* The card paints itself; inner sheet chrome would cover its corners. */
+ .crate-reminders-ui .pwa-modal-sheet--card .pwa-sheet-surface>:is(.settings-sheet,.modal-card){border:0;border-radius:0;background:transparent;box-shadow:none}
+ /* The card already floats above the closing keyboard; nothing to cover. */
+ .pwa-modal-sheet--card .pwa-keyboard-motion-fill{display:none}
+ .crate-reminders-ui .pwa-modal-sheet--page .pwa-sheet-surface{border:1px solid var(--pwa-sheet-card-border);border-bottom:0;border-radius:var(--pwa-sheet-card-radius) var(--pwa-sheet-card-radius) 0 0;box-shadow:var(--pwa-sheet-card-shadow)}
+}
 @media(prefers-reduced-motion:reduce){
  .pwa-modal-sheet__container,.pwa-modal-sheet__backdrop,.pwa-reminder-sheet-stage{transition-duration:0ms!important}
 }

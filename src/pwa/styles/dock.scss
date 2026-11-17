@@ -32,6 +32,7 @@
   // Obsidian keeps the shared, nearly opaque dock; the PWA uses its flat chrome surface.
   .pwa-dock { --dock-surface-hover: var(--pwa-glass-hover-fill); }
   .pwa-dock__surface, .pwa-dock__add { @include glass.surface; }
+  .pwa-dock__surface { box-shadow: var(--dock-elevation); }
   // Rows soften beneath the pill instead of vanishing.
   .pwa-dock::before {
     -webkit-mask-image: linear-gradient(to bottom, transparent 20px, #0004 60px, #0009);

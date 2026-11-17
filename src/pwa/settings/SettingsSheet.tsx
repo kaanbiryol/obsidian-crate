@@ -90,7 +90,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 		{page === screen && message && <p className="settings-feedback" role="alert">{message}</p>}
 	</>;
 	return <PwaModalSheet isOpen={!transition.isClosing} onClose={close} onCloseEnd={transition.finishClose}
-		onOpenEnd={() => { onOpenEnd(); if (store.getSnapshot().syncRequested) panelRef.current?.querySelector('[data-settings-sync]')?.scrollIntoView({ block: 'start' }); }} variant="settings" label={title} dismissible={!exclusive && !transition.isClosing}>
+		onOpenEnd={() => { onOpenEnd(); if (store.getSnapshot().syncRequested) panelRef.current?.querySelector('[data-settings-sync]')?.scrollIntoView({ block: 'start' }); }} variant="settings" presentation="page" label={title} dismissible={!exclusive && !transition.isClosing}>
 		<aside data-pwa-back={!!detailPage && !exclusive && !closing} className="settings-sheet settings-sheet--unified outline-none" aria-busy={busy || transition.isClosing} tabIndex={-1}>
 			<div className="settings-page-stack" inert={detailPage === 'shortcut'} aria-hidden={detailPage === 'shortcut'}>
 			<PwaPushStack page={detailPage === 'shortcut' ? null : detailPage} entryId={detailPage === 'shortcut' ? null : entryId} immediate={immediate} onBackComplete={navigation.finishBack} rootRef={panelRef}

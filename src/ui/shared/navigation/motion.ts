@@ -5,6 +5,12 @@ export const PWA_SURFACE_SPRING = {
 	restDelta: 0.1, restSpeed: 1,
 } as const;
 
+/** The dock grows into its view menu with a soft overshoot of a few pixels,
+ * like a native control expanding; closing settles with PWA_SURFACE_SPRING. */
+export const PWA_DOCK_EXPAND_SPRING = {
+	...PWA_SURFACE_SPRING, stiffness: 420, damping: 30,
+} as const;
+
 /** Full-width navigation covers more distance and needs a slightly quicker response. */
 export const PWA_NAVIGATION_SPRING = {
 	...PWA_SURFACE_SPRING, stiffness: 600, damping: 49,

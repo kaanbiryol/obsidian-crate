@@ -8,7 +8,7 @@ import { useKeyboardHeight } from '@/pwa/hooks/useKeyboardHeight';
 import { PwaSheetSurface } from './PwaSheetSurface';
 
 export function PwaModalSheet({
-	isOpen, onClose, onCloseEnd, onOpenEnd, children, variant, sheetClassName,
+	isOpen, onClose, onCloseEnd, onOpenEnd, children, variant, presentation = 'card', sheetClassName,
 	keyboardInset: keyboardInsetOverride, dismissible = true, viewportPortal = false, recedeCanvas = true, recedeCovered = true, label, role = 'dialog', descriptionId,
 }: {
 	isOpen: boolean;
@@ -18,6 +18,8 @@ export function PwaModalSheet({
 	onOpenEnd?: () => void;
 	children: React.ReactNode;
 	variant: 'reminder' | 'settings';
+	/** On phones a card floats inside the screen edges; a page fills the width at full height. */
+	presentation?: 'card' | 'page';
 	sheetClassName?: string;
 	/** Measured automatically; override only for coordinated screen handoffs. */
 	keyboardInset?: number;
@@ -120,7 +122,7 @@ export function PwaModalSheet({
 		>
 			<Drawer.Portal container={mountPoint}>
 				<div data-recede-canvas={recedeCanvas ? '' : undefined}
-					className={`pwa-modal-sheet pwa-modal-sheet--${variant}${sheetClassName ? ` ${sheetClassName}` : ''}${keyboardInset > 0 ? ' is-keyboard-open' : ''}`}>
+					className={`pwa-modal-sheet pwa-modal-sheet--${variant} pwa-modal-sheet--${presentation}${sheetClassName ? ` ${sheetClassName}` : ''}${keyboardInset > 0 ? ' is-keyboard-open' : ''}`}>
 					<div className="pwa-modal-sheet__scroll-boundary" onTouchStartCapture={(event) => {
 						// WebKit focus can scroll this invisible one-pixel boundary to
 						// its end. Start every drag at its top so Base UI does not

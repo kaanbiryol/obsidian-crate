@@ -54,6 +54,22 @@ export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, ac
 	const [previewTab, setPreviewTab] = useState<DockTab | null>(null);
 	const overflowTabs = destinations.filter(item => !tabs.includes(item.id));
 	const [closingTabs, setClosingTabs] = useState<typeof overflowTabs | null>(null);
+	const preview = useRef<HTMLSpanElement>(null);
+	const previewShown = useRef(false);
+	useLayoutEffect(() => {
+		const highlight = preview.current;
+		const choice = previewTab === null ? null : highlight?.parentElement?.querySelector<HTMLElement>(`[data-dock-destination="${previewTab}"]`);
+		if (!highlight) return;
+		if (choice) {
+			// Appear on the first choice; slide only between choices.
+			if (!previewShown.current) highlight.dataset.instant = 'true';
+			highlight.style.setProperty('--dock-preview-y', `${choice.offsetTop}px`);
+			highlight.style.setProperty('--dock-preview-height', `${choice.offsetHeight}px`);
+			if (!previewShown.current) { void highlight.offsetHeight; delete highlight.dataset.instant; }
+		}
+		previewShown.current = Boolean(choice);
+		highlight.dataset.visible = String(Boolean(choice));
+	}, [previewTab]);
 	const closeViews = useCallback(() => { setOpen(false); setDragging(false); setPreviewTab(null); }, []);
 	const selectDockTab = (tab: DockTab) => { closeViews(); onSelect(tab); };
 	const selectPickerTab = (tab: DockTab) => {
@@ -104,7 +120,7 @@ export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, ac
 					return workspace?.querySelector<HTMLElement>('.pwa-dock:not([inert]) [data-dock-group]') ?? dock?.querySelector<HTMLElement>('[data-dock-group]') ?? false;
 				}}>
 					<Dialog.Title className="pwa-dock__sr">More views</Dialog.Title>
-					<div className="pwa-dock__choices">{(open ? overflowTabs : closingTabs ?? overflowTabs).map(item => <Button key={item.id} className="pwa-dock__destination" data-dock-destination={item.id} data-preview={previewTab === item.id ? 'true' : undefined} aria-current={item.id === activeTab ? 'page' : undefined} onClick={() => selectPickerTab(item.id)}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /><span>{item.label}</span></Button>)}</div>
+					<div className="pwa-dock__choices"><span ref={preview} className="pwa-dock__preview" aria-hidden="true" />{(open ? overflowTabs : closingTabs ?? overflowTabs).map(item => <Button key={item.id} className="pwa-dock__destination" data-dock-destination={item.id} data-preview={previewTab === item.id ? 'true' : undefined} aria-current={item.id === activeTab ? 'page' : undefined} onClick={() => selectPickerTab(item.id)}><ThemeIcon id={item.iconName} size="l" aria-hidden="true" /><span>{item.label}</span></Button>)}</div>
 				</Dialog.Popup>
 			</Dialog.Portal>
 		</Dialog.Root>

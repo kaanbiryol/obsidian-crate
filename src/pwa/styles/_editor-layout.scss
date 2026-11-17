@@ -198,4 +198,29 @@
     padding-bottom: 16px;
   }
 
+  // The shared sheet card (host/drawer.scss) floats this sheet on phones.
+  @media (max-width: 640px) {
+    // Include the 8px gap below the card in both measured heights.
+    .pwa-modal-sheet--reminder.is-editor-screen .pwa-reminder-sheet-stage {
+      height: min(calc(var(--pwa-editor-content-height, 224px) + env(safe-area-inset-bottom) + 8px), 100%);
+    }
+
+    .pwa-modal-sheet--reminder.is-editor-screen.is-keyboard-open .pwa-reminder-sheet-stage {
+      height: min(calc(var(--pwa-editor-content-height, 224px) + 24px + var(--pwa-keyboard-inset, 0px)), 100%);
+    }
+
+    // Pickers paint their own surface; keep it inside the card's hairline and corners.
+    .pwa-modal-sheet--card .pwa-picker-sheet {
+      clip-path: inset(1px round calc(var(--pwa-sheet-card-radius) - 1px));
+    }
+
+    // On the narrowest phones, give the header back the width the gaps took
+    // so its title still clears the actions on either side.
+    @media (max-width: 360px) {
+      .pwa-modal-sheet--reminder .pwa-reminder-sheet-stage .reminder-modal-header {
+        padding-inline: 8px;
+      }
+    }
+  }
+
 }

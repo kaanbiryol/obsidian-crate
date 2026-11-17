@@ -340,7 +340,14 @@ and a count can only go down: after moving literals onto roles, run
   use a sampled spring curve with a cubic fallback. Direct drawer dragging
   remains unanimated, and CSS transitions resume from the current position.
   All modal sheets and backdrops use the shared 420ms spring curve on entry
-  and a coordinated 320ms exit. Sheet swipes shorten that exit to 240–320ms
+  and a coordinated 320ms exit. On phones (up to 640px) `PwaModalSheet`
+  presents a `card` or a `page`. A card (reminders, short Reading dialogs,
+  draft recovery) fits its content and floats 8px from the screen edges and the
+  keyboard over a lighter 20% dim; its surface keeps the full-width layout box
+  and keyboard padding while `::before` paints the card. A page (settings, the
+  shortcut setup, full-height Reading dialogs) keeps its full height and spans
+  the width. Both share `--pwa-sheet-card-radius` (30px), border and shadow
+  tokens. Sheet swipes shorten that exit to 240–320ms
   using the drawer's release strength and the shared spring curve. A 240ms floor
   keeps a fast flick's remaining travel visible instead of compressing it into
   the first few frames;
@@ -366,7 +373,11 @@ and a count can only go down: after moving literals onto roles, run
   120ms, and control movement uses the shared control spring or 180ms CSS curve.
   The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
   changes retain visible travel instead of spending almost all their time settling.
-  Dock expansion uses the surface spring; native dragging remains immediate.
+  Dock expansion uses a spring with a soft overshoot of a few pixels and closes
+  on the surface spring; its choices' icons and labels rise 8px into stationary
+  hit targets. A held switcher swells until the menu opens, the expanded surface
+  gains a shadow with its progress, and one highlight slides between choices
+  under a held finger. Native dragging remains immediate.
   Shared control tokens inherit these PWA defaults without changing Obsidian.
   Shared navigation indicators use a critically damped spring. Centered Obsidian
   dialogs use a stationary fade; bottom sheets retain their source direction and
