@@ -11,12 +11,13 @@ import type { ReadingSection } from '@/reading/core/reading-presentation';
 import { FeatureNavigationContext, type CrateSection } from '../navigation/feature-navigation';
 
 /** PWA navigation; shared feature panels supply their destinations and actions. */
-export function PwaDock<T extends string>({ section, items, activeTab, onTabChange, onAdd, inert = false, disabled = false, className = '' }: {
+export function PwaDock<T extends string>({ section, items, activeTab, onTabChange, onAdd, addBlocked = false, inert = false, disabled = false, className = '' }: {
 	section: CrateSection;
 	items: readonly NavigationItem<T>[];
 	activeTab: T;
 	onTabChange: (tab: T) => void;
 	onAdd?: () => void;
+	addBlocked?: boolean;
 	inert?: boolean;
 	disabled?: boolean;
 	className?: string;
@@ -68,5 +69,5 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
 		}
 		selectDockTab(tab);
 	};
-	return <><AppDock section={section} tabs={tabs} destinations={DOCK_TABS.filter(item => allowed(item.id))} activeTab={currentTab as DockTab} activeIndex={indicatorIndex} onSelect={selectDockTab} onPin={selectPickerTab} onAdd={onAdd} inert={inert || navigation?.active === false} disabled={disabled} className={className} /><PwaToast toast={inert ? null : toast} /></>;
+	return <><AppDock section={section} tabs={tabs} destinations={DOCK_TABS.filter(item => allowed(item.id))} activeTab={currentTab as DockTab} activeIndex={indicatorIndex} onSelect={selectDockTab} onPin={selectPickerTab} onAdd={onAdd} addBlocked={addBlocked} inert={inert || navigation?.active === false} disabled={disabled} className={className} /><PwaToast toast={inert ? null : toast} /></>;
 }

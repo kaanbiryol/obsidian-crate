@@ -8,7 +8,7 @@ import { DOCK_TABS, type DockTab } from './dock-destinations';
 import { motion, useMotionTemplate, type MotionValue } from 'motion/react';
 
 /** Host-independent dock; the adapter owns destinations, preferences and routing. */
-export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, activeIndex = tabs.indexOf(activeTab), indicatorPosition, onSelect, onPin, onAdd, inert = false, disabled = false, className = '' }: {
+export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, activeIndex = tabs.indexOf(activeTab), indicatorPosition, onSelect, onPin, onAdd, addBlocked = false, inert = false, disabled = false, className = '' }: {
 	section: 'reminders' | 'reading';
 	tabs: readonly DockTab[];
 	destinations?: readonly (typeof DOCK_TABS[number])[];
@@ -19,6 +19,7 @@ export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, ac
 	onSelect: (tab: DockTab) => void;
 	onPin: (tab: DockTab) => void;
 	onAdd?: () => void;
+	addBlocked?: boolean;
 	inert?: boolean;
 	disabled?: boolean;
 	className?: string;
@@ -107,16 +108,18 @@ export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, ac
 				</Dialog.Popup>
 			</Dialog.Portal>
 		</Dialog.Root>
-		{onAdd && <DockAddButton section={section} disabled={disabled} onClick={onAdd} />}
+		{onAdd && <DockAddButton section={section} disabled={disabled} blocked={addBlocked} onClick={onAdd} />}
 	</div>;
 }
 
 /** Shared capture action for the main dock and detail screens. */
-export function DockAddButton({ section, disabled = false, onClick, className = '' }: {
+export function DockAddButton({ section, disabled = false, blocked = false, onClick, className = '' }: {
 	section: 'reminders' | 'reading';
 	disabled?: boolean;
+	/** Looks disabled but stays tappable, so the tap can explain why. */
+	blocked?: boolean;
 	onClick: () => void;
 	className?: string;
 }) {
-	return <Button className={`pwa-dock__add ${className}`} disabled={disabled} aria-label={section === 'reading' ? 'Save a link' : 'Add reminder'} data-action={section === 'reminders' ? 'open-create-modal' : 'open-save-link'} onClick={onClick}><ThemeIcon id="plus" size="l" aria-hidden="true" /></Button>;
+	return <Button className={`pwa-dock__add ${className}`} disabled={disabled} aria-disabled={blocked || undefined} aria-label={section === 'reading' ? 'Save a link' : 'Add reminder'} data-action={section === 'reminders' ? 'open-create-modal' : 'open-save-link'} onClick={onClick}><ThemeIcon id="plus" size="l" aria-hidden="true" /></Button>;
 }

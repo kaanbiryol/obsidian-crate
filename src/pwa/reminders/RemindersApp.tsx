@@ -144,6 +144,7 @@ export function RemindersApp() {
 					</>
 				) : undefined}
 				backgroundInert={Boolean(modal) || settingsOpen}
+				addBlocked={isOffline}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}

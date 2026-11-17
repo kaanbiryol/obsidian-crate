@@ -95,8 +95,15 @@ try {
 			await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
 			await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Close settings', exact: true }).tap();
 			await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
+			// Offline reminders are read-only: + looks disabled but a tap still says why.
+			await expect(fab).toHaveAttribute('aria-disabled', 'true');
+			await expect(fab).toHaveCSS('opacity', '0.4');
+			await fab.tap({ force: true });
+			await expect(page.getByRole('status').filter({ hasText: 'Offline data is read-only' })).toBeVisible();
+			await expect(page.getByRole('textbox', { name: 'Reminder title', exact: true })).toHaveCount(0);
 			await page.context().setOffline(false);
 			await expect(fab).toBeVisible();
+			await expect(fab).not.toHaveAttribute('aria-disabled');
 			await fab.evaluate(element => { window.originalFab = element; });
 			const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
 			const editor = page.getByRole('dialog', { name: 'Edit reminder', exact: true });

@@ -78,7 +78,7 @@
   .pwa-dock__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .pwa-dock__add { display: flex; flex: 0 0 60px; align-items: center; justify-content: center; height: 60px; padding: 0; border-radius: 50%; color: var(--text-normal); touch-action: manipulation; }
   .pwa-dock__add > svg { width: 25px; height: 25px; }
-  .pwa-dock__add:disabled { opacity: .4; }
+  .pwa-dock__add:is(:disabled, [aria-disabled="true"]) { opacity: .4; }
   // An absolute portal keeps the menu out of the dock's flex layout.
   .pwa-dock__portal { position: absolute; inset: 0; pointer-events: none; }
   .pwa-dock__portal > * { pointer-events: auto; }

@@ -44,6 +44,8 @@ interface PwaRemindersAppShellProps {
 	children?: React.ReactNode;
 	className?: string;
 	backgroundInert?: boolean;
+	/** Adding is unavailable (offline): the + looks disabled and a tap explains why. */
+	addBlocked?: boolean;
 	incomplete?: boolean;
 	checkingReminders?: boolean;
 	showLoadingIndicator?: boolean;
@@ -75,6 +77,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	children,
 	className = '',
 	backgroundInert = false,
+	addBlocked = false,
 	incomplete = false,
 	checkingReminders = false,
 	showLoadingIndicator = false,
@@ -226,7 +229,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 
 				<PwaDock section="reminders" items={TABS} activeTab={viewMode} onTabChange={handleViewModeChange}
 					inert={initializing || backgroundInert || projectOpen}
-					onAdd={handleAdd} />
+					onAdd={handleAdd} addBlocked={addBlocked} />
 
 				<div className="pwa-project-layer" data-project-open={projectOpen} data-pwa-back={canGoBack} inert={initializing}>
 					<AnimatePresence initial={false} custom={navigationMotion} onExitComplete={finishProjectClose}>
@@ -249,7 +252,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 									reorderInteraction="long-press"
 								/>
 							</div>
-							<div className="pwa-dock pwa-project-dock" inert={initializing || backgroundInert}><PwaDockAddButton section="reminders" onClick={handleAdd} className="pwa-project-fab" /></div>
+							<div className="pwa-dock pwa-project-dock" inert={initializing || backgroundInert}><PwaDockAddButton section="reminders" blocked={addBlocked} onClick={handleAdd} className="pwa-project-fab" /></div>
 						</NavigationScreen>}
 					</AnimatePresence>
 				</div>
