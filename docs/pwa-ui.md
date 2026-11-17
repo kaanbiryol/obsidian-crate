@@ -9,9 +9,10 @@ preparation, and update activation for both features. It checks on launch,
 foreground/pageshow and reconnect while visible and online, never on a timer.
 `PwaUpdateButton` shows a compact **Update** pill in the Reminders and Reading
 headers, to the left of sync and Settings. Selecting **Update** immediately starts
-applying the update without a confirmation sheet. Offline or pending work disables
-the action; update failures appear as toast feedback. `PwaUpdateNotice` provides the
-same action at the top of Settings. There is no floating update banner.
+applying the update without a confirmation sheet. Offline or pending work dims
+the pill, and selecting it then explains why in a toast, since touch devices never
+show its title. Update failures also appear as toast feedback. The pill is the only
+update action; Settings has none. There is no floating update banner.
 At launch, a found update downloads and applies behind the Reminders launch splash
 (released after a 30s stall, on failure, offline or backgrounding, and at once when
 saved work needs review or a restored editor or capture form is open);

@@ -27,7 +27,7 @@ import { useSettingsSelector, useSettingsStore } from './settings-context';
 import { shallowEqual, type SettingsSnapshot } from './settings-store';
 import { ReminderRecoveryNotices } from '../reminders/notices/ReminderRecoveryNotices';
 import { useAppUpdate } from '../update/PwaUpdateProvider';
-import { PwaUpdateNotice, PwaUpdateFeedback } from '../update/PwaUpdateNotice';
+import { PwaUpdateFeedback } from '../update/PwaUpdateNotice';
 import type { PwaPreferences } from './preferences';
 
 type SettingsAction = 'refresh' | 'export-reminders' | 'export-reading' | 'logout';
@@ -117,7 +117,6 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 						{attention.map(text => <p key={text}>{text}</p>)}
 						<Button size="touch" variant="ghost" onClick={() => { panelRef.current?.querySelector('[data-settings-sync]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }}>Review sync</Button>
 					</div>}
-					<PwaUpdateNotice disabled={busy || unsynced} />
 					<PwaUpdateFeedback />
 					<GeneralSettings preferences={preferences} onPreferencesChange={changePreferences} />
 					<TabSettings preferences={preferences} onChange={changePreferences} />

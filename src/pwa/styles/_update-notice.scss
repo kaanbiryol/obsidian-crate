@@ -8,21 +8,8 @@
 		color: var(--interactive-accent);
 		font-size: 13px;
 		font-weight: 600;
+		// Blocked stays tappable so the tap can explain why; it looks disabled.
+		&[aria-disabled="true"] { opacity: 0.3; }
 	}
-	.settings-row.pwa-update-notice {
-		padding-block: 12px 16px;
-		margin-bottom: 8px;
-		border-bottom: 1px solid var(--crate-divider);
-		gap: 16px;
-	}
-	.pwa-update-button.crate-action-button {
-		white-space: nowrap;
-		display: grid;
-		place-items: center;
-		flex-shrink: 0;
-		min-width: 100px;
-	}
-	.pwa-update-button__label { grid-area: 1 / 1; }
-	.pwa-update-button__label[aria-hidden="true"] { visibility: hidden; }
 	.pwa-update-status { font-size: 13px; }
 }

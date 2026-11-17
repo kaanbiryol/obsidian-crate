@@ -40,10 +40,14 @@ try {
         expect(checks).toBeGreaterThan(beforeCheck);
         await expect(page.locator('.pwa-update-floating')).toHaveCount(0);
         await context.setOffline(true);
-        await expect(pill).toBeDisabled();
+        await expect(pill).toHaveAttribute('aria-disabled', 'true');
         await expect(pill).toHaveAttribute('title', 'Connect to the internet to update.');
+        // aria-disabled keeps the pill tappable; Playwright treats it as disabled, so force.
+        await pill.click({ force: true });
+        await expect(page.getByRole('status').filter({ hasText: 'Connect to the internet to update.' })).toBeVisible();
+        await expect(pill).toHaveAttribute('aria-busy', 'false');
         await context.setOffline(false);
-        await expect(pill).toBeEnabled();
+        await expect(pill).toHaveAttribute('aria-disabled', 'false');
         await switchFeature(page, 'Reminders');
         await expect(page.locator('.pwa-reminders-view')).toBeVisible();
         await page.locator('[data-crate-section="reminders"] .pwa-dock [data-tab="inbox"]').click();
@@ -51,9 +55,8 @@ try {
         await page.screenshot({ path: `test-results/update-notice/${engine.name()}-${colorScheme}.png` });
         await page.getByRole('button', { name: 'Open settings', exact: true }).click();
         const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-        await expect(settings.locator('.pwa-update-notice')).toBeVisible();
-        await expect(settings.getByRole('button', { name: 'Update to the latest version' })).toHaveCount(1);
-        await expect(settings.getByRole('button', { name: 'Update app', exact: true })).toHaveCount(0);
+        await expect(settings).toBeVisible();
+        await expect(settings.getByRole('button', { name: /update/i })).toHaveCount(0);
         await page.getByRole('button', { name: 'Close settings', exact: true }).click();
         await switchFeature(page, 'Reading');
         await page.reload();
@@ -85,7 +88,7 @@ try {
         await expect(pill).toBeEnabled();
         expect(errors).toEqual([]);
         await context.close();
-        console.log(`${engine.name()} ${colorScheme}: global detection, foreground checks, direct updates, offline blocking, Settings and compact layout passed`);
+        console.log(`${engine.name()} ${colorScheme}: global detection, foreground checks, direct updates, offline blocking with a reason, no Settings duplicate and compact layout passed`);
       }
     } finally { await browser.close(); }
   }

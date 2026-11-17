@@ -1,5 +1,5 @@
 import { pwaSyncState } from '../sync/state';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 import { usePwaUpdate } from './usePwaUpdate';
 import { useToast } from '../hooks/useToast';
@@ -55,7 +55,7 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 			&& pwaSyncState(current).canUpdate
 			&& !document.querySelector('.pwa-modal-sheet--reminder, .pwa-reading-sheet, [role="alertdialog"]');
 	};
-	const { updating, update, launchPending } = usePwaUpdate(showToast, sync.contentReady, {
+	const { updating, update: apply, launchPending } = usePwaUpdate(showToast, sync.contentReady, {
 		version, checkComplete,
 		// Preserve automatic updates behind the Reminders launch splash only.
 		canApply: () => activeSection === 'reminders' && Boolean(store.getSnapshot().reminders?.connected) && !store.getOpen() && canApply(),
@@ -65,6 +65,11 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 	const blockedReason = !online ? 'Connect to the internet to update.'
 		: !sync.ready ? 'Checking saved changes…'
 		: !sync.canUpdate ? 'Finish editing or syncing before updating.' : null;
+	// Touch devices never show the button's title, so a blocked tap says why in a toast.
+	const update = useCallback(async () => {
+		if (blockedReason) showToast('info', blockedReason);
+		else await apply();
+	}, [blockedReason, showToast, apply]);
 	const value = useMemo(() => ({ version, updating, update, launchPending, blockedReason, feedback: toast }), [version, updating, update, launchPending, blockedReason, toast]);
 	return <UpdateContext.Provider value={value}>
 		{children}
