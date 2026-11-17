@@ -18,6 +18,41 @@
 		font-weight: var(--crate-font-weight-semibold);
 	}
 
+	// One slim row for offline and failed refreshes, shared by every feature.
+	.pwa-connection-banner {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-height: 36px;
+		padding: 4px 4px 4px 12px;
+		border: 1px solid color-mix(in srgb, var(--text-warning) 18%, transparent);
+		border-radius: var(--radius-l, 12px);
+		background: color-mix(in srgb, var(--text-warning) 10%, transparent);
+		color: var(--text-warning);
+		font-size: var(--crate-font-xs);
+		font-weight: var(--crate-font-weight-semibold);
+		line-height: 1.35;
+		flex-shrink: 0;
+	}
+
+	.pwa-connection-banner__icon { flex-shrink: 0; }
+	.pwa-connection-banner__copy { flex: 1; min-width: 0; overflow-wrap: anywhere; padding-block: 4px; }
+
+	.pwa-connection-banner__retry {
+		flex-shrink: 0;
+		min-height: 28px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 8px;
+		background: transparent;
+		box-shadow: none;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+
+		&:disabled { opacity: .5; }
+	}
+
 	.pwa-notice {
 		padding: 12px 12px 2px;
 		border: 1px solid var(--background-modifier-border);

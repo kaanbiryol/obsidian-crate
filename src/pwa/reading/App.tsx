@@ -14,6 +14,7 @@ import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { PwaPullRefreshIndicator } from '../components/PwaChrome';
 import { PwaDock } from '../components/PwaDock';
+import { connectionIssueReason, PwaConnectionBanner } from '../components/PwaConnectionBanner';
 import { TabTransition } from '../../ui/shared/navigation/TabTransition';
 import { PwaUpdateButton } from '../update/PwaUpdateNotice';
 import { AUTH_TOKEN_KEY } from '../config';
@@ -84,6 +85,7 @@ function ReadingAppContent() {
 		});
 	}, [sharedLinkReady, session, saving, takeSharedLink, run, saveLink, open, openCaptureForm]);
 	const openCapture = () => {
+		if (readOnly) { showToast('info', 'Connect to save links.'); return; }
 		if (!session) { showToast('info', 'Choose a Reading folder in Obsidian’s Crate settings to save a link.'); return; }
 		// Mount and focus within the tap so iOS can open its software keyboard.
 		flushSync(openCaptureForm);
@@ -102,21 +104,29 @@ function ReadingAppContent() {
 	if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
 	// A share stays staged until a connected Reading session copies it into its draft.
 	const share = new URL(location.href).searchParams.has('share');
-	const notices = <ReadingNotices recovery={recovery} error={error} showError={!readingDisabled && !adding} readOnly={readOnly}
-		syncIssue={pending.find(op => op.error || op.review)} offline={isOffline && !!session} onExport={() => void run(exportReadingData)}
+	// Offline, an unanswered encryption check and a library that never loaded share one banner.
+	const connectionText = readingDisabled ? null
+		: isOffline && (session || readOnly) ? 'Offline · showing saved articles'
+		: readOnly || (session && !cache && error) ? (readOnly && connectionIssueReason(error)) || 'Couldn’t connect · showing saved articles'
+		: null;
+	const notices = <ReadingNotices recovery={recovery} error={connectionText ? null : error} showError={!readingDisabled && !adding}
+		connectionText={connectionText} retrying={connecting}
+		syncIssue={pending.find(op => op.error || op.review)} onExport={() => void run(exportReadingData)}
 		onRetry={() => { if (session) void run(refreshManually); else void connect(); }} onReview={() => setSettingsOpen(true)} />;
 	return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
 		{!session && !readingDisabled ? <ReadingWelcome share={share} notices={notices} /> : <>
 			<ReadingLibraryPanel listStyle={preferences.reminderListStyle} initialSection={featureNavigation?.readingTab}
 				renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
-				renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} onAdd={openCapture} />}
+				renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} addBlocked={readOnly} onAdd={openCapture} />}
 				source={source} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length,
-					error: !readingDisabled && !cache && error ? 'Your library is unavailable. Retry when connected.' : null }}
+					error: !readingDisabled && !connectionText && !cache && error ? 'Your library is unavailable. Retry when connected.' : null }}
 				onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }}
 				onRefresh={refreshManually} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />}
 				notice={!reader && notices} activeId={reader?.item.crate_reading_id} readerClosing={readerClosing} onReaderClosed={finishReaderClose}
 				readerMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : readerMotion}
-				listContent={readingDisabled ? <EmptyState className="crate-reading__empty crate-reading-disabled" icon="book-open"
+				listContent={!readingDisabled && savedOnly && !visibleItems.length ? <EmptyState className="crate-reading__empty" icon="book-open"
+					title="Your library isn’t on this device" description="Connect to see it. Articles you save for offline show up here." />
+				: readingDisabled ? <EmptyState className="crate-reading__empty crate-reading-disabled" icon="book-open"
 					title="Connect your Reading folder"
 					description={<>In Obsidian, open <strong>Crate settings → Reading</strong> and select <strong>Reading folder</strong>.</>}>
 					{share && <p>Your shared link is saved on this device. Connect Reading, then return to save it.</p>}
@@ -162,18 +172,19 @@ function ReadingWelcome({ share, notices }: { share: boolean; notices: ReactNode
 	</section>;
 }
 
-/** Earlier-session recovery, then a connection error or else the first change that needs attention. */
-function ReadingNotices({ recovery, error, showError, readOnly, syncIssue, offline, onExport, onRetry, onReview }: {
-	recovery: boolean; error: string | null; showError: boolean; readOnly: boolean; syncIssue: PendingReading | undefined;
-	/** Offline, only articles saved on this device are listed. */
-	offline: boolean; onExport: () => void; onRetry: () => void; onReview: () => void;
+/** Earlier-session recovery, then the connection banner or an error, or else the first change that needs attention. */
+function ReadingNotices({ recovery, error, showError, connectionText, retrying, syncIssue, onExport, onRetry, onReview }: {
+	recovery: boolean; error: string | null; showError: boolean; syncIssue: PendingReading | undefined;
+	/** Offline or unable to connect; only articles saved on this device are listed. */
+	connectionText: string | null; retrying: boolean; onExport: () => void; onRetry: () => void; onReview: () => void;
 }) {
 	return <>
-		{offline && <p className="crate-reading__notice">Showing articles saved for offline. Connect to see your whole library.</p>}
+		{connectionText && <PwaConnectionBanner text={connectionText} retrying={retrying}
+			onRetry={connectionText.startsWith('Offline') ? undefined : onRetry} />}
 		{recovery && <p className="crate-reading__notice">{'Changes from an earlier sign-in are still stored here. '}
 			<Button variant="outline" onClick={onExport}>Export earlier changes</Button></p>}
-		{error && showError && <p className="crate-reading__notice" role="alert">{readOnly && <strong>Unable to connect. </strong>}{error}{' '}
-			<Button variant="outline" onClick={onRetry}>{readOnly ? 'Try again' : 'Retry'}</Button></p>}
+		{error && showError && <p className="crate-reading__notice" role="alert">{error}{' '}
+			<Button variant="outline" onClick={onRetry}>Retry</Button></p>}
 		{!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'}{' '}
 			<Button variant="outline" onClick={onReview}>Review changes</Button></p>}
 	</>;

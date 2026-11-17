@@ -894,19 +894,24 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   faults.encryptionUnavailable = true;
   await page.reload();
   // Before: a full-screen error hid the saved library on a device without encryption evidence.
-  await expect(page.locator('.crate-reading__notice').filter({ hasText: 'Unable to connect.' })).toBeVisible();
+  // Before: an Unable to connect notice and a library-unavailable card stacked for one cause.
+  await expect(page.locator('.pwa-connection-banner').filter({ hasText: 'Couldn’t connect' })).toBeVisible();
+  await expect(page.locator('.crate-reading__notice')).toHaveCount(0);
   // Before: the read-only library listed nothing although the article was saved for offline.
   await saved.waitFor();
   await expect(page.locator('.crate-encryption-unlock')).toHaveCount(0);
-  await page.getByRole('button',{name:'Save a link',exact:true}).click();
-  await page.getByLabel('Link',{exact:true}).fill('https://offline.example.invalid/refused');
-  await page.getByRole('button',{name:'Save link',exact:true}).click();
-  await expect(page.getByRole('dialog', { name: 'Save a link' }).getByRole('alert')).toContainText('Could not verify encryption');
+  // Locked storage cannot hold a link: + looks disabled and a tap explains why instead of opening the form.
+  const add = page.locator('.pwa-dock__add');
+  await expect(add).toHaveAttribute('aria-disabled', 'true');
+  await add.click({ force: true });
+  await expect(page.getByRole('status').filter({ hasText: 'Connect to save links.' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Save a link' })).toHaveCount(0);
   assert.deepEqual(sent, []);
   faults.encryptionUnavailable = false;
   await page.reload();
   await saved.waitFor();
-  await expect(page.locator('.crate-reading__notice').filter({ hasText: 'Unable to connect.' })).toHaveCount(0);
+  await expect(page.locator('.pwa-connection-banner')).toHaveCount(0);
+  await expect(page.locator('.pwa-dock__add')).not.toHaveAttribute('aria-disabled');
   await expect(readingSync).toHaveAttribute('data-sync-state','synced');
 });
 

@@ -2,43 +2,44 @@ import { useEffect, useMemo, useState } from 'react';
 import { isStandaloneApp } from '../shell/device';
 import type { DataMode } from '../types';
 import type { PushState } from './types';
+import { connectionIssueReason } from '../components/PwaConnectionBanner';
 
-function formatLastUpdated(timestamp: number | null, now: number): string {
-	if (!timestamp) return 'Not updated yet';
+function formatLastUpdated(timestamp: number, now: number): string {
 	const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
-	if (elapsedSeconds < 45) return 'Last updated just now';
-	if (elapsedSeconds < 90) return 'Last updated 1m ago';
+	if (elapsedSeconds < 45) return 'updated just now';
+	if (elapsedSeconds < 90) return 'updated 1m ago';
 	const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-	if (elapsedMinutes < 60) return `Last updated ${elapsedMinutes}m ago`;
+	if (elapsedMinutes < 60) return `updated ${elapsedMinutes}m ago`;
 	const elapsedHours = Math.floor(elapsedMinutes / 60);
-	if (elapsedHours < 24) return `Last updated ${elapsedHours}h ago`;
+	if (elapsedHours < 24) return `updated ${elapsedHours}h ago`;
 	const elapsedDays = Math.floor(elapsedHours / 24);
-	return `Last updated ${elapsedDays}d ago`;
+	return `updated ${elapsedDays}d ago`;
 }
 
+/** The connection banner: offline, or the last refresh or encryption check failed. */
 export function getPwaStatusText({
 	dataMode,
 	error,
 	isOffline,
 	lastUpdatedAt,
 	now,
-	refreshing,
+	unavailableMessage = null,
 }: {
 	dataMode: DataMode;
 	error: string | null;
 	isOffline: boolean;
 	lastUpdatedAt: number | null;
 	now: number;
-	refreshing: boolean;
+	unavailableMessage?: string | null;
 }): string | null {
-	const lastUpdated = formatLastUpdated(lastUpdatedAt, now);
-	if (isOffline) return lastUpdatedAt ? `Offline - ${lastUpdated}` : 'Offline';
+	const updated = lastUpdatedAt ? ` · ${formatLastUpdated(lastUpdatedAt, now)}` : '';
+	if (isOffline) return `Offline${updated}`;
+	const reason = connectionIssueReason(unavailableMessage);
+	if (reason) return reason;
 	// Cached data is hydrated before the initial live refresh starts. Keep that
 	// normal startup handoff quiet unless the refresh actually fails.
-	if (dataMode === 'cached') return error ? `${lastUpdated} - stale` : null;
-	if (dataMode === 'error') return error ? `Refresh failed - ${error}` : 'Refresh failed';
-	if (refreshing) return lastUpdatedAt ? `Refreshing - ${lastUpdated}` : 'Refreshing';
-	return lastUpdatedAt ? lastUpdated : null;
+	if (unavailableMessage || dataMode === 'error' || (dataMode === 'cached' && error)) return `Couldn’t connect${updated}`;
+	return null;
 }
 
 export function usePwaStatus({
@@ -49,7 +50,7 @@ export function usePwaStatus({
 	isOffline,
 	lastUpdatedAt,
 	push,
-	refreshing,
+	unavailableMessage = null,
 }: {
 	authToken: string | null;
 	bootstrapped: boolean;
@@ -58,13 +59,13 @@ export function usePwaStatus({
 	isOffline: boolean;
 	lastUpdatedAt: number | null;
 	push: PushState;
-	refreshing: boolean;
+	/** An unanswered encryption check while the offline copy is shown. */
+	unavailableMessage?: string | null;
 }): {
 	readOnlyMessage: string | null;
 	readOnly: boolean;
 	canShowNotificationPrompt: boolean;
 	statusText: string | null;
-	statusKind: 'offline' | DataMode;
 } {
 	const [statusNow, setStatusNow] = useState(() => Date.now());
 
@@ -86,27 +87,26 @@ export function usePwaStatus({
 
 	const readOnlyMessage = useMemo(() => {
 		if (isOffline) return 'Offline data is read-only';
-		if (dataMode === 'cached') return 'Showing last saved reminders. Refresh before editing.';
+		if (unavailableMessage || dataMode === 'cached') return 'Showing last saved reminders. Refresh before editing.';
 		if (dataMode === 'error') return 'Refresh reminders before editing.';
 		return null;
-	}, [dataMode, isOffline]);
+	}, [dataMode, isOffline, unavailableMessage]);
 	const readOnly = Boolean(readOnlyMessage);
-	const canShowNotificationPrompt = Boolean(authToken && bootstrapped && (push.phase === 'off' || push.phase === 'error') && isStandaloneApp());
 	const statusText = useMemo(() => getPwaStatusText({
 		dataMode,
 		error,
 		isOffline,
 		lastUpdatedAt,
 		now: statusNow,
-		refreshing,
-	}), [dataMode, error, isOffline, lastUpdatedAt, refreshing, statusNow]);
-	const statusKind = isOffline ? 'offline' : dataMode === 'live' ? 'live' : dataMode;
+		unavailableMessage,
+	}), [dataMode, error, isOffline, lastUpdatedAt, statusNow, unavailableMessage]);
+	// Enabling alerts needs the server, so the prompt waits while the banner shows.
+	const canShowNotificationPrompt = Boolean(authToken && bootstrapped && !statusText && (push.phase === 'off' || push.phase === 'error') && isStandaloneApp());
 
 	return {
 		readOnlyMessage,
 		readOnly,
 		canShowNotificationPrompt,
 		statusText,
-		statusKind,
 	};
 }

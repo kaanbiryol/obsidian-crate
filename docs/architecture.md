@@ -358,7 +358,7 @@ the existing app credential after enrollment completes. `AppConnectionGate` pres
 one unlock/reconnect surface above the feature screens; a failure confined to one
 feature still allows opening the other. When the startup encryption check gets no
 answer on a device without encryption evidence, both features show their plaintext
-offline copy read-only under an **Unable to connect** notice; writes stay locked. Scope-specific encryption adapters share
+offline copy read-only under a **Couldn’t connect** banner; writes stay locked. Scope-specific encryption adapters share
 verification and key-import policy through `encryption/encryption-verification.ts`, retaining
 their local storage migration and cache responsibilities. Expired credentials are
 matched against the current connection before suspension; expiry preserves drafts

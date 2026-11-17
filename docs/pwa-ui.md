@@ -23,6 +23,21 @@ activates a waiting service worker once every client has closed, so a later cold
 launch can start on the new version without these checks. That is safe because the
 pending reminder outbox and Reading queue formats are frozen, so the new version still reads them.
 
+## Connection banner
+
+`PwaConnectionBanner` is the one place a feature says it is offline or could not
+reach Crate: a single warning row under the header (Reading puts it at the top of
+the list). It reads **Offline · updated 8m ago** while the browser is offline, and
+**Couldn’t connect · updated 8m ago** when a refresh or the encryption check got no
+answer, with **Retry** only in the second case. A server refusal (403, 423 or 429)
+shows its own reason instead. It replaces the stale status line, the
+**Unable to connect** card and Reading’s library-unavailable notice, so one cause
+never produces stacked cards. While it shows, the **Get alerts** prompt is hidden
+and the Reminders **+** is dimmed; selecting it explains why in a toast. Reading
+still saves links offline into its queue, so its **+** dims only while storage is
+locked by an unanswered encryption check. With nothing saved for offline, Reading
+shows **Your library isn’t on this device** instead of its first-link empty state.
+
 ## Launch appearance
 
 The PWA resolves its saved theme in a nonce-authorized inline script before the

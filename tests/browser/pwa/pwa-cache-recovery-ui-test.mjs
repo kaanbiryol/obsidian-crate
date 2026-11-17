@@ -84,15 +84,15 @@ async function verify(browser) {
 		});
 		const reloaded = Date.now();
 		await page.reload();
-		const unavailable = page.getByRole('region', { name: 'Unable to connect', exact: true });
-		await expect(unavailable).toBeVisible({ timeout: 12_000 });
+		const unavailable = page.locator('.pwa-connection-banner');
+		await expect(unavailable).toContainText('Couldn’t connect', { timeout: 12_000 });
 		expect(Date.now() - reloaded).toBeLessThan(12_000);
 		const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
 		await expect(card).toBeVisible();
 		await expect(page.getByText('Unlock Crate')).toHaveCount(0);
 		await card.getByRole('checkbox').click();
 		await expect(page.getByRole('status').filter({ hasText: 'Refresh before editing.' })).toBeVisible();
-		await unavailable.getByRole('button', { name: 'Try again', exact: true }).click();
+		await unavailable.getByRole('button', { name: 'Retry', exact: true }).click();
 		await expect.poll(() => checks).toBeGreaterThan(2);
 		await expect(unavailable).toBeVisible();
 		await page.waitForTimeout(250);

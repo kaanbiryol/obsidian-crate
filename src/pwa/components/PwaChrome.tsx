@@ -8,7 +8,7 @@ import {
 	Bell,
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
-import type { DataMode } from '../types';
+import { PwaConnectionBanner } from './PwaConnectionBanner';
 import { createPwaOpeningScreenHtml } from '../shell/opening-screen';
 import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
 import { loadPwaPreferences } from '../settings/preferences';
@@ -59,24 +59,26 @@ export function PwaHeaderActions({
 
 export function PwaTopNotices({
 	statusText,
-	statusKind,
+	onRetry,
+	retrying,
 	showNotificationPrompt,
 	onEnableNotifications,
 	children,
 }: {
 	statusText: string | null;
-	statusKind: DataMode | 'offline';
+	/** Omitted while offline. */
+	onRetry?: () => void;
+	retrying: boolean;
 	showNotificationPrompt: boolean;
 	onEnableNotifications: () => void;
 	children?: React.ReactNode;
 }) {
-	const showStatusLine = Boolean(statusText && statusKind !== 'live');
-	const showNotices = showStatusLine || showNotificationPrompt || children;
+	const showNotices = statusText || showNotificationPrompt || children;
 	if (!showNotices) return null;
 
 	return (
 		<div className="pwa-top-notices">
-			{showStatusLine && <div className={`pwa-status-line is-${statusKind}`} role="status">{statusText}</div>}
+			{statusText && <PwaConnectionBanner text={statusText} onRetry={onRetry} retrying={retrying} />}
 			{children}
 			{showNotificationPrompt && (
 				<div className="pwa-notification-prompt">

@@ -88,7 +88,7 @@ function useRemindersController() {
 		isOffline,
 		lastUpdatedAt,
 		push,
-		refreshing,
+		unavailableMessage,
 	});
 
 	const { readOnlyMessage, readOnly } = status;

@@ -11,8 +11,6 @@ import { ReminderCacheNotice } from './notices/ReminderCacheNotice';
 import { ReminderSourceNotice } from './notices/ReminderSourceNotice';
 import { ReminderRecoveryNotices } from './notices/ReminderRecoveryNotices';
 import { ReminderSyncNotice } from './notices/ReminderSyncNotice';
-import { PwaNotice } from '../components/PwaNotice';
-import { PwaButton } from '../components/PwaButton';
 import { WebReminderCard } from './WebReminderCard';
 
 // Keep the editor ready for the tap's synchronous focus/keyboard activation.
@@ -26,7 +24,7 @@ export function RemindersApp() {
 	const { preferences } = usePwaPreferences();
 	const active = useContext(FeatureNavigationContext)?.active !== false;
 	const { connection, sync, mutations, editor, status, presentation, enablePushNotifications } = useRemindersRuntime();
-	const { authToken, bootstrapped, config, selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId, unavailableMessage } = connection;
+	const { authToken, bootstrapped, config, selectedProject, setSelectedProject, startTab, launchReminderId, setLaunchReminderId } = connection;
 	const { loading, refreshing, error, issues, dataMode, isOffline, loadReminders, rebuildOfflineCache } = sync;
 	const {
 		toggleReminderCompleted, persistReorder, visibleReminders, visibleProjects, changes,
@@ -34,7 +32,7 @@ export function RemindersApp() {
 		recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges,
 	} = mutations;
 	const { modal, saving, transition: modalTransition, closeModal, openReminder, openModal, editFailedChange, editReminder, saveReminder, deleteReminder } = editor;
-	const { readOnlyMessage, canShowNotificationPrompt, statusText, statusKind } = status;
+	const { readOnlyMessage, canShowNotificationPrompt, statusText } = status;
 	const {
 		colorScheme, isDarkMode, settingsOpen, toggleSettings, reorderDragging, setReorderDragging,
 		showToast, handlePullRefresh, initialContentReady, sharedReminders, resolvePageTitle,
@@ -120,13 +118,11 @@ export function RemindersApp() {
 						/>
 						<PwaTopNotices
 							statusText={statusText}
-							statusKind={statusKind}
+							onRetry={isOffline ? undefined : () => { void handlePullRefresh(); }}
+							retrying={refreshing}
 							showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
 							onEnableNotifications={enablePushNotifications}
 						>
-							{unavailableMessage && <PwaNotice title="Unable to connect" aria-label="Unable to connect" actions={
-								<PwaButton variant="ghost" size="touch" type="button" disabled={refreshing} onClick={() => { void handlePullRefresh(); }}>Try again</PwaButton>
-							}><span role="status">{unavailableMessage}</span></PwaNotice>}
 							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
 							<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
 							{(changes.some(change => change.status !== 'pending') || storageError) && <ReminderSyncNotice
@@ -144,7 +140,7 @@ export function RemindersApp() {
 					</>
 				) : undefined}
 				backgroundInert={Boolean(modal) || settingsOpen}
-				addBlocked={isOffline}
+				addBlocked={Boolean(statusText)}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}

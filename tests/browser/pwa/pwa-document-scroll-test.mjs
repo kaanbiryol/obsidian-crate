@@ -191,7 +191,7 @@ try {
   await expectOwner(offline.page, 'reminders-view-scroll');
   await offline.context.setOffline(true);
   await offline.page.evaluate(() => window.dispatchEvent(new Event('offline')));
-  const notice = offline.page.locator('.crate-feature-panel[data-active="true"] .pwa-status-line');
+  const notice = offline.page.locator('.crate-feature-panel[data-active="true"] .pwa-connection-banner');
   await expect(notice).toBeVisible();
   await expect.poll(() => notice.evaluate(element => getComputedStyle(element.closest('.pwa-below-header-content')).position)).toBe('fixed');
   await expectOwner(offline.page, 'reminders-view-scroll');

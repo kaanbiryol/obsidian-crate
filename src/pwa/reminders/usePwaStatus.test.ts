@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getPwaStatusText } from './usePwaStatus';
+import { ENCRYPTION_UNVERIFIED } from '../encryption/encryption-verification';
 
 const now = new Date('2026-08-27T12:00:00.000Z').getTime();
 
@@ -11,7 +12,6 @@ describe('getPwaStatusText', () => {
 			isOffline: false,
 			lastUpdatedAt: now,
 			now,
-			refreshing: false,
 		})).toBeNull();
 	});
 
@@ -22,8 +22,7 @@ describe('getPwaStatusText', () => {
 			isOffline: false,
 			lastUpdatedAt: now,
 			now,
-			refreshing: false,
-		})).toBe('Last updated just now - stale');
+		})).toBe('Couldn’t connect · updated just now');
 	});
 
 	it('continues to show offline status for cached data', () => {
@@ -33,8 +32,14 @@ describe('getPwaStatusText', () => {
 			isOffline: true,
 			lastUpdatedAt: now,
 			now,
-			refreshing: false,
-		})).toBe('Offline - Last updated just now');
+		})).toBe('Offline · updated just now');
+	});
+
+	it('keeps a server refusal reason but folds the unanswered check into one line', () => {
+		const base = { dataMode: 'cached' as const, error: null, isOffline: false, lastUpdatedAt: now - 8 * 60_000, now };
+		expect(getPwaStatusText({ ...base, unavailableMessage: ENCRYPTION_UNVERIFIED })).toBe('Couldn’t connect · updated 8m ago');
+		expect(getPwaStatusText({ ...base, unavailableMessage: 'Too many requests. Try again shortly.' })).toBe('Too many requests. Try again shortly.');
+		expect(getPwaStatusText({ ...base, dataMode: 'error', error: 'Load failed', lastUpdatedAt: null })).toBe('Couldn’t connect');
 	});
 });
 
@@ -50,7 +55,7 @@ describe('usePwaStatus clock', () => {
 			renderHook(() => {
 				renders++;
 				return usePwaStatus({ authToken: 'token', bootstrapped: true, dataMode: 'live', error: null, isOffline: false,
-					lastUpdatedAt: now, push: { phase: 'on' } as never, refreshing: false });
+					lastUpdatedAt: now, push: { phase: 'on' } as never });
 			}, () => {
 				Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
 				vi.stubGlobal('window', Object.assign(window, { setInterval, clearInterval }));
