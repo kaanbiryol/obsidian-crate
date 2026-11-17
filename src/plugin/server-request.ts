@@ -2,6 +2,7 @@ import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import type CratePlugin from './CratePlugin';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { obsidianHttpTransport, WorkerApiHttpClient } from '../sync/worker-api/http';
+import { isTransientSyncFailure } from '../sync/failures';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 interface ServerRequestOptions {
@@ -16,6 +17,12 @@ export type SyncApiConnectionHost = ServerConnectionHost & Pick<CratePlugin, 'sy
 
 function connectionChanged(): DOMException {
 	return new DOMException('The server connection changed. Reopen settings and try again.', 'AbortError');
+}
+
+/** The server could not be reached, was busy, or the connection changed while waiting:
+ * such a failure says nothing about how the server is set up. */
+export function isUnreachableServer(error: unknown): boolean {
+	return isTransientSyncFailure(error) || (error instanceof DOMException && error.name === 'AbortError');
 }
 
 /** Capture once for operations that span requests, queued saves and UI publication. */

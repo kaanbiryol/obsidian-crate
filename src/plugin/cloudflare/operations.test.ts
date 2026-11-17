@@ -13,6 +13,7 @@ const platform = { isMobile: false };
 
 const revealCloudflareOperation = vi.fn(() => false);
 const offerFeatureChoice = vi.fn(async () => {});
+const ensureServerSetup = vi.fn(async () => []);
 const startVaultReplacement = vi.fn(() => true);
 const readServerEncryption = vi.fn(async (): Promise<unknown> => null);
 
@@ -31,6 +32,7 @@ async function loadPluginIntegration() {
 	vi.doMock('./connection', () => ({ configureCloudflareAuthorizedDevice }));
 	vi.doMock('../vault-replacement', () => ({ confirmVaultReplacement: async () => false }));
 	vi.doMock('../feature-settings', () => ({ offerFeatureChoice }));
+	vi.doMock('../server-setup', () => ({ ensureServerSetup }));
 	vi.doMock('../sync-integration', () => ({ startVaultReplacement }));
 	vi.doMock('../../sync/encryption/server-encryption', () => ({ readServerEncryption }));
 	vi.doMock('../device-token', () => ({ generateSecureToken, hashToken }));
@@ -99,6 +101,7 @@ afterEach(() => {
 	vi.doUnmock('../../ui/cloudflare/deployment-modal');
 	vi.doUnmock('../../ui/cloudflare/authorization-modal');
 	vi.doUnmock('../feature-settings');
+	vi.doUnmock('../server-setup');
 	vi.doUnmock('../../sync/encryption/server-encryption');
 });
 
@@ -135,6 +138,8 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
 		);
 		expect(offerFeatureChoice).toHaveBeenCalledExactlyOnceWith(plugin);
+		// Server setup finishes after the feature choice, even when the vault confirmed every feature.
+		await vi.waitFor(() => expect(ensureServerSetup).toHaveBeenCalledExactlyOnceWith(plugin));
 	});
 
 	it.each([

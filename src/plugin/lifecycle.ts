@@ -9,6 +9,7 @@ import { errorMessage } from "../platform/logger";
 import { CrateSettingTab } from "../ui/settings/settings-tab";
 import { activateRemindersView, initializeReminders } from "../reminders/plugin-integration";
 import { ensureReminderNotificationPolicy } from "../reminders/notification-policy-sync";
+import { ensureServerSetup } from "./server-setup";
 import {
 	initializeSyncManagers,
 	registerSyncCommands,
@@ -191,6 +192,8 @@ async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signa
 		// Desktop notifications waited for this sync, so they see reminders other devices completed or moved.
 		markStartupSyncSettled(plugin);
 		plugin.reminders?.notifications.refresh();
+		// Once per start, after the first sync, so an offline or busy startup does not report setup problems.
+		void ensureServerSetup(plugin);
 		if (!plugin.remindersSettings.enabled || !plugin.reminders) return;
 		// Sync writes visible notes through the vault, so the watcher saw each
 		// change; scans deferred while syncing are flushed instead of a full reload.

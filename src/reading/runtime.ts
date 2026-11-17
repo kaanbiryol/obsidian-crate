@@ -1,5 +1,5 @@
 import { readReadingPolicy, writeReadingPolicy } from './server';
-import { captureServerConnection } from '../plugin/server-request';
+import { captureServerConnection, isUnreachableServer } from '../plugin/server-request';
 import { Notice, TFolder } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
@@ -14,6 +14,8 @@ export const READING_VIEW_TYPE = 'crate-reading';
  * still refreshes at least every `REFRESH_MAX_WAIT_MS`. */
 const REFRESH_DELAY_MS = 400;
 const REFRESH_MAX_WAIT_MS = 2_000;
+/** Vault changes check the server's Reading folder at most this often; Complete server setup checks at once. */
+const POLICY_RECHECK_MS = 60_000;
 
 /** The plugin settings, vault, sync state and server credentials Reading runs on. */
 type ReadingRuntimeHost = Pick<CratePlugin, 'app' | 'settings' | 'remindersSettings' | 'secretStorage' | 'syncRuntime' | 'writeSettings'>;
@@ -21,7 +23,13 @@ type ReadingRuntimeHost = Pick<CratePlugin, 'app' | 'settings' | 'remindersSetti
 /** Reading state of one plugin instance. Only `runtime` ends with a stop; the rest outlives restarts. */
 interface ReadingPluginState {
 	/** The running library, replaced by every restart. */
-	runtime?: { library: ReadingLibrary; stop: () => Promise<void> };
+	runtime?: {
+		library: ReadingLibrary; stop: () => Promise<void>;
+		/** Saves or adopts the server's Reading folder now; rejects when that fails. */
+		checkSetup: () => Promise<void>;
+		/** Why the last server folder check failed, until one succeeds. */
+		setupError: () => string | undefined;
+	};
 	/** Settles once every stopped library has drained, so a replacement starts after it. */
 	stopping?: Promise<void>;
 	listeners: Set<() => void>;
@@ -58,6 +66,15 @@ export function stopReading(plugin: ReadingRuntimeHost): void {
 	if (state?.runtime) state.stopping = Promise.allSettled([state.stopping, state.runtime.stop()]).then(() => {});
 	if (state) state.runtime = undefined;
 	notifyRuntime(plugin);
+}
+/** Makes sure the connected server knows this vault's Reading folder. Does nothing while Reading is off or no server is connected. */
+export function checkReadingSetup(plugin: ReadingRuntimeHost): Promise<void> {
+	const runtime = states.get(plugin)?.runtime;
+	if (!runtime || !plugin.settings.reading.enabled || !plugin.settings.workerUrl) return Promise.resolve();
+	return runtime.checkSetup();
+}
+export function readingSetupError(plugin: ReadingRuntimeHost): string | undefined {
+	return states.get(plugin)?.runtime?.setupError();
 }
 export async function waitForStoppedReading(plugin: ReadingRuntimeHost): Promise<void> { await states.get(plugin)?.stopping; }
 
@@ -130,6 +147,29 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	let timer: number | undefined;
 	let scheduledAt = 0;
 	let lastErrorAt = 0;
+	let policyCheck: Promise<void> | undefined;
+	let setupError: string | undefined;
+	// Adopting the server's folder restarts Reading, which a running download should not see change.
+	const checkPolicy = (): Promise<void> => {
+		if (policyCheck) return policyCheck;
+		checkedAt = Date.now();
+		const connection = captureServerConnection(plugin);
+		policyCheck = reconcileReadingPolicy(plugin, folder, () => { controller.signal.throwIfAborted(); connection.assertCurrent(); }).then(adopted => {
+			setupError = undefined;
+			if (adopted) startReading(plugin);
+			else { policyChecked = true; retry = true; schedule(); }
+		}, (error: unknown) => {
+			// Keep local data readable. Adoption waits for authoritative folder setup; an
+			// unreachable server says nothing about it.
+			if (!controller.signal.aborted && !isUnreachableServer(error)) setupError = error instanceof Error ? error.message : 'Could not set up Reading on the server.';
+			throw error;
+		}).finally(() => { policyCheck = undefined; });
+		return policyCheck;
+	};
+	const checkSetup = () => {
+		if (plugin.syncRuntime.isWritingVault()) return Promise.reject(new Error('Sync is updating files. Try again when it finishes.'));
+		return checkPolicy();
+	};
 	const refreshes = new Set<Promise<void>>();
 	// The first refresh finds clips waiting for import; later ones handle notes that changed
 	// and retry work that waited for sync or an editor.
@@ -141,17 +181,7 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		timer = undefined;
 		if (controller.signal.aborted || !plugin.app.workspace.layoutReady) return;
 
-		// Adopting the server's folder restarts Reading, which a running download should not see change.
-		if (plugin.settings.workerUrl && !plugin.syncRuntime.isWritingVault() && Date.now() - checkedAt > 60_000) {
-			checkedAt = Date.now();
-			void (async () => {
-				const connection = captureServerConnection(plugin);
-				return reconcileReadingPolicy(plugin, folder, () => { controller.signal.throwIfAborted(); connection.assertCurrent(); });
-			})().then(adopted => {
-				if (adopted) startReading(plugin);
-				else { policyChecked = true; retry = true; schedule(); }
-			}).catch(() => { /* Keep local data readable. Adoption waits for authoritative folder setup. */ });
-		}
+		if (plugin.settings.workerUrl && !plugin.syncRuntime.isWritingVault() && Date.now() - checkedAt > POLICY_RECHECK_MS) void checkPolicy().catch(() => {});
 		const first = starting, paths = [...changedPaths], checks = [...checkPaths], retrying = retry;
 		const reindexed = [...reindexedPaths].filter(path => !changedPaths.has(path));
 		starting = false; retry = false; changedPaths.clear(); reindexedPaths.clear(); checkPaths.clear();
@@ -216,7 +246,7 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	};
 	const onAbort = () => { void stop(); };
 	lifetime.addEventListener('abort', onAbort, { once: true });
-	readingState(plugin).runtime = { library, stop };
+	readingState(plugin).runtime = { library, stop, checkSetup, setupError: () => setupError };
 	notifyRuntime(plugin);
 	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) schedule(); });
 }

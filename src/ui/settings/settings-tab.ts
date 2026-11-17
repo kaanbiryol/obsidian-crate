@@ -13,6 +13,7 @@ import { renderForgetServerSetting } from './infrastructure/server-selection-set
 import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './infrastructure/config-section';
 import { renderDevicesSection } from './devices-section';
 import { renderSelfHostedUpdateNotice } from './infrastructure/self-hosted-update-notice';
+import { renderServerSetupNotice } from './server-setup-notice';
 import { renderInfrastructureSection, renderServerActions } from './infrastructure/infrastructure-section';
 import { renderSyncSection } from './sync-section';
 import { renderRemindersSettings } from '../../reminders/ui/plugin/settings-section';
@@ -49,6 +50,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		const showInfrastructure = isConfigured || Boolean(this.plugin.settings.cloudflareDeployment?.d1DatabaseId);
 
 		this.renderSection(renderServerUpdateNotice, containerEl);
+		this.renderSection(renderServerSetupNotice, containerEl);
 		this.renderSection(renderSelfHostedUpdateNotice, containerEl);
 		this.renderSection(renderGetStartedSection, containerEl);
 

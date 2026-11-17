@@ -5,9 +5,10 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { normalizeCrateSettings } from '../plugin/settings';
 import { endPluginLifecycle } from '../plugin/lifecycle-state';
 import { createReadingNote, parseReadingNote, updateReadingNote } from './core/notes';
-import { changeReadingFolder, getReadingLibrary, restartReading, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
+import { changeReadingFolder, checkReadingSetup, getReadingLibrary, readingSetupError, restartReading, startReading, stopReading, subscribeReadingRuntime, waitForStoppedReading } from './runtime';
 import { readReadingPolicy, writeReadingPolicy } from './server';
 import { SECRET_KEYS } from '../platform/secret-keys';
+import { SyncTransportError } from '../sync/worker-api/http';
 import { DEFAULT_READING_SETTINGS } from './settings';
 import { readReadingFrontmatter } from './core/frontmatter';
 
@@ -184,6 +185,60 @@ describe('Reading runtime lifecycle', () => {
 			expect(h.plugin.settings.reading.folderPath).toBe('Other reading');
 			expect(getReadingLibrary(h.plugin)).toBeDefined();
 			expect(getReadingLibrary(h.plugin)).not.toBe(original);
+		} finally { stopReading(h.plugin); }
+	});
+	function connectedHarness() {
+		const h = harness();
+		h.plugin.settings.workerUrl = 'https://server.example';
+		h.workspace.layoutReady = true;
+		Object.assign(h.plugin, { secretStorage: { get: (key: string) => key === SECRET_KEYS.AUTH_TOKEN ? 'synthetic' : null }, registerInterval: vi.fn(), writeSettings: vi.fn() });
+		return h;
+	}
+	const saved = { enabled: 1, folder_path: 'Reading', generation: 'g', revision: 'r1' };
+	it('reports a failed server folder setup without retrying on its own', async () => {
+		const h = connectedHarness();
+		vi.mocked(readReadingPolicy).mockResolvedValue(null);
+		vi.mocked(writeReadingPolicy).mockRejectedValueOnce(new Error('Encrypted sync is not ready.'));
+		startReading(h.plugin);
+		try {
+			await vi.advanceTimersByTimeAsync(400);
+			expect(writeReadingPolicy).toHaveBeenCalledOnce();
+			expect(readingSetupError(h.plugin)).toBe('Encrypted sync is not ready.');
+			await vi.advanceTimersByTimeAsync(120_000);
+			expect(writeReadingPolicy).toHaveBeenCalledOnce();
+		} finally { stopReading(h.plugin); vi.mocked(readReadingPolicy).mockReset(); }
+	});
+	it('does not report an unreachable server as a setup problem', async () => {
+		const h = connectedHarness();
+		vi.mocked(readReadingPolicy).mockRejectedValueOnce(new SyncTransportError('offline'));
+		startReading(h.plugin);
+		try {
+			await vi.advanceTimersByTimeAsync(400);
+			expect(readReadingPolicy).toHaveBeenCalledOnce();
+			expect(readingSetupError(h.plugin)).toBeUndefined();
+		} finally { stopReading(h.plugin); }
+	});
+	it('checks now when asked and reports why it failed', async () => {
+		const h = connectedHarness();
+		vi.mocked(readReadingPolicy).mockResolvedValueOnce(saved).mockRejectedValueOnce(new Error('Encrypted sync is not ready.')).mockResolvedValueOnce(saved);
+		startReading(h.plugin);
+		try {
+			await vi.advanceTimersByTimeAsync(400);
+			expect(readReadingPolicy).toHaveBeenCalledOnce();
+			// Within the recheck interval, an explicit check still asks the server.
+			await expect(checkReadingSetup(h.plugin)).rejects.toThrow('Encrypted sync is not ready.');
+			expect(readingSetupError(h.plugin)).toBe('Encrypted sync is not ready.');
+			await expect(checkReadingSetup(h.plugin)).resolves.toBeUndefined();
+			expect(readingSetupError(h.plugin)).toBeUndefined();
+			expect(readReadingPolicy).toHaveBeenCalledTimes(3);
+		} finally { stopReading(h.plugin); }
+	});
+	it('skips the setup check while Reading is off or no server is connected', async () => {
+		const h = harness();
+		startReading(h.plugin);
+		try {
+			await expect(checkReadingSetup(h.plugin)).resolves.toBeUndefined();
+			expect(readReadingPolicy).not.toHaveBeenCalled();
 		} finally { stopReading(h.plugin); }
 	});
 	it('saves and extracts on desktop before checking a configured server policy', async () => {

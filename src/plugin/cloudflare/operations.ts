@@ -15,6 +15,7 @@ import { getPluginLifecycleSignal } from '../lifecycle-state';
 import { configureCloudflareAuthorizedDevice } from './connection';
 import { beginConnectionOperation, runningConnectionOperation } from '../connection-operation';
 import { offerFeatureChoice } from '../feature-settings';
+import { ensureServerSetup } from '../server-setup';
 import { startVaultReplacement } from '../sync-integration';
 import { readServerEncryption } from '../../sync/encryption/server-encryption';
 import { WorkerApiHttpClient } from '../../sync/worker-api/http';
@@ -272,7 +273,11 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 	presentation.connected(connection, replacing);
 	if (connection.success && !isReconnect) {
 		// Choose features first, so the replacement syncs the chosen folders.
-		void offerFeatureChoice(plugin).finally(() => { if (replacing) startVaultReplacement(plugin); });
+		// The server side of setup runs even when every feature was already confirmed here.
+		void offerFeatureChoice(plugin).finally(() => {
+			if (replacing) startVaultReplacement(plugin);
+			void ensureServerSetup(plugin);
+		});
 	}
 }
 
