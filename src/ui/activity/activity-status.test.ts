@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { SyncActivityProgress, SyncState } from '../../sync/types';
-import { describeActivityStatus, isActivityBusy } from './activity-status';
+import { describeActivityStatus, describeSyncSelection, isActivityBusy } from './activity-status';
 
 const now = Date.parse('2026-01-01T12:00:00Z');
 const state: SyncState = { status: 'idle', lastSync: new Date(now).toISOString(), lastError: null, pendingChanges: 0, conflictCount: 0 };
@@ -20,7 +20,7 @@ it('keeps Stop sync enabled through completion work after the engine becomes idl
 	const busy = describeActivityStatus(state, progress, 1, true, false, now);
 	expect(busy).toMatchObject({ text: 'Syncing…', indicatorState: { status: 'syncing' }, button: { label: 'Stop sync', disabled: false } });
 	expect(describeActivityStatus(state, progress, 1, true, true, now).button).toMatchObject({ label: 'Stopping…', disabled: true });
-	expect(describeActivityStatus(state, null, 0, true, false, now).button).toMatchObject({ label: 'Sync vault', disabled: false });
+	expect(describeActivityStatus(state, null, 0, true, false, now).button).toMatchObject({ label: 'Sync', disabled: false });
 	expect(describeActivityStatus(state, progress, 1, false, false, now).button).toMatchObject({ label: 'Syncing…', disabled: true });
 });
 
@@ -32,13 +32,13 @@ it('does not report an older successful sync while local startup checks are unfi
 		button: { label: 'Checking…', disabled: true },
 	});
 	expect(describeActivityStatus({ ...state, initializing: false }, null, 0, true, false, now)).toMatchObject({
-		text: 'Synced just now', subtitleState: 'synced', button: { label: 'Sync vault', disabled: false },
+		text: 'Synced just now', subtitleState: 'synced', button: { label: 'Sync', disabled: false },
 	});
 });
 
 it.each(['error', 'offline'] as const)('keeps %s visible during startup checks', status => {
 	expect(describeActivityStatus({ ...state, status, initializing: true }, null, 0, true, false, now)).toMatchObject({
-		subtitleState: 'attention', button: { label: 'Sync vault', disabled: false },
+		subtitleState: 'attention', button: { label: 'Sync', disabled: false },
 	});
 });
 
@@ -69,4 +69,15 @@ it.each([
 	[{ status: 'error' }, null, false],
 ] as const)('treats %j with progress %j as busy: %s', (patch, progress, busy) => {
 	expect(isActivityBusy({ ...state, ...patch }, progress)).toBe(busy);
+});
+
+it.each([
+	[0, 0, 'Sync'],
+	[0, 3, 'Get remote changes'],
+	[1, 3, 'Sync 1 file'],
+	[3, 3, 'Sync 3 files'],
+] as const)('labels the sync button for %i of %i checked files', (checked, total, label) => {
+	const button = describeSyncSelection(checked, total);
+	expect(button.label).toBe(label);
+	expect(button.title.includes('Unchecked files stay on this device')).toBe(checked < total);
 });

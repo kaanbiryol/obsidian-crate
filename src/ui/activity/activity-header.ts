@@ -14,16 +14,14 @@ export interface ActivityHeaderOptions {
 	getState(): SyncState;
 	getServerUrl(): string;
 	fileActions(path: string): PendingFileAction[];
-	onSync(): void;
 }
 
-/** Sync status and the sync/stop control in the Activity header, plus the sync error notice above the tabs. */
+/** Sync status in the Activity header, plus the sync error notice above the tabs. The
+ * sync and stop control sits under the Pending file list, next to the files it syncs. */
 export class ActivityHeader {
 	private readonly subtitleEl: HTMLSpanElement;
 	private readonly subtitleLabelEl: HTMLSpanElement;
 	private subtitleIndicatorRoot: Root | undefined;
-	private readonly syncBtn: HTMLButtonElement;
-	private readonly syncBtnLabel: HTMLSpanElement;
 	private readonly errorNoticeEl: HTMLDivElement;
 	private readonly errorTitleEl: HTMLSpanElement;
 	private readonly errorIssuesEl: HTMLDivElement;
@@ -33,13 +31,6 @@ export class ActivityHeader {
 		this.subtitleEl = header.createSpan({ cls: 'crate-activity-subtitle', attr: { role: 'status' } });
 		this.subtitleIndicatorRoot = createRoot(this.subtitleEl.createSpan({ cls: 'crate-activity-subtitle-indicator' }));
 		this.subtitleLabelEl = this.subtitleEl.createSpan({ cls: 'crate-activity-subtitle-label' });
-		this.syncBtn = header.createEl('button', {
-			cls: 'crate-sync-now-btn crate-sync-primary-action reminder-modal-header-action',
-			attr: { type: 'button', 'aria-label': 'Sync vault', title: 'Sync all local and remote changes, including unchecked files.' },
-		});
-		this.syncBtnLabel = this.syncBtn.createSpan({ cls: 'reminder-modal-header-action-label' });
-		this.syncBtn.addEventListener('click', () => options.onSync());
-		this.updateSyncBtn();
 
 		this.errorNoticeEl = contentEl.createDiv({
 			cls: 'crate-sync-error-notice',
@@ -58,16 +49,6 @@ export class ActivityHeader {
 		this.subtitleIndicatorRoot?.render(createElement(StatusBarIndicator, { state: status.indicatorState }));
 		this.subtitleEl.setAttribute('title', status.text);
 		this.subtitleEl.setAttribute('data-state', status.subtitleState);
-	}
-
-	updateSyncBtn(status = this.options.getStatus()): void {
-		const button = status.button;
-		this.syncBtn.disabled = button.disabled;
-		this.syncBtn.hidden = false;
-		this.syncBtn.setAttribute('aria-label', button.label);
-		this.syncBtn.setAttribute('title', button.title);
-		this.syncBtnLabel.setText(button.label);
-		this.syncBtn.toggleClass('is-enabled', !button.disabled);
 	}
 
 	updateSyncErrorNotice(): void {

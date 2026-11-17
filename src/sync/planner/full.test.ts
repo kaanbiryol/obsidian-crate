@@ -135,6 +135,37 @@ describe('createFullSyncPlan', () => {
 		expect(setEntry).not.toHaveBeenCalled();
 	});
 
+	it('leaves held paths out of the plan and keeps their baselines', async () => {
+		const baseline = { hash: 'synced', size: 1, modified: new Date(0).toISOString(), revision: 'r1' };
+		// Held files are skipped like ignored ones, so the scan never lists them.
+		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([]);
+		conflictMocks.classifyPaths.mockReturnValue([
+			{ path: 'notes/held.md', action: 'delete', remoteHash: 'synced', remoteRevision: 'r1' },
+		]);
+		const removeEntry = vi.fn();
+		const held = new Set(['notes/held.md', 'notes/held-gone.md']);
+
+		const plan = await createFullSyncPlan(
+			{
+				vault: { adapter: { readBinary: vi.fn() } } as never,
+				localManifest: {
+					getEntry: () => baseline,
+					getManifest: () => ({ version: 1, files: { 'notes/held.md': baseline, 'notes/held-gone.md': baseline } }),
+					removeEntry, setEntry: vi.fn(),
+				} as never,
+				signal: new AbortController().signal, shouldIgnore: path => held.has(path), isHeld: path => held.has(path),
+				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+				encrypted: () => false,
+			},
+			{ 'notes/held.md': baseline },
+			5,
+		);
+
+		// Unread local files are not deletes, and a server deletion is left for a later sync.
+		expect(plan.diffs).toEqual([]);
+		expect(removeEntry).not.toHaveBeenCalled();
+	});
+
 	it('hashes every file during full reconciliation regardless of matching metadata', async () => {
 		const unchangedContent = new TextEncoder().encode('unchanged').buffer;
 		const unchangedHash = await sha256Hex(unchangedContent);

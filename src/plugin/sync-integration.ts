@@ -104,7 +104,7 @@ function openFileHistoryWhenReady(plugin: CratePlugin, path: string): void {
 /** Opens sync activity. Its Sync and Stop buttons run the same actions as the commands. */
 export function openSyncActivity(plugin: CratePlugin, tab?: ActivityTab): void {
 	new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime, {
-		sync: () => runSyncNow(plugin),
+		sync: held => runSyncNow(plugin, held),
 		stop: () => stopSyncNow(plugin),
 	}, tab).open();
 }
@@ -124,13 +124,13 @@ export function startVaultReplacement(plugin: CratePlugin): boolean {
 }
 
 /** A sync the user started: reports errors instead of throwing. Conflicts notify through the sync result listener. */
-export async function runSyncNow(plugin: CratePlugin): Promise<void> {
+export async function runSyncNow(plugin: CratePlugin, held?: readonly string[]): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	try {
 		// Startup initialization runs after the workspace is ready.
 		await waitForSyncReady(plugin);
 		if (signal.aborted) return;
-		const result = await plugin.syncRuntime.sync();
+		const result = await plugin.syncRuntime.sync(undefined, { held });
 		if (result.outcome === 'cancelled') return;
 		if (!result.success) {
 			showSyncError(plugin, 'Sync completed with errors.');

@@ -40,17 +40,30 @@ export function describeActivityStatus(
 	const needsAttention = state.status === 'error' || state.status === 'offline';
 	const checking = !!state.initializing && !syncing && !needsAttention;
 	const canStop = syncing && canStopSync;
-	const buttonLabel = stopping ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : checking ? 'Checking…' : 'Sync vault';
+	const buttonLabel = stopping ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : checking ? 'Checking…' : 'Sync';
 	return {
 		lastSyncLabel: status.lastSyncLabel,
 		text: status.text,
 		subtitleState: syncing || checking ? 'syncing' : needsAttention ? 'attention' : status.kind === 'pending' ? 'pending' : status.kind === 'synced' ? 'synced' : 'idle',
 		indicatorState: syncing ? { ...state, status: 'syncing' as const } : state,
 		checkingConflicts: checking || syncing && !['saving', 'reminders'].includes(state.work?.phase ?? ''),
+		/** The Pending tab's sync button. While `idle` it starts a sync, and the file list names
+		 * what that sync uploads; otherwise it stops the running sync or waits. */
 		button: {
 			label: buttonLabel,
 			disabled: stopping || checking || (syncing && !canStop),
-			title: buttonLabel === 'Sync vault' ? 'Sync all local and remote changes, including unchecked files.' : buttonLabel,
+			idle: !stopping && !syncing && !checking,
 		},
 	};
+}
+
+/** The idle sync button's label and description for `checked` of `total` pending files.
+ * Every sync gets remote changes; unchecked files stay on this device. */
+export function describeSyncSelection(checked: number, total: number): { label: string; title: string } {
+	if (total === 0) return { label: 'Sync', title: 'Get changes from your other devices.' };
+	if (checked === 0) return { label: 'Get remote changes', title: 'Get changes from your other devices. Unchecked files stay on this device.' };
+	const label = `Sync ${checked} ${checked === 1 ? 'file' : 'files'}`;
+	return checked < total
+		? { label, title: 'Upload the checked files and get changes from your other devices. Unchecked files stay on this device.' }
+		: { label, title: 'Upload these files and get changes from your other devices.' };
 }

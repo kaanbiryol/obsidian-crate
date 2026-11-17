@@ -77,7 +77,7 @@ export async function createFullSyncPlan(
 	}
 
 	for (const path of Object.keys(manifestEntries)) {
-		if (!getPathEntry(localFiles, path) && !getPathEntry(remoteFiles, path)) {
+		if (!getPathEntry(localFiles, path) && !getPathEntry(remoteFiles, path) && !context.isHeld?.(path)) {
 			context.localManifest.removeEntry(path);
 		}
 	}

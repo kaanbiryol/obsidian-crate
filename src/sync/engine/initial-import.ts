@@ -5,6 +5,7 @@ import type { SyncApiClient } from '../worker-api/client';
 import type { SyncResult, SyncWork } from '../types';
 import type { PreparedUpload } from '../transfer/types';
 import type { TransferContext } from '../transfer/types';
+import type { LocalManifest } from '../manifest/manifest';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { partitionSkippedUploads } from '../local/local-file-changes';
 import { getTransferBudgetBytes, prepareUploadChunks } from '../transfer/budget';
@@ -31,15 +32,32 @@ interface ImportContext {
 	report(work: SyncWork): void;
 	getImportToken(): string | undefined;
 	setImportToken(token: string | undefined): void;
+	/** Paths the user left unchecked: not uploaded or pruned, and any server copy stays. */
+	heldPaths?: ReadonlySet<string>;
 }
 
 export const ANOTHER_DEVICE_IMPORTING = 'Another device is uploading this vault for the first time. Let it finish, then sync. If this device started it, select Replace server files.';
-export const FIRST_UPLOAD_UNFINISHED = 'The first upload of this vault has not finished. Select Sync now on the device that started it, then sync here.';
+export const FIRST_UPLOAD_UNFINISHED = 'The first upload of this vault has not finished. Sync on the device that started it, then sync here.';
+export const OWN_FIRST_UPLOAD_UNFINISHED = 'The first upload of this vault has not finished. Sync again to finish it.';
+
+type ImportManifest = Pick<LocalManifest, 'getEntry' | 'getInitialImportToken'>;
+
+/** Without the token, an import is this device's only while it holds every server file's
+ * revision: the import is empty, or this device uploaded those files before tokens were kept. */
+function holdsServerFiles(remote: Record<string, FileEntry>, manifest: Pick<ImportManifest, 'getEntry'>): boolean {
+	return Object.entries(remote).every(([path, entry]) => !!entry.revision && manifest.getEntry(path)?.revision === entry.revision);
+}
 
 /** Resuming a first upload prunes server files the importing device lacks, so
- * ordinary uploads and deletes wait until it finishes. */
-export async function assertNoOpenInitialImport(api: { initialImport?: Pick<SyncApiClient['initialImport'], 'begin'> }): Promise<void> {
-	if ((await api.initialImport?.begin())?.state === 'importing') throw new Error(FIRST_UPLOAD_UNFINISHED);
+ * ordinary uploads and deletes wait until it finishes. The error says which device can finish it. */
+export async function assertNoOpenInitialImport(
+	api: { initialImport?: Pick<SyncApiClient['initialImport'], 'begin'>; getManifest(): Promise<{ files: Record<string, FileEntry> }> },
+	manifest: ImportManifest,
+): Promise<void> {
+	const session = await api.initialImport?.begin();
+	if (session?.state !== 'importing') return;
+	const own = manifest.getInitialImportToken() === session.token || holdsServerFiles((await api.getManifest()).files, manifest);
+	throw new Error(own ? OWN_FIRST_UPLOAD_UNFINISHED : FIRST_UPLOAD_UNFINISHED);
 }
 
 /** The committed remote inventory is the checkpoint; initial uploads need no receipt journal. */
@@ -70,22 +88,27 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	context.report({ phase: 'scanning' });
 	const local = await getAllVaultFiles(transfer.vault, path => context.shouldIgnore(path), () => context.signal.throwIfAborted());
 	const remote = await context.api.getManifest();
-	// Only the device that started an import prunes or replaces its files. Without the
-	// token, an import is this device's only while it holds every server file's revision:
-	// the import is empty, or this device uploaded those files before tokens were kept.
+	// Only the device that started an import prunes or replaces its files.
 	if (context.getImportToken() !== session.token) {
-		const owned = Object.entries(remote.files).every(([path, entry]) => !!entry.revision && transfer.localManifest.getEntry(path)?.revision === entry.revision);
-		if (!owned) throw new Error(ANOTHER_DEVICE_IMPORTING);
+		if (!holdsServerFiles(remote.files, transfer.localManifest)) throw new Error(ANOTHER_DEVICE_IMPORTING);
 		context.setImportToken(session.token);
 		await context.save();
 	}
+	const held = context.heldPaths ?? new Set<string>();
 	const localPaths = new Set(local.map(file => file.path));
-	const obsolete = Object.keys(remote.files).filter(path => !localPaths.has(path));
+	const obsolete = Object.keys(remote.files).filter(path => !localPaths.has(path) && !held.has(path));
 	await context.api.initialImport.prune(session.token, obsolete.map(path => ({ path, hash: remote.files[path]!.hash, revision: remote.files[path]!.revision })));
 	for (const path of obsolete) transfer.localManifest.removeEntry(path);
 	const inventory = createPathRecord<FileEntry>();
+	// Held files keep any server copy. One the server lacks loses its old baseline, so the
+	// next sync uploads it as a new file instead of reading the empty server as a deletion.
+	for (const path of held) {
+		const existing = remote.files[path];
+		if (existing) inventory[path] = existing;
+		else if (localPaths.has(path)) transfer.localManifest.removeEntry(path);
+	}
 	// Skipped files are reported, not uploaded; a server row they already have stays as it is.
-	const { eligible: files, skipped } = partitionSkippedUploads(local, transfer.encrypted());
+	const { eligible: files, skipped } = partitionSkippedUploads(local.filter(file => !held.has(file.path)), transfer.encrypted());
 	for (const issue of skipped) {
 		(result.issues ??= []).push(issue);
 		const existing = remote.files[issue.path!];

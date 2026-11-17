@@ -24,7 +24,7 @@ const { outputFiles } = await build({
       getActivityProgress: () => null, addProgressListener: () => {}, removeProgressListener: () => {},
       addStateChangeListener: fn => listeners.add(fn), removeStateChangeListener: fn => listeners.delete(fn),
       listSharedCheckpoints: async () => [], loadHistoryComparison: unused, createHistoryRestore: unused,
-      loadPendingDiff: unused, syncSelected: unused, createPendingDiscard: unused, createConflictReview: unused,
+      loadPendingDiff: unused, createPendingDiscard: unused, createConflictReview: unused,
       listRecentFileVersions: unused, getPendingRestores: () => [], loadFileHistoryPreview: unused,
       restoreRecentFileVersion: unused, loadCurrentSyncedPreview: unused,
     };
@@ -78,7 +78,8 @@ for (const engine of [chromium, webkit]) {
         ${css}</style><body></body></html>`);
       await page.addScriptTag({ content: outputFiles[0].text });
       const dialog = page.getByRole('dialog', { name: 'Sync activity', exact: true });
-      const sync = page.getByRole('button', { name: 'Sync vault', exact: true });
+      // The one sync button sits on the Pending tab, under its empty state.
+      const sync = page.getByRole('tabpanel', { name: 'Pending', exact: true }).getByRole('button', { name: 'Sync', exact: true });
       const close = page.getByRole('button', { name: 'Close sync activity', exact: true });
       const heading = page.getByRole('heading', { name: 'Sync activity', exact: true });
       await expect(sync).toBeEnabled();
@@ -86,10 +87,9 @@ for (const engine of [chromium, webkit]) {
       const surface = await dialog.boundingBox();
       assert.ok(surface.x >= 0 && surface.y >= 0 && surface.x + surface.width <= width + 1 && surface.y + surface.height <= height + 1);
       if (width >= 700) assert.ok(surface.width <= 800 && surface.height <= 560);
-      const [closeBox, headingBox, syncBox] = await Promise.all([close.boundingBox(), heading.boundingBox(), sync.boundingBox()]);
+      const [closeBox, headingBox] = await Promise.all([close.boundingBox(), heading.boundingBox()]);
       assert.ok(closeBox.x + closeBox.width <= headingBox.x);
-      assert.ok(headingBox.x + headingBox.width <= syncBox.x);
-      assert.ok(Math.abs(closeBox.y + closeBox.height / 2 - syncBox.y - syncBox.height / 2) <= 1);
+      assert.equal(await page.locator('.modal-header button, .reminder-modal-header button').filter({ hasText: /sync/i }).count(), 0);
       const actionStyle = await sync.evaluate(primaryStyle);
       for (const tab of ['Pending', 'Conflicts', 'History']) {
         await page.getByRole('tab', { name: tab, exact: true }).click();
@@ -99,7 +99,8 @@ for (const engine of [chromium, webkit]) {
         const geometry = await panel.evaluate(panel => {
           const area = (panel.querySelector('.crate-history-timeline-content') ?? panel).getBoundingClientRect();
           const icon = panel.querySelector('.crate-empty-icon').getBoundingClientRect();
-          const text = panel.querySelector('.crate-empty-text').getBoundingClientRect();
+          // The last item is the text, or the Pending tab's sync button below it.
+          const text = panel.querySelector('.crate-activity-empty-state').lastElementChild.getBoundingClientRect();
           return { x: (icon.left + icon.right) / 2 - (area.left + area.right) / 2,
             y: (icon.top + text.bottom) / 2 - (area.top + area.bottom) / 2,
             overflow: panel.scrollHeight - panel.clientHeight };

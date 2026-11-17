@@ -1,11 +1,12 @@
 import { setIcon } from 'obsidian';
 
-export function renderLoadingState(container: HTMLElement, text: string): void {
+export function renderLoadingState(container: HTMLElement, text: string): HTMLElement {
 	const loading = container.createDiv({ cls: 'crate-activity-loading' });
 	loading.setAttribute('role', 'status');
 	loading.setAttribute('aria-live', 'polite');
 	loading.createSpan({ cls: 'crate-activity-spinner' }).setAttribute('aria-hidden', 'true');
 	loading.createSpan({ cls: 'crate-activity-loading-label', text }).setAttribute('title', text);
+	return loading;
 }
 
 /** An arrow button that returns from a detail pane to `label`, on layouts that show one pane at a time. */
@@ -59,11 +60,12 @@ export function renderEmptyState(
 	title: string,
 	description: string,
 	tone: EmptyStateTone = 'accent',
-): void {
+): HTMLElement {
 	const wrapper = container.createDiv({ cls: 'crate-activity-empty-state' });
 	const iconEl = wrapper.createDiv({ cls: `crate-empty-icon crate-empty-icon-${tone}` });
 	setIcon(iconEl, icon);
 	const textEl = wrapper.createDiv({ cls: 'crate-empty-text' });
 	textEl.createSpan({ text: title, cls: 'crate-empty-title' });
 	textEl.createSpan({ text: description, cls: 'crate-empty-desc' });
+	return wrapper;
 }

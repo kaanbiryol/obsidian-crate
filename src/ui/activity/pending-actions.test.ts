@@ -29,7 +29,7 @@ const { createPendingActions } = await import('./pending-actions');
 function setup() {
 	const key = 'Notes/Today.md';
 	const rows = { contextTargets: vi.fn(() => [key]) };
-	const actions = { syncSelected: vi.fn(), discard: vi.fn() };
+	const actions = { sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: vi.fn() }, discard: vi.fn() };
 	const selection = createPendingActions(
 		new FakeElement('div') as never, new FakeElement('div') as never, [key], new Set(), actions, rows as never,
 	);

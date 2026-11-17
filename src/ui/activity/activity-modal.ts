@@ -10,7 +10,7 @@ import { PendingDiscardModal } from './pending-discard-modal';
 import { formatSyncProgress, syncProgressFraction } from './progress-label';
 import type { ConflictReview } from '../../sync/conflict/review';
 import { ConflictReviewModal } from './conflict-review-modal';
-import { Notice, Platform, type App } from 'obsidian';
+import { Platform, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './ActivitySheet';
@@ -33,7 +33,6 @@ export interface ActivityModalDeps extends FileHistoryRuntime {
 	listSharedCheckpoints(): Promise<SharedCheckpoint[]>;
 	createHistoryRestore(entry: SyncHistoryEntry): Promise<HistoryRestoreReview>;
 	loadPendingDiff: PendingDiffLoader;
-	syncSelected(keys: string[]): Promise<unknown>;
 	createPendingDiscard(keys: string[]): Promise<PendingDiscardReview>;
 	createConflictReview(record: ConflictRecord): Promise<ConflictReview>;
 	getPendingKeys(): string[];
@@ -49,9 +48,10 @@ export interface ActivityModalDeps extends FileHistoryRuntime {
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
 
-/** The header's Sync and Stop actions. They report their own failures and settle when done. */
+/** The Pending tab's Sync and Stop actions. They report their own failures and settle when
+ * done. `held` lists pending keys left unchecked, whose files the sync leaves alone. */
 export interface ActivityModalActions {
-	sync(): Promise<void>;
+	sync(held?: readonly string[]): Promise<void>;
 	stop(): Promise<void>;
 }
 
@@ -105,7 +105,6 @@ export class ActivityModal extends BaseUiModal {
 			return;
 		}
 		const status = this.getActivityStatus();
-		this.header.updateSyncBtn(status);
 		this.header.updateSyncStatusText(status);
 		this.renderConflicts(status);
 		this.renderPending();
@@ -119,6 +118,7 @@ export class ActivityModal extends BaseUiModal {
 			const text = state.status === 'syncing' || progress ? formatSyncProgress(progress, state.work) : 'Checking local files…';
 			if (loadingLabel.textContent !== text) loadingLabel.textContent = text;
 			loadingLabel.setAttribute('title', text);
+			this.pendingChecks?.updateAction();
 			return;
 		}
 		const syncing = state.status === 'syncing' || !!progress;
@@ -126,7 +126,6 @@ export class ActivityModal extends BaseUiModal {
 		if (syncing && this.pendingChecks && this.pendingPanel.querySelector('.crate-pending-browser')) {
 			const work = progress?.work ?? state.work;
 			this.pendingChecks.setSyncProgress({ label: formatSyncProgress(progress, state.work), fraction: syncProgressFraction(work) });
-			this.header.updateSyncBtn();
 			return;
 		}
 		const paths = this.deps.getPendingKeys();
@@ -136,7 +135,6 @@ export class ActivityModal extends BaseUiModal {
 		if (showsBrowser && rendered?.length === paths.length && rendered.every((key, index) => key === paths[index])
 			&& this.pendingPanel.querySelector('.crate-pending-browser')) {
 			this.pendingChecks?.setSyncProgress();
-			this.header.updateSyncBtn();
 			return;
 		}
 		this.renderedBrowserPaths = showsBrowser ? paths : undefined;
@@ -147,15 +145,14 @@ export class ActivityModal extends BaseUiModal {
 			paths, loadDiff: (path, deleted, options) => this.deps.loadPendingDiff(path, deleted, options), state, progress,
 			lastSyncLabel: this.getActivityStatus().lastSyncLabel, browserState: this.pendingBrowserState,
 			actions: {
-				syncSelected: async keys => {
-					try { return await this.deps.syncSelected(keys); }
-					catch (error) { new Notice(error instanceof Error ? error.message : 'Could not sync selected files.'); throw error; }
+				sync: {
+					describe: () => this.getActivityStatus().button,
+					run: held => this.toggleSync(held),
 				},
 				fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
 				discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard(keys.filter(key => this.deps.hasPendingKey(key))), () => this.refresh()).open(),
 			},
 		});
-		this.header.updateSyncBtn();
 	}
 	private applyStateChange(): void {
 		const state = this.deps.getState();
@@ -223,16 +220,15 @@ export class ActivityModal extends BaseUiModal {
 			getState: () => this.deps.getState(),
 			getServerUrl: () => this.settings.workerUrl,
 			fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
-			onSync: () => this.toggleSync(),
 		});
 	}
 
-	private toggleSync(): void {
+	private toggleSync(held: string[]): void {
 		if (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress()) {
 			this.stoppingSync = true;
-			this.header.updateSyncBtn();
-			void this.actions.stop().finally(() => { this.stoppingSync = false; this.header.updateSyncBtn(); });
-		} else void this.actions.sync();
+			this.pendingChecks?.updateAction();
+			void this.actions.stop().finally(() => { this.stoppingSync = false; this.pendingChecks?.updateAction(); });
+		} else void this.actions.sync(held);
 	}
 
 	private switchTab(tab: ActivityTab): void {
@@ -240,7 +236,6 @@ export class ActivityModal extends BaseUiModal {
 		else this.pendingChecks?.pause();
 		this.currentTab = tab;
 		if (tab === 'history') { this.renderHistory(); void this.sharedHistory?.refresh(); }
-		this.header.updateSyncBtn();
 		this.header.updateSyncStatusText();
 	}
 
@@ -264,7 +259,6 @@ export class ActivityModal extends BaseUiModal {
 	}
 
 	private refresh(): void {
-		this.header.updateSyncBtn();
 		this.header.updateSyncErrorNotice();
 		this.header.updateSyncStatusText();
 		this.updateTabCounts();

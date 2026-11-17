@@ -552,8 +552,8 @@ with a descriptive label. Leave `Button`'s variant unset only for structural
 controls with their own presentation, such as navigation tabs and article rows.
 
 `_action.scss` owns the shared border, typography, corners, and states, using
-Sync vault's quiet outlined treatment. `_tokens.scss` maps the action tokens to
-host theme values. Actions use Sync vault's input radius and smaller UI text
+the sync button's quiet outlined treatment. `_tokens.scss` maps the action tokens to
+host theme values. Actions use the sync button's input radius and smaller UI text
 (4px corners and 12px text in the PWA). Obsidian retains its theme values.
 Compact text actions are at least 28px tall, with 8px horizontal padding, including
 in narrow desktop panes. Coarse pointers use at least 44px targets. `size="touch"`

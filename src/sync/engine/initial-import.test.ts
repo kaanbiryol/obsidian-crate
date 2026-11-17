@@ -11,7 +11,7 @@ vi.mock('../transfer/prepare', async importOriginal => ({
 	}),
 }));
 
-import { ANOTHER_DEVICE_IMPORTING, runInitialImport } from './initial-import';
+import { ANOTHER_DEVICE_IMPORTING, assertNoOpenInitialImport, FIRST_UPLOAD_UNFINISHED, OWN_FIRST_UPLOAD_UNFINISHED, runInitialImport } from './initial-import';
 import { createEmptySyncResult } from '../sync-result';
 
 const events: string[] = [];
@@ -204,4 +204,57 @@ it('saves the confirmed files when a later import request fails', async () => {
 	expect(result.uploaded).toBeGreaterThanOrEqual(32);
 	expect(calls.at(-1)).toBe('save');
 	expect(calls.filter(call => call.startsWith('entry'))).toHaveLength(result.uploaded);
+});
+
+it('leaves held files out of a first upload without pruning their server copies', async () => {
+	const { getAllVaultFiles } = await import('../local/file-discovery');
+	const local = (path: string): VaultFile => ({ path, size: 1, mtime: 1, extension: 'md' });
+	vi.mocked(getAllVaultFiles).mockImplementationOnce(async () => [local('keep.md'), local('draft.md'), local('new.md')]);
+	const remoteEntry = { hash: 'a'.repeat(64), size: 1, revision: 'r1', modified: new Date(1).toISOString() };
+	const uploaded: string[] = [];
+	const pruned: string[] = [];
+	const removeEntry = vi.fn();
+	let inventory: Record<string, unknown> = {};
+	const result = await runInitialImport({
+		transfer: {
+			vault: {}, localManifest: { getEntry: () => undefined, setEntry: vi.fn(), removeEntry },
+			markdownBaseCache: { putBase: async () => {} },
+			encrypted: () => false,
+			runConcurrent: async (tasks: Array<() => Promise<void>>) => { for (const task of tasks) await task(); },
+		} as never,
+		api: {
+			// The server already holds the held draft and a held local delete.
+			getManifest: async () => ({ files: { 'draft.md': remoteEntry, 'deleted.md': remoteEntry } }),
+			initialImport: {
+				begin: async () => ({ state: 'importing', token: 't' }),
+				prune: async (_token: string, files: Array<{ path: string }>) => { pruned.push(...files.map(file => file.path)); },
+				upload: async (_token: string, batch: Array<{ path: string; hash: string }>) => {
+					uploaded.push(...batch.map(file => file.path));
+					return { results: batch.map(file => ({ path: file.path, success: true, hash: file.hash, revision: 'r' })) };
+				},
+				finish: async (_token: string, files: Record<string, unknown>) => { inventory = files; return 1; },
+			},
+		} as never,
+		shouldIgnore: () => false, signal: new AbortController().signal, save: async () => {}, setLastSeq: () => {}, report: () => {},
+		getImportToken: () => 't', setImportToken: () => {},
+		heldPaths: new Set(['draft.md', 'new.md', 'deleted.md']),
+	}, createEmptySyncResult());
+	expect(result?.uploaded).toBe(1);
+	expect(uploaded).toEqual(['keep.md']);
+	expect(pruned).toEqual([]);
+	expect(Object.keys(inventory).sort()).toEqual(['deleted.md', 'draft.md', 'keep.md']);
+	// A held file the server lacks loses any old baseline, so it uploads later as new.
+	expect(removeEntry.mock.calls).toEqual([['new.md']]);
+});
+
+it.each([
+	['this device holds the import token', 't', {}, OWN_FIRST_UPLOAD_UNFINISHED],
+	['the server is still empty', undefined, {}, OWN_FIRST_UPLOAD_UNFINISHED],
+	['another device uploaded files', undefined, { 'a.md': { hash: 'a', size: 1, revision: 'r1', modified: '' } }, FIRST_UPLOAD_UNFINISHED],
+] as const)('blocks targeted transfers during a first upload and says who finishes it when %s', async (_case, token, files, message) => {
+	const api = { initialImport: { begin: async () => ({ state: 'importing' as const, token: 't' }) }, getManifest: async () => ({ files }) };
+	await expect(assertNoOpenInitialImport(api as never, { getEntry: () => undefined, getInitialImportToken: () => token }))
+		.rejects.toThrow(message);
+	const finished = { ...api, initialImport: { begin: async () => ({ state: 'complete' as const, token: 't' }) } };
+	await expect(assertNoOpenInitialImport(finished as never, { getEntry: () => undefined, getInitialImportToken: () => token })).resolves.toBeUndefined();
 });

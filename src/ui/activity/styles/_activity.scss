@@ -127,7 +127,9 @@
 .modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action {
     @include action.styles;
 }
-.crate-reminders-ui .crate-activity-modal .crate-sync-now-btn { width: 11ch; min-width: 11ch; }
+// The Pending tab's sync button when no file list shows, under its empty or progress state.
+.crate-reminders-ui button.crate-pending-sync-action { min-width: 14ch; margin-top: 4px; }
+@media (pointer: coarse) { .crate-reminders-ui button.crate-pending-sync-action { min-height: 44px; } }
 
 .crate-activity-subtitle:empty { display: none; }
 

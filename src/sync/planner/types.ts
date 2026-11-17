@@ -151,6 +151,9 @@ export interface FullSyncPlannerContext {
 	vault: Vault;
 	localManifest: PlannerManifest;
 	shouldIgnore(path: string): boolean;
+	/** Paths this sync leaves alone at the user's request. `shouldIgnore` skips them too,
+	 * but their baselines stay, since the planner never read their local files. */
+	isHeld?(path: string): boolean;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
 	encrypted(): boolean;

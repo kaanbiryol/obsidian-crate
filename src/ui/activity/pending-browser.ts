@@ -30,6 +30,8 @@ export interface PendingChecks {
 	dispose(): void;
 	/** Locks the list and shows sync progress in its footer; no argument clears it. */
 	setSyncProgress(progress?: { label: string; fraction?: number }): void;
+	/** Shows the sync button's current state, such as Stopping… after Stop sync. */
+	updateAction(): void;
 }
 
 let nextBrowserId = 0;
@@ -60,7 +62,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	const heading = sidebar.createDiv({ cls: 'crate-browser-list-heading' });
 	if (!actions) heading.createSpan({ text: 'Files' });
 	const list = sidebar.createEl('nav', { cls: 'crate-browser-files', attr: { 'aria-label': 'Pending files' } });
-	const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions ? 'Checkboxes choose which files to sync with the button below the list. Sync vault syncs all local and remote changes, including unchecked files. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Review changes since the last sync.' });
+	const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions ? 'Checkboxes choose which files the button below the list uploads. It also gets changes from your other devices. Unchecked files stay on this device until you sync them. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Review changes since the last sync.' });
 	listHint.id = `crate-pending-hint-${++nextBrowserId}`;
 	list.setAttribute('aria-describedby', listHint.id);
 
@@ -277,6 +279,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 			browser.classList.toggle('is-syncing', !!progress);
 			selection?.setProgress(progress);
 		},
+		updateAction: () => selection?.update(),
 	};
 }
 

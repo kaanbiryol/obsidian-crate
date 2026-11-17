@@ -105,7 +105,6 @@
     .crate-browser-toolbar { padding: 12px 12px; gap: 8px; flex-wrap: wrap; }
 }
 
-.crate-sync-now-btn[hidden] { display: none; }
 .crate-browser-select-all { color: color-mix(in srgb, var(--text-muted) 80%, transparent); display: flex; align-items: center; gap: 16px; cursor: pointer; padding-left: 12px; }
 .crate-pending-browser input[type='checkbox'] {
     appearance: none;
@@ -257,7 +256,7 @@ body.is-mobile .crate-pending-browser .crate-browser-actions button {
     .crate-pending-browser .crate-browser-actions .crate-browser-sync { height: 44px; min-height: 44px; }
 }
 
-.crate-browser-action-status { order: 3; flex-basis: 100%; color: var(--text-error); font-size: 12px; line-height: 1.4; &:empty { display: none; } }
+.crate-browser-action-status { order: 3; flex-basis: 100%; min-width: 0; overflow: hidden; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; &:empty { display: none; } }
 .modal.crate-pending-discard-modal {
     .crate-modal-body {
         display: flex;

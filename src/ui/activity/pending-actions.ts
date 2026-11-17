@@ -2,58 +2,79 @@ import { Menu, Notice, Platform, setIcon } from 'obsidian';
 import { decodePendingChange } from '../../sync/pending/pending-change';
 import type { PendingFileAction } from './file-actions';
 import type { PendingRowSelection } from './pending-row-selection';
+import { describeSyncSelection } from './activity-status';
+
+/** The Pending tab's one sync control. */
+export interface PendingSyncAction {
+	/** The button's state from sync status. While `idle` it starts a sync; otherwise it stops one or waits. */
+	describe(): { label: string; disabled: boolean; idle: boolean };
+	/** Starts a sync that leaves the `held` pending keys alone, or stops the running sync. */
+	run(held: string[]): void;
+}
 
 export interface PendingActions {
-	syncSelected(keys: string[]): Promise<unknown>;
+	sync: PendingSyncAction;
 	discard(keys: string[]): void;
 	fileActions?(path: string): PendingFileAction[];
+}
+
+/** The sync button for a Pending tab without a file list, as when nothing is pending or
+ * a sync is running. Returns its update, for sync state changes. */
+export function renderPendingSyncButton(parent: HTMLElement, action: PendingSyncAction): () => void {
+	const button = parent.createEl('button', { cls: 'crate-sync-primary-action crate-pending-sync-action', attr: { type: 'button' } });
+	const update = () => {
+		const state = action.describe();
+		const { label, title } = state.idle ? describeSyncSelection(0, 0) : { label: state.label, title: state.label };
+		button.textContent = label;
+		button.setAttribute('title', title);
+		button.disabled = state.disabled;
+	};
+	button.addEventListener('click', () => action.run([]));
+	update();
+	return update;
 }
 
 /** Selection belongs to this open activity view, never to sync settings. */
 export function createPendingActions(
 	sidebar: HTMLElement, heading: HTMLElement, keys: string[], excluded: Set<string>, actions: PendingActions, rows: PendingRowSelection,
 ) {
-	const selectAll = heading.createEl('label', { cls: 'crate-browser-select-all', attr: { title: 'Choose files to sync with the button below. Sync vault also includes unchecked files.' } });
+	const selectAll = heading.createEl('label', { cls: 'crate-browser-select-all', attr: { title: 'Choose files to sync with the button below. Unchecked files stay on this device.' } });
 	const all = selectAll.createEl('input', { attr: { type: 'checkbox', 'aria-label': 'Select all files for sync' } });
 	selectAll.createSpan({ text: 'Select all' });
 	heading.prepend(selectAll);
 	const count = heading.createSpan({ cls: 'crate-browser-selection-count', attr: { role: 'status' } });
 	const footer = sidebar.createDiv({ cls: 'crate-browser-actions' });
 	const sync = footer.createEl('button', { cls: 'crate-browser-sync', attr: { type: 'button' } });
-	const syncLabel = sync.createSpan({ cls: 'crate-browser-sync-label', text: 'Sync files' });
+	const syncLabel = sync.createSpan({ cls: 'crate-browser-sync-label', text: 'Sync' });
 	const status = footer.createDiv({ cls: 'crate-browser-action-status', attr: { role: 'status', 'aria-live': 'polite' } });
 	const checkboxes = new Map<string, HTMLInputElement>();
-	let busy = false;
-	// A running sync, from this button or Sync vault, locks the selection and shows its progress here.
+	// A running sync locks the selection and shows its progress here.
 	let progress: { label: string; fraction?: number } | undefined;
-	const locked = () => busy || !!progress;
+	const locked = () => !!progress || !actions.sync.describe().idle;
 	const checked = () => keys.filter(key => !excluded.has(key));
 	const update = () => {
 		const selected = checked();
+		const action = actions.sync.describe();
 		all.checked = selected.length === keys.length;
 		all.indeterminate = selected.length > 0 && selected.length < keys.length;
 		all.disabled = locked();
 		for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = locked(); }
 		count.textContent = `${selected.length} of ${keys.length} files selected`;
-		const label = progress ? progress.label : busy ? 'Syncing…' : selected.length ? `Sync ${selected.length} ${selected.length === 1 ? 'file' : 'files'}` : 'Sync files';
+		const { label, title } = action.idle ? describeSyncSelection(selected.length, keys.length) : { label: action.label, title: action.label };
 		syncLabel.textContent = label;
 		sync.setAttribute('aria-label', label);
-		sync.title = label;
-		sync.disabled = locked() || selected.length === 0;
-		sync.toggleClass('is-syncing', locked());
+		sync.title = title;
+		sync.disabled = action.disabled;
+		sync.toggleClass('is-syncing', !!progress);
 		sync.setCssProps({ '--crate-sync-progress': progress?.fraction === undefined ? '0' : String(progress.fraction) });
+		status.textContent = progress?.label ?? '';
 	};
 	all.addEventListener('change', () => {
 		for (const key of keys) { if (all.checked) excluded.delete(key); else excluded.add(key); }
 		update();
 	});
 	sync.addEventListener('click', () => {
-		if (locked() || !checked().length) return;
-		const selected = checked();
-		busy = true; status.textContent = ''; update();
-		void actions.syncSelected(selected).catch((error: unknown) => {
-			status.textContent = error instanceof Error ? error.message : 'Could not sync the selected files.';
-		}).finally(() => { busy = false; update(); });
+		if (!sync.disabled) actions.sync.run(keys.filter(key => excluded.has(key)));
 	});
 	const contextMenu = (key: string) => {
 		const targets = rows.contextTargets(key);
@@ -72,6 +93,7 @@ export function createPendingActions(
 	update();
 	return {
 		setProgress: (next?: { label: string; fraction?: number }) => { progress = next; update(); },
+		update,
 		toggleChecked: (key: string) => { checkboxes.get(key)?.click(); },
 		removeRow: (key: string) => { checkboxes.delete(key); },
 		addCheckbox: (row: HTMLElement, key: string) => {

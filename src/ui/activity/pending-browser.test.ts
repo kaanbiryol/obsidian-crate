@@ -5,6 +5,7 @@ import type { PendingBrowserState, PendingChecks } from './pending-browser';
 
 const { window, document } = parseHTML('<html><body></body></html>');
 const modified: PendingDiff = { before: 'old', after: 'new', beforeSize: 3, afterSize: 3, kind: 'modified' };
+const idle = { label: 'Sync', disabled: false, idle: true };
 
 beforeAll(() => {
 	// The Obsidian mock installs its element helpers on these globals when first imported.
@@ -68,11 +69,11 @@ it('checks a long list only when a file is selected, also after a rebuild that a
 it('renders only rows near the viewport while selection, navigation and sync cover every file', async () => {
 	const { renderPendingBrowser } = await import('./pending-browser');
 	const paths = Array.from({ length: 5000 }, (_, index) => `note-${index}.md`);
-	const syncSelected = vi.fn(async () => {});
+	const run = vi.fn();
 	const panel = document.createElement('div');
 	document.body.replaceChildren(panel);
 	const state: PendingBrowserState = {};
-	const checks = renderPendingBrowser(panel, paths, vi.fn(async () => modified), state, { syncSelected, discard: vi.fn() });
+	const checks = renderPendingBrowser(panel, paths, vi.fn(async () => modified), state, { sync: { describe: () => idle, run }, discard: vi.fn() });
 	const names = () => [...panel.querySelectorAll('.crate-browser-file-name')].map(name => name.textContent);
 	// An unsized list renders a bounded window instead of 5,000 rows.
 	expect(names().length).toBeLessThanOrEqual(50);
@@ -93,9 +94,36 @@ it('renders only rows near the viewport while selection, navigation and sync cov
 	expect(names()).toContain('note-4999.md');
 	expect(panel.querySelector('.crate-browser-file[tabindex="0"] .crate-browser-file-name')?.textContent).toBe('note-4999.md');
 
-	(panel.querySelector('.crate-browser-sync') as HTMLButtonElement).click();
-	await vi.waitFor(() => expect(syncSelected).toHaveBeenCalledOnce());
-	expect(syncSelected.mock.calls[0]).toEqual([paths]);
+	// Every file is checked, so the sync holds none back.
+	const sync = panel.querySelector('.crate-browser-sync') as HTMLButtonElement;
+	expect(sync.textContent).toBe('Sync 5000 files');
+	sync.click();
+	expect(run).toHaveBeenCalledExactlyOnceWith([]);
+	checks.dispose();
+});
+
+it('names what the sync uploads and holds back unchecked files', async () => {
+	const { renderPendingBrowser } = await import('./pending-browser');
+	const run = vi.fn();
+	const panel = document.createElement('div');
+	document.body.replaceChildren(panel);
+	const checks = renderPendingBrowser(panel, ['a.md', 'b.md'], vi.fn(async () => modified), {}, { sync: { describe: () => idle, run }, discard: vi.fn() });
+	const sync = panel.querySelector('.crate-browser-sync') as HTMLButtonElement;
+	const boxes = [...panel.querySelectorAll<HTMLInputElement>('.crate-browser-file-check input')];
+	const uncheck = (box: HTMLInputElement) => { box.checked = false; box.dispatchEvent(new window.Event('change')); };
+
+	uncheck(boxes[0]!);
+	expect(sync.textContent).toBe('Sync 1 file');
+	expect(sync.title).toContain('Unchecked files stay on this device');
+	sync.click();
+	expect(run).toHaveBeenLastCalledWith(['a.md']);
+
+	// With nothing checked, the button still gets remote changes.
+	uncheck(boxes[1]!);
+	expect(sync.textContent).toBe('Get remote changes');
+	expect(sync.disabled).toBe(false);
+	sync.click();
+	expect(run).toHaveBeenLastCalledWith(['a.md', 'b.md']);
 	checks.dispose();
 });
 
@@ -103,19 +131,28 @@ it('locks the selection and shows sync progress in the footer, then restores it'
 	const { renderPendingBrowser } = await import('./pending-browser');
 	const panel = document.createElement('div');
 	document.body.replaceChildren(panel);
-	const checks = renderPendingBrowser(panel, ['a.md', 'b.md'], vi.fn(async () => modified), {}, { syncSelected: vi.fn(async () => {}), discard: vi.fn() });
+	let action = idle;
+	const checks = renderPendingBrowser(panel, ['a.md', 'b.md'], vi.fn(async () => modified), {}, { sync: { describe: () => action, run: vi.fn() }, discard: vi.fn() });
 	const sync = panel.querySelector('.crate-browser-sync') as HTMLButtonElement;
 	const boxes = () => [...panel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
 
+	// The running sync's button stops it; its progress shows beside the bar.
+	action = { label: 'Stop sync', disabled: false, idle: false };
 	checks.setSyncProgress({ label: 'Uploading 1 of 2 files', fraction: 0.5 });
 	expect(panel.querySelector('.crate-pending-browser')?.classList.contains('is-syncing')).toBe(true);
-	expect(sync.textContent).toBe('Uploading 1 of 2 files');
-	expect(sync.title).toBe('Uploading 1 of 2 files');
-	expect(sync.disabled).toBe(true);
+	expect(sync.textContent).toBe('Stop sync');
+	expect(panel.querySelector('.crate-browser-action-status')?.textContent).toBe('Uploading 1 of 2 files');
+	expect(sync.disabled).toBe(false);
 	expect(sync.style.getPropertyValue('--crate-sync-progress')).toBe('0.5');
 	expect(boxes().every(box => box.disabled)).toBe(true);
 	expect(panel.querySelector('.crate-browser-file-name')?.textContent).toBe('a.md');
 
+	action = { label: 'Stopping…', disabled: true, idle: false };
+	checks.updateAction();
+	expect(sync.textContent).toBe('Stopping…');
+	expect(sync.disabled).toBe(true);
+
+	action = idle;
 	checks.setSyncProgress();
 	expect(sync.textContent).toBe('Sync 2 files');
 	expect(sync.disabled).toBe(false);

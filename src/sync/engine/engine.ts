@@ -1,4 +1,4 @@
-import { pendingChangeKey } from '../pending/pending-change';
+import { decodePendingChange, pendingChangeKey } from '../pending/pending-change';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
 import { createEngineFileOperations, type EngineFileOperations } from './file-operations';
 import { createEngineHistory } from './history';
@@ -545,15 +545,24 @@ export class SyncEngine {
 		this.queueController.onFileRename(file, oldPath);
 	}
 
-	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		return this.runTrackedWorkflow(async () => {
+	/** Syncs every local and remote change. Paths of `held` pending keys, the files left
+	 * unchecked in Sync activity, are left alone in both directions and stay pending. */
+	async sync(progressCallback?: (current: number, total: number) => void, options: { held?: readonly string[] } = {}): Promise<SyncResult> {
+		const held = new Set((options.held ?? []).map(key => decodePendingChange(key).path));
+		const result = await this.runTrackedWorkflow(async () => {
 			this.contexts.clearPlannedContent();
 			try {
-				return await runSyncWorkflow(this.contexts.syncWorkflow, progressCallback);
+				return await this.contexts.withHeldPaths(held, () => runSyncWorkflow(this.contexts.syncWorkflow, progressCallback));
 			} finally {
 				this.contexts.clearPlannedContent();
 			}
 		});
+		// The cursor may now be past a remote change to a held file. If that file's local change
+		// is later discarded, only a full comparison with the server finds the change again.
+		if (held.size > 0 && result.success && !this.lifecycle.abortSignal.aborted) {
+			await this.requestFullSync().catch(error => logger.warn('Could not save the full sync request:', errorMessage(error)));
+		}
+		return result;
 	}
 
 

@@ -80,6 +80,13 @@ interface SyncEngineContextDependencies {
  * when a sync starts. */
 export class SyncEngineContexts {
 	private readonly plannedContent = new PlannedContent();
+	/** Paths the running sync leaves alone in both directions, at the user's request.
+	 * Empty outside `withHeldPaths`. */
+	private held: ReadonlySet<string> = new Set();
+	private readonly isHeld = (path: string): boolean => this.held.has(path);
+	/** Planners skip held paths as they skip ignored ones; other ignore checks, such as the
+	 * pending queue's, never see them, so their pending changes stay. */
+	private readonly skipPath = (path: string): boolean => this.isHeld(path) || this.dependencies.shouldIgnore(path);
 	private readonly transfer: TransferContext;
 	private readonly localDiffPlanner: LocalDiffPlannerContext;
 	/** Publishes a finished sync's outcome. */
@@ -108,7 +115,7 @@ export class SyncEngineContexts {
 			vault: d.vault,
 			plannedContent: this.plannedContent,
 			localManifest: d.localManifest,
-			shouldIgnore: d.shouldIgnore,
+			shouldIgnore: this.skipPath,
 			verifyContent: d.verifyContent,
 			runConcurrent: d.runConcurrent,
 			encrypted: this.encrypted,
@@ -143,6 +150,7 @@ export class SyncEngineContexts {
 				report: this.reportWork,
 				getImportToken: () => d.localManifest.getInitialImportToken(),
 				setImportToken: token => d.localManifest.setInitialImportToken(token),
+				heldPaths: this.held,
 			}, result, progress),
 			// Resolved per call so tests can replace the incremental planner.
 			incrementalSync: (progressCallback, onFailure) => this.incrementalSync(progressCallback, onFailure),
@@ -150,6 +158,7 @@ export class SyncEngineContexts {
 			hasSyncCursor: () => d.getSettings().lastSeq > 0,
 			createFullSyncPlan: (remoteFiles, concurrency, options) => createFullSyncPlan({
 				...this.localDiffPlanner,
+				isHeld: this.isHeld,
 				initialConfigPull: {
 					firstSync: d.getSettings().lastSync === null && d.getSettings().lastSeq === 0,
 					get: () => d.localManifest.getInitialConfigPull(),
@@ -198,6 +207,13 @@ export class SyncEngineContexts {
 	}
 
 	clearPlannedContent(): void { this.plannedContent.clear(); }
+
+	/** Runs a standard sync that leaves `held` paths alone, then clears them. */
+	async withHeldPaths<T>(held: ReadonlySet<string>, run: () => Promise<T>): Promise<T> {
+		this.held = held;
+		try { return await run(); }
+		finally { this.held = new Set(); }
+	}
 
 	readonly prepareUploadFromPath = (path: string): Promise<PreparedUpload | null> =>
 		prepareTransferUploadFromPath(this.transfer, path);
@@ -297,7 +313,7 @@ export class SyncEngineContexts {
 	 * replacement check comes first, so no server request runs before it passes. */
 	readonly beforeTargetedTransfer = async ({ recover }: { recover: boolean }): Promise<void> => {
 		this.assertNoVaultReplacement();
-		await assertNoOpenInitialImport(this.dependencies.api);
+		await assertNoOpenInitialImport(this.dependencies.api, this.dependencies.localManifest);
 		if (recover) await this.replayUploads();
 	};
 
@@ -340,7 +356,7 @@ export class SyncEngineContexts {
 			fileManager: d.fileManager,
 			files: d.files,
 			localManifest: d.localManifest,
-			shouldIgnore: d.shouldIgnore,
+			shouldIgnore: this.skipPath,
 			getLocalChanges: onUnchanged => planLocalChanges({
 				...this.localDiffPlanner,
 				pendingKeys: new Set(d.getPendingKeys()),

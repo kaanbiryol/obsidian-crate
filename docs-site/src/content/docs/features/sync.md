@@ -39,7 +39,7 @@ Under **Sync → Sync options**:
 ## Take a break from syncing
 
 - **Sync only when you ask:** turn off **Automatic sync**. A sync that is already running still finishes.
-- **Stop right now:** select **Pause sync** in Sync activity, or run **Crate: Stop sync**. This also turns off automatic sync on this device until you turn it back on.
+- **Stop right now:** select **Stop sync** on the **Pending** tab of Sync activity, or run **Crate: Stop sync**. This also turns off automatic sync on this device until you turn it back on.
 
 The web app and reminder notifications keep working either way, because they use your server directly.
 
@@ -49,10 +49,11 @@ Run **Crate: Show sync activity** and open **Pending** to see every file waiting
 
 ![Sync activity with one pending note, showing the line that changed since the last sync](../../../assets/screenshots/crate-sync-pending.png)
 
-- Select **Sync vault** at the top to send everything, including unchecked files.
-- Uncheck the files you want to hold back, then select the **Sync files** button at the bottom. It shows how many files it will send, and the rest stay pending for next time.
+- Select the sync button below the list. It sends the checked files and gets changes from your other devices. Its label says what it sends, such as **Sync 3 files**.
+- Uncheck the files you want to hold back. They stay on this device, untouched by changes from other devices, until you sync them. With every file unchecked, the button reads **Get remote changes**.
+- With nothing pending, the button reads **Sync** and gets changes from your other devices. While a sync runs, it reads **Stop sync**.
 
-Holding files back applies to that one sync. If you want to decide exactly when the rest go, turn off automatic sync first.
+Holding files back applies to that one sync. **Crate: Sync now**, the **Sync now** button in settings and automatic sync always send everything, so turn off automatic sync first if you want to decide exactly when the rest go.
 
 <details>
 <summary>Good to know</summary>

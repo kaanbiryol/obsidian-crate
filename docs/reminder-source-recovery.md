@@ -4,12 +4,12 @@ The plugin shows **Some reminders could not be refreshed** when a reminder note 
 
 For a temporary storage error, wait until the vault is available and select **Refresh reminders**. A successful refresh clears the warning and reads the current task text. Renaming a note moves its warning to the new path; confirmed deletion removes its saved entries.
 
-Crate writes ordinary descriptions as plain-text `<!-- crate-desc:details -->` comments, including multiline text. Literal percent signs such as `%20` stay as typed. Encoded `crate-desc:v1:` descriptions are also readable, and encoding is used for comment syntax (`--`), literal carriage returns and leading `v<number>:` prefixes. The parser reads both representations without changing the note. An unsupported version such as `v2:` or a damaged comment needs source repair; after repairing it, select **Sync vault** to resume setup; uploaded files do not need to be sent again. In **Sync activity**, each source error identifies the note path and malformed
+Crate writes ordinary descriptions as plain-text `<!-- crate-desc:details -->` comments, including multiline text. Literal percent signs such as `%20` stay as typed. Encoded `crate-desc:v1:` descriptions are also readable, and encoding is used for comment syntax (`--`), literal carriage returns and leading `v<number>:` prefixes. The parser reads both representations without changing the note. An unsupported version such as `v2:` or a damaged comment needs source repair; after repairing it, run **Crate: Sync now** to resume setup; uploaded files do not need to be sent again. In **Sync activity**, each source error identifies the note path and malformed
 description errors include a line number. Select **Open file** to open an available
 local note, or **Reveal in Finder** / **Reveal in File Explorer** on desktop to locate
 it. Back up the note before removing only a broken `crate-desc` comment in Source
 mode; keep the task and its `crate-id`, then re-add the description in Crate.
-Select **Sync vault** after saving to resume setup. Uploaded file contents remain synced.
+Run **Crate: Sync now** after saving to resume setup. Uploaded file contents remain synced.
 
 Sync errors show recovery guidance for common failures, including file sizes,
 permissions, storage, network connections and interrupted transfers. The alert shows

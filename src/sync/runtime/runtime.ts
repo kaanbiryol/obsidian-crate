@@ -674,10 +674,11 @@ export class SyncRuntime {
 		}
 	}
 
-	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+	/** `held` lists pending keys whose files this sync leaves alone, as unchecked in Sync activity. */
+	async sync(progressCallback?: (current: number, total: number) => void, options: { held?: readonly string[] } = {}): Promise<SyncResult> {
 		return this.runSyncOperation(
 			'sync',
-			(syncEngine, wrappedCallback) => syncEngine.sync(wrappedCallback),
+			(syncEngine, wrappedCallback) => syncEngine.sync(wrappedCallback, options),
 			progressCallback,
 			'Sync triggered',
 		);

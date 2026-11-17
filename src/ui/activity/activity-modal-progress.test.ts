@@ -21,7 +21,7 @@ function runtime(overrides: Partial<ActivityModalDeps>): ActivityModalDeps {
 	const unused = () => Promise.reject(new Error('Not used in this test'));
 	return {
 		loadHistoryComparison: unused, listSharedCheckpoints: async () => [], createHistoryRestore: unused,
-		loadPendingDiff: unused, syncSelected: unused, createPendingDiscard: unused, createConflictReview: unused,
+		loadPendingDiff: unused, createPendingDiscard: unused, createConflictReview: unused,
 		listRecentFileVersions: unused, getPendingRestores: () => [], loadFileHistoryPreview: unused,
 		restoreRecentFileVersion: unused, loadCurrentSyncedPreview: unused,
 		getPendingKeys: () => [], getPendingChangeCount: () => 0, hasPendingKey: () => false, getActiveConflicts: () => [],
@@ -39,7 +39,7 @@ function createModal(settings: CrateSettings, deps: ActivityModalDeps,
 /** ActivityTabs mounts these panels and the runtime calls these handlers; React is mocked here. */
 interface ModalInternals {
 	pendingPanel: FakeElement; conflictsPanel: FakeElement; pendingCount: FakeElement; conflictsCount: FakeElement;
-	header: ActivityHeader; pendingChecks?: { start(): void; pause(): void; dispose(): void; setSyncProgress(progress?: { label: string; fraction?: number }): void };
+	header: ActivityHeader; pendingChecks?: { start(): void; pause(): void; dispose(): void; setSyncProgress(progress?: { label: string; fraction?: number }): void; updateAction(): void };
 	onProgress(): void; onStateChange(): void; refresh(): void; renderPending(): void;
 	createHeader(header: FakeElement, contentEl: FakeElement): ActivityHeader;
 }
@@ -141,7 +141,7 @@ it('keeps the pending file browser and its comparisons while the pending set is 
 	const browser = internal.pendingPanel.querySelector('.crate-pending-browser');
 	expect(browser).toBeTruthy();
 	const dispose = vi.fn();
-	internal.pendingChecks = { start: vi.fn(), pause: vi.fn(), dispose, setSyncProgress: vi.fn() };
+	internal.pendingChecks = { start: vi.fn(), pause: vi.fn(), dispose, setSyncProgress: vi.fn(), updateAction: vi.fn() };
 
 	internal.renderPending();
 	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBe(browser);
@@ -163,7 +163,7 @@ it('keeps the file browser in view during a sync and shows progress in its foote
 	internal.renderPending();
 	const browser = internal.pendingPanel.querySelector('.crate-pending-browser');
 	const setSyncProgress = vi.fn();
-	internal.pendingChecks = { start: vi.fn(), pause: vi.fn(), dispose: vi.fn(), setSyncProgress };
+	internal.pendingChecks = { start: vi.fn(), pause: vi.fn(), dispose: vi.fn(), setSyncProgress, updateAction: vi.fn() };
 
 	// Before: a sync replaced the list and diff with a loading label.
 	state = { ...state, status: 'syncing', work: { phase: 'uploading', current: 1, total: 2 } };
@@ -229,24 +229,32 @@ it('ages the last-sync label every minute while open and stops when closed', asy
 	} finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
 });
 
-it('runs the shared sync and stop actions from the header button and shows stopping until stop settles', async () => {
-	let state = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
+it('runs the shared sync and stop actions from the Pending tab and shows stopping until stop settles', async () => {
+	let state = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 0, conflictCount: 0 } as SyncState;
 	let stopped!: () => void;
 	const actions = { sync: vi.fn(async () => {}), stop: vi.fn(() => new Promise<void>(resolve => { stopped = resolve; })) };
 	const modal = createModal(DEFAULT_SETTINGS, runtime({ getState: () => state }), actions);
 	const header = new FakeElement('div');
-	mountPanels(internals(modal), header);
-	const button = header.querySelector('.crate-sync-now-btn')!;
+	const internal = internals(modal);
+	mountPanels(internal, header);
+	internal.refresh();
+	const button = () => internal.pendingPanel.querySelector('.crate-pending-sync-action')!;
+	// Before: the header had its own Sync vault button, apart from the files it synced.
+	expect(header.querySelector('button')).toBeNull();
+	expect(button().textContent).toBe('Sync');
 
-	button.dispatchEvent(new Event('click'));
-	expect(actions.sync).toHaveBeenCalledOnce();
+	// With nothing pending, the button still gets remote changes.
+	button().dispatchEvent(new Event('click'));
+	expect(actions.sync).toHaveBeenCalledExactlyOnceWith([]);
 
 	state = { ...state, status: 'syncing' };
-	button.dispatchEvent(new Event('click'));
+	internal.refresh();
+	expect(button().textContent).toBe('Stop sync');
+	button().dispatchEvent(new Event('click'));
 	expect(actions.stop).toHaveBeenCalledOnce();
-	expect(button.getAttribute('aria-label')).toBe('Stopping…');
+	expect(button().textContent).toBe('Stopping…');
 	state = { ...state, status: 'idle' };
 	stopped();
-	await vi.waitFor(() => expect(button.getAttribute('aria-label')).toBe('Sync vault'));
+	await vi.waitFor(() => { internal.refresh(); expect(button().textContent).toBe('Sync'); });
 	expect(actions.sync).toHaveBeenCalledOnce();
 });

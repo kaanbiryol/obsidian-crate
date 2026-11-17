@@ -140,7 +140,7 @@ files the server already synced.
 
 ### 5. Initial Import
 
-There is no separate initial-sync command. Each sync first asks the server for an unfinished initial import; while one is open, the vault is uploaded through it before any incremental or full reconciliation. Server files missing locally are pruned from the import, files are prepared in byte-budgeted chunks so binary contents cannot accumulate without bound in memory, and small files are committed in batches of up to 32. Three requests stay in flight: each takes the next prepared batch as soon as its previous one finishes, and the local manifest is saved every 256 confirmed files or 5 seconds, and when the import finishes or fails. The committed server inventory remains the resume point. Files over 25 MB are reported as skipped and keep any server copy they already have. Only the device that started the import prunes or uploads for it; another device stops until it finishes (see [upload recovery](upload-recovery.md)). Finishing the import sets the changelog cursor.
+There is no separate initial-sync command. Each sync first asks the server for an unfinished initial import; while one is open, the vault is uploaded through it before any incremental or full reconciliation. Server files missing locally are pruned from the import, files are prepared in byte-budgeted chunks so binary contents cannot accumulate without bound in memory, and small files are committed in batches of up to 32. Three requests stay in flight: each takes the next prepared batch as soon as its previous one finishes, and the local manifest is saved every 256 confirmed files or 5 seconds, and when the import finishes or fails. The committed server inventory remains the resume point. Files over 25 MB are reported as skipped and keep any server copy they already have. Only the device that started the import prunes or uploads for it; another device stops until it finishes (see [upload recovery](upload-recovery.md)). While an import is open, queue flushes and selected-file sync stop with an error that says whether this device can finish it by syncing again or must wait for the device that started it. Finishing the import sets the changelog cursor. A sync that holds files back (below) leaves them out of the import like skipped files: they are neither uploaded nor pruned, any server copy stays in the inventory, and a held local file the server lacks loses its old baseline so a later sync uploads it as new.
 
 Entry point: `engine/engine.ts:sync()` -> `engine/initial-import.ts:runInitialImport()`
 
@@ -393,9 +393,20 @@ Readers never wait for sync.
 
 Implementation: `queue/controller.ts` and `queue/flush.ts`
 
-Selected-file sync classifies only the selected paths against current server
-metadata. Ordinary uploads and deletes use the shared transfer executors and
-concurrency limits, with progress reported per batch.
+Sync Activity's sync button runs the standard sync with the unchecked pending
+files held back (`SyncEngine.sync` with `held` keys). The planners skip held
+paths in both directions, as they skip ignored paths: no upload, delete,
+download, merge or conflict copy, and their baselines and pending changes stay.
+Only the planners see them; the queue and other ignore checks do not. The
+cursor still advances, so it can pass a remote change to a held file. A
+successful held sync therefore requests one full sync, which finds that change
+again if the local edit is later discarded. When the held file itself syncs,
+its conditional write meets the newer server version and reconciles as any
+concurrent edit does.
+
+Selected-file sync, used by history restore, classifies only the selected paths
+against current server metadata. Ordinary uploads and deletes use the shared
+transfer executors and concurrency limits, with progress reported per batch.
 Only files that lose a conditional-write race fall back to individual
 reconciliation. Remote deletions still wait for successful uploads and rename
 preservation; unselected files and the global changelog cursor stay untouched.

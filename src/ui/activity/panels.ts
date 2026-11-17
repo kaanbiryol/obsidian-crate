@@ -1,4 +1,4 @@
-import type { PendingActions } from './pending-actions';
+import { renderPendingSyncButton, type PendingActions } from './pending-actions';
 import { formatSyncProgress } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, renderLoadingState } from './rendering';
@@ -14,31 +14,32 @@ interface PendingPanelOptions {
 	actions?: PendingActions;
 }
 
-/** Returns the file browser's checks when the panel shows one. */
+/** Returns the file browser's checks when the panel shows one. With actions, every other
+ * state gets the sync button too, so the tab can always sync or stop. */
 export function renderPendingPanel(container: HTMLElement, { paths, loadDiff, state, progress, lastSyncLabel = 'Your vault is up to date.', browserState, actions }: PendingPanelOptions): PendingChecks | undefined {
 	const hasError = state?.status === 'error';
 	const syncing = state?.status === 'syncing';
 	const checking = state?.initializing && !hasError && state.status !== 'offline';
 	container.toggleClass('has-file-browser', paths.length > 0 && !syncing && !progress && !checking);
-	if (syncing || progress) {
-		renderLoadingState(container, formatSyncProgress(progress, state?.work));
-		return;
-	}
-	if (checking) {
-		renderLoadingState(container, 'Checking local files…');
-		return;
-	}
+	const withSyncButton = (parent: HTMLElement): PendingChecks | undefined => {
+		if (!actions) return;
+		const update = renderPendingSyncButton(parent, actions.sync);
+		return { start() {}, pause() {}, dispose() {}, setSyncProgress() {}, updateAction: update };
+	};
+	if (syncing || progress) return withSyncButton(renderLoadingState(container, formatSyncProgress(progress, state?.work)));
+	if (checking) return withSyncButton(renderLoadingState(container, 'Checking local files…'));
 	if (paths.length === 0) {
+		let empty: HTMLElement;
 		if (hasError) {
-			renderEmptyState(container, 'inbox', 'No pending files', 'The last sync had errors. View history for details.');
+			empty = renderEmptyState(container, 'inbox', 'No pending files', 'The last sync had errors. View history for details.');
 		} else if (state?.status === 'offline') {
-			renderEmptyState(container, 'wifi-off', 'Server unavailable', 'Check the server connection above, then try again.');
+			empty = renderEmptyState(container, 'wifi-off', 'Server unavailable', 'Check the server connection above, then try again.');
 		} else if (state && !state.lastSync) {
-			renderEmptyState(container, 'refresh-cw', 'No completed sync yet', 'No successful sync is recorded on this device.');
+			empty = renderEmptyState(container, 'refresh-cw', 'No completed sync yet', 'No successful sync is recorded on this device.');
 		} else {
-			renderEmptyState(container, 'check', 'All synced', lastSyncLabel, 'success');
+			empty = renderEmptyState(container, 'check', 'All synced', lastSyncLabel, 'success');
 		}
-		return;
+		return withSyncButton(empty);
 	}
 
 	return renderPendingBrowser(container, paths, loadDiff, browserState, actions);

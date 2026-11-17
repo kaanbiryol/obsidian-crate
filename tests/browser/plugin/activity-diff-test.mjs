@@ -17,14 +17,14 @@ const { outputFiles } = await build({
             window.calls = 0;
             window.loadArguments = [];
             window.pendingChangeKey = pendingChangeKey;
-            window.syncKeys = []; window.discardKeys = []; window.discarded = 0;
-            window.syncFailure = false;
+            window.heldKeys = []; window.discardKeys = []; window.discarded = 0;
             const actions = {
                 fileActions: path => [
                     { id: 'open', title: 'Open in Obsidian', icon: 'file', run: async () => { window.openedPath = path; } },
                     { id: 'reveal', title: 'Reveal in Finder', icon: 'folder-open', run: async () => { window.revealedPath = path; } },
                 ],
-                syncSelected: async keys => { if (window.syncFailure) throw new Error('Sync unavailable'); window.syncKeys = keys; },
+                // The modal's sync action receives the unchecked keys, which the sync holds back.
+                sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: held => { window.heldKeys = held; } },
                 discard: keys => {
                     window.discardKeys = keys;
                     new PendingDiscardModal({}, async () => {
@@ -212,9 +212,7 @@ for (const browserType of [chromium, webkit]) {
                 await expect(page.getByRole('button', { name: /^Sync \d+ files?$/ })).toBeEnabled();
                 await expect(page.locator('.crate-browser-file[aria-pressed="true"]')).toHaveCount(0);
                 await page.getByRole('button', { name: /^Sync \d+ files?$/ }).click();
-                assert.deepEqual(await page.evaluate(() => window.syncKeys), [
-                    '.obsidian/appearance.json', '.obsidian/types.json', '.obsidian/community-plugins.json', '.obsidian/plugins/omnisearch/data.json', pendingChangeKey('delete', 'Notes/Archive.md'),
-                ]);
+                assert.deepEqual(await page.evaluate(() => window.heldKeys), ['.obsidian/core-plugins.json']);
                 await page.evaluate(() => window.mount());
                 await expect(checks.nth(1)).not.toBeChecked();
                 await all.check();
@@ -223,8 +221,8 @@ for (const browserType of [chromium, webkit]) {
                 await expect(page.locator('.crate-browser-selection-count')).toHaveText('6 of 6 files selected');
                 await all.uncheck();
                 await expect(syncSelected).toBeVisible();
-                await expect(syncSelected).toBeDisabled();
-                await expect(syncSelected).toHaveText('Sync files');
+                await expect(syncSelected).toBeEnabled();
+                await expect(syncSelected).toHaveText('Get remote changes');
                 await expect(page.locator('.crate-browser-selection-count')).toHaveText('0 of 6 files selected');
                 const highlighted = page.locator('.crate-browser-file[aria-pressed="true"]');
                 for (const shortcut of ['Control+a', 'Meta+a']) {
@@ -234,8 +232,8 @@ for (const browserType of [chromium, webkit]) {
                     await expect(page.locator('.crate-browser-file-check input:checked')).toHaveCount(0);
                     await expect(highlighted).toHaveCount(6);
                     await expect(syncSelected).toBeVisible();
-                    await expect(syncSelected).toBeDisabled();
-                    await expect(syncSelected).toHaveText('Sync files');
+                    await expect(syncSelected).toBeEnabled();
+                    await expect(syncSelected).toHaveText('Get remote changes');
                     await expect(page.locator('.crate-browser-selection-count')).toHaveText('0 of 6 files selected');
                 }
                 await checks.nth(1).check();
@@ -265,11 +263,8 @@ for (const browserType of [chromium, webkit]) {
                 await expect(syncSelected).toHaveText('Sync 6 files');
                 await expect(page.locator('.crate-browser-selection-count')).toHaveText('6 of 6 files selected');
                 await checks.nth(1).uncheck();
-                await page.evaluate(() => { window.syncFailure = true; });
                 await syncSelected.click();
-                await expect(page.getByText('Sync unavailable', { exact: true })).toBeVisible();
-                await page.evaluate(() => { window.syncFailure = false; });
-                await syncSelected.click();
+                assert.deepEqual(await page.evaluate(() => window.heldKeys), ['.obsidian/core-plugins.json']);
                 await all.check();
                 await expect(syncSelected).toBeVisible();
                 await expect(syncSelected).toHaveText('Sync 6 files');
@@ -450,8 +445,8 @@ for (const browserType of [chromium, webkit]) {
                 await first.focus();
                 await page.keyboard.press('Control+a');
                 await expect(syncSelected).toBeVisible();
-                await expect(syncSelected).toBeDisabled();
-                await expect(syncSelected).toHaveText('Sync files');
+                await expect(syncSelected).toBeEnabled();
+                await expect(syncSelected).toHaveText('Get remote changes');
                 await expect(page.locator('.crate-browser-selection-count')).toHaveText('0 of 20 files selected');
                 // Every rendered row is highlighted; the menu below counts all 20 files.
                 await expect(highlighted).toHaveCount(await rows.count());
@@ -477,10 +472,10 @@ for (const browserType of [chromium, webkit]) {
                 await page.getByRole('checkbox', { name: 'Sync note.md', exact: true }).uncheck();
                 await expect(page.getByRole('checkbox', { name: 'Sync delete:note.md', exact: true })).toBeChecked();
                 await syncSelected.click();
-                assert.deepEqual(await page.evaluate(() => window.syncKeys), ['delete:note.md']);
+                assert.deepEqual(await page.evaluate(() => window.heldKeys), [pendingChangeKey('delete', 'note.md')]);
                 await all.check();
                 await syncSelected.click();
-                assert.deepEqual(await page.evaluate(() => window.syncKeys), ['delete:note.md', pendingChangeKey('delete', 'note.md')]);
+                assert.deepEqual(await page.evaluate(() => window.heldKeys), []);
                 await literalPath.click({ button: 'right' });
                 await page.getByRole('menuitem', { name: 'Open in Obsidian', exact: true }).click();
                 assert.equal(await page.evaluate(() => window.openedPath), 'delete:note.md');
