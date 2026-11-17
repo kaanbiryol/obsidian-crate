@@ -47,7 +47,7 @@
 }
 
 .crate-reminders-ui button.crate-reading-tag-filter__more {
-	gap: 4px; color: var(--text-normal);
+	display: inline-flex; align-items: center; gap: 4px; color: var(--text-normal);
 	svg { flex-shrink: 0; }
 }
 
