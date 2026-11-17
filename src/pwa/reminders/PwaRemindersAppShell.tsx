@@ -1,8 +1,8 @@
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
-import { PWA_CONTROL_SPRING, PWA_FADE } from '../../ui/shared/navigation/motion';
+import { PWA_CONTROL_SPRING } from '../../ui/shared/navigation/motion';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
-import React, { useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useContext, useMemo, useRef } from 'react';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 
 import { PwaDock, PwaDockAddButton } from '../components/PwaDock';
@@ -15,6 +15,7 @@ import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import type { Reminder } from '@/reminders/types/reminder';
 import type { TabId } from '@/reminders/ui/shared/layoutConstants';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
+import { useContentReveal } from '@/ui/shared/useContentReveal';
 import { NavigationScreen } from '../../ui/shared/navigation/NavigationScreen';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { RemindersViewPanels } from '@/reminders/ui/shared/RemindersViewPanels';
@@ -94,23 +95,11 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		initialTab: requested?.section === 'reminders' ? requested.tab : initialTab, initialProject, reduceMotion,
 	});
 	const shell = useRef<HTMLDivElement>(null);
-	const contentRevealed = useRef(false);
 
-	useLayoutEffect(() => {
-		if (showLoadingIndicator || contentRevealed.current) return;
-		contentRevealed.current = true;
-		if (reduceMotion) return;
-		// Reveal the snapshot as one stationary change. Keep the title, actions,
-		// and dock painted, and never replay this entrance for background refreshes.
-		const regions = shell.current?.querySelectorAll<HTMLElement>(
-			'.pwa-navigation-viewport .view-header-meta, .pwa-navigation-viewport .pwa-schedule-switcher, .pwa-navigation-viewport .reminders-content',
-		);
-		const animations = Array.from(regions ?? [], region => region.animate(
-			[{ opacity: 0 }, { opacity: 1 }],
-			{ duration: PWA_FADE.duration * 1000, easing: 'ease-out' },
-		));
-		return () => animations.forEach(animation => animation.cancel());
-	}, [showLoadingIndicator, reduceMotion]);
+	// Reveal the snapshot as one stationary change. Keep the title, actions, and dock painted.
+	useContentReveal(showLoadingIndicator, () => shell.current?.querySelectorAll<HTMLElement>(
+		'.pwa-navigation-viewport .view-header-meta, .pwa-navigation-viewport .pwa-schedule-switcher, .pwa-navigation-viewport .reminders-content',
+	));
 
 	const { currentHeader, primaryTab, handleAdd, panelCardRenderer, listCardRenderer, handleReorder } = useRemindersShellModel({
 		reminders, projects, upcomingDays, viewMode, selectedProject, renderCard, onAdd, onReorder, addDisabled: backgroundInert,

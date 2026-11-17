@@ -16,8 +16,10 @@ export interface ReadingLibrarySource {
 /** The query that `items` and `tags` answer, which trails the asked query until it loads. */
 interface ShownLibraryQuery { section: ReadingSection; q: string; tag: string | null }
 interface Pages extends ShownLibraryQuery { key: string; items: ReadingItem[]; cursor: string | null; tags: ReadingTag[]; loading: boolean; error: string | null; reloading?: boolean }
-interface Cached { items: ReadingItem[]; cursor: string | null }
-interface Cache { revision: unknown; pages: Map<string, Cached>; tags: Map<ReadingSection, ReadingTag[]> }
+/** What a query or section answered, and the library revision it answered for. */
+interface Cached { items: ReadingItem[]; cursor: string | null; revision: unknown; browse: boolean }
+interface CachedTags { tags: ReadingTag[]; revision: unknown }
+interface Cache { revision: unknown; pages: Map<string, Cached>; tags: Map<ReadingSection, CachedTags> }
 // Typing waits this long before a search reaches the server.
 const SEARCH_DELAY_MS = 250;
 // A filtered Highlights page scans a bounded run of notes, so it can come back empty with a
@@ -46,17 +48,27 @@ function reuseUnchanged(shown: ReadingItem[], next: ReadingItem[]): ReadingItem[
 /** The loaded pages for one section, search and tag; a change starts again from the first page.
  * A new query keeps the previous pages, their tags and their query until its first page and its
  * section's tags both answer, so the list, count and tags change together. Pages and tags read
- * since the last `revision` are kept, so returning to them shows them without asking again. */
+ * since the last `revision` are kept, so returning to them shows them without asking again. A new
+ * revision keeps each section's unfiltered pages on screen while they reload in the background. */
 export function useLibraryPages(source: ReadingLibrarySource | undefined, section: ReadingSection, q: string, tag: string | null) {
 	const query = q.trim(), key = JSON.stringify([section, query, tag]);
-	const [pages, setPages] = useState<Pages>({ key: '', section, q: query, tag, items: [], cursor: null, tags: [], loading: !!source, error: null });
-	const current = useRef(key), latest = useRef(source), shown = useRef(pages), requests = useRef(0);
-	current.current = key; latest.current = source; shown.current = pages;
+	const [loaded, setPages] = useState<Pages>({ key: '', section, q: query, tag, items: [], cursor: null, tags: [], loading: !!source, error: null });
 	const enabled = !!source, revision = source?.revision;
 	const cache = useRef<Cache>({ revision: undefined, pages: new Map(), tags: new Map() });
-	if (cache.current.revision !== revision) cache.current = { revision, pages: new Map(), tags: new Map() };
+	if (cache.current.revision !== revision) {
+		// Searches and tags are read again; sections keep their pages to show while they reload.
+		const pages = new Map([...cache.current.pages].filter(([, cached]) => cached.browse));
+		cache.current = { revision, pages, tags: cache.current.tags };
+	}
+	// A query read before shows in the same render, so returning to it never paints a loading state.
+	const known = cache.current.pages.get(key), knownTags = cache.current.tags.get(section);
+	const pages: Pages = enabled && loaded.key !== key && known && knownTags
+		? { key, section, q: query, tag, items: known.items, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null }
+		: loaded;
+	const current = useRef(key), latest = useRef(source), shown = useRef(pages), stored = useRef(loaded), requests = useRef(0);
+	current.current = key; latest.current = source; shown.current = pages; stored.current = loaded;
 	const fetchPage = useCallback(async (cursor: string | null, replace: boolean) => {
-		const source = latest.current, saved = cache.current;
+		const source = latest.current, saved = cache.current, answering = saved.revision;
 		if (!source) return;
 		// Only the latest request applies, so a page answered after a refresh cannot leave a gap.
 		const requested = key, request = ++requests.current, stale = () => current.current !== requested || requests.current !== request;
@@ -65,8 +77,8 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		// A reload of the shown query runs in the background; only a next page shows its spinner.
 		setPages(state => ({ ...state, loading: true, error: null, reloading: replace && state.key === requested }));
 		// A first page also reads its section's tags, unless they were read since the last revision.
-		const knownTags = saved.tags.get(section);
-		const tags = replace && !knownTags ? source.loadTags(section).catch(() => shown.current.section === section ? shown.current.tags : []) : Promise.resolve(knownTags ?? shown.current.tags);
+		const knownTags = saved.tags.get(section), freshTags = knownTags && knownTags.revision === answering ? knownTags.tags : undefined;
+		const tags = replace && !freshTags ? source.loadTags(section).catch(() => knownTags?.tags ?? (shown.current.section === section ? shown.current.tags : [])) : Promise.resolve(freshTags ?? shown.current.tags);
 		try {
 			let page = await source.load({ section, q: query, tag, cursor }), items = page.items;
 			for (let follows = 0; !page.items.length && page.cursor && follows < MAX_EMPTY_FOLLOWS && !stale(); follows++) {
@@ -83,8 +95,8 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 			const listed = !replace ? appendNew(previous.items, items) : previous.key === requested ? reuseUnchanged(previous.items, items) : items;
 			// Unchanged tags keep the shown row.
 			const kept = previous.section === section && JSON.stringify(previous.tags) === JSON.stringify(sectionTags) ? previous.tags : sectionTags;
-			saved.pages.set(requested, { items: listed, cursor: page.cursor });
-			if (replace) saved.tags.set(section, kept);
+			saved.pages.set(requested, { items: listed, cursor: page.cursor, revision: answering, browse: !query && !tag });
+			if (replace) saved.tags.set(section, { tags: kept, revision: answering });
 			setPages({ key: requested, section, q: query, tag, items: listed, cursor: page.cursor, tags: kept, loading: false, error: null });
 		} catch (cause) {
 			if (stale()) return;
@@ -96,11 +108,12 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 	}, [key, section, query, tag]);
 	useEffect(() => {
 		if (!enabled) return;
-		// A query read since the last revision shows at once, without asking the server again.
+		// A query read before shows at once. Since the last revision it needs no request;
+		// an older answer stays on screen while it reloads in the background.
 		const known = cache.current.pages.get(key), knownTags = cache.current.tags.get(section);
 		if (known && knownTags) {
-			if (shown.current.key !== key) setPages({ key, section, q: query, tag, ...known, tags: knownTags, loading: false, error: null });
-			return;
+			if (stored.current.key !== key) setPages({ key, section, q: query, tag, items: known.items, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null });
+			if (known.revision === revision && knownTags.revision === revision) return;
 		}
 		const timer = window.setTimeout(() => { void fetchPage(null, true); }, query ? SEARCH_DELAY_MS : 0);
 		return () => window.clearTimeout(timer);

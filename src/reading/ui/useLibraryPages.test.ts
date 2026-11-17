@@ -173,3 +173,70 @@ it('reads a section\'s tags once for every tag and search in it', async () => {
 		expect(loadTags).toHaveBeenCalledTimes(1);
 	} finally { vi.useRealTimers(); }
 });
+
+it('shows a section read before a new revision at once and reloads it in the background', async () => {
+	vi.useFakeTimers();
+	try {
+		const archived = { crate_reading_id: 'archived', title: 'Archived' } as ReadingItem;
+		let archive = [archived];
+		const load = vi.fn(async ({ section }: { section: string }) => ({ items: section === 'inbox' ? [item] : archive, cursor: null }));
+		const loadTags = vi.fn(async (section: string) => [{ name: section, count: 1 }]);
+		let section: 'inbox' | 'archived' = 'inbox', query = '', revision = 1;
+		const hook = renderHook(() => useLibraryPages({ load, loadTags, revision, present: items => items }, section, query, null));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		section = 'archived';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		query = 'arch';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		query = '';
+		section = 'inbox';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		expect(load).toHaveBeenCalledTimes(3);
+		// A sync changes the library while the inbox is shown.
+		archive = [archived, { crate_reading_id: 'new', title: 'New' } as ReadingItem];
+		revision = 2;
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		expect(load).toHaveBeenCalledTimes(4);
+		section = 'archived';
+		hook.rerender();
+		// The earlier archive shows without a loading state, then its reload replaces it.
+		expect(hook.current).toMatchObject({ items: [archived], tags: [{ name: 'archived', count: 1 }], shown: { section: 'archived' }, loading: false });
+		await act(async () => { await vi.runAllTimersAsync(); });
+		expect(hook.current.items.map(entry => entry.crate_reading_id)).toEqual(['archived', 'new']);
+		expect(load).toHaveBeenCalledTimes(5);
+		expect(loadTags).toHaveBeenCalledTimes(4);
+		// A search from before the sync is read again rather than shown from memory.
+		query = 'arch';
+		hook.rerender();
+		expect(hook.current).toMatchObject({ shown: { q: '' }, loading: true });
+	} finally { vi.useRealTimers(); }
+});
+
+it('never renders a loading state when returning to a section read before', async () => {
+	vi.useFakeTimers();
+	try {
+		const load = vi.fn(async ({ section }: { section: string }) => ({ items: section === 'inbox' ? [item] : [], cursor: null }));
+		let section: 'inbox' | 'archived' = 'inbox';
+		const renders: Array<{ section: string; loading: boolean }> = [];
+		const hook = renderHook(() => {
+			const pages = useLibraryPages({ load, loadTags: async () => [], revision: 1, present: items => items }, section, '', null);
+			renders.push({ section: pages.shown.section, loading: pages.loading });
+			return pages;
+		});
+		await act(async () => { await vi.runAllTimersAsync(); });
+		section = 'archived';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		renders.length = 0;
+		section = 'inbox';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		expect(renders.length).toBeGreaterThan(0);
+		expect(renders).toEqual(renders.map(() => ({ section: 'inbox', loading: false })));
+		expect(load).toHaveBeenCalledTimes(2);
+	} finally { vi.useRealTimers(); }
+});

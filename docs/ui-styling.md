@@ -356,10 +356,13 @@ and a count can only go down: after moving literals onto roles, run
   Initialize unvisited features and picker modules after the entrance completes.
   Picker screen handoffs retain their existing focus/keyboard timing; these are
   replacements inside one drawer, not additional stacked dialogs.
-  Stationary tab dissolves use 240ms ease-in-out so outgoing content stays visible
+  Stationary tab dissolves use 180ms ease-in-out so outgoing content stays visible
   through the early frames and both screens blend at the midpoint. Switching
-  to or from Reading uses that same tab dissolve in both hosts. Toasts retain
-  their 160ms fade. Press feedback uses
+  to or from Reading uses that same tab dissolve in both hosts. Content that
+  replaces a loading state fades in over 160ms through `useContentReveal`, so a
+  Reading section that has to load never pops in; a screen read before draws at
+  once without fading, and Reading sections keep their pages through a sync while
+  they reload. Toasts retain their 160ms fade. Press feedback uses
   120ms, and control movement uses the shared control spring or 180ms CSS curve.
   The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
   changes retain visible travel instead of spending almost all their time settling.

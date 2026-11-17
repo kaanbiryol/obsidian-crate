@@ -14,6 +14,7 @@ import type { ReadingItem } from '../core/model';
 import type { ReadingSnapshot } from '../data/library';
 import { groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
+import { useContentReveal } from '@/ui/shared/useContentReveal';
 import { HighlightList } from './HighlightList';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
@@ -101,6 +102,12 @@ export function ReadingLibraryPanel({
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
 	const { listQuery, items, excerpts, count, tags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
+	// A section that had to load fades its count, tags and list in instead of popping in.
+	useContentReveal(loading, () => {
+		const list = lists.current.get(section), library = list?.parentElement;
+		if (!list || !library) return undefined;
+		return [list, ...library.querySelectorAll<HTMLElement>(':scope > .crate-reading__header .view-header-meta, :scope > .crate-reading-tag-filter')];
+	});
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
 	useEffect(() => {
