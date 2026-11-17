@@ -51,7 +51,8 @@ export function useReadingSession(connection: ReadingConnection) {
 		return true;
 	}, [isCurrentSession]);
 	const openCapture = useCallback(() => { setError(null); setAdding(true); }, []);
-	const closeCapture = useCallback(() => setAdding(false), []);
+	// Dismissing the form discards its link, like the reminder sheet; the next open starts empty.
+	const closeCapture = useCallback(() => { setAdding(false); setUrl(''); }, []);
 	const takeSharedLink = useCallback(() => setSharedLinkReady(false), []);
 	const run = useCallback(async (action: () => Promise<void>) => {
 		const revision = generation.current;

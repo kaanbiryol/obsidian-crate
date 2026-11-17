@@ -131,16 +131,13 @@ function ReminderEditorSheet({
 	return (
 		<PwaModalSheet
 			isOpen={!isClosing}
-			onClose={(reason) => {
+			onClose={() => {
 				if (saving || isClosing || !canInteract) return false;
 				if (modal.draft.deleteConfirm) transitionDeleteConfirmation(false);
 				else if (activeScreen !== 'editor') returnToEditor();
 				else {
-					if (reason === 'swipe') {
-						// A gesture may be accidental. Keep the persisted draft for reopening.
-						editorScreenRef.current?.dismissKeyboard();
-						dismissModal();
-					} else onClose();
+					// A swipe dismisses like the close button; reopening starts fresh.
+					onClose();
 					return true;
 				}
 				return false;

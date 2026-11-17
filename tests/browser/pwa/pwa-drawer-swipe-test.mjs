@@ -78,12 +78,12 @@ try {
 			assert.equal(await editor.evaluate(el => Boolean(el.closest('.crate-modal-canvas'))), false, 'The sheet must not inherit the background scale');
 			await expect(page.locator('.pwa-modal-sheet__backdrop')).toHaveCSS('transition-duration', '0s');
 			await checkSheetDragPosition(page, editor, { recedeCanvas: false });
-			await title.fill('Keep my swiped draft');
+			await title.fill('Discard my swiped draft');
 			// A short, slow drag from a focused field moves the sheet, then settles back.
 			await swipe(page, title, 40, 600);
 			await expect(editor).toBeVisible();
 			await expect(editor).toHaveCSS('transform', 'none');
-			await expect(title).toHaveText('Keep my swiped draft');
+			await expect(title).toHaveText('Discard my swiped draft');
 			await page.evaluate(() => document.getSelection()?.collapseToEnd());
 			// WebKit can focus-scroll the invisible containment layer to its end.
 			// That must not prevent the next header drag from dismissing the sheet.
@@ -96,23 +96,23 @@ try {
 			await checkDismissal();
 			await expect(editor).toHaveCount(0);
 			await expect.poll(scale).toBe(1);
+			// A swipe dismisses like the close button, so reopening starts fresh.
 			await card.tap();
-			await expect(title).toHaveText('Keep my swiped draft');
+			await expect(title).toHaveText('Check this article');
 			// As on iOS, content at its top hands a downward drag to the sheet, even
-			// from a focused field, and dismissal keeps the draft.
+			// from a focused field.
 			await expect(editor).toHaveCSS('transform', 'none');
 			await title.focus();
 			await swipe(page, title);
 			await expect(editor).toHaveCount(0);
 			await card.tap();
-			await expect(title).toHaveText('Keep my swiped draft');
 			// WebKit scrolls the sheet's one-pixel containment layer when a field is
 			// focused; the drag must still reach the sheet.
 			await expect(editor).toHaveCSS('transform', 'none');
 			await swipe(page, editor.getByRole('textbox', { name: 'Reminder description', exact: true }));
 			await expect(editor).toHaveCount(0);
 			await card.tap();
-			await expect(title).toHaveText('Keep my swiped draft');
+			await title.fill('Keep my picker draft');
 
 			await editor.getByRole('button', { name: 'Inbox', exact: true }).tap();
 			const picker = page.getByRole('dialog', { name: 'Select project', exact: true });
@@ -123,14 +123,14 @@ try {
 			await swipe(page, picker.getByRole('heading', { name: 'Project', exact: true }));
 			await expect(editor).toBeVisible();
 			await expect(editor).toHaveCSS('transform', 'none');
-			await expect(title).toHaveText('Keep my swiped draft');
+			await expect(title).toHaveText('Keep my picker draft');
 			await expect(title).toBeFocused();
 			const checkButtonDismissal = await trackSheetDismissal(editor, { recedeCanvas: false });
 			await editor.getByRole('button', { name: 'Close reminder editor', exact: true }).tap();
 			await checkButtonDismissal();
 			await expect(page.locator('.pwa-modal-sheet')).toHaveCount(0);
 			assert.deepEqual(errors, [], 'Drawer interactions must not throw');
-			console.log(`${browserType.name()}: cancelled and completed swipes, native field gestures, retained drafts and picker return passed`);
+			console.log(`${browserType.name()}: cancelled and completed swipes, native field gestures, discarded drafts and picker return passed`);
 		} catch (error) {
 			if (page) await saveSwipeFailure(page, browserType.name()).catch(diagnosticError => console.error(diagnosticError));
 			throw error;

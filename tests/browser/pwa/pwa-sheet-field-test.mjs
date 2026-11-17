@@ -85,12 +85,13 @@ try {
 			});
 			for (const sample of interrupted) expect(sample).toEqual({ moving: true, focused: true, caret: 'rgba(0, 0, 0, 0)' });
 			await expect(field).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
-			await page.getByLabel('Link', { exact: true }).fill('https://example.com/keep-draft');
+			await page.getByLabel('Link', { exact: true }).fill('https://example.com/discarded-draft');
 			await page.getByRole('button', { name: 'Close save a link', exact: true }).click();
 			await expect(page.getByRole('dialog')).toHaveCount(0);
 			await page.getByRole('button', { name: 'Save a link', exact: true }).tap();
 			await expect(page.getByLabel('Link', { exact: true })).toBeFocused();
-			await expect(page.getByLabel('Link', { exact: true })).toHaveValue('https://example.com/keep-draft');
+			// Dismissing the form discards its link, like the reminder sheet.
+			await expect(page.getByLabel('Link', { exact: true })).toHaveValue('');
 			await expect(popup).toHaveCSS('transform', 'none');
 			await expect(field).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
 			const frames = await page.evaluate(() => { cancelAnimationFrame(window.caretFrame); return window.caretFrames; });
@@ -105,7 +106,7 @@ try {
 			await page.getByRole('button', { name: 'Save a link', exact: true }).tap();
 			await expect(field).toBeFocused();
 			await expect(field).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
-			console.log(`${engine.name()}: sheet autofocus, caret motion, touch focus, keyboard geometry, drag interruption, reduced motion and draft preservation passed`);
+			console.log(`${engine.name()}: sheet autofocus, caret motion, touch focus, keyboard geometry, drag interruption, reduced motion and draft discarding passed`);
 		} finally { await browser.close(); }
 	}
 } finally { await new Promise(resolve => server.close(resolve)); }
