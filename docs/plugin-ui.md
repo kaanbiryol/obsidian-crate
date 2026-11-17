@@ -43,8 +43,8 @@ show without a server; and **Management** for
 **Account and devices**, **Usage**, **Server**, and **Troubleshooting**. **Usage**
 shows Cloudflare account metrics and allowances when an account is configured. Feature switches
 live inside their disclosures. Collapsed rows summarize folder choices or status.
-The web-app row has two visible actions: **Open app** and **Connect another device**.
-Connecting another device opens a QR dialog with **Copy link**; if clipboard
+The web-app row has two visible actions: **Open app** and **Set up on phone** (**Set up on another device** in
+Obsidian mobile). Setting up a device opens a QR dialog with **Copy link**; if clipboard
 access fails, the same dialog reveals a read-only setup link.
 Collapsed folder and timing summaries show current choices. Reminder display
 preferences disappear when local reminders are off; folder selection stays

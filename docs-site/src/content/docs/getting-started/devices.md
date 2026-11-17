@@ -30,7 +30,7 @@ Connecting another vault to a server that already has files replaces that vault'
 Once Obsidian is connected and your vault has synced:
 
 1. Open **Settings → Crate → Crate web app**.
-2. Select **Open app** to use it on this device, or **Connect another device** to show a QR code. **Copy link** gives you the same link to open elsewhere.
+2. Select **Open app** to use it on this device, or **Set up on phone** (**Set up on another device** in Obsidian mobile) to show a QR code. **Copy link** gives you the same link to open elsewhere.
 3. Open the link or scan the code on the device you want to connect.
 
 The web app holds both Reading and Reminders. It talks to your server directly, so Obsidian doesn't need to stay open.

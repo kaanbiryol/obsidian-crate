@@ -422,11 +422,11 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(noticeMessages).toContain('Could not create app code: Invalid token');
-		expect(showCodeButton?.buttonEl.textContent).toBe('Connect another device');
+		expect(showCodeButton?.buttonEl.textContent).toBe('Set up on phone');
 		expect(showCodeButton?.buttonEl.classNames.has('is-disabled')).toBe(false);
 	});
 
-	it('shows the setup link as a QR code to connect another device', async () => {
+	it('shows the setup link as a QR code to set up a phone', async () => {
 		const { renderCrateWebApp } = await loadNotificationsSectionModule();
 		renderCrateWebApp({ containerEl: new FakeElement('div') as never, plugin: createPlugin({}) });
 		getSettingByName('Crate web app').buttons[1]?.click();

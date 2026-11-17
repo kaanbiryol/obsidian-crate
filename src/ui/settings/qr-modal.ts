@@ -1,22 +1,24 @@
 import { createModalActions, createModalFooter, SharedModal } from '../plugin/shared-modal';
-import { Notice, Setting, type App } from 'obsidian';
+import { Notice, Platform, Setting, type App } from 'obsidian';
 import qrcode from 'qrcode-generator';
 
 export class QRModal extends SharedModal {
 	private readonly data: string;
+	private readonly title: string;
 
-	constructor(app: App, data: string) {
+	constructor(app: App, data: string, title: string) {
 		super(app);
 		this.data = data;
+		this.title = title;
 	}
 
 	onOpen(): void {
-		this.openLayout('Connect another device');
+		this.openLayout(this.title);
 		const contentEl = this.bodyEl;
 		this.modalEl.addClass('crate-qr-modal');
 
 		contentEl.createEl('p', {
-			text: 'Scan this code with your other device, or copy the link below. This setup link expires in 10 minutes.',
+			text: `Scan this code with your ${Platform.isMobile ? 'other device' : 'phone'}, or copy the link below. This setup link expires in 10 minutes.`,
 			cls: 'crate-qr-desc',
 		});
 

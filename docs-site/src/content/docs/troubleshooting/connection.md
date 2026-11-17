@@ -49,7 +49,7 @@ Turning on R2 in a different Cloudflare account won't help this server. See the 
 
 Pairing codes work once and expire after ten minutes. [Create a new code](/docs/getting-started/self-hosting/#create-another-pairing-code), then enter it under **Connect to your server** in Obsidian.
 
-A pairing code is for Obsidian only. To connect the web app, connect Obsidian first, then use **Crate web app → Connect another device**.
+A pairing code is for Obsidian only. To connect the web app, connect Obsidian first, then use **Crate web app → Set up on phone**.
 
 ## The web app asks me to reconnect
 

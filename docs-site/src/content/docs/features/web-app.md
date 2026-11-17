@@ -13,7 +13,7 @@ It works with your Reading and Reminders folders only. For your whole vault, use
 
 1. On a connected Obsidian device, finish a sync.
 2. Open **Settings → Crate → Crate web app**.
-3. Select **Open app** to use this device, or **Connect another device** to show a QR code. **Copy link** gives you the same link to send to another device.
+3. Select **Open app** to use this device, or **Set up on phone** to show a QR code. **Copy link** gives you the same link to send to another device. In Obsidian mobile the button reads **Set up on another device**.
 4. Open the link or scan the code on the device you want to connect.
 5. Open a reminder or article you know is synced to check you're looking at the right vault.
 

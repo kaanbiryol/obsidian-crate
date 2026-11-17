@@ -17,7 +17,7 @@ async function openDialog(writeText: ReturnType<typeof vi.fn>) {
 	vi.stubGlobal('DOMParser', class { parseFromString() { return { documentElement: { tagName: 'invalid' } }; } });
 	vi.stubGlobal('navigator', { clipboard: { writeText } });
 	const { QRModal } = await import('./qr-modal');
-	new QRModal({} as never, 'https://crate.example/notifications?token=fresh').onOpen();
+	new QRModal({} as never, 'https://crate.example/notifications?token=fresh', 'Set up on phone').onOpen();
 	MockSetting.instances.flatMap(row => row.buttons).find(button => button.buttonEl.textContent === 'Copy link')!.click();
 }
 

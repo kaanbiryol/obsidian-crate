@@ -11,7 +11,9 @@ export function renderCrateWebApp({ containerEl, plugin }: Omit<SettingsSectionC
 	if (!plugin.syncRuntime.getApiClient()) return;
 	new Setting(containerEl)
 		.setName('Crate web app')
-		.setDesc('Open here, or connect another device with a QR code or setup link.')
+		.setDesc(Platform.isMobile
+			? 'Open it in your browser, or scan a QR code to set it up on another device.'
+			: 'Open it in your browser, or scan a QR code to set it up on your phone.')
 		.setClass('crate-web-app-setting')
 		.addButton(button => {
 			button.setButtonText('Open app');
@@ -32,18 +34,24 @@ export function renderCrateWebApp({ containerEl, plugin }: Omit<SettingsSectionC
 			}));
 		})
 		.addButton(button => {
-			button.setButtonText('Connect another device');
+			const label = webAppSetupLabel();
+			button.setButtonText(label);
 			button.onClick(() => runButtonTask({
-				button, idleText: 'Connect another device', runningText: 'Creating...',
+				button, idleText: label, runningText: 'Creating...',
 				task: () => showWebAppCode(plugin),
 			}));
 		});
 }
 
-/** Opens the QR code and setup link for another device; a failure shows a notice. */
+/** Obsidian mobile is already on a phone, so it points at another device instead. */
+function webAppSetupLabel(): string {
+	return Platform.isMobile ? 'Set up on another device' : 'Set up on phone';
+}
+
+/** Opens the QR code and setup link for a phone or other device; a failure shows a notice. */
 export async function showWebAppCode(plugin: CratePlugin): Promise<void> {
 	try {
-		new QRModal(plugin.app, await buildEnrollmentUrl(plugin)).open();
+		new QRModal(plugin.app, await buildEnrollmentUrl(plugin), webAppSetupLabel()).open();
 	} catch (error) {
 		new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
 	}
