@@ -13,7 +13,7 @@ export interface ReadingLibrarySource {
 	present: (items: ReadingItem[]) => ReadingItem[];
 }
 
-interface Pages { key: string; items: ReadingItem[]; cursor: string | null; loading: boolean; error: string | null }
+interface Pages { key: string; items: ReadingItem[]; cursor: string | null; loading: boolean; error: string | null; reloading?: boolean }
 // Typing waits this long before a search reaches the server.
 const SEARCH_DELAY_MS = 250;
 // A filtered Highlights page scans a bounded run of notes, so it can come back empty with a
@@ -23,6 +23,19 @@ const MAX_EMPTY_FOLLOWS = 3;
 const MAX_RELOAD_PAGES = 20;
 
 const appendNew = (items: ReadingItem[], more: ReadingItem[]) => [...items, ...more.filter(item => !items.some(other => other.crate_reading_id === item.crate_reading_id))];
+
+/** A reload's items, reusing the shown objects (and array) that did not change so rows keep their identity. */
+function reuseUnchanged(shown: ReadingItem[], next: ReadingItem[]): ReadingItem[] {
+	const byId = new Map(shown.map(item => [item.crate_reading_id, item]));
+	let changed = shown.length !== next.length;
+	const items = next.map((item, index) => {
+		const previous = byId.get(item.crate_reading_id);
+		const kept = previous && JSON.stringify(previous) === JSON.stringify(item) ? previous : item;
+		if (kept !== shown[index]) changed = true;
+		return kept;
+	});
+	return changed ? items : shown;
+}
 
 /** The loaded pages for one section, search and tag; a change starts again from the first page. */
 export function useLibraryPages(source: ReadingLibrarySource | undefined, section: ReadingSection, q: string, tag: string | null) {
@@ -39,7 +52,8 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		// A refresh of the shown query reads as many items as it shows, so the list keeps its place.
 		const keep = replace && shown.current.key === requested ? shown.current.items.length : 0;
 		// A new search or tag keeps the previous items listed until its first page answers.
-		setPages(state => ({ ...state, key: requested, loading: true, error: null, ...replace && state.key !== requested ? { cursor: null } : {} }));
+		// A reload of the shown query runs in the background; only a next page shows its spinner.
+		setPages(state => ({ ...state, key: requested, loading: true, error: null, reloading: replace && state.key === requested, ...replace && state.key !== requested ? { cursor: null } : {} }));
 		try {
 			let page = await source.load({ section, q: query, tag, cursor }), items = page.items;
 			for (let follows = 0; !page.items.length && page.cursor && follows < MAX_EMPTY_FOLLOWS && !stale(); follows++) {
@@ -51,10 +65,10 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 				items = appendNew(items, page.items);
 			}
 			if (stale()) return;
-			setPages(state => ({ key: requested, items: replace ? items : appendNew(state.items, items), cursor: page.cursor, loading: false, error: null }));
+			setPages(state => ({ key: requested, items: replace ? state.key === requested ? reuseUnchanged(state.items, items) : items : appendNew(state.items, items), cursor: page.cursor, loading: false, error: null }));
 		} catch (cause) {
 			if (stale()) return;
-			setPages(state => ({ ...state, loading: false, error: cause instanceof Error ? cause.message : 'Your library is unavailable. Retry when connected.' }));
+			setPages(state => ({ ...state, loading: false, reloading: false, error: cause instanceof Error ? cause.message : 'Your library is unavailable. Retry when connected.' }));
 		}
 	}, [key, section, query, tag]);
 	// A new revision reloads the pages shown.
@@ -67,5 +81,6 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 	const loadMore = useCallback(() => { if (settled && pages.cursor && !pages.loading) void fetchPage(pages.cursor, false); }, [fetchPage, settled, pages.cursor, pages.loading]);
 	// Until the new search or tag answers, the previous pages stay listed so the caller can
 	// narrow them locally instead of blanking the list.
-	return { items: pages.items, cursor: settled ? pages.cursor : null, loading: pages.loading || !settled, error: settled ? pages.error : null, loadMore };
+	return { items: pages.items, cursor: settled ? pages.cursor : null, loading: pages.loading || !settled, loadingMore: settled && pages.loading && !pages.reloading,
+		error: settled ? pages.error : null, loadMore };
 }

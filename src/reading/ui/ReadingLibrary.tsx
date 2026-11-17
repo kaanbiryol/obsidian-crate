@@ -99,7 +99,7 @@ export function ReadingLibraryPanel({
 		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 1000);
 		return () => window.clearTimeout(timer);
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
-	const { listQuery, items, excerpts, count, loadTags, loading, more, pageLoading, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
+	const { listQuery, items, excerpts, count, loadTags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
@@ -182,7 +182,7 @@ export function ReadingLibraryPanel({
 								</Button>
 							</li>)}</ul>
 						</section>)}
-						{more && pageLoading && <LoadingIndicator label="Loading more" />}
+						{more && loadingMore && <LoadingIndicator label="Loading more" />}
 					</>)}
 				</div>
 				{!renderNavigation && <FloatingActionButton className="crate-reading__mobile-add" aria-label="Save a link" onClick={onAdd} animateOnMount={false} />}

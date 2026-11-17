@@ -42,5 +42,5 @@ export function useReadingLibraryQuery({ snapshot, source, section, query, tag }
 	// empty narrowing waits on the (delayed) spinner rather than flashing the empty state.
 	const loading = source ? pages.loading && count === 0 : snapshot.loading;
 	const more = source ? !!pages.cursor : false;
-	return { listQuery, items, excerpts, count, loadTags, loading, more, pageLoading: !!source && pages.loading, pageError: pages.error, loadMore: pages.loadMore };
+	return { listQuery, items, excerpts, count, loadTags, loading, more, pageLoading: !!source && pages.loading, loadingMore: !!source && pages.loadingMore, pageError: pages.error, loadMore: pages.loadMore };
 }

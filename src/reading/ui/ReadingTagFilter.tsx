@@ -14,7 +14,8 @@ export function ReadingTagFilter({ load, selected, onChange }: ReadingTagFilterP
 	useEffect(() => {
 		let current = true;
 		// A failed read keeps the last tags; the list itself reports connection problems.
-		load().then(value => { if (current) setTags(value); }, () => {});
+		// Unchanged tags keep the shown row.
+		load().then(value => { if (current) setTags(shown => shown.join('\n') === value.join('\n') ? shown : value); }, () => {});
 		return () => { current = false; };
 	}, [load]);
 	const shown = selected && !tags.includes(selected) ? [selected, ...tags] : tags;

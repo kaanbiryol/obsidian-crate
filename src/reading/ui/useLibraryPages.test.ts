@@ -96,3 +96,26 @@ it('drops a page that arrives after a newer load of the same query', async () =>
 	expect(titles(hook.current.items)).toEqual(['Article 1', 'Article 2']);
 	expect(hook.current.cursor).toBe('2');
 });
+
+it('keeps unchanged rows and hides the next-page spinner while a refresh reloads', async () => {
+	let library = [1, 2, 3].map(article);
+	const api = server(() => library);
+	const { hook, refresh } = harness(api.load);
+	await flush(); await api.settle();
+	const shown = hook.current.items;
+	// Returning to the app reloads the shown pages in the background.
+	refresh(); await flush();
+	expect(hook.current).toMatchObject({ loading: true, loadingMore: false });
+	library = library.map(entry => ({ ...entry }));
+	await api.settle();
+	expect(hook.current.items).toBe(shown);
+	// A changed row is replaced; the others keep their objects.
+	library = [{ ...library[0]!, title: 'Renamed' }, ...library.slice(1)];
+	refresh(); await flush(); await api.settle();
+	expect(hook.current.items[0]!.title).toBe('Renamed');
+	expect(hook.current.items[1]).toBe(shown[1]);
+	// Asking for the next page shows its spinner.
+	act(() => hook.current.loadMore()); await flush();
+	expect(hook.current.loadingMore).toBe(true);
+	await api.settle();
+});
