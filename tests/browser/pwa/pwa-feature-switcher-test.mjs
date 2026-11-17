@@ -103,13 +103,14 @@ try {
             fade.pause();
             const opacity = time => { fade.currentTime = time; return Number(getComputedStyle(outgoing).opacity); };
             const incoming = container.querySelector(':scope > .pwa-tab-panel:not([data-leaving])');
-            const result = { early: opacity(60), middle: opacity(120), duration: Number(fade.effect.getTiming().duration),
+            const duration = Number(fade.effect.getTiming().duration);
+            const result = { early: opacity(duration / 4), middle: opacity(duration / 2), duration,
               interactive: !incoming.inert && outgoing.inert, covered: getComputedStyle(incoming).opacity === '1' };
             fade.finish();
             return result;
           }, tab);
-          assert.ok(dissolve.early >= .7 && dissolve.early < 1, `${name} → ${tab}: keep the outgoing screen visible at 60ms: ${JSON.stringify(dissolve)}`);
-          assert.ok(dissolve.middle >= .35 && dissolve.middle <= .65, `${name} → ${tab}: show both screens at 120ms: ${JSON.stringify(dissolve)}`);
+          assert.ok(dissolve.early >= .7 && dissolve.early < 1, `${name} → ${tab}: keep the outgoing screen visible a quarter of the way in: ${JSON.stringify(dissolve)}`);
+          assert.ok(dissolve.middle >= .35 && dissolve.middle <= .65, `${name} → ${tab}: show both screens halfway: ${JSON.stringify(dissolve)}`);
           assert.ok(dissolve.duration <= 320 && dissolve.interactive && dissolve.covered);
           await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
         }

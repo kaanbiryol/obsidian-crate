@@ -154,7 +154,7 @@ async function checkScheduleFade(page, nextView, interruptWith) {
 	}, { nextView, interruptWith, reducedMotion });
 	assert.equal(samples.some(frame => frame.fading), !reducedMotion, 'Fade only when motion is enabled');
 	assert.ok(samples.every(frame => frame.coverage === 1 && frame.inert && frame.oldContent && frame.stationary && frame.chromeStable), 'Keep the background covered and content stationary, departing content inert, and chrome stable');
-	assert.ok(samples.some(frame => JSON.stringify(frame.transition) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.24s', 'ease-in-out'])), 'Reuse the dock tab fade');
+	assert.ok(samples.some(frame => JSON.stringify(frame.transition) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.12s', 'ease-in-out'])), 'Reuse the dock tab fade');
 	await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
 }
 

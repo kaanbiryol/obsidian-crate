@@ -182,7 +182,8 @@ async function checkFeatureFades({ page, name, closed, active, direct }) {
       if (!fade) throw new Error(`No dissolve to ${label}`);
       fade.pause();
       const opacity = time => { fade.currentTime = time; return Number(getComputedStyle(outgoing).opacity); };
-      const result = { crossFeature, early: opacity(60), middle: opacity(120), inert: outgoing.inert };
+      const duration = Number(fade.effect.getTiming().duration);
+      const result = { crossFeature, early: opacity(duration / 4), middle: opacity(duration / 2), inert: outgoing.inert };
       fade.finish();
       return result;
     }, label);
@@ -205,13 +206,13 @@ async function checkFeatureFades({ page, name, closed, active, direct }) {
       const front = document.querySelector('.crate-feature-panel[data-front="true"]');
       const outer = front.getAnimations().find(animation => animation.transitionProperty === 'opacity');
       if (!outer) throw new Error(`Missing Reading return to ${label}`);
-      outer.pause(); outer.currentTime = 120;
+      outer.pause(); outer.currentTime = Number(outer.effect.getTiming().duration) / 2;
       await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
       const panel = document.querySelector('.crate-feature-panel[data-active="true"]');
       const outgoing = panel.querySelector('.pwa-navigation-viewport > .pwa-tab-transition > .pwa-tab-panel:not([data-leaving])');
       select(next); await Promise.resolve();
       const fade = outgoing.getAnimations().find(animation => animation.transitionProperty === 'opacity');
-      if (fade) { fade.pause(); fade.currentTime = 120; }
+      if (fade) { fade.pause(); fade.currentTime = Number(fade.effect.getTiming().duration) / 2; }
       const result = { entering: panel.dataset.entering, retained: outgoing.isConnected,
         opacity: outgoing.isConnected ? Number(getComputedStyle(outgoing).opacity) : 0 };
       fade?.finish(); outer.finish(); return result;
@@ -386,7 +387,7 @@ async function checkLocalFades({ page, dock, closed, active, openViews, direct }
     // scroller before React removes its node (especially with reduced motion).
     if (!interruptWith) assert.ok(samples.filter(frame => frame.outgoing > 0).every(frame => frame.oldTitle && frame.oldScroll),
       'The visible outgoing title and scroll position must remain intact: ' + JSON.stringify({ selector, samples }));
-    assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.24s', 'ease-in-out']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs use the perceptible tab dissolve with reversible opacity transitions');
+    assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.12s', 'ease-in-out']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs use the perceptible tab dissolve with reversible opacity transitions');
     assert.ok(samples.every(frame => frame.x === frame.oldX && frame.y === frame.oldY && frame.transform === 'none' && frame.translate === 'none' && frame.scale === 'none'));
     await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
   };
