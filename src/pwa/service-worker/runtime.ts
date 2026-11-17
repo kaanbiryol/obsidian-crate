@@ -42,6 +42,9 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 		`/notifications/crate-icon-512.png?v=${config.version}`,
 		`/notifications/crate-mark-256.png?v=${config.version}`,
 		`/notifications/apple-touch-icon-180.png?v=${config.version}`,
+		// WebKit holds the load event for the manifest, and iOS keeps its launch
+		// screen until then, so a network-only manifest blanks slow launches.
+		`/notifications/manifest.json?v=${config.version}`,
 		...config.chunkUrls,
 	];
 
@@ -123,7 +126,8 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 			|| url.pathname === '/notifications/crate-icon-192.png'
 			|| url.pathname === '/notifications/crate-icon-512.png'
 			|| url.pathname === '/notifications/crate-mark-256.png'
-			|| url.pathname === '/notifications/apple-touch-icon-180.png') {
+			|| url.pathname === '/notifications/apple-touch-icon-180.png'
+			|| url.pathname === '/notifications/manifest.json') {
 			event.respondWith(caches.match(event.request).then(cached => {
 				if (cached) return cached;
 				return fetch(event.request).then(response => {

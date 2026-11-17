@@ -43,6 +43,9 @@ Once the launch destination is known, the real Reminders shell stays mounted
 while data loads. Its title, settings icon, and dock keep their DOM nodes and
 geometry; only the content loading indicator is replaced. Startup checks assert node
 identity and sample header visibility during delayed fetches in both engines.
+The service worker precaches the versioned web manifest with the shell: WebKit
+holds the load event for it, and iOS keeps its launch screen until then, so a
+network-only manifest left slow launches on a blank screen.
 Home Screen cold launches and the OS-owned launch snapshot still require a
 physical iPhone check.
 

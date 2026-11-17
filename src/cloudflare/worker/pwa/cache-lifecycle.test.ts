@@ -69,7 +69,7 @@ it('prepares the complete shell and leaves a failed install waiting', async () =
 	const harness = runtimeHarness();
 	await harness.dispatch('install');
 	const urls = ['/notifications', ...['app.js', 'crate-icon-192.png', 'crate-icon-512.png',
-		'crate-mark-256.png', 'apple-touch-icon-180.png'].map(name => `/notifications/${name}?v=${PWA_ASSET_VERSION}`)];
+		'crate-mark-256.png', 'apple-touch-icon-180.png', 'manifest.json'].map(name => `/notifications/${name}?v=${PWA_ASSET_VERSION}`)];
 	// Downloads start in order, four at a time, so they may finish in any order.
 	expect(harness.fetch.mock.calls.map(call => call[0])).toEqual(urls);
 	expect(harness.put.mock.calls.map(call => call[0] as string).sort()).toEqual([...urls].sort());
@@ -97,7 +97,7 @@ it('serves the cached shell offline and never saves enrollment query responses',
 });
 
 it.each(['app.js', 'assets/old-editor.js', 'crate-icon-192.png',
-	'crate-icon-512.png', 'crate-mark-256.png', 'apple-touch-icon-180.png'])('uses retained cache entries for %s before requesting the network', async asset => {
+	'crate-icon-512.png', 'crate-mark-256.png', 'apple-touch-icon-180.png', 'manifest.json'])('uses retained cache entries for %s before requesting the network', async asset => {
 	const harness = runtimeHarness();
 	harness.matchAsset.mockResolvedValueOnce(new Response('old version'));
 	const request = new Request(`https://crate.test/notifications/${asset}?v=old`);
