@@ -343,11 +343,12 @@ and a count can only go down: after moving literals onto roles, run
   and a coordinated 320ms exit. On phones (up to 640px) `PwaModalSheet`
   presents a `card` or a `page`. A card (reminders, short Reading dialogs,
   draft recovery) fits its content and floats 8px from the screen edges and the
-  keyboard over a lighter 20% dim; its surface keeps the full-width layout box
+  keyboard, and above the home indicator when the keyboard is closed
+  (`--pwa-sheet-card-gap`, with no safe-area padding inside), over a lighter 20% dim; its surface keeps the full-width layout box
   and keyboard padding while `::before` paints the card. A page (settings, the
   shortcut setup, full-height Reading dialogs) keeps its full height and spans
-  the width. Both share `--pwa-sheet-card-radius` (30px), border and shadow
-  tokens. Sheet swipes shorten that exit to 240–320ms
+  the width without a border. Both share `--pwa-sheet-card-radius` (30px) and
+  shadow tokens; only the card draws the border. Sheet swipes shorten that exit to 240–320ms
   using the drawer's release strength and the shared spring curve. A 240ms floor
   keeps a fast flick's remaining travel visible instead of compressing it into
   the first few frames;

@@ -34,7 +34,7 @@
     background: transparent;
     border: 0;
     border-radius: 0;
-    padding: 0 0 env(safe-area-inset-bottom);
+    padding: 0 0 var(--pwa-sheet-content-safe-bottom, env(safe-area-inset-bottom));
     box-shadow: none;
     animation: none;
 
@@ -200,9 +200,9 @@
 
   // The shared sheet card (host/drawer.scss) floats this sheet on phones.
   @media (max-width: 640px) {
-    // Include the 8px gap below the card in both measured heights.
+    // Include the gap below the card in both measured heights.
     .pwa-modal-sheet--reminder.is-editor-screen .pwa-reminder-sheet-stage {
-      height: min(calc(var(--pwa-editor-content-height, 224px) + env(safe-area-inset-bottom) + 8px), 100%);
+      height: min(calc(var(--pwa-editor-content-height, 224px) + var(--pwa-sheet-card-gap, 8px)), 100%);
     }
 
     .pwa-modal-sheet--reminder.is-editor-screen.is-keyboard-open .pwa-reminder-sheet-stage {

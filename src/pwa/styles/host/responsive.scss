@@ -17,7 +17,7 @@
 @media (max-width: 640px){
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
 	.pwa-modal-sheet__container--reminder{max-height:90dvh!important}
-	.pwa-picker-sheet{padding:0 0 calc(16px + env(safe-area-inset-bottom))}
+	.pwa-picker-sheet{padding:0 0 calc(16px + var(--pwa-sheet-content-safe-bottom, env(safe-area-inset-bottom)))}
 }
 @media (max-width: 420px){
 	.settings-panel{padding-right:12px;padding-left:12px}
