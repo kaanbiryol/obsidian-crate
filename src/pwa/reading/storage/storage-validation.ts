@@ -1,5 +1,5 @@
 import type { PendingReading, ReadingCommand } from '../outbox';
-import { isRecord, isSha256Hex } from '@/platform/validation';
+import { isRecord, isSha256Hex, sameJson } from '@/platform/validation';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { readingHighlights } from '@/reading/core/highlights';
 import { MAX_READING_TITLE_LENGTH, readingTimestamp, readingUrl } from '@/reading/core/model';
@@ -59,15 +59,6 @@ export function isReadingCommand(command: unknown): command is ReadingCommand {
 	if (!isRecord(value.changes)) return false;
 	return Object.keys(value.changes).length > 0 && Object.entries(value.changes).every(([key, field]) =>
 		isChangeField(key, field, false) && isChangeField(key, before[key], true));
-}
-
-function sameJson(left: unknown, right: unknown): boolean {
-	if (left === right) return true;
-	if (Array.isArray(left) && Array.isArray(right)) return left.length === right.length && left.every((value: unknown, index) => sameJson(value, right[index]));
-	if (!isRecord(left) || !isRecord(right)) return false;
-	const leftKeys = Object.keys(left).filter(key => left[key] !== undefined);
-	const rightKeys = Object.keys(right).filter(key => right[key] !== undefined);
-	return leftKeys.length === rightKeys.length && leftKeys.every(key => Object.hasOwn(right, key) && sameJson(left[key], right[key]));
 }
 
 /** Validate in place. Dispatch bytes and unknown metadata are never rewritten. */

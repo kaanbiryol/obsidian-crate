@@ -78,6 +78,7 @@ export class ActivityModal extends BaseUiModal {
 	private updateScheduled = false;
 	private stateChanged = false;
 	private renderedBrowserPaths: string[] | undefined;
+	private renderedAutomaticSync: boolean | undefined;
 	// A file's state change and progress tick arrive together; apply them once.
 	private scheduleUpdate(stateChanged: boolean): void {
 		this.stateChanged ||= stateChanged;
@@ -125,19 +126,21 @@ export class ActivityModal extends BaseUiModal {
 		// A sync started from the file browser keeps it in view, locked, with progress in its footer.
 		if (syncing && this.pendingChecks && this.pendingPanel.querySelector('.crate-pending-browser')) {
 			const work = progress?.work ?? state.work;
-			this.pendingChecks.setSyncProgress({ label: formatShortSyncProgress(progress, state.work), fraction: syncProgressFraction(work) });
+			this.pendingChecks.setSyncProgress({ label: formatShortSyncProgress(progress, work), fraction: syncProgressFraction(work) });
 			return;
 		}
 		const paths = this.deps.getPendingKeys();
 		// Rebuilding the file browser discards its comparisons; keep it while the pending set is unchanged.
 		const showsBrowser = paths.length > 0 && !isActivityBusy(state, progress);
 		const rendered = this.renderedBrowserPaths;
+		// Automatic sync decides whether rows carry checkboxes, so changing it rebuilds the list.
 		if (showsBrowser && rendered?.length === paths.length && rendered.every((key, index) => key === paths[index])
-			&& this.pendingPanel.querySelector('.crate-pending-browser')) {
+			&& this.renderedAutomaticSync === this.settings.automaticSync && this.pendingPanel.querySelector('.crate-pending-browser')) {
 			this.pendingChecks?.setSyncProgress();
 			return;
 		}
 		this.renderedBrowserPaths = showsBrowser ? paths : undefined;
+		this.renderedAutomaticSync = this.settings.automaticSync;
 		this.pendingChecks?.dispose();
 		this.pendingPanel.empty();
 		this.pendingBrowserState.configDir = this.app.vault.configDir;
@@ -147,7 +150,8 @@ export class ActivityModal extends BaseUiModal {
 			actions: {
 				sync: {
 					describe: () => this.getActivityStatus().button,
-					run: held => this.toggleSync(held),
+					// Automatic sync uploads unchecked files soon anyway, so nothing is held back while it is on.
+					run: held => this.toggleSync(this.settings.automaticSync ? [] : held),
 				},
 				automaticSync: this.settings.automaticSync,
 				fileActions: path => getPendingFileActions(this.app, path, () => this.close()),

@@ -24,7 +24,9 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 	useLayoutEffect(() => { latest.current = { highlights, onSave, onAnnotate, onCopyComplete, onSelect, onFeedback, disabled }; }, [highlights, onSave, onAnnotate, onCopyComplete, onSelect, onFeedback, disabled]);
 	const [draft, setDraft] = useState<HighlightEdit | null>(null), [geometry, setGeometry] = useState<HighlightGeometry | null>(null);
 	const [busy, setBusy] = useState(false);
-	const commands = useRef({ copy: () => {}, share: () => {}, annotate: () => {}, remove: () => {} });
+	// A save or delete that failed offers Retry in place of Note until it succeeds or the edit changes.
+	const [failed, setFailed] = useState(false);
+	const commands = useRef({ copy: () => {}, share: () => {}, annotate: () => {}, remove: () => {}, retry: () => {} });
 	const [transferBusy, setTransferBusy] = useState(false);
 	const [layout, setLayout] = useState(0);
 
@@ -52,13 +54,15 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		if (!reader || !text) return;
 		const document = reader.ownerDocument, window = document.defaultView;
 		if (!window) return;
-		let alive = true, transferring = false;
+		let alive = true, transferring = false, failedRemove = false;
 		const edit = (value: HighlightEdit | null) => { editing.current = value; setDraft(value); };
 		const fail = (message: string) => latest.current.onFeedback?.('error', message);
+		const clearFailure = () => { failedRemove = false; setFailed(false); };
+		const persistFailed = (remove: boolean, message: string) => { failedRemove = remove; setFailed(true); fail(message); };
 		const persist = async (value: HighlightEdit, remove = false) => {
 			if (saving.current) return;
-			if (latest.current.disabled) { fail('Waiting for your previous change to sync. Try again shortly.'); return; }
-			saving.current = true; setBusy(true);
+			if (latest.current.disabled) { persistFailed(remove, 'Waiting for your previous change to sync. Try again shortly.'); return; }
+			saving.current = true; setBusy(true); clearFailure();
 			try {
 				if (!highlightRange(text, value.highlight)) throw new Error('Article text changed. Select the passage again.');
 				const next = latest.current.highlights.filter(entry => value.original
@@ -69,7 +73,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 				await latest.current.onSave(readingHighlights(next));
 				if (!alive) return;
 				if (editing.current === value) edit(remove ? null : { original: value.highlight, highlight: value.highlight });
-			} catch (cause) { if (alive && editing.current === value) fail(cause instanceof Error ? cause.message : 'Could not save highlight.'); }
+			} catch (cause) { if (alive && editing.current === value) persistFailed(remove, cause instanceof Error ? cause.message : 'Could not save highlight.'); }
 			finally { saving.current = false; if (alive) setBusy(false); }
 		};
 		const transfer = async (share: boolean) => {
@@ -109,15 +113,16 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 				latest.current.onAnnotate(saved);
 			},
 			remove: () => { if (editing.current) void persist(editing.current, true); },
+			retry: () => { if (editing.current) void persist(editing.current, failedRemove); },
 		};
 		const interaction = registerReadingHighlightInteraction({
 			reader, text, controls,
 			getState: () => ({ editing: editing.current, saving: saving.current, ...latest.current }),
 			edit,
-			select: edit,
+			select: value => { edit(value); clearFailure(); },
 			onSelect: highlight => latest.current.onSelect?.(highlight),
 			persist: value => { void persist(value); },
-			onDismiss: () => edit(null),
+			onDismiss: () => { edit(null); clearFailure(); },
 			relayout: () => setLayout(value => value + 1),
 		});
 		function dismiss() { interaction.dismiss(); }
@@ -146,7 +151,9 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			style={{ ...geometry.menu, transformOrigin: geometry.menu.top < geometry.start.top ? 'center bottom' : 'center top' }}>
 			<Button variant="ghost" aria-label="Copy text" disabled={transferBusy} onClick={() => commands.current.copy()}>Copy</Button>
 			{canShare && <Button variant="ghost" aria-label="Share text" disabled={transferBusy} onClick={() => commands.current.share()}>Share</Button>}
-			<Button variant="ghost" aria-label={note ? 'Edit highlight note' : 'Add highlight note'} disabled={busy || disabled} onClick={() => commands.current.annotate()}>Note</Button>
+			{failed
+				? <Button variant="ghost" aria-label="Retry highlight" disabled={busy || disabled} onClick={() => commands.current.retry()}>Retry</Button>
+				: <Button variant="ghost" aria-label={note ? 'Edit highlight note' : 'Add highlight note'} disabled={busy || disabled} onClick={() => commands.current.annotate()}>Note</Button>}
 			<span className="crate-reading-reader__selection-divider" aria-hidden="true" />
 			<IconButton className="crate-reading-reader__delete-highlight" icon="trash-2" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />
 			{busy && <span className="crate-reading__sr-only" role="status">Saving highlight</span>}

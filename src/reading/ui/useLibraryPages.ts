@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { sameJson } from '@/platform/validation';
 import type { ReadingItem } from '../core/model';
 import type { ReadingSection, ReadingTag } from '../core/reading-presentation';
 
@@ -29,6 +30,8 @@ const MAX_EMPTY_FOLLOWS = 3;
 const MAX_RELOAD_PAGES = 20;
 // A new query whose request takes longer than this shows a loading state instead of the previous list.
 const SLOW_LIBRARY_QUERY_MS = 250;
+// Searches and tag filters kept since the last revision; older ones are read again.
+const MAX_CACHED_QUERIES = 20;
 
 const appendNew = (items: ReadingItem[], more: ReadingItem[]) => [...items, ...more.filter(item => !items.some(other => other.crate_reading_id === item.crate_reading_id))];
 
@@ -38,11 +41,19 @@ function reuseUnchanged(shown: ReadingItem[], next: ReadingItem[]): ReadingItem[
 	let changed = shown.length !== next.length;
 	const items = next.map((item, index) => {
 		const previous = byId.get(item.crate_reading_id);
-		const kept = previous && JSON.stringify(previous) === JSON.stringify(item) ? previous : item;
+		const kept = previous && sameJson(previous, item) ? previous : item;
 		if (kept !== shown[index]) changed = true;
 		return kept;
 	});
 	return changed ? items : shown;
+}
+
+/** Saves an answer as the most recent, dropping the oldest searches and tags past MAX_CACHED_QUERIES. */
+function remember(pages: Map<string, Cached>, key: string, cached: Cached): void {
+	pages.delete(key);
+	pages.set(key, cached);
+	const queries = [...pages].filter(([, entry]) => !entry.browse);
+	for (const [old] of queries.slice(0, Math.max(0, queries.length - MAX_CACHED_QUERIES))) pages.delete(old);
 }
 
 /** The loaded pages for one section, search and tag; a change starts again from the first page.
@@ -99,8 +110,8 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 			const previous = shown.current;
 			const listed = !replace ? appendNew(previous.items, items) : previous.key === requested ? reuseUnchanged(previous.items, items) : items;
 			// Unchanged tags keep the shown row.
-			const kept = previous.section === section && JSON.stringify(previous.tags) === JSON.stringify(sectionTags) ? previous.tags : sectionTags;
-			saved.pages.set(requested, { items: listed, cursor: page.cursor, revision: answering, browse: !query && !tag });
+			const kept = previous.section === section && sameJson(previous.tags, sectionTags) ? previous.tags : sectionTags;
+			remember(saved.pages, requested, { items: listed, cursor: page.cursor, revision: answering, browse: !query && !tag });
 			if (replace && !tagsFailed) saved.tags.set(section, { tags: kept, revision: answering });
 			setPages({ key: requested, section, q: query, tag, items: listed, cursor: page.cursor, tags: kept, loading: false, error: null });
 		} catch (cause) {
@@ -128,7 +139,8 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 	// previous query. A search counts from when its typing delay sends the request.
 	const [slowKey, setSlowKey] = useState<string | null>(null);
 	useEffect(() => {
-		if (settled) return;
+		// A settled query forgets it was slow, so a later return to it waits again.
+		if (settled) { setSlowKey(null); return; }
 		const timer = window.setTimeout(() => setSlowKey(key), (query ? SEARCH_DELAY_MS : 0) + SLOW_LIBRARY_QUERY_MS);
 		return () => window.clearTimeout(timer);
 	}, [settled, key, query]);

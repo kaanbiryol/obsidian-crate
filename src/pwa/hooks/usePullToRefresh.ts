@@ -12,6 +12,15 @@ function findPullScrollTarget(target: EventTarget | null, selector: string): HTM
 	return null;
 }
 
+/** A sideways scroller between the touch and the pull target owns its swipes, which the
+ * pull would otherwise claim on their first, slightly downward move. */
+function insideHorizontalScroller(target: EventTarget | null, boundary: HTMLElement): boolean {
+	for (let node = target instanceof Element ? target : null; node && node !== boundary; node = node.parentElement) {
+		if (node.scrollWidth > node.clientWidth && /auto|scroll/.test(getComputedStyle(node).overflowX)) return true;
+	}
+	return false;
+}
+
 function dampenPullDistance(distance: number): number {
 	return PULL_REFRESH_MAX_DISTANCE * distance / (distance + PULL_REFRESH_MAX_DISTANCE);
 }
@@ -66,6 +75,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			if ((event.target as Element | null)?.closest('.pwa-modal-sheet, [inert]')) return;
 			const nextScrollTarget = findPullScrollTarget(event.target, scrollSelector);
 			if (!nextScrollTarget || scrollPort(nextScrollTarget).scrollTop > 0) return;
+			if (insideHorizontalScroller(event.target, nextScrollTarget)) return;
 
 			const touch = event.touches.item(0);
 			if (!touch) return;

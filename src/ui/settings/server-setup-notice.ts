@@ -19,8 +19,9 @@ export function renderServerSetupNotice({ containerEl, plugin, rerender }: Setti
 		.addButton(button => button.setButtonText('Complete server setup').setCta().onClick(async () => {
 			button.setDisabled(true);
 			try {
-				const { issues, unreachable } = await ensureServerSetup(plugin);
+				const { issues, unreachable, deferred } = await ensureServerSetup(plugin);
 				if (unreachable) new Notice('Could not reach your Crate server. Check your connection and try again.');
+				else if (deferred) new Notice(deferred);
 				else if (!issues.length && !readingSetupError(plugin)) new Notice('Server setup is complete.');
 			} finally { rerender(); }
 		}));

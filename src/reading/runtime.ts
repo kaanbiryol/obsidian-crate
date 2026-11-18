@@ -67,6 +67,10 @@ export function stopReading(plugin: ReadingRuntimeHost): void {
 	if (state) state.runtime = undefined;
 	notifyRuntime(plugin);
 }
+/** The Reading folder check waits while sync writes files; it says nothing about the server. */
+export class ReadingSetupBusyError extends Error {
+	constructor() { super('Sync is updating files. Try again when it finishes.'); this.name = 'ReadingSetupBusyError'; }
+}
 /** Makes sure the connected server knows this vault's Reading folder. Does nothing while Reading is off or no server is connected. */
 export function checkReadingSetup(plugin: ReadingRuntimeHost): Promise<void> {
 	const runtime = states.get(plugin)?.runtime;
@@ -167,7 +171,7 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		return policyCheck;
 	};
 	const checkSetup = () => {
-		if (plugin.syncRuntime.isWritingVault()) return Promise.reject(new Error('Sync is updating files. Try again when it finishes.'));
+		if (plugin.syncRuntime.isWritingVault()) return Promise.reject(new ReadingSetupBusyError());
 		return checkPolicy();
 	};
 	const refreshes = new Set<Promise<void>>();

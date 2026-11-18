@@ -2,6 +2,16 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Whether two JSON values hold the same data; undefined fields count as absent. */
+export function sameJson(left: unknown, right: unknown): boolean {
+	if (left === right) return true;
+	if (Array.isArray(left) && Array.isArray(right)) return left.length === right.length && left.every((value: unknown, index) => sameJson(value, right[index]));
+	if (!isRecord(left) || !isRecord(right)) return false;
+	const leftKeys = Object.keys(left).filter(key => left[key] !== undefined);
+	const rightKeys = Object.keys(right).filter(key => right[key] !== undefined);
+	return leftKeys.length === rightKeys.length && leftKeys.every(key => Object.hasOwn(right, key) && sameJson(left[key], right[key]));
+}
+
 /** Canonical lowercase SHA-256 hex digest. */
 export function isSha256Hex(value: unknown): value is string {
 	return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
