@@ -57,8 +57,7 @@
 		box-sizing: border-box; min-width: 220px; padding: 6px;
 		border: 1px solid var(--crate-divider); border-radius: 14px; background: var(--crate-panel-bg, var(--crate-app-bg));
 		box-shadow: 0 2px 6px rgba(0, 0, 0, .08), 0 12px 32px rgba(0, 0, 0, .24);
-		transform-origin: top right; animation: crate-reading-menu-in 180ms cubic-bezier(.2, .9, .3, 1.15);
-		@media (prefers-reduced-motion: reduce) { animation: none; }
+		transform-origin: top right;
 	}
 	.crate-reading-menu__item {
 		display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 44px; padding: 0 12px;
@@ -167,4 +166,3 @@
   }
 }
 
-@keyframes crate-reading-menu-in { from { opacity: 0; transform: scale(.92); } }

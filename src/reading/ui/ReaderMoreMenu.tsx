@@ -1,7 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type React from 'react';
+import { AnimatePresence, useReducedMotion } from 'motion/react';
 import { Button } from '../../ui/shared/Button';
 import { ThemeIcon } from '../../ui/shared/ThemeIcon';
+import { PWA_DOCK_EXPAND_SPRING, PWA_FADE, PWA_SURFACE_SPRING } from '../../ui/shared/navigation/motion';
+import { PresenceSurface } from './PresenceSurface';
 
 export interface ReaderMenuAction {
 	label: string;
@@ -19,6 +22,7 @@ export function ReaderMoreMenu({ label, actions, disabled = false }: { label: st
 	const [open, setOpen] = useState(false);
 	const root = useRef<HTMLSpanElement>(null), trigger = useRef<HTMLButtonElement>(null);
 	const menuId = useId();
+	const reduceMotion = useReducedMotion();
 	const items = () => [...root.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? []];
 	const close = (refocus: boolean) => { setOpen(false); if (refocus) trigger.current?.focus({ preventScroll: true }); };
 	useEffect(() => {
@@ -50,10 +54,14 @@ export function ReaderMoreMenu({ label, actions, disabled = false }: { label: st
 			aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} disabled={disabled} onClick={() => setOpen(value => !value)}>
 			<ThemeIcon id="more-horizontal" size="m" aria-hidden="true" />
 		</Button>
-		{open && <div id={menuId} role="menu" aria-label={label} className="crate-reading-menu__popup" onKeyDown={onKeyDown}>
+		{/* Grows out of the trigger corner like an iOS menu and shrinks back into it. */}
+		<AnimatePresence>{open && <PresenceSurface key="menu" id={menuId} role="menu" aria-label={label} className="crate-reading-menu__popup" onKeyDown={onKeyDown}
+			initial={{ opacity: 0, scale: reduceMotion ? 1 : .6 }}
+			animate={{ opacity: 1, scale: 1, transition: { opacity: PWA_FADE, scale: PWA_DOCK_EXPAND_SPRING } }}
+			exit={{ opacity: 0, scale: reduceMotion ? 1 : .8, transition: { opacity: PWA_FADE, scale: PWA_SURFACE_SPRING } }}>
 			{regular.map(item)}
 			{regular.length > 0 && danger.length > 0 && <div role="separator" className="crate-reading-menu__separator" />}
 			{danger.map(item)}
-		</div>}
+		</PresenceSurface>}</AnimatePresence>
 	</span>;
 }

@@ -1,10 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
+import { PWA_CONTROL_SPRING, PWA_FADE, PWA_SURFACE_SPRING } from '../../ui/shared/navigation/motion';
 import { readingHighlights, type ReadingHighlight } from '../core/highlights';
 import { highlightRange, highlightTextRects } from './reader-highlights';
 import { readingHighlightGeometry, type HighlightGeometry } from './reading-highlight-geometry';
 import { registerReadingHighlightInteraction, type HighlightEdit } from './reading-highlight-interaction';
+import { PresenceSurface } from './PresenceSurface';
 
 /** Native initial selection; portable handles for editing a saved annotation. */
 export function ReadingHighlightActions({ body, article, content, highlights, onSave, onAnnotate, onCopyComplete, onSelect, onFeedback, disabled }: {
@@ -124,22 +127,31 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 	const note = draft && savedHighlight(highlights, draft.highlight)?.note;
 	// Obsidian desktop has no native share sheet, so offer Copy only.
 	const canShare = typeof article.current?.ownerDocument.defaultView?.navigator.share === 'function';
-	return draft && geometry && <div ref={controls} className="crate-reading-reader__highlight-editor">
+	const reduceMotion = useReducedMotion();
+	// The editor fades as one surface; the toolbar also grows from the edge facing the passage.
+	// Moving between highlights or dragging a handle keeps it mounted, so only show and hide animate.
+	const toolbarMotion = {
+		hidden: { scale: reduceMotion ? 1 : .9, transition: PWA_SURFACE_SPRING },
+		shown: { scale: 1, transition: PWA_CONTROL_SPRING },
+	};
+	return <AnimatePresence>{draft && geometry && <PresenceSurface key="editor" ref={controls} className="crate-reading-reader__highlight-editor"
+		variants={{ hidden: { opacity: 0, transition: PWA_FADE }, shown: { opacity: 1, transition: PWA_FADE } }} initial="hidden" animate="shown" exit="hidden">
 		<div aria-hidden="true">{geometry.boxes.map((box, index) => <span key={index} className="crate-reading-reader__highlight-preview" style={box} />)}</div>
 		{(['start', 'end'] as const).map(edge => {
 			const box = geometry[edge];
 			return <button key={edge} type="button" className="crate-reading-reader__highlight-handle" data-highlight-edge={edge} aria-label={`Adjust highlight ${edge}`} disabled={busy || disabled}
 				style={{ left: box.left + (edge === 'end' ? box.width : 0), top: box.top, '--highlight-line-height': `${box.height}px` } as React.CSSProperties} />;
 		})}
-		<div className="crate-reading-reader__selection" role="group" aria-label="Highlight actions" style={geometry.menu}>
+		<motion.div className="crate-reading-reader__selection" role="group" aria-label="Highlight actions" variants={toolbarMotion}
+			style={{ ...geometry.menu, transformOrigin: geometry.menu.top < geometry.start.top ? 'center bottom' : 'center top' }}>
 			<Button variant="ghost" aria-label="Copy text" disabled={transferBusy} onClick={() => commands.current.copy()}>Copy</Button>
 			{canShare && <Button variant="ghost" aria-label="Share text" disabled={transferBusy} onClick={() => commands.current.share()}>Share</Button>}
 			<Button variant="ghost" aria-label={note ? 'Edit highlight note' : 'Add highlight note'} disabled={busy || disabled} onClick={() => commands.current.annotate()}>Note</Button>
 			<span className="crate-reading-reader__selection-divider" aria-hidden="true" />
 			<IconButton className="crate-reading-reader__delete-highlight" icon="trash-2" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />
 			{busy && <span className="crate-reading__sr-only" role="status">Saving highlight</span>}
-		</div>
-	</div>;
+		</motion.div>
+	</PresenceSurface>}</AnimatePresence>;
 }
 
 function savedHighlight(highlights: ReadingHighlight[], highlight: ReadingHighlight): ReadingHighlight | undefined {

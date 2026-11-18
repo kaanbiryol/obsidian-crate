@@ -39,7 +39,7 @@
 		"src/pwa/styles/host/drawer.scss": 1,
 		"src/pwa/styles/host/reminders-view.scss": 5,
 		"src/pwa/styles/host/theme.scss": 3,
-		"src/reading/ui/styles/_reader.scss": 2,
+		"src/reading/ui/styles/_reader.scss": 1,
 		"src/reminders/ui/shared/styles/_projects.scss": 1,
 		"src/styles/plugin-ui/_modal.scss": 1,
 		"src/ui/activity/styles/_activity.scss": 1,
