@@ -53,7 +53,7 @@ Run **Crate: Show sync activity** and open **Pending** to see every file waiting
 - Uncheck the files you want to hold back. They stay on this device, untouched by changes from other devices, until you sync them. With every file unchecked, the button reads **Get remote changes**.
 - With nothing pending, the button reads **Sync** and gets changes from your other devices. While a sync runs, it reads **Stop sync**.
 
-Holding files back applies to that one sync. **Crate: Sync now**, the **Sync now** button in settings and automatic sync always send everything, so turn off automatic sync first if you want to decide exactly when the rest go.
+Holding files back applies to that one sync. **Crate: Sync now**, the **Sync now** button in settings and automatic sync always send everything. With automatic sync on, the list has no checkboxes and the button reads **Sync now**, so turn off automatic sync first if you want to decide exactly when files go.
 
 <details>
 <summary>Good to know</summary>

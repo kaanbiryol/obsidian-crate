@@ -38,6 +38,17 @@ function setup() {
 	return { row };
 }
 
+function setupSelection(automaticSync: boolean) {
+	const keys = ['Notes/Today.md', 'Notes/Draft.md'];
+	const sidebar = new FakeElement('div'), heading = new FakeElement('div');
+	const actions = { sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: vi.fn() }, discard: vi.fn(), automaticSync };
+	const selection = createPendingActions(sidebar as never, heading as never, keys, new Set([keys[1]!]), actions, { contextTargets: () => [] } as never);
+	const row = new FakeElement('div');
+	selection.addCheckbox(row as never, keys[0]!);
+	const button = sidebar.querySelector('.crate-browser-sync')!;
+	return { selection, heading, row, button, run: actions.sync.run };
+}
+
 describe('pending change actions', () => {
 	beforeEach(() => { obsidian.shown.length = 0; });
 
@@ -57,5 +68,31 @@ describe('pending change actions', () => {
 		obsidian.isMobile = false;
 		const { row } = setup();
 		expect(row.children).toHaveLength(0);
+	});
+
+	it('lets manual sync hold unchecked files', () => {
+		const { selection, heading, row, button, run } = setupSelection(false);
+		expect(selection.checkable).toBe(true);
+		expect(heading.querySelector('.crate-browser-select-all')).not.toBeNull();
+		expect(row.querySelector('.crate-browser-file-check')).not.toBeNull();
+		expect(button.collectText()).toContain('Sync 1 file');
+
+		button.dispatchEvent(new Event('click'));
+
+		expect(run).toHaveBeenCalledWith(['Notes/Draft.md']);
+	});
+
+	it('drops checkboxes under automatic sync, which uploads every pending file', () => {
+		const { selection, heading, row, button, run } = setupSelection(true);
+		expect(selection.checkable).toBe(false);
+		expect(heading.querySelector('.crate-browser-select-all')).toBeNull();
+		expect(heading.collectText()).toContain('Changes sync automatically');
+		expect(row.children).toHaveLength(0);
+		expect(button.collectText()).toContain('Sync now');
+
+		button.dispatchEvent(new Event('click'));
+
+		// A selection left from before automatic sync was on holds nothing back.
+		expect(run).toHaveBeenCalledWith([]);
 	});
 });

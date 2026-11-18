@@ -14,6 +14,9 @@ export interface PendingSyncAction {
 
 export interface PendingActions {
 	sync: PendingSyncAction;
+	/** Automatic sync uploads every pending file soon after it changes, so the list
+	 * offers no checkboxes: an unchecked file would upload on the next sync anyway. */
+	automaticSync?: boolean;
 	discard(keys: string[]): void;
 	fileActions?(path: string): PendingFileAction[];
 }
@@ -38,11 +41,20 @@ export function renderPendingSyncButton(parent: HTMLElement, action: PendingSync
 export function createPendingActions(
 	sidebar: HTMLElement, heading: HTMLElement, keys: string[], excluded: Set<string>, actions: PendingActions, rows: PendingRowSelection,
 ) {
-	const selectAll = heading.createEl('label', { cls: 'crate-browser-select-all', attr: { title: 'Choose files to sync with the button below. Unchecked files stay on this device.' } });
-	const all = selectAll.createEl('input', { attr: { type: 'checkbox', 'aria-label': 'Select all files for sync' } });
-	selectAll.createSpan({ text: 'Select all' });
-	heading.prepend(selectAll);
-	const count = heading.createSpan({ cls: 'crate-browser-selection-count', attr: { role: 'status' } });
+	const checkable = !actions.automaticSync;
+	let all: HTMLInputElement | undefined;
+	let count: HTMLSpanElement | undefined;
+	if (checkable) {
+		const selectAll = heading.createEl('label', { cls: 'crate-browser-select-all', attr: { title: 'Choose files to sync with the button below. Unchecked files stay on this device.' } });
+		all = selectAll.createEl('input', { attr: { type: 'checkbox', 'aria-label': 'Select all files for sync' } });
+		selectAll.createSpan({ text: 'Select all' });
+		heading.prepend(selectAll);
+		count = heading.createSpan({ cls: 'crate-browser-selection-count', attr: { role: 'status' } });
+	} else {
+		const note = heading.createSpan({ cls: 'crate-browser-auto-sync-note' });
+		setIcon(note.createSpan({ cls: 'crate-browser-auto-sync-icon', attr: { 'aria-hidden': 'true' } }), 'refresh-cw');
+		note.createSpan({ text: 'Changes sync automatically' });
+	}
 	const footer = sidebar.createDiv({ cls: 'crate-browser-actions' });
 	const sync = footer.createEl('button', { cls: 'crate-browser-sync', attr: { type: 'button' } });
 	const syncLabel = sync.createSpan({ cls: 'crate-browser-sync-label', text: 'Sync' });
@@ -56,12 +68,16 @@ export function createPendingActions(
 	const update = () => {
 		const selected = checked();
 		const action = actions.sync.describe();
-		all.checked = selected.length === keys.length;
-		all.indeterminate = selected.length > 0 && selected.length < keys.length;
-		all.disabled = locked();
+		if (all && count) {
+			all.checked = selected.length === keys.length;
+			all.indeterminate = selected.length > 0 && selected.length < keys.length;
+			all.disabled = locked();
+			count.textContent = `${selected.length} of ${keys.length} files selected`;
+		}
 		for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = locked(); }
-		count.textContent = `${selected.length} of ${keys.length} files selected`;
-		const { label, title } = action.idle ? describeSyncSelection(selected.length, keys.length) : { label: action.label, title: action.label };
+		const { label, title } = !action.idle ? { label: action.label, title: action.label }
+			: checkable ? describeSyncSelection(selected.length, keys.length)
+				: { label: 'Sync now', title: 'Upload these files and get changes from your other devices.' };
 		// Only Stop sync carries the detail; Stopping… stands alone.
 		const detail = action.idle || action.disabled ? '' : progress?.label ?? '';
 		syncLabel.textContent = label;
@@ -72,12 +88,12 @@ export function createPendingActions(
 		sync.toggleClass('is-syncing', !!progress);
 		sync.setCssProps({ '--crate-sync-progress': progress?.fraction === undefined ? '0' : String(progress.fraction) });
 	};
-	all.addEventListener('change', () => {
+	all?.addEventListener('change', () => {
 		for (const key of keys) { if (all.checked) excluded.delete(key); else excluded.add(key); }
 		update();
 	});
 	sync.addEventListener('click', () => {
-		if (!sync.disabled) actions.sync.run(keys.filter(key => excluded.has(key)));
+		if (!sync.disabled) actions.sync.run(checkable ? keys.filter(key => excluded.has(key)) : []);
 	});
 	const contextMenu = (key: string) => {
 		const targets = rows.contextTargets(key);
@@ -95,11 +111,14 @@ export function createPendingActions(
 	};
 	update();
 	return {
+		/** Whether rows carry checkboxes that Space toggles. */
+		checkable,
 		setProgress: (next?: { label: string; fraction?: number }) => { progress = next; update(); },
 		update,
 		toggleChecked: (key: string) => { checkboxes.get(key)?.click(); },
 		removeRow: (key: string) => { checkboxes.delete(key); },
 		addCheckbox: (row: HTMLElement, key: string) => {
+			if (!checkable) return;
 			const { path } = decodePendingChange(key);
 			const label = row.createEl('label', { cls: 'crate-browser-file-check' });
 			const input = label.createEl('input', { attr: { type: 'checkbox', 'aria-label': `Sync ${path}` } });

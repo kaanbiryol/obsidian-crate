@@ -25,6 +25,7 @@ const { outputFiles } = await build({
                 ],
                 // The modal's sync action receives the unchecked keys, which the sync holds back.
                 sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: held => { window.heldKeys = held; } },
+                get automaticSync() { return window.automaticSync; },
                 discard: keys => {
                     window.discardKeys = keys;
                     new PendingDiscardModal({}, async () => {
@@ -38,6 +39,7 @@ const { outputFiles } = await build({
             window.fail = false;
             window.delayed = false;
             const state = {};
+            window.closeDetail = () => { state.showDetail = false; };
             window.paths = ['.obsidian/appearance.json', '.obsidian/core-plugins.json', '.obsidian/types.json', '.obsidian/community-plugins.json', '.obsidian/plugins/omnisearch/data.json', pendingChangeKey('delete', 'Notes/Archive.md')];
             const before = JSON.stringify({
                 theme: 'system', accentColor: '#7c3aed', baseFontSize: 16,
@@ -511,6 +513,16 @@ for (const browserType of [chromium, webkit]) {
                 await rows.first().click();
                 await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 assert.equal(await page.evaluate(() => window.calls), 2, 'Selecting a binary file loads its details on demand');
+                // Automatic sync uploads every pending file, so the list offers no checkboxes to hold one back.
+                await page.evaluate(() => { window.automaticSync = true; window.heldKeys = ['stale']; window.closeDetail(); window.mount(); });
+                await expect(page.locator('.crate-pending-browser input[type="checkbox"]')).toHaveCount(0);
+                await expect(page.locator('.crate-browser-list-heading')).toHaveText('Changes sync automatically');
+                await expect(rows.first()).not.toHaveAttribute('aria-keyshortcuts', 'Space');
+                await expect(page.locator('.crate-browser-sync')).toHaveText('Sync now');
+                await page.locator('.crate-browser-sync').click();
+                assert.deepEqual(await page.evaluate(() => window.heldKeys), []);
+                if (browserType === chromium) await page.screenshot({ path: `.generated/activity-diff/${theme}-${width}-automatic.png` });
+                await page.evaluate(() => { window.automaticSync = false; window.mount(); });
                 // Short phases, growing counters, and long setup messages keep
                 // the same label bounds and spinner position, including on mobile.
                 let progressBounds;

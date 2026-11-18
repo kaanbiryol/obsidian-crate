@@ -149,6 +149,7 @@ export class ActivityModal extends BaseUiModal {
 					describe: () => this.getActivityStatus().button,
 					run: held => this.toggleSync(held),
 				},
+				automaticSync: this.settings.automaticSync,
 				fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
 				discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard(keys.filter(key => this.deps.hasPendingKey(key))), () => this.refresh()).open(),
 			},

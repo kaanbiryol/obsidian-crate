@@ -62,7 +62,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	const heading = sidebar.createDiv({ cls: 'crate-browser-list-heading' });
 	if (!actions) heading.createSpan({ text: 'Files' });
 	const list = sidebar.createEl('nav', { cls: 'crate-browser-files', attr: { 'aria-label': 'Pending files' } });
-	const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions ? 'Checkboxes choose which files the button below the list uploads. It also gets changes from your other devices. Unchecked files stay on this device until you sync them. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Review changes since the last sync.' });
+	const listHint = sidebar.createDiv({ cls: 'crate-browser-list-hint', text: actions?.automaticSync ? 'These files upload on the next automatic sync. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : actions ? 'Checkboxes choose which files the button below the list uploads. It also gets changes from your other devices. Unchecked files stay on this device until you sync them. Space toggles the focused checkbox. Command or Control+A highlights all files. Shift-click selects a range; Command or Control-click selects individual files. Right-click or press Shift+F10 for actions on highlighted files.' : 'Review changes since the last sync.' });
 	listHint.id = `crate-pending-hint-${++nextBrowserId}`;
 	list.setAttribute('aria-describedby', listHint.id);
 
@@ -147,7 +147,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 			'aria-pressed': 'false', 'aria-controls': detail.id,
 		} });
 		button.tabIndex = index === focusIndex ? 0 : -1;
-		if (selection) button.setAttribute('aria-keyshortcuts', 'Space');
+		if (selection?.checkable) button.setAttribute('aria-keyshortcuts', 'Space');
 		if (!actions) setIcon(button.createSpan({ cls: 'crate-browser-file-icon', attr: { 'aria-hidden': 'true' } }), deleted ? 'trash-2' : updateVersion ? 'package' : 'file-text');
 		const info = button.createSpan({ cls: 'crate-browser-file-info' });
 		info.createSpan({ cls: 'crate-browser-file-name', text: updateVersion ? crateUpdateTitle(updateVersion) : parts.pop() ?? path, attr: { title: path } });
@@ -174,7 +174,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 			});
 		});
 		button.addEventListener('keyup', event => {
-			if (selection && event.key === ' ') event.preventDefault();
+			if (selection?.checkable && event.key === ' ') event.preventDefault();
 		});
 		const entry = { element: actions ? row : button, button, status };
 		rows.set(index, entry);
@@ -235,7 +235,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		const index = button ? rowIndexes.get(button) : target === list ? focusIndex : undefined;
 		if (index === undefined) return;
 		const key = paths[index]!;
-		if (selection && button && event.key === ' ') {
+		if (selection?.checkable && button && event.key === ' ') {
 			event.preventDefault();
 			if (!event.repeat) selection.toggleChecked(key);
 			return;

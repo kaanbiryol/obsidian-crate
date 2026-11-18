@@ -277,3 +277,5 @@ body.is-mobile .crate-pending-browser .crate-browser-actions button {
 
 .crate-browser-list-heading { flex-wrap: wrap; gap: 8px; }
 .crate-browser-selection-count { white-space: nowrap; }
+.crate-browser-auto-sync-note { display: flex; align-items: center; gap: 8px; padding-left: 12px; }
+.crate-browser-auto-sync-icon { display: flex; svg { width: 14px; height: 14px; } }

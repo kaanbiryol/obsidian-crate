@@ -394,7 +394,9 @@ Readers never wait for sync.
 Implementation: `queue/controller.ts` and `queue/flush.ts`
 
 Sync Activity's sync button runs the standard sync with the unchecked pending
-files held back (`SyncEngine.sync` with `held` keys). The planners skip held
+files held back (`SyncEngine.sync` with `held` keys). With automatic sync on the
+list has no checkboxes and holds nothing back, since the next automatic sync
+would upload the files anyway. The planners skip held
 paths in both directions, as they skip ignored paths: no upload, delete,
 download, merge or conflict copy, and their baselines and pending changes stay.
 Only the planners see them; the queue and other ignore checks do not. The
