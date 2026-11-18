@@ -16,7 +16,7 @@ import {
 	createPwaHtml,
 	createPwaVersionJson,
 } from './index';
-import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
+import { PWA_ASSET_VERSION, PWA_ASSET_VERSION_HEADER } from '../../../pwa/shell/version';
 
 function htmlSecurityHeaders(nonce?: string): Record<string, string> {
 	return {
@@ -58,6 +58,7 @@ function versionedAssetHeaders(request: Request): Record<string, string> {
 		'Cache-Control': version === PWA_ASSET_VERSION || isContentHashedChunk
 			? 'public, max-age=31536000, immutable'
 			: 'no-store',
+		[PWA_ASSET_VERSION_HEADER]: PWA_ASSET_VERSION,
 		'Referrer-Policy': 'no-referrer',
 		'X-Content-Type-Options': 'nosniff',
 	};
@@ -68,6 +69,7 @@ export function handleNotificationsPage(request: Request): Response {
 	return new Response(createPwaHtml(request.url, nonce), {
 		headers: {
 			'Content-Type': 'text/html; charset=utf-8',
+			[PWA_ASSET_VERSION_HEADER]: PWA_ASSET_VERSION,
 			...htmlSecurityHeaders(nonce),
 			...corsHeaders(),
 		},
@@ -110,6 +112,7 @@ export function handleManifest(request: Request): Response {
 	return new Response(createManifestJson(request.url), {
 		headers: {
 			'Content-Type': 'application/manifest+json',
+			[PWA_ASSET_VERSION_HEADER]: PWA_ASSET_VERSION,
 			...staticAssetHeaders(),
 			...corsHeaders(),
 		},

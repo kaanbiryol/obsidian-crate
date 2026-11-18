@@ -3,7 +3,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker, { ReminderAlarm } from './index';
-import { PWA_ASSET_VERSION } from '../../pwa/shell/version';
+import { PWA_ASSET_VERSION, PWA_ASSET_VERSION_HEADER } from '../../pwa/shell/version';
 import { CRATE_SERVER_INFO } from './server/server-info';
 import type { Env } from './types';
 
@@ -363,6 +363,17 @@ describe('worker entrypoint', () => {
 		expect(versionedCrateIconResponse.headers.get('Content-Type')).toBe('image/png');
 		expect(versionedTouchIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedTouchIconResponse.headers.get('Content-Type')).toBe('image/png');
+	});
+
+	it('names the build that served every precached PWA asset, whatever version was requested', async () => {
+		// A service worker install verifies this, since a server still on the previous
+		// version answers any `?v=` while a deploy propagates.
+		const paths = ['/notifications', '/notifications/app.js?v=older', '/notifications/manifest.json?v=older',
+			'/notifications/crate-icon-192.png?v=older', '/notifications/icon.svg?v=older'];
+		for (const path of paths) {
+			const response = await worker.fetch(new Request(`https://worker.test${path}`), createEnv());
+			expect(response.headers.get(PWA_ASSET_VERSION_HEADER), path).toBe(PWA_ASSET_VERSION);
+		}
 	});
 
 	it('rejects blank bearer tokens', async () => {

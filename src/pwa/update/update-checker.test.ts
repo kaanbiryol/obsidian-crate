@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { startUpdateChecks } from './update-checker';
+import { rememberReplacedPwaVersion, startUpdateChecks, wasPwaVersionJustReplaced } from './update-checker';
 
 const AN_HOUR = 60 * 60_000;
 
@@ -78,5 +78,32 @@ describe('app-wide update checks', () => {
 		documentEvents.dispatchEvent(new Event('visibilitychange'));
 		await vi.advanceTimersByTimeAsync(0);
 		expect(check).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('versions an update just replaced', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		const items = new Map<string, string>();
+		vi.stubGlobal('localStorage', { getItem: (key: string) => items.get(key) ?? null, setItem: (key: string, value: string) => items.set(key, value) });
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.useRealTimers();
+	});
+
+	it('ignores the replaced version only while a deploy can still be propagating', () => {
+		rememberReplacedPwaVersion('old');
+		expect(wasPwaVersionJustReplaced('old')).toBe(true);
+		expect(wasPwaVersionJustReplaced('newer')).toBe(false);
+		vi.advanceTimersByTime(10 * 60_000);
+		// A later rollback to the same build is offered again.
+		expect(wasPwaVersionJustReplaced('old')).toBe(false);
+	});
+
+	it('offers every version when storage is unavailable', () => {
+		vi.stubGlobal('localStorage', undefined);
+		rememberReplacedPwaVersion('old');
+		expect(wasPwaVersionJustReplaced('old')).toBe(false);
 	});
 });

@@ -1,6 +1,7 @@
 import { hasUnsettledReminders } from '../reminders/outbox/reminder-outbox-storage';
 import { hasUnsettledReading } from '../reading/update-guard';
-import { fetchPwaAssetVersion } from './update-checker';
+import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
+import { fetchPwaAssetVersion, rememberReplacedPwaVersion } from './update-checker';
 
 function waitForWorker(worker: ServiceWorker, activate: boolean): Promise<void> {
 	return new Promise((resolve, reject) => {
@@ -70,6 +71,7 @@ export async function applyPwaUpdate(beforeReload?: () => Promise<void>, options
 	// Reading storage can yield while a new command starts preparing its identity.
 	if (options.canApply && !options.canApply()) return false;
 	if (options.beforeNavigation && !options.beforeNavigation()) return false;
+	rememberReplacedPwaVersion(PWA_ASSET_VERSION);
 	window.location.reload();
 	return true;
 }

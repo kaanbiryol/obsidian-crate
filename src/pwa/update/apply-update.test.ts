@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hasUnsettledReminders } from '../reminders/outbox/reminder-outbox-storage';
 import { hasUnsettledReading } from '../reading/update-guard';
 import { applyPwaUpdate, preparePwaUpdate, waitForWorkerActivation } from './apply-update';
-import { fetchPwaAssetVersion } from './update-checker';
+import { fetchPwaAssetVersion, rememberReplacedPwaVersion } from './update-checker';
+import { PWA_ASSET_VERSION } from '@/pwa/shell/version';
 
 vi.mock('../reading/update-guard', () => ({ hasUnsettledReading: vi.fn(async () => false) }));
 vi.mock('../reminders/outbox/reminder-outbox-storage', () => ({ hasUnsettledReminders: vi.fn(() => false) }));
-vi.mock('./update-checker', async importOriginal => ({ ...await importOriginal<object>(), fetchPwaAssetVersion: vi.fn() }));
+vi.mock('./update-checker', async importOriginal => ({ ...await importOriginal<object>(), fetchPwaAssetVersion: vi.fn(), rememberReplacedPwaVersion: vi.fn() }));
 
 class UpdateWorker extends EventTarget {
 	state: ServiceWorkerState = 'installing';
@@ -66,9 +67,12 @@ describe('reliable PWA updates', () => {
 		await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith({ type: 'CRATE_ACTIVATE_UPDATE' }));
 		expect(onStage.mock.calls).toEqual([['downloading'], ['activating']]);
 		expect(reload).not.toHaveBeenCalled();
+		expect(rememberReplacedPwaVersion).not.toHaveBeenCalled();
 		worker.transition('activated');
 		await update;
 		expect(reload).toHaveBeenCalledOnce();
+		// A server still answering with this version during the deploy is not offered again.
+		expect(rememberReplacedPwaVersion).toHaveBeenCalledWith(PWA_ASSET_VERSION);
 	});
 
 	it('downloads without activating while an editor is open', async () => {

@@ -1,7 +1,11 @@
 import { Script } from 'node:vm';
 import { expect, it, vi } from 'vitest';
 import { SERVICE_WORKER_JS } from './index';
-import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
+import { PWA_ASSET_VERSION, PWA_ASSET_VERSION_HEADER } from '../../../pwa/shell/version';
+
+const served = (body: string, version = PWA_ASSET_VERSION, init: ResponseInit = {}) =>
+	new Response(body, { ...init, headers: { [PWA_ASSET_VERSION_HEADER]: version } });
+const networkResponse = () => served('network');
 
 it('waits for explicit activation and retains assets for every live client version', async () => {
 	const handlers = new Map<string, (event: Record<string, unknown>) => void>();
@@ -15,7 +19,7 @@ it('waits for explicit activation and retains assets for every live client versi
 		self: { addEventListener: (type: string, handler: (event: Record<string, unknown>) => void) => handlers.set(type, handler), skipWaiting,
 			location: { href: `https://crate.test/notifications/sw.js?v=${PWA_ASSET_VERSION}` },
 			clients: { matchAll: async () => live, claim: async () => {} } },
-		fetch: async () => ({ ok: true }),
+		fetch: async () => networkResponse(),
 		caches: { keys: async () => [...shells], delete: async (name: string) => shells.delete(name), open: async () => ({ put }) },
 	});
 	const event = async (type: string, args = {}) => {
@@ -40,7 +44,7 @@ function runtimeHarness() {
 	const put = vi.fn(async (_request: RequestInfo | URL, _response: Response) => {});
 	const matchShell = vi.fn().mockResolvedValue(undefined);
 	const matchAsset = vi.fn().mockResolvedValue(undefined);
-	const fetch = vi.fn(async (_request: RequestInfo | URL, _options?: RequestInit) => new Response('network'));
+	const fetch = vi.fn(async (_request: RequestInfo | URL, _options?: RequestInit) => networkResponse());
 	const open = vi.fn(async () => ({ put, match: matchShell }));
 	const showNotification = vi.fn().mockResolvedValue(undefined);
 	const matchClients = vi.fn().mockResolvedValue([]);
@@ -76,11 +80,19 @@ it('prepares the complete shell and leaves a failed install waiting', async () =
 	expect(harness.open).toHaveBeenCalledWith(`crate-reminders-shell-${PWA_ASSET_VERSION}`);
 	expect(harness.skipWaiting).not.toHaveBeenCalled();
 	harness.fetch.mockClear(); harness.put.mockClear();
-	harness.fetch.mockResolvedValueOnce(new Response('shell')).mockResolvedValueOnce(new Response('', { status: 503 }));
+	harness.fetch.mockResolvedValueOnce(served('shell')).mockResolvedValueOnce(served('', PWA_ASSET_VERSION, { status: 503 }));
 	await expect(harness.dispatch('install')).rejects.toThrow('Offline asset unavailable');
 	// A failure stops new downloads; only the four already in flight ran.
 	expect(harness.fetch).toHaveBeenCalledTimes(4);
 	expect(harness.put.mock.calls.map(call => call[0])).not.toContain(urls[1]);
+	expect(harness.skipWaiting).not.toHaveBeenCalled();
+});
+
+it('rejects a shell served by the previous version while a deploy propagates', async () => {
+	const harness = runtimeHarness();
+	harness.fetch.mockResolvedValueOnce(served('shell', 'previous'));
+	await expect(harness.dispatch('install')).rejects.toThrow('Offline asset is from another app version: /notifications');
+	expect(harness.put.mock.calls.map(call => call[0])).not.toContain('/notifications');
 	expect(harness.skipWaiting).not.toHaveBeenCalled();
 });
 

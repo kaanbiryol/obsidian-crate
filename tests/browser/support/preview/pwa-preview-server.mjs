@@ -41,8 +41,11 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 		createPwaHtml,
 		createPwaVersionJson,
 	} = assets;
+	const assetVersion = JSON.parse(createPwaVersionJson()).assetVersion;
 
 	const handleRequest = async (req, res) => {
+		// Like the Worker's PWA_ASSET_VERSION_HEADER, so service worker installs verify the build.
+		res.setHeader('X-Crate-Asset-Version', assetVersion);
 		const url = new URL(req.url || '/', origin ?? listeningOrigin(server));
 		const path = url.pathname;
 		const method = req.method || 'GET';

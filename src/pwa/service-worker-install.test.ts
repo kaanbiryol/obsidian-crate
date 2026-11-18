@@ -11,14 +11,14 @@ const runtime = await build({
 const chunks = Array.from({ length: 74 }, (_, index) => `/notifications/assets/chunk-${index.toString(36).padStart(8, 'A')}.js`);
 
 /** Runs one install against in-memory caches holding `previous` from an earlier version. */
-async function install(chunkUrls: string[], previous: string[], failing?: string, scriptVersion = 'v2') {
+async function install(chunkUrls: string[], previous: string[], failing?: string, scriptVersion = 'v2', servedVersion = (_url: string) => 'v2') {
 	const stores = new Map<string, Map<string, Response>>([['crate-reminders-shell-v1', new Map(previous.map(url => [url, new Response(url)]))]]);
 	let inFlight = 0, peak = 0;
 	const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
 		inFlight += 1; peak = Math.max(peak, inFlight);
 		await new Promise(resolve => setTimeout(resolve, 1));
 		inFlight -= 1;
-		return new Response(url, { status: url === failing ? 503 : 200 });
+		return new Response(url, { status: url === failing ? 503 : 200, headers: { 'X-Crate-Asset-Version': servedVersion(url) } });
 	});
 	const caches = {
 		open: async (name: string) => {
@@ -69,4 +69,18 @@ it('refuses to install a version its registration did not request', async () => 
 	expect(result).toBe('This app version was not requested by the update flow.');
 	expect(fetched).toEqual([]);
 	expect(cached).toBeUndefined();
+});
+
+it('refuses assets that a server still on the previous version answered', async () => {
+	// While a deploy propagates, caching them reopens the old app after the update.
+	for (const stale of ['/notifications', '/notifications/app.js?v=v2', '/notifications/manifest.json?v=v2']) {
+		const { result, cached } = await install(chunks.slice(0, 2), [], undefined, 'v2', url => url === stale ? 'v1' : 'v2');
+		expect(result).toBe(`Offline asset is from another app version: ${stale}`);
+		expect(cached.has(stale)).toBe(false);
+	}
+});
+
+it('accepts a content-hashed chunk from either version', async () => {
+	const { result } = await install(chunks.slice(0, 2), [], undefined, 'v2', url => url === chunks[0] ? 'v1' : 'v2');
+	expect(result).toBe('installed');
 });

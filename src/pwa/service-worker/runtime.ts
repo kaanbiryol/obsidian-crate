@@ -1,5 +1,6 @@
 import { receiveReadingShare } from '../shell/share-target';
 import { decryptPushDisplay } from '../encryption/encrypted-push';
+import { PWA_ASSET_VERSION_HEADER } from '../shell/version';
 import type { ServiceWorkerConfig } from './config';
 
 interface NotificationData {
@@ -69,6 +70,13 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 					if (!response.ok) {
 						queue.length = 0;
 						throw new Error('Offline asset unavailable: ' + url);
+					}
+					// While a deploy propagates, a server still on the previous version
+					// can answer any `?v=`; caching it would reopen that version after the
+					// update. A content-hashed chunk is the same file from either version.
+					if (!HASHED_CHUNK.test(url) && response.headers.get(PWA_ASSET_VERSION_HEADER) !== config.version) {
+						queue.length = 0;
+						throw new Error('Offline asset is from another app version: ' + url);
 					}
 					await cache.put(url, response);
 				}

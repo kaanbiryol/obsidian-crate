@@ -7,7 +7,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { PwaToast } from '../components/PwaToast';
 import { useSettingsOpen, useSettingsSelector, useSettingsStore } from '../settings/settings-context';
 import { shallowEqual } from '../settings/settings-store';
-import { startUpdateChecks, fetchPwaAssetVersion } from './update-checker';
+import { startUpdateChecks, fetchPwaAssetVersion, wasPwaVersionJustReplaced } from './update-checker';
 import type { CrateSection } from '../navigation/feature-navigation';
 import type { ToastState } from '../types';
 
@@ -44,7 +44,7 @@ export function PwaUpdateProvider({ activeSection, children }: { activeSection: 
 		const stop = startUpdateChecks(async () => {
 			try {
 				const next = await fetchPwaAssetVersion();
-				if (active && next) setVersion(next === PWA_ASSET_VERSION ? null : next);
+				if (active && next) setVersion(next === PWA_ASSET_VERSION || wasPwaVersionJustReplaced(next) ? null : next);
 			} finally { if (active) setCheckComplete(true); }
 		});
 		return () => { active = false; stop(); };

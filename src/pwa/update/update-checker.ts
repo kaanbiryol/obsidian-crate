@@ -29,3 +29,20 @@ export async function fetchPwaAssetVersion(): Promise<string | null> {
 	const result = await response.json() as { assetVersion?: string };
 	return typeof result.assetVersion === 'string' && result.assetVersion.trim() ? result.assetVersion : null;
 }
+
+const REPLACED_VERSION_KEY = 'crate-pwa-replaced-version';
+// While a deploy propagates, the server can still answer with the version an
+// update just replaced. Offering it again would downgrade, and its install fails.
+const REPLACED_VERSION_GRACE_MS = 10 * 60_000;
+
+export function rememberReplacedPwaVersion(version: string): void {
+	try { localStorage.setItem(REPLACED_VERSION_KEY, JSON.stringify({ version, at: Date.now() })); }
+	catch { /* Without storage a propagating deploy can only offer the old version briefly. */ }
+}
+
+export function wasPwaVersionJustReplaced(version: string): boolean {
+	try {
+		const stored = JSON.parse(localStorage.getItem(REPLACED_VERSION_KEY) ?? 'null') as { version?: unknown; at?: unknown } | null;
+		return stored?.version === version && typeof stored.at === 'number' && Date.now() - stored.at < REPLACED_VERSION_GRACE_MS;
+	} catch { return false; }
+}
