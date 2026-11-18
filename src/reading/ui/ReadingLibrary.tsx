@@ -67,6 +67,8 @@ export function ReadingLibraryPanel({
 	notice, beforeListContent, listContent,
 }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
+	// Whether the last section switch was made on a screen already showing, so it can stay until the next answers.
+	const [holdSwitch, setHoldSwitch] = useState(false);
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [visible, setVisible] = useState(PAGE_SIZE);
 	const [busy, setBusy] = useState<ReadonlySet<string>>(new Set()), [error, setError] = useState<string | null>(null);
@@ -75,22 +77,27 @@ export function ReadingLibraryPanel({
 	// A history swipe reveals the PWA tab bar immediately. Keep its indicator
 	// parked at the selected tab while the reader covers an unfinished spring.
 	const animateTabIndicator = readerMotion === undefined || !reader;
+	const { section: shownSection, listQuery, shownTag, items, excerpts, count, tags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag, holdPrevious: holdSwitch });
+	// A server library keeps the previous section's screen until the tapped one answers. Rows
+	// restart from the first page whenever a different section's screen shows.
+	const [visibleSection, setVisibleSection] = useState(shownSection);
+	if (visibleSection !== shownSection) { setVisibleSection(shownSection); setVisible(PAGE_SIZE); }
 	const pending = useRef(new Set<string>()), lists = useRef(new Map<ReadingSection, HTMLDivElement>());
 	const setListRef = useCallback((node: HTMLDivElement | null) => {
-		if (node) lists.current.set(section, node);
+		if (node) lists.current.set(shownSection, node);
 		// Retained views can re-enter before unmounting. Keep refs per section so
 		// finishing a previous exit cannot clear the currently visible scroll owner.
-		return () => { if (lists.current.get(section) === node) lists.current.delete(section); };
-	}, [section]);
+		return () => { if (lists.current.get(shownSection) === node) lists.current.delete(shownSection); };
+	}, [shownSection]);
 	const previousArticle = useRef(activeId);
 	useEffect(() => {
 		if (!activeId && previousArticle.current && !readerClosing) {
-			const list = lists.current.get(section);
+			const list = lists.current.get(shownSection);
 			const button = list?.querySelector<HTMLButtonElement>(`[data-reading-id="${previousArticle.current}"]`);
 			(button ?? list)?.focus({ preventScroll: true });
 		}
 		if (!readerClosing) previousArticle.current = activeId;
-	}, [activeId, readerClosing, section]);
+	}, [activeId, readerClosing, shownSection]);
 	useEffect(() => {
 		if (reader) {
 			if (readerMotion !== undefined) setExitingReader(reader);
@@ -101,11 +108,10 @@ export function ReadingLibraryPanel({
 		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 1000);
 		return () => window.clearTimeout(timer);
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
-	const { listQuery, shownTag, items, excerpts, count, tags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag });
 	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
 	// A section that had to load fades its count, tags and list in instead of popping in.
 	useContentReveal(loading, () => {
-		const list = lists.current.get(section), library = list?.parentElement;
+		const list = lists.current.get(shownSection), library = list?.parentElement;
 		if (!list || !library) return undefined;
 		return [list, ...library.querySelectorAll<HTMLElement>(':scope > .crate-reading__header .view-header-meta, :scope > .crate-reading-tag-filter')];
 	});
@@ -116,10 +122,10 @@ export function ReadingLibraryPanel({
 	const shownFilter = useRef<{ section: ReadingSection; tag: string | null } | null>(null);
 	const departingList = useRef<{ tag: string | null; node: HTMLElement } | null>(null);
 	useLayoutEffect(() => {
-		const previous = shownFilter.current, departing = departingList.current, list = lists.current.get(section);
-		shownFilter.current = loading ? null : { section, tag: shownTag };
+		const previous = shownFilter.current, departing = departingList.current, list = lists.current.get(shownSection);
+		shownFilter.current = loading ? null : { section: shownSection, tag: shownTag };
 		departingList.current = null;
-		if (!previous || loading || previous.section !== section || departing?.tag !== shownTag || !list) return;
+		if (!previous || loading || previous.section !== shownSection || departing?.tag !== shownTag || !list) return;
 		const owner = list.ownerDocument.defaultView ?? window, style = owner.getComputedStyle(list);
 		const duration = parseFloat(style.getPropertyValue('--pwa-motion-tab-duration'));
 		if (!duration) return;
@@ -132,7 +138,7 @@ export function ReadingLibraryPanel({
 		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-tab-ease').trim() || 'ease-in-out' });
 		animation.onfinish = () => node.remove();
 		return () => { animation.cancel(); node.remove(); };
-	}, [loading, section, shownTag]);
+	}, [loading, shownSection, shownTag]);
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
 	useEffect(() => {
@@ -141,14 +147,14 @@ export function ReadingLibraryPanel({
 	// Near the end, reveal the next rows already loaded, or ask the server for its next page.
 	// Runs after each render too, so a list shorter than its scroller keeps filling.
 	const loadNearEnd = useCallback(() => {
-		const list = lists.current.get(section);
+		const list = lists.current.get(shownSection);
 		// A hidden list has no height and would look scrolled to its end.
 		if (!list || !list.clientHeight || listContent || loading || pageLoading || pageError) return;
 		if (visible >= count && !more) return;
 		if (list.scrollHeight - list.scrollTop - list.clientHeight > NEAR_END_PX) return;
 		if (visible >= count) loadMore();
 		setVisible(value => value + PAGE_SIZE);
-	}, [section, listContent, loading, pageLoading, pageError, visible, count, more, loadMore]);
+	}, [shownSection, listContent, loading, pageLoading, pageError, visible, count, more, loadMore]);
 	useEffect(() => { loadNearEnd(); }, [loadNearEnd]);
 	const run = (key: string, action: () => Promise<void>) => {
 		if (pending.current.has(key)) return;
@@ -156,21 +162,24 @@ export function ReadingLibraryPanel({
 		void action().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not update reading.'))
 			.finally(() => { pending.current.delete(key); setBusy(new Set(pending.current)); });
 	};
-	const resetList = () => { setVisible(PAGE_SIZE); lists.current.get(section)?.scrollTo({ top: 0 }); };
+	const resetList = () => { setVisible(PAGE_SIZE); lists.current.get(shownSection)?.scrollTo({ top: 0 }); };
 	const selectTag = (value: string | null) => {
 		if (value === tag) return;
 		setTag(value); resetList();
 		// Copy the rows as they now show, scrolled to the top like the incoming list.
-		const list = lists.current.get(section);
+		const list = lists.current.get(shownSection);
 		departingList.current = list && !reduceMotion ? { tag: value, node: copyDepartingList(list) } : null;
 	};
 	const selectSection = (next: ReadingSection) => {
+		// A screen arriving from another feature, or hidden, shows its own section rather than a stale one.
+		const list = lists.current.get(shownSection);
+		setHoldSwitch(!!renderLibraryContent && !!list && !list.closest('[inert], [data-entering="true"]'));
 		setSection(next); setTag(null);
-		if (renderLibraryContent && next !== section) setVisible(PAGE_SIZE);
-		else resetList();
+		// A transition host shows the next section's screen from its first rows; see visibleSection.
+		if (!renderLibraryContent || next === section) resetList();
 	};
-	const renderLibrary = (content: React.ReactNode) => renderLibraryContent ? renderLibraryContent(section, content) : content;
-	const highlightsCopy = emptyHighlightsCopy(Boolean(listQuery || tag)), linksCopy = emptyLinksCopy(section, Boolean(listQuery || tag));
+	const renderLibrary = (content: React.ReactNode) => renderLibraryContent ? renderLibraryContent(shownSection, content) : content;
+	const highlightsCopy = emptyHighlightsCopy(Boolean(listQuery || tag)), linksCopy = emptyLinksCopy(shownSection, Boolean(listQuery || tag));
 	return <section className="crate-reading crate-reading-workspace" aria-label="Reading" data-list-style={listStyle} data-reader-open={!!reader} data-reader-motion={readerMotion}>
 		<div className="crate-reading__layout">
 			<aside className="crate-reading__sidebar" inert={readerMotion !== undefined && (!!reader || readerClosing)}>
@@ -182,41 +191,41 @@ export function ReadingLibraryPanel({
 			</aside>
 			<div className="crate-reading__library" aria-busy={busy.size > 0} inert={readerMotion !== undefined && (!!reader || readerClosing)}>
 				{renderLibrary(<>
-				<ViewHeader className="crate-reading__header" title={section === 'inbox' ? 'Reading' : readingSections.find(item => item.id === section)!.label} count={count}
-					countUnit={section === 'highlights' ? 'highlight' : 'saved link'} showMeta={!loading && !more} reserveMetaSpace rightContent={<div className="crate-view-header-actions">
+				<ViewHeader className="crate-reading__header" title={shownSection === 'inbox' ? 'Reading' : readingSections.find(item => item.id === shownSection)!.label} count={count}
+					countUnit={shownSection === 'highlights' ? 'highlight' : 'saved link'} showMeta={!loading && !more} reserveMetaSpace rightContent={<div className="crate-view-header-actions">
 						{headerStatus}
 						{onSettings && <IconButton size="large" iconSize="l" icon="settings" label={settingsLabel} onClick={onSettings} />}
 						<IconButton size="large" iconSize="l" className="crate-reading__add" icon="plus" label="Save a link" onClick={onAdd} />
 						{headerActions}
 					</div>} />
 				<TextField fieldClassName="crate-reading__search" label="Search reading" hideLabel type="search"
-					placeholder={section === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />}
+					placeholder={shownSection === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />}
 					value={query} onChange={event => { setQuery(event.target.value); resetList(); }}
 					trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
-				<ReadingTagFilter tags={tags} selected={tag} onChange={selectTag} />
+				<ReadingTagFilter tags={tags} selected={shownSection === section ? tag : shownTag} onChange={selectTag} />
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1} onScroll={loadNearEnd}>
 					{notice}
-					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, section))}
+					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, shownSection))}
 						onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
 					{(error || snapshot.error || pageError) && <p className="crate-reading__notice" role="alert">{error || snapshot.error || pageError}{' '}
 						<Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <ReadingIssues issues={snapshot.issues} />}
 					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" /> : <>
-						{section === 'highlights' && (count > 0
+						{shownSection === 'highlights' && (count > 0
 							? <HighlightList entries={excerpts.slice(0, visible)} disabled={busy.has('open')}
-								onView={(item, highlight) => run('open', () => onOpen(item, highlight, section))} onOpenItem={item => run('open', () => onOpen(item, undefined, section))} />
+								onView={(item, highlight) => run('open', () => onOpen(item, highlight, shownSection))} onOpenItem={item => run('open', () => onOpen(item, undefined, shownSection))} />
 							: !more && <EmptyState className="crate-reading__empty" icon="highlighter" title={highlightsCopy.title} description={highlightsCopy.description} />)}
-						{section !== 'highlights' && items.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open" title={linksCopy.title} description={linksCopy.description}>
-							{section === 'inbox' && !listQuery && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}>
+						{shownSection !== 'highlights' && items.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open" title={linksCopy.title} description={linksCopy.description}>
+							{shownSection === 'inbox' && !listQuery && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}>
 								<ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link
 							</Button>}
 						</EmptyState>}
-						{section !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}>
+						{shownSection !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}>
 							<h3>{group.label}</h3>
 							<ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
 								<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`}
-									aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, section))}>
+									aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, shownSection))}>
 									<ReadingItemContent item={item} />
 								</Button>
 							</li>)}</ul>

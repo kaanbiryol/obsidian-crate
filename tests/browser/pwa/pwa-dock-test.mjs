@@ -20,8 +20,13 @@ function dockScenario(engine, scenario, run) {
         deviceName: `Dock ${scenario}`,
         handleRequest: ({ request, dispatch }) => {
           // Serve fixtures behind the service worker too; page.route does not intercept its requests.
-          if (new URL(request.url, 'http://localhost').pathname === '/reminders/list') {
+          const url = new URL(request.url, 'http://localhost');
+          if (url.pathname === '/reminders/list') {
             return Response.json(reminderFixture);
+          }
+          // Archive answers like a phone on a network, so a first visit has a gap to cover.
+          if (url.pathname === '/reading/items' && url.searchParams.get('section') === 'archived') {
+            return new Promise(resolve => setTimeout(resolve, 150)).then(dispatch);
           }
           return dispatch();
         },
@@ -404,6 +409,30 @@ async function checkLocalFades({ page, dock, closed, active, openViews, direct }
   await checkScreenFade('.pwa-dock [data-tab="today"]');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await dock().locator('[data-dock-group]').tap(); await closed();
+  // A first visit keeps the current screen until the section answers, then dissolves once to
+  // its loaded list. Before: it faded to an empty screen, then faded the list in.
+  await openViews();
+  const frames = await page.evaluate(async () => {
+    const panel = document.querySelector('.crate-feature-panel[data-active="true"]');
+    const container = panel.querySelector('.pwa-tab-transition');
+    panel.querySelector('[data-dock-destination="archive"]').click();
+    const frames = [], start = performance.now();
+    while (performance.now() - start < 3000) {
+      await new Promise(requestAnimationFrame);
+      const visible = [...container.querySelectorAll(':scope > .pwa-tab-panel')].filter(layer => Number(getComputedStyle(layer).opacity) > 0);
+      frames.push({ titles: visible.map(layer => layer.querySelector('.view-header-title').textContent), blank: visible.some(layer => !layer.querySelector('.crate-reading__item, .crate-reading__empty')) });
+      if (!container.querySelector(':scope > .pwa-tab-panel[data-leaving]') && frames.at(-1).titles.join() === 'Archive') break;
+    }
+    return frames;
+  });
+  assert.deepEqual(frames[0].titles, ['Reading'], JSON.stringify(frames));
+  assert.deepEqual(frames.at(-1).titles, ['Archive'], JSON.stringify(frames));
+  assert.ok(frames.every(frame => !frame.blank), 'A quick first page never shows a screen without its list: ' + JSON.stringify(frames));
+  await closed(); await active('Archive');
+  // A section read before dissolves at once.
+  await openViews();
+  await page.locator('.crate-feature-panel[data-active="true"] [data-dock-destination="reading"]').click();
+  await closed(); await active('Reading');
   await openViews();
   await checkScreenFade('[data-dock-destination="archive"]');
   await closed(); await active('Archive');

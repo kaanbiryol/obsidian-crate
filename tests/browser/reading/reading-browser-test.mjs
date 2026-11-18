@@ -597,7 +597,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   for (const [section, title] of [['favorites', 'Favorites'], ['inbox', 'Reading'], ['favorites', 'Favorites'], ['inbox', 'Reading']]) {
     await page.locator('.pwa-reading-root [data-dock-group]').click({ button: 'right' });
     await page.locator(`[data-dock-destination="${section === 'inbox' ? 'reading' : section}"]`).click();
-    await page.waitForFunction(() => !document.querySelector('.pwa-reading-root [data-leaving="true"]'));
+    // A section read for the first time keeps the current screen until it answers, then dissolves.
+    await page.waitForFunction(title => !document.querySelector('.pwa-reading-root [data-leaving="true"]')
+      && document.querySelector('.pwa-reading-root .pwa-tab-panel .crate-reading__header h1')?.textContent === title, title);
     await expect(page.locator('.crate-reading__header h1')).toHaveText(title);
     for (let visit = 0; visit < 2; visit++) {
       await page.getByRole('button', { name: /browser.example.invalid browser.example.invalid/ }).click();

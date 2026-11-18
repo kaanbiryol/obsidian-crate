@@ -77,3 +77,35 @@ it('shows a loading state, not an empty library, until a server library\'s first
 		expect(hook.current).toMatchObject({ items: [systems], count: 1, loading: false });
 	} finally { vi.useRealTimers(); }
 });
+
+it('keeps the previous section listed until another section answers, then shows a loading state only when slow', async () => {
+	vi.useFakeTimers();
+	try {
+		const archived = { ...note('archived', 'Archived essay'), reading_status: 'archived' } as ReadingItem;
+		let answer: () => void = () => {};
+		const load = vi.fn(async ({ section }: { section: string }) => {
+			// Favorites never answers; Archive answers when the test says.
+			if (section === 'favorites') await new Promise<never>(() => {});
+			if (section === 'archived') await new Promise<void>(resolve => { answer = resolve; });
+			return { items: section === 'archived' ? [archived] : [systems, cooking], cursor: null };
+		});
+		const source: ReadingLibrarySource = { load, loadTags: async () => [], revision: 1, present: items => items };
+		let section: 'inbox' | 'archived' | 'favorites' = 'inbox';
+		const hook = renderHook(() => useReadingLibraryQuery({ snapshot: { items: [], loading: false }, source, section, query: '', tag: null, holdPrevious: true }));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		section = 'archived';
+		hook.rerender();
+		// Before: the new section listed nothing at once, so a quick answer faded out to an empty screen and back in.
+		await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+		expect(hook.current).toMatchObject({ section: 'inbox', count: 2, loading: false });
+		await act(async () => { answer(); await vi.advanceTimersByTimeAsync(0); });
+		expect(hook.current).toMatchObject({ section: 'archived', items: [archived], count: 1, loading: false });
+		section = 'favorites';
+		hook.rerender();
+		await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+		expect(hook.current).toMatchObject({ section: 'archived', loading: false });
+		// A slow section shows its own loading state rather than the previous list.
+		await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+		expect(hook.current).toMatchObject({ section: 'favorites', items: [], loading: true });
+	} finally { vi.useRealTimers(); }
+});

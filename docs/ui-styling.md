@@ -372,7 +372,11 @@ and a count can only go down: after moving literals onto roles, run
   replaces a loading state fades in over 160ms through `useContentReveal`, so a
   Reading section that has to load never pops in; a screen read before draws at
   once without fading, and Reading sections keep their pages through a sync while
-  they reload. Toasts retain their 160ms fade. Press feedback uses
+  they reload. Switching sections on a visible Reading screen to one the PWA has not read
+  yet keeps the current screen, with the dock already on the new tab, until its
+  first page answers, then dissolves once; only a section slower than 400ms shows
+  a loading state. Arriving from Reminders never shows a stale section, and
+  nothing loads before the user switches. Toasts retain their 160ms fade. Press feedback uses
   120ms, and control movement uses the shared control spring or 180ms CSS curve.
   The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
   changes retain visible travel instead of spending almost all their time settling.
