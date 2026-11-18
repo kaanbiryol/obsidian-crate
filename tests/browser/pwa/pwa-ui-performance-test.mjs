@@ -138,6 +138,28 @@ for (const browserType of [chromium, webkit]) {
 				await expect(page.locator('#refreshes')).toHaveText('1');
 				await expect(page.locator('.pwa-pull-refresh')).not.toHaveClass(/is-visible/);
 			}
+			// A slow pull must claim its first small move, or iOS starts a native
+			// bounce that drags the header down with the indicator.
+			const claimed = await page.evaluate(() => {
+				const list = document.getElementById('scroll');
+				const dispatch = (type, y, cancelable = true) => {
+					const event = new Event(type, { bubbles: true, cancelable });
+					Object.defineProperty(event, 'touches', { value: { length: 1, item: () => ({ clientX: 30, clientY: y }) } });
+					list.dispatchEvent(event);
+					return event.defaultPrevented;
+				};
+				dispatch('touchstart', 0);
+				const small = dispatch('touchmove', 4);
+				dispatch('touchend', 4);
+				dispatch('touchstart', 0);
+				dispatch('touchmove', 200, false);
+				return small;
+			});
+			assert.equal(claimed, true, 'pull should claim its first downward move');
+			await page.waitForTimeout(50);
+			await expect(page.locator('.pwa-pull-refresh')).not.toHaveClass(/is-visible/);
+			await page.evaluate(() => document.getElementById('scroll').dispatchEvent(new Event('touchend', { bubbles: true })));
+			await expect(page.locator('#refreshes')).toHaveText('1');
 		}
 
 

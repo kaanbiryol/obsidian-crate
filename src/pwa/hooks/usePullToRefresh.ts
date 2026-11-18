@@ -90,14 +90,18 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			const touch = event.touches.item(0);
 			if (!touch) return;
 			const delta = touch.clientY - startY;
-			if (delta <= 0 || (!pulling && Math.abs(touch.clientX - startX) > delta)) {
+			// An uncancelable move means native scrolling already owns the gesture;
+			// pulling on top of its bounce drags the whole screen down.
+			if (delta <= 0 || !event.cancelable || (!pulling && Math.abs(touch.clientX - startX) > delta)) {
 				reset();
 				return;
 			}
 
+			// Claim the first downward move, or iOS starts its own bounce and every
+			// later move stops being cancelable.
+			event.preventDefault();
 			pulling = true;
 			currentDistance = Math.min(PULL_REFRESH_MAX_DISTANCE, Math.round(dampenPullDistance(delta)));
-			if (currentDistance > 8) event.preventDefault();
 
 			if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
 			animationFrame = window.requestAnimationFrame(() => {
