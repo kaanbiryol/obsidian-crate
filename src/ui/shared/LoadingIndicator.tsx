@@ -12,9 +12,13 @@ export function LoadingSpinner({ className, progress }: { className: string; pro
 	</svg>;
 }
 
-/** A quiet initial loading state; CSS delays its appearance to avoid quick flashes. */
-export function LoadingIndicator({ label }: { label: string }) {
-	return <div className="crate-content-loading" role="status" aria-label={label}>
+/** How long the spinner waits before it appears; mirrors the delay in `_loading-indicator.scss`. */
+export const LOADING_INDICATOR_DELAY_MS = 250;
+
+/** A quiet initial loading state; CSS delays its appearance to avoid quick flashes.
+ * `immediate` shows it at once, for a loading state that already waited before showing. */
+export function LoadingIndicator({ label, immediate = false }: { label: string; immediate?: boolean }) {
+	return <div className={`crate-content-loading${immediate ? ' crate-content-loading--immediate' : ''}`} role="status" aria-label={label}>
 		<LoadingSpinner className="crate-content-loading__spinner" />
 	</div>;
 }

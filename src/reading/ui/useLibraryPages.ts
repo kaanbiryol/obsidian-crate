@@ -27,8 +27,8 @@ const SEARCH_DELAY_MS = 250;
 const MAX_EMPTY_FOLLOWS = 3;
 // A refresh reads at most this many pages to keep the user's place.
 const MAX_RELOAD_PAGES = 20;
-// A new query that takes longer than this shows a loading state instead of the previous list.
-const SLOW_LIBRARY_QUERY_MS = 400;
+// A new query whose request takes longer than this shows a loading state instead of the previous list.
+const SLOW_LIBRARY_QUERY_MS = 250;
 
 const appendNew = (items: ReadingItem[], more: ReadingItem[]) => [...items, ...more.filter(item => !items.some(other => other.crate_reading_id === item.crate_reading_id))];
 
@@ -124,16 +124,17 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		return () => window.clearTimeout(timer);
 	}, [fetchPage, key, section, query, tag, enabled, revision]);
 	const settled = pages.key === key;
-	// A wait past SLOW_LIBRARY_QUERY_MS shows a loading state rather than the previous query.
+	// A request unanswered past SLOW_LIBRARY_QUERY_MS shows a loading state rather than the
+	// previous query. A search counts from when its typing delay sends the request.
 	const [slowKey, setSlowKey] = useState<string | null>(null);
 	useEffect(() => {
 		if (settled) return;
-		const timer = window.setTimeout(() => setSlowKey(key), SLOW_LIBRARY_QUERY_MS);
+		const timer = window.setTimeout(() => setSlowKey(key), (query ? SEARCH_DELAY_MS : 0) + SLOW_LIBRARY_QUERY_MS);
 		return () => window.clearTimeout(timer);
-	}, [settled, key]);
+	}, [settled, key, query]);
 	const loadMore = useCallback(() => { if (settled && pages.cursor && !pages.loading) void fetchPage(pages.cursor, false); }, [fetchPage, settled, pages.cursor, pages.loading]);
 	// Until a first page answers, the empty initial state is not the library's answer.
 	return { items: pages.items, shown: { section: pages.section, q: pages.q, tag: pages.tag }, tags: pages.tags, answered: !!pages.key,
 		cursor: settled ? pages.cursor : null, loading: pages.loading || !settled, loadingMore: settled && pages.loading && !pages.reloading,
-		slow: !settled && slowKey === key, error: settled ? pages.error : null, loadMore };
+		slow: !settled && slowKey === key, waiting: enabled && !settled, error: settled ? pages.error : null, loadMore };
 }

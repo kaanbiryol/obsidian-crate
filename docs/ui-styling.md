@@ -381,8 +381,13 @@ and a count can only go down: after moving literals onto roles, run
   once without fading, and Reading sections keep their pages through a sync while
   they reload. Switching sections on a visible Reading screen to one the PWA has not read
   yet keeps the current screen, with the dock already on the new tab, until its
-  first page answers, then dissolves once; only a section slower than 400ms shows
-  a loading state. Arriving from Reminders never shows a stale section, and
+  first page answers, then dissolves once. A section, tag or search the PWA has not
+  read dims the current list to 45% at once, with the 120ms feedback curve, so the
+  tap reads as taken; only a request slower than 250ms (counted after a search's
+  typing delay) replaces it with a loading state, whose spinner shows at once
+  rather than after the usual 250ms spinner delay. A spinner that became visible
+  stays at least 300ms so a quick answer never flickers it; a load that answers
+  before its spinner appears shows its content at once. Arriving from Reminders never shows a stale section, and
   nothing loads before the user switches. Press feedback uses
   120ms ease-out (`--pwa-motion-feedback-ease`), and control movement uses the shared control spring or 180ms CSS curve.
   The dock selection highlight uses a 300ms spring-like curve so adjacent-tab

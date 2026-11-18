@@ -17,7 +17,7 @@ it('asks a server library from three characters and rechecks its candidates loca
 		const source: ReadingLibrarySource = { load, loadTags: async () => [{ name: 'Server', count: 2 }], revision: 1, present: items => items };
 		let query = 'sy';
 		const hook = renderHook(() => useReadingLibraryQuery({ snapshot: { items: [], loading: false }, source, section: 'inbox', query, tag: null }));
-		await act(async () => { await vi.runAllTimersAsync(); });
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 		expect(load).toHaveBeenLastCalledWith(expect.objectContaining({ q: '' }));
 		expect(hook.current).toMatchObject({ listQuery: '', count: 2, loading: false, more: false });
 		query = 'sys';
@@ -46,17 +46,23 @@ it('keeps the previous tag\'s list and count until the new tag answers, then sho
 		const source: ReadingLibrarySource = { load, loadTags: async () => [{ name: 'Work', count: 1 }, { name: 'Home', count: 1 }], revision: 1, present: items => items };
 		let tag: string | null = null;
 		const hook = renderHook(() => useReadingLibraryQuery({ snapshot: { items: [], loading: false }, source, section: 'inbox', query: '', tag }));
-		await act(async () => { await vi.runAllTimersAsync(); });
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 		expect(hook.current).toMatchObject({ count: 2, loading: false });
 		tag = 'Work';
 		hook.rerender();
 		// Before: the list narrowed locally at once, then changed again when the server answered.
+		// The previous list shows pending at once, so the tap reads as taken.
 		await act(async () => { await vi.advanceTimersByTimeAsync(100); });
-		expect(hook.current).toMatchObject({ count: 2, loading: false });
-		await act(async () => { await vi.advanceTimersByTimeAsync(400); });
-		expect(hook.current.loading).toBe(true);
-		await act(async () => { answer(); await vi.runAllTimersAsync(); });
-		expect(hook.current).toMatchObject({ items: [systems], count: 1, loading: false });
+		expect(hook.current).toMatchObject({ count: 2, loading: false, pending: true });
+		// The dimmed list already waited, so the spinner shows at once.
+		await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+		expect(hook.current).toMatchObject({ loading: true, immediateLoading: true, pending: false });
+		// Once shown, the spinner stays 300ms even though the tag answers sooner.
+		await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+		await act(async () => { answer(); await vi.advanceTimersByTimeAsync(0); });
+		expect(hook.current).toMatchObject({ count: 1, loading: true });
+		await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+		expect(hook.current).toMatchObject({ items: [systems], count: 1, loading: false, pending: false });
 	} finally { vi.useRealTimers(); }
 });
 
@@ -73,7 +79,8 @@ it('shows a loading state, not an empty library, until a server library\'s first
 		// Before: the unanswered first page listed an empty inbox and offered to save a first link.
 		await act(async () => { await vi.advanceTimersByTimeAsync(100); });
 		expect(hook.current).toMatchObject({ count: 0, loading: true });
-		await act(async () => { answer(); await vi.runAllTimersAsync(); });
+		// The spinner had not appeared yet, so the answer shows at once.
+		await act(async () => { answer(); await vi.advanceTimersByTimeAsync(0); });
 		expect(hook.current).toMatchObject({ items: [systems], count: 1, loading: false });
 	} finally { vi.useRealTimers(); }
 });
@@ -92,14 +99,14 @@ it('keeps the previous section listed until another section answers, then shows 
 		const source: ReadingLibrarySource = { load, loadTags: async () => [], revision: 1, present: items => items };
 		let section: 'inbox' | 'archived' | 'favorites' = 'inbox';
 		const hook = renderHook(() => useReadingLibraryQuery({ snapshot: { items: [], loading: false }, source, section, query: '', tag: null, holdPrevious: true }));
-		await act(async () => { await vi.runAllTimersAsync(); });
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 		section = 'archived';
 		hook.rerender();
 		// Before: the new section listed nothing at once, so a quick answer faded out to an empty screen and back in.
 		await act(async () => { await vi.advanceTimersByTimeAsync(100); });
-		expect(hook.current).toMatchObject({ section: 'inbox', count: 2, loading: false });
+		expect(hook.current).toMatchObject({ section: 'inbox', count: 2, loading: false, pending: true });
 		await act(async () => { answer(); await vi.advanceTimersByTimeAsync(0); });
-		expect(hook.current).toMatchObject({ section: 'archived', items: [archived], count: 1, loading: false });
+		expect(hook.current).toMatchObject({ section: 'archived', items: [archived], count: 1, loading: false, pending: false });
 		section = 'favorites';
 		hook.rerender();
 		await act(async () => { await vi.advanceTimersByTimeAsync(100); });

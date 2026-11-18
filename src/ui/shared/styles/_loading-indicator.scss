@@ -47,3 +47,5 @@
 .crate-reminders-ui .reminders-loading--still .crate-content-loading__spinner {
 	animation: crate-loading-appear 0s 250ms forwards;
 }
+// A loading state that already waited before showing needs no second delay.
+.crate-reminders-ui .crate-content-loading--immediate .crate-content-loading__spinner { animation-delay: 0s; }

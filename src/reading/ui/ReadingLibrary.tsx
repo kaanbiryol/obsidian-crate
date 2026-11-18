@@ -79,7 +79,7 @@ export function ReadingLibraryPanel({
 	// A history swipe reveals the PWA tab bar immediately. Keep its indicator
 	// parked at the selected tab while the reader covers an unfinished spring.
 	const animateTabIndicator = readerMotion === undefined || !reader;
-	const { section: shownSection, listQuery, shownTag, items, excerpts, count, tags, loading, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag, holdPrevious: holdSwitch });
+	const { section: shownSection, listQuery, shownTag, items, excerpts, count, tags, loading, immediateLoading, pending: waiting, more, pageLoading, loadingMore, pageError, loadMore } = useReadingLibraryQuery({ snapshot, source, section, query, tag, holdPrevious: holdSwitch });
 	// A server library keeps the previous section's screen until the tapped one answers. Rows
 	// restart from the first page whenever a different section's screen shows.
 	const [visibleSection, setVisibleSection] = useState(shownSection);
@@ -161,11 +161,16 @@ export function ReadingLibraryPanel({
 			position: 'absolute', top: `${list.offsetTop}px`, left: `${list.offsetLeft}px`, width: `${list.offsetWidth}px`, height: `${list.offsetHeight}px`,
 			boxSizing: 'border-box', pointerEvents: 'none', background: opaqueBackground(list, owner),
 		});
+		// Rows dimmed while the tag loaded leave from where they were.
+		if (wasWaiting.current) node.dataset.pending = 'true';
 		list.after(node);
 		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || PWA_FADE_TIMING.easing });
 		animation.onfinish = () => node.remove();
 		return () => { animation.cancel(); node.remove(); };
 	}, [loading, shownSection, shownTag]);
+	// Whether the last painted list was dimmed, read above before this updates it.
+	const wasWaiting = useRef(false);
+	useLayoutEffect(() => { wasWaiting.current = waiting; }, [waiting]);
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
 	useEffect(() => {
@@ -231,14 +236,15 @@ export function ReadingLibraryPanel({
 					trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
 				<ReadingTagFilter tags={tags} selected={shownSection === section ? tag : shownTag} onChange={selectTag} />
 				{beforeListContent}
-				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1} onScroll={loadNearEnd}>
+				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1} onScroll={loadNearEnd}
+					data-pending={waiting || undefined} aria-busy={waiting || undefined}>
 					{notice}
 					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, shownSection))}
 						onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
 					{(error || snapshot.error || pageError) && <p className="crate-reading__notice" role="alert">{error || snapshot.error || pageError}{' '}
 						<Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
 					{snapshot.issues.length > 0 && <ReadingIssues issues={snapshot.issues} />}
-					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" /> : <>
+					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" immediate={immediateLoading} /> : <>
 						{shownSection === 'highlights' && (count > 0
 							? <HighlightList entries={excerpts.slice(0, visible)} disabled={busy.has('open')}
 								onView={(item, highlight) => run('open', () => onOpen(item, highlight, shownSection))} onOpenItem={item => run('open', () => onOpen(item, undefined, shownSection))} />

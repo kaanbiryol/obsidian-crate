@@ -3,6 +3,11 @@ import type { ReadingSnapshot } from '../data/library';
 import { countReadingTags, filterReadingHighlights, filterReadingItems, settledHighlights, type ReadingSection } from '../core/reading-presentation';
 import { matchesReadingQuery, searchableQuery } from '../core/search-terms';
 import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
+import { useMinimumLoading } from './useMinimumLoading';
+import { LOADING_INDICATOR_DELAY_MS } from '@/ui/shared/LoadingIndicator';
+
+// A loading spinner, once visible, stays at least this long so a quick answer never flickers it.
+const MIN_LOADING_MS = 300;
 
 interface ReadingLibraryQuery {
 	/** The library shown; with a server `source`, `snapshot` holds only its local state. */
@@ -20,7 +25,8 @@ interface ReadingLibraryQuery {
  * items, or a server library's matched pages with local changes shown over them. A server
  * library keeps listing the previous search or tag until the new one answers, then changes the
  * list, count and tags together. With `holdPrevious`, another section keeps the previous section listed the
- * same way, so a switch changes screens once its list is ready; otherwise, and when slow, it shows a loading state. */
+ * same way, so a switch changes screens once its list is ready; otherwise, and when slow, it shows a loading state.
+ * The previous list is `pending` while it waits, and a visible spinner stays at least MIN_LOADING_MS. */
 export function useReadingLibraryQuery({ snapshot, source, section, query, tag, holdPrevious = false }: ReadingLibraryQuery) {
 	// Filter on a deferred query so typing never waits for the list to re-render.
 	const deferredQuery = useDeferredValue(query);
@@ -48,7 +54,12 @@ export function useReadingLibraryQuery({ snapshot, source, section, query, tag, 
 	const snapshotItems = snapshot.items;
 	const localTags = useMemo(() => source ? [] : countReadingTags(snapshotItems, section), [source, snapshotItems, section]);
 	const tags = source ? (otherSection ? [] : pages.tags) : localTags;
-	const loading = source ? !pages.answered || otherSection || pages.slow : snapshot.loading;
+	// A loading state that replaced a slow request's dimmed list already waited, so its spinner shows at once.
+	const shownLoading = useMinimumLoading(source ? !pages.answered || otherSection || pages.slow : snapshot.loading,
+		source && pages.slow ? 0 : LOADING_INDICATOR_DELAY_MS, MIN_LOADING_MS);
+	const loading = shownLoading.loading, immediateLoading = shownLoading.appearDelayMs === 0;
+	// The list shown answers an earlier section, search or tag while the new one loads.
+	const pending = !loading && pages.waiting;
 	const more = source ? !!pages.cursor : false;
-	return { section: listedSection, listQuery, shownTag: shown.tag, items, excerpts, count, tags, loading, more, pageLoading: !!source && pages.loading, loadingMore: !!source && pages.loadingMore, pageError: pages.error, loadMore: pages.loadMore };
+	return { section: listedSection, listQuery, shownTag: shown.tag, items, excerpts, count, tags, loading, immediateLoading, pending, more, pageLoading: !!source && pages.loading, loadingMore: !!source && pages.loadingMore, pageError: pages.error, loadMore: pages.loadMore };
 }

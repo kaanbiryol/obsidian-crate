@@ -361,6 +361,8 @@ async function openReadingBrowserFixture(t, name, engine, contextOptions = {}) {
     await page.goto(await fixture.readingAppUrl());
     await page.getByRole('searchbox', { name: 'Search reading' }).waitFor();
     await expect(readingSync).toHaveAttribute('data-sync-state', 'synced');
+    // A spinner that appeared stays its minimum, so wait for the library to list.
+    await expect(page.getByRole('status', { name: 'Loading Reading', exact: true })).toHaveCount(0);
   };
   return { ...fixture, browser, context, page, readingSync, seedArticle, enroll, holdResponse, releases, faults, sent };
 }

@@ -184,6 +184,26 @@ it('asks for a section\'s tags again after they failed, rather than keeping none
 	} finally { vi.useRealTimers(); }
 });
 
+it('counts a slow search from when its typing delay sends the request', async () => {
+	vi.useFakeTimers();
+	try {
+		const load = vi.fn(async ({ q }: { q: string }) => {
+			if (q) await new Promise<never>(() => {});
+			return { items: [item], cursor: null };
+		});
+		let q = '';
+		const hook = renderHook(() => useLibraryPages({ load, loadTags: async () => [], revision: 1, present: items => items }, 'inbox', q, null));
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+		q = 'found';
+		hook.rerender();
+		// The request leaves at 250ms; only an answer slower than 250ms more shows loading.
+		await act(async () => { await vi.advanceTimersByTimeAsync(499); });
+		expect(hook.current).toMatchObject({ waiting: true, slow: false });
+		await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+		expect(hook.current).toMatchObject({ waiting: true, slow: true });
+	} finally { vi.useRealTimers(); }
+});
+
 it('reads a section\'s tags once for every tag and search in it', async () => {
 	vi.useFakeTimers();
 	try {
