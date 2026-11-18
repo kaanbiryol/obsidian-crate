@@ -34,7 +34,7 @@ import { EmptyState } from '../../ui/shared/EmptyState';
 
 export function ReadingReader({
 	item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onDelete,
-	onSaveComplete, onCopyComplete, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.',
+	onSaveComplete, onCopyComplete, onFeedback, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.',
 	mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false,
 	floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange, syncStatus, pendingHighlights, savedOffline, onOfflineChange,
 }: {
@@ -49,6 +49,8 @@ export function ReadingReader({
 	/** Host feedback after an explicit form save has been accepted. */
 	onSaveComplete?: (action: 'tags' | 'note') => void;
 	onCopyComplete?: () => void;
+	/** Host toast or notice for highlight save, copy and share outcomes. */
+	onFeedback?: (kind: 'success' | 'error', message: string) => void;
 	highlightCode?: (code: string, language: string) => string | undefined;
 	loadingError?: string; onRetryOpen?: () => void;
 	focusHighlight?: ReadingHighlight; autoHideNavigation?: boolean; floatingHighlights?: boolean;
@@ -223,7 +225,7 @@ export function ReadingReader({
 			</div>
 		</div>
 		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={item.crate_reading_id} body={body} article={article} content={content}
-			highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onAnnotate={openNote} onCopyComplete={onCopyComplete}
+			highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onAnnotate={openNote} onCopyComplete={onCopyComplete} onFeedback={onFeedback}
 			onSelect={videoId ? seekToHighlight : undefined} />}
 		{floatingHighlights && highlightsOpen && <ReadingDialog title="Highlights" fullHeight onClose={closeHighlights}>{close => renderHighlights(close)}</ReadingDialog>}
 		{!(floatingHighlights && highlightsOpen && noteOverHighlights) && noteDialog}

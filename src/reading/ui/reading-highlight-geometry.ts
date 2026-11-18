@@ -1,6 +1,6 @@
 type Box = { left: number; top: number; width: number; height: number };
 type Rect = Box & { right: number; bottom: number };
-export type HighlightGeometry = { boxes: Box[]; start: Box; end: Box; menu: { left: number; top: number }; feedback: { left: number; top: number } };
+export type HighlightGeometry = { boxes: Box[]; start: Box; end: Box; menu: { left: number; top: number } };
 /** Matches `.crate-reading-reader__selection`: Copy, Share, Note and Delete. */
 export const HIGHLIGHT_MENU_WIDTH = 256;
 
@@ -29,9 +29,5 @@ export function readingHighlightGeometry({ rects, bounds, scrollTop, viewportHei
 	const headerBottom = headingBottom ?? navBottom;
 	const desiredY = above >= Math.max(navBottom, headerBottom) + 8 ? above : below;
 	const menuY = Math.max(navBottom + 8, Math.min(viewportBottom - 64, desiredY));
-	const feedbackY = menuY + 156 <= viewportBottom ? menuY + 60 : Math.max(navBottom + 8, menuY - 112);
-	return { boxes, start: first, end: last,
-		menu: { left, top: menuY - bounds.top + scrollTop },
-		feedback: { left: Math.max(12, Math.min(bounds.width - 232, left)), top: feedbackY - bounds.top + scrollTop },
-	};
+	return { boxes, start: first, end: last, menu: { left, top: menuY - bounds.top + scrollTop } };
 }

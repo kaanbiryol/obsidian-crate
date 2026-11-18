@@ -33,9 +33,6 @@
 		}
 		&[data-press-active]:not(:disabled) { color: var(--text-normal); background: color-mix(in srgb, var(--text-normal) 10%, transparent); }
 	}
-	&__highlight-error { position: absolute; z-index: 3; width: min(220px, calc(100% - 24px)); padding: 8px; border: 1px solid var(--crate-divider); border-radius: 10px; background: var(--crate-app-bg); box-shadow: 0 4px 20px rgba(0, 0, 0, .18); }
-	&__highlight-error p { font-size: 12px; margin: 0 0 4px; }
-	&__highlight-error button { width: 100%; min-height: 44px; }
 	&__highlight-editor.is-hit-testing { visibility: hidden; }
 	&__highlight-preview { position: absolute; pointer-events: none; z-index: 1; background: rgba(224, 184, 30, .35); box-shadow: inset 0 -2px rgba(191, 155, 0, .8); }
 	&__body mark.is-editing { background: transparent; }

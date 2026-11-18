@@ -253,8 +253,9 @@ In Reading, releasing a text selection saves a highlight automatically and opens
 an inline action menu with **Copy**, **Share**, and **Delete highlight**. Copy and
 Share use the passage text and remain available while a highlight save is pending.
 Share opens the device share sheet where supported, otherwise it copies the text
-with feedback. Cancellation is quiet; failed actions show an error without
-claiming success. Tapping a saved highlight reopens its menu and resize handles.
+with feedback. Cancellation is quiet; failed saves, copies and shares show an
+error without claiming success, as a toast in the PWA and a notice in Obsidian,
+so the message never covers the passage or its handles. Tapping a saved highlight reopens its menu and resize handles.
 The menu stays within the reader viewport and clear of the passage and handles.
 Dragging a handle previews the range without moving the article; release saves
 the resized range. Handles auto-scroll near the reader edges and support Left/Right

@@ -7,21 +7,22 @@ import { readingHighlightGeometry, type HighlightGeometry } from './reading-high
 import { registerReadingHighlightInteraction, type HighlightEdit } from './reading-highlight-interaction';
 
 /** Native initial selection; portable handles for editing a saved annotation. */
-export function ReadingHighlightActions({ body, article, content, highlights, onSave, onAnnotate, onCopyComplete, onSelect, disabled }: {
+export function ReadingHighlightActions({ body, article, content, highlights, onSave, onAnnotate, onCopyComplete, onSelect, onFeedback, disabled }: {
 	body: React.RefObject<HTMLDivElement | null>; article: React.RefObject<HTMLElement | null>;
 	content: DocumentFragment | null; highlights: ReadingHighlight[]; onSave: (highlights: ReadingHighlight[]) => Promise<void>; disabled: boolean;
 	/** Opens the note editor for a saved highlight. */
 	onAnnotate: (highlight: ReadingHighlight) => void;
 	onCopyComplete?: () => void; onSelect?: (highlight: ReadingHighlight) => void;
+	/** Host toast or notice for save, copy and share outcomes. */
+	onFeedback?: (kind: 'success' | 'error', message: string) => void;
 }) {
 	const controls = useRef<HTMLDivElement>(null), editing = useRef<HighlightEdit | null>(null), saving = useRef(false);
-	const latest = useRef({ highlights, onSave, onAnnotate, onCopyComplete, onSelect, disabled });
-	useLayoutEffect(() => { latest.current = { highlights, onSave, onAnnotate, onCopyComplete, onSelect, disabled }; }, [highlights, onSave, onAnnotate, onCopyComplete, onSelect, disabled]);
+	const latest = useRef({ highlights, onSave, onAnnotate, onCopyComplete, onSelect, onFeedback, disabled });
+	useLayoutEffect(() => { latest.current = { highlights, onSave, onAnnotate, onCopyComplete, onSelect, onFeedback, disabled }; }, [highlights, onSave, onAnnotate, onCopyComplete, onSelect, onFeedback, disabled]);
 	const [draft, setDraft] = useState<HighlightEdit | null>(null), [geometry, setGeometry] = useState<HighlightGeometry | null>(null);
-	const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
-	const commands = useRef({ copy: () => {}, share: () => {}, annotate: () => {}, save: () => {}, remove: () => {} });
+	const [busy, setBusy] = useState(false);
+	const commands = useRef({ copy: () => {}, share: () => {}, annotate: () => {}, remove: () => {} });
 	const [transferBusy, setTransferBusy] = useState(false);
-	const [feedback, setFeedback] = useState<{ message: string; failed: boolean } | null>(null);
 	const [layout, setLayout] = useState(0);
 
 	useLayoutEffect(() => {
@@ -48,14 +49,13 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		if (!reader || !text) return;
 		const document = reader.ownerDocument, window = document.defaultView;
 		if (!window) return;
-		let alive = true, retryRemove = false, transferring = false;
+		let alive = true, transferring = false;
 		const edit = (value: HighlightEdit | null) => { editing.current = value; setDraft(value); };
-		const clearFeedback = () => { setError(null); setFeedback(null); };
+		const fail = (message: string) => latest.current.onFeedback?.('error', message);
 		const persist = async (value: HighlightEdit, remove = false) => {
 			if (saving.current) return;
-			retryRemove = remove;
-			if (latest.current.disabled) { setError('Waiting for your previous change to sync. Try again shortly.'); return; }
-			saving.current = true; setBusy(true); setError(null);
+			if (latest.current.disabled) { fail('Waiting for your previous change to sync. Try again shortly.'); return; }
+			saving.current = true; setBusy(true);
 			try {
 				if (!highlightRange(text, value.highlight)) throw new Error('Article text changed. Select the passage again.');
 				const next = latest.current.highlights.filter(entry => value.original
@@ -66,13 +66,13 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 				await latest.current.onSave(readingHighlights(next));
 				if (!alive) return;
 				if (editing.current === value) edit(remove ? null : { original: value.highlight, highlight: value.highlight });
-			} catch (cause) { if (alive && editing.current === value) setError(cause instanceof Error ? cause.message : 'Could not save highlight.'); }
+			} catch (cause) { if (alive && editing.current === value) fail(cause instanceof Error ? cause.message : 'Could not save highlight.'); }
 			finally { saving.current = false; if (alive) setBusy(false); }
 		};
 		const transfer = async (share: boolean) => {
 			const value = editing.current;
 			if (!value || transferring) return;
-			transferring = true; setTransferBusy(true); setFeedback(null);
+			transferring = true; setTransferBusy(true);
 			const current = () => alive && editing.current?.highlight === value.highlight;
 			try {
 				// Invoke directly from the button press, before awaiting anything else.
@@ -85,12 +85,12 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 						if (!share && latest.current.onCopyComplete) {
 							dismiss();
 							latest.current.onCopyComplete();
-						} else setFeedback({ message: 'Text copied.', failed: false });
+						} else latest.current.onFeedback?.('success', 'Text copied.');
 					}
 				}
 			} catch (cause) {
 				if (current() && !(share && cause instanceof Error && cause.name === 'AbortError')) {
-					setFeedback({ message: share ? 'Could not share text. Try Copy instead.' : 'Could not copy text. Try again.', failed: true });
+					fail(share ? 'Could not share text. Try Copy instead.' : 'Could not copy text. Try again.');
 				}
 			} finally { transferring = false; if (alive) setTransferBusy(false); }
 		};
@@ -101,21 +101,20 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 				const value = editing.current;
 				if (!value || saving.current) return;
 				const saved = savedHighlight(latest.current.highlights, value.highlight);
-				if (!saved) { setFeedback({ message: 'Save this highlight before adding a note.', failed: true }); return; }
+				if (!saved) { fail('Save this highlight before adding a note.'); return; }
 				dismiss();
 				latest.current.onAnnotate(saved);
 			},
-			save: () => { if (editing.current) void persist(editing.current, retryRemove); },
 			remove: () => { if (editing.current) void persist(editing.current, true); },
 		};
 		const interaction = registerReadingHighlightInteraction({
 			reader, text, controls,
 			getState: () => ({ editing: editing.current, saving: saving.current, ...latest.current }),
 			edit,
-			select: value => { edit(value); clearFeedback(); },
+			select: edit,
 			onSelect: highlight => latest.current.onSelect?.(highlight),
 			persist: value => { void persist(value); },
-			onDismiss: () => { edit(null); clearFeedback(); },
+			onDismiss: () => edit(null),
 			relayout: () => setLayout(value => value + 1),
 		});
 		function dismiss() { interaction.dismiss(); }
@@ -140,8 +139,6 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			<IconButton className="crate-reading-reader__delete-highlight" icon="trash-2" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />
 			{busy && <span className="crate-reading__sr-only" role="status">Saving highlight</span>}
 		</div>
-		{feedback && !error && <div className="crate-reading-reader__highlight-error" style={geometry.feedback}><p role={feedback.failed ? 'alert' : 'status'}>{feedback.message}</p></div>}
-		{error && <div className="crate-reading-reader__highlight-error" style={geometry.feedback}><p role="alert">{error}</p><Button variant="ghost" disabled={busy || disabled} onClick={() => commands.current.save()}>Retry highlight</Button></div>}
 	</div>;
 }
 

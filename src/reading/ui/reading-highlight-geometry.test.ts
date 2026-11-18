@@ -27,15 +27,13 @@ describe('reading highlight geometry', () => {
 		expect(geometry.menu.left + HIGHLIGHT_MENU_WIDTH).toBeLessThanOrEqual(390 - 12);
 	});
 
-	it('keeps the toolbar and feedback in view near the bottom of a narrow viewport', () => {
+	it('keeps the toolbar in view near the bottom of a narrow viewport', () => {
 		const geometry = readingHighlightGeometry({
 			bounds: rect(0, 0, 320, 844), scrollTop: 100, viewportHeight: 600,
 			navigationBottom: 60, rects: [rect(250, 570, 50, 24)],
 		})!;
 		expect(geometry.menu.left + HIGHLIGHT_MENU_WIDTH).toBeLessThanOrEqual(320 - 12);
 		expect(geometry.menu.top - 100 + 52).toBeLessThanOrEqual(600);
-		expect(geometry.feedback.top).toBeLessThan(geometry.menu.top);
-		expect(geometry.feedback.top - 100).toBeGreaterThanOrEqual(68);
 	});
 
 	it('omits the overlay when the passage has no visible text rectangles', () => {

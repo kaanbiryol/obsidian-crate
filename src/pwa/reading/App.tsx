@@ -143,7 +143,7 @@ function ReadingAppContent() {
 					mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)}
 					onBack={closeReader} onUpdate={changes => updateFromReader(visibleReader, changes)}
 					syncStatus={reader.item.path ? readingItemSyncStatus(pending, reader.item.crate_reading_id, isOffline) : undefined} pendingHighlights={readerHighlights}
-					onCopyComplete={() => showToast('success', 'Copied')}
+					onCopyComplete={() => showToast('success', 'Copied')} onFeedback={(kind, message) => showToast(kind, message)}
 					onSaveComplete={action => showToast('success', `${action === 'tags' ? 'Tags' : 'Note'} saved${navigator.onLine ? '' : ' on this device'}`)}
 					onRetry={() => retryArticle(reader.item)}
 					onDelete={reader.item.path && reader.markdown !== null ? async () => { await deleteItem(visibleReader, reader.markdown!); closeReader(); } : undefined} />} />
