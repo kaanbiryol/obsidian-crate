@@ -41,8 +41,6 @@ export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) 
 		dock?.style.setProperty('--dock-tabs-opacity', `${Math.max(0, Math.min(1, 1 - (progress - 0.06) * 3))}`);
 		// Labels and icons rise into place inside their stationary hit targets.
 		dock?.style.setProperty('--dock-menu-progress', `${progress}`);
-		// Choices and tabs blur only while the surface moves, so resting text stays crisp.
-		dock?.toggleAttribute('data-dock-morphing', progress > 0 && progress < 1);
 	}, [expandedHeight]);
 	useMotionValueEvent(height, 'change', paint);
 	useMotionValueEvent(expandedHeight, 'change', () => paint(height.get()));

@@ -379,8 +379,9 @@ and a count can only go down: after moving literals onto roles, run
   Dock expansion uses a spring with a soft overshoot of a few pixels and closes
   on a quicker critically damped spring; its choices' icons and labels rise 8px
   into stationary hit targets. While the surface changes shape, the choices and
-  tab icons blur with its progress and crossfade where they overlap, so a chosen
-  view visibly collapses back into the bar; resting states carry no filter. A held switcher swells until the menu opens, the expanded surface
+  tab icons crossfade where they overlap, so a chosen view visibly collapses back
+  into the bar; neither carries a filter, since WebKit paints blurred layers inside
+  the clipped menu with stray edge artifacts. A held switcher swells until the menu opens, the expanded surface
   gains a shadow with its progress, and one highlight slides between choices
   under a held finger. Native dragging remains immediate.
   Shared control tokens inherit these PWA defaults without changing Obsidian.

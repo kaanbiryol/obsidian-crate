@@ -97,11 +97,8 @@
     transition: opacity var(--pwa-motion-feedback-duration) var(--pwa-motion-fade-ease);
   }
   .pwa-dock__menu[data-starting-style], .pwa-dock__menu[data-ending-style] { opacity: 0; }
-  // Closing keeps the blurring choices visible while the surface collapses, then drops them.
+  // Closing keeps the choices visible while the surface collapses, then drops them.
   .pwa-dock__menu[data-ending-style] { transition: opacity var(--pwa-motion-fade-duration) cubic-bezier(.4, 0, 1, 1); }
-  // Like a material morph, choices and tabs soften while the surface changes shape.
-  .pwa-dock[data-dock-morphing] .pwa-dock__choices { filter: blur(calc((1 - var(--dock-menu-progress, 1)) * 10px)); }
-  .pwa-dock[data-dock-morphing] :is(.pwa-dock__tab, .pwa-dock__indicator) { filter: blur(calc(var(--dock-menu-progress, 0) * 8px)); }
   .pwa-dock__menu[data-ending-style] { pointer-events: none; }
   .pwa-dock__choices { position: relative; opacity: var(--dock-menu-opacity, 0); }
   // One highlight follows the held finger between choices.
