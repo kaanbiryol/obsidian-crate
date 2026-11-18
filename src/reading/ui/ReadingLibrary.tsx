@@ -21,6 +21,7 @@ import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
 import type { ReadingLibrarySource } from './useLibraryPages';
 import { useReadingLibraryQuery } from './useReadingLibraryQuery';
+import { useDepartedRows } from './useDepartedRows';
 import { ReadingTagFilter } from './ReadingTagFilter';
 
 export interface ReadingLibraryProps {
@@ -93,7 +94,7 @@ export function ReadingLibraryPanel({
 	useEffect(() => {
 		if (!activeId && previousArticle.current && !readerClosing) {
 			const list = lists.current.get(shownSection);
-			const button = list?.querySelector<HTMLButtonElement>(`[data-reading-id="${previousArticle.current}"]`);
+			const button = list?.querySelector<HTMLButtonElement>(`.crate-reading__item:not([inert]) > [data-reading-id="${previousArticle.current}"]`);
 			(button ?? list)?.focus({ preventScroll: true });
 		}
 		if (!readerClosing) previousArticle.current = activeId;
@@ -108,7 +109,32 @@ export function ReadingLibraryPanel({
 		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 1000);
 		return () => window.clearTimeout(timer);
 	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
-	const groups = useMemo(() => groupReadingItems(items.slice(0, visible)), [items, visible]);
+	// A row that leaves the list, like an article archived in the reader, stays in place until
+	// the reader has closed, then collapses so the rows below slide up rather than jump.
+	const { rows, departed, settle } = useDepartedRows(items, JSON.stringify([shownSection, listQuery, shownTag]));
+	const holdDeparted = !!reader || readerClosing || !!exitingReader;
+	const collapsing = useRef(new Map<HTMLElement, Animation>());
+	useLayoutEffect(() => {
+		const list = lists.current.get(shownSection);
+		if (holdDeparted || !departed.size || !list) return;
+		const owner = list.ownerDocument.defaultView ?? window, listStyle = owner.getComputedStyle(list);
+		const duration = parseFloat(listStyle.getPropertyValue('--pwa-motion-dismiss-duration'));
+		const easing = listStyle.getPropertyValue('--pwa-motion-surface-ease').trim() || 'ease-out';
+		for (const node of list.querySelectorAll<HTMLElement>('[data-departing="true"]')) {
+			if (collapsing.current.has(node)) continue;
+			const ids = node.dataset.departed ? [node.dataset.departed] : [...node.querySelectorAll<HTMLElement>('[data-departed]')].map(row => row.dataset.departed!);
+			if (!duration) { settle(ids); continue; }
+			const style = owner.getComputedStyle(node);
+			const animation = node.animate([
+				{ height: `${node.offsetHeight}px`, paddingTop: style.paddingTop, paddingBottom: style.paddingBottom, marginBottom: style.marginBottom, opacity: 1 },
+				{ height: '0px', paddingTop: '0px', paddingBottom: '0px', marginBottom: '0px', opacity: 0 },
+			], { duration, easing, fill: 'forwards' });
+			collapsing.current.set(node, animation);
+			animation.onfinish = () => { collapsing.current.delete(node); settle(ids); };
+		}
+	}, [holdDeparted, departed, shownSection, settle]);
+	useEffect(() => () => { for (const animation of collapsing.current.values()) animation.cancel(); }, []);
+	const groups = useMemo(() => groupReadingItems(rows.slice(0, visible)), [rows, visible]);
 	// A section that had to load fades its count, tags and list in instead of popping in.
 	useContentReveal(loading, () => {
 		const list = lists.current.get(shownSection), library = list?.parentElement;
@@ -216,20 +242,27 @@ export function ReadingLibraryPanel({
 							? <HighlightList entries={excerpts.slice(0, visible)} disabled={busy.has('open')}
 								onView={(item, highlight) => run('open', () => onOpen(item, highlight, shownSection))} onOpenItem={item => run('open', () => onOpen(item, undefined, shownSection))} />
 							: !more && <EmptyState className="crate-reading__empty" icon="highlighter" title={highlightsCopy.title} description={highlightsCopy.description} />)}
-						{shownSection !== 'highlights' && items.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open" title={linksCopy.title} description={linksCopy.description}>
+						{shownSection !== 'highlights' && rows.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open" title={linksCopy.title} description={linksCopy.description}>
 							{shownSection === 'inbox' && !listQuery && !tag && <Button variant="outline" className="crate-reading__text-action" onClick={onAdd}>
 								<ThemeIcon id="plus" size="m" aria-hidden="true" />Save your first link
 							</Button>}
 						</EmptyState>}
-						{shownSection !== 'highlights' && groups.map(group => <section className="crate-reading__group" key={group.label} aria-label={group.label}>
+						{shownSection !== 'highlights' && groups.map(group => {
+							const groupDeparts = group.items.every(item => departed.has(item.crate_reading_id));
+							return <section className="crate-reading__group" key={group.label} aria-label={group.label} inert={groupDeparts} data-departing={groupDeparts || undefined}>
 							<h3>{group.label}</h3>
-							<ul className="crate-reading__list">{group.items.map(item => <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}>
+							<ul className="crate-reading__list">{group.items.map(item => {
+								const departs = departed.has(item.crate_reading_id);
+								return <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}
+									inert={departs} data-departed={departs ? item.crate_reading_id : undefined} data-departing={departs && !groupDeparts || undefined}>
 								<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`}
 									aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, shownSection))}>
 									<ReadingItemContent item={item} />
 								</Button>
-							</li>)}</ul>
-						</section>)}
+							</li>;
+							})}</ul>
+						</section>;
+						})}
 						{more && loadingMore && <LoadingIndicator label="Loading more" />}
 					</>)}
 				</div>

@@ -14,6 +14,8 @@
 	&__group { margin: 0 0 var(--crate-space-16); }
 	&__group h3 { color: var(--text-muted); margin: 0; padding: 4px 12px var(--crate-space-4); font-size: 12px; font-weight: 450; }
 	&__list { list-style: none; padding: 0; margin: 0; }
+	// Departed rows clip their content while they collapse.
+	&__group[data-departing], &__item[data-departing] { overflow: hidden; }
 	&__item { position: relative; display: flex; align-items: center; min-width: 0; @include list-item.surface; margin-bottom: var(--crate-list-row-gap); }
 	@media (hover: hover) and (pointer: fine) { &__item:hover { @include list-item.hover; } }
 	&__item:has(button[data-press-active]) { @include list-item.active; }
