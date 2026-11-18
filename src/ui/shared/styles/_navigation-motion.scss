@@ -1,11 +1,12 @@
 .crate-reminders-ui, .crate-feature-shell {
   --pwa-motion-surface-duration: 420ms;
   --pwa-motion-dismiss-duration: 320ms;
-  --pwa-motion-fade-duration: 160ms;
-  --pwa-motion-fade-ease: ease-out;
-  --pwa-motion-tab-duration: 120ms;
-  --pwa-motion-tab-ease: ease-in-out;
+  // Every stationary fade: tab and feature dissolves, content reveals, Reading tag
+  // changes, list rows, empty states and toasts. PWA_FADE in navigation/motion.ts mirrors it.
+  --pwa-motion-fade-duration: 140ms;
+  --pwa-motion-fade-ease: ease-in-out;
   --pwa-motion-feedback-duration: 120ms;
+  --pwa-motion-feedback-ease: ease-out;
   --pwa-motion-control-duration: 180ms;
   --pwa-motion-dock-duration: 300ms;
   --pwa-motion-dock-ease: cubic-bezier(.22, .61, .36, 1);
@@ -29,7 +30,6 @@
     --pwa-motion-dismiss-duration: 0ms;
     --pwa-motion-navigation-duration: 0ms;
     --pwa-motion-fade-duration: 0ms;
-    --pwa-motion-tab-duration: 0ms;
     --pwa-motion-feedback-duration: 0ms;
     --pwa-motion-control-duration: 0ms;
     --pwa-motion-dock-duration: 0ms;

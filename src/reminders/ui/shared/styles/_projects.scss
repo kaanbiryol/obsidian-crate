@@ -62,7 +62,7 @@
     height: var(--collapsible-panel-height);
     opacity: 1;
     overflow: hidden;
-    transition: height 240ms var(--crate-motion-easing), opacity 160ms var(--crate-motion-easing);
+    transition: height 240ms var(--crate-motion-easing), opacity var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease);
 
     &[data-starting-style],
     &[data-ending-style] {

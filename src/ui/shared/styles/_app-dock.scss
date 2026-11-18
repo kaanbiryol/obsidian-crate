@@ -75,7 +75,7 @@
   }
   // A held switcher swells until the menu takes over, then settles back.
   .pwa-dock__group { transition: scale var(--pwa-motion-control-duration) var(--pwa-motion-control-ease); }
-  .pwa-dock__group[data-press-active] { scale: 1.14; transition: scale 330ms var(--pwa-motion-fade-ease); }
+  .pwa-dock__group[data-press-active] { scale: 1.14; transition: scale 330ms var(--pwa-motion-feedback-ease); }
   .pwa-dock__group { gap: 4px; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
   .pwa-dock__view-icon { animation: pwa-dock-icon-in var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease); }
   @keyframes pwa-dock-icon-in { from { opacity: .25; } to { opacity: 1; } }
@@ -94,7 +94,7 @@
     // or delaying input. The short exit fade lets Base UI finish its lifecycle.
     clip-path: inset(var(--dock-menu-inset, 0px) 0 0 round 28px);
     opacity: 1;
-    transition: opacity var(--pwa-motion-feedback-duration) var(--pwa-motion-fade-ease);
+    transition: opacity var(--pwa-motion-feedback-duration) var(--pwa-motion-feedback-ease);
   }
   .pwa-dock__menu[data-starting-style], .pwa-dock__menu[data-ending-style] { opacity: 0; }
   // Closing keeps the choices visible while the surface collapses, then drops them.
@@ -102,7 +102,7 @@
   .pwa-dock__menu[data-ending-style] { pointer-events: none; }
   .pwa-dock__choices { position: relative; opacity: var(--dock-menu-opacity, 0); }
   // One highlight follows the held finger between choices.
-  .pwa-dock__preview { position: absolute; top: 0; left: 0; right: 0; height: var(--dock-preview-height, 44px); border-radius: 22px; background: color-mix(in srgb, var(--text-normal) 12%, transparent); opacity: 0; pointer-events: none; transform: translateY(var(--dock-preview-y, 0px)); transition: opacity var(--pwa-motion-feedback-duration) var(--pwa-motion-fade-ease), transform var(--pwa-motion-control-duration) var(--pwa-motion-control-ease); }
+  .pwa-dock__preview { position: absolute; top: 0; left: 0; right: 0; height: var(--dock-preview-height, 44px); border-radius: 22px; background: color-mix(in srgb, var(--text-normal) 12%, transparent); opacity: 0; pointer-events: none; transform: translateY(var(--dock-preview-y, 0px)); transition: opacity var(--pwa-motion-feedback-duration) var(--pwa-motion-feedback-ease), transform var(--pwa-motion-control-duration) var(--pwa-motion-control-ease); }
   .pwa-dock__preview[data-visible="true"] { opacity: 1; }
   .pwa-dock__preview[data-instant] { transition: none; }
   .pwa-dock__menu[data-dragging="true"] { user-select: none; -webkit-user-select: none; }

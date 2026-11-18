@@ -270,7 +270,7 @@ and a count can only go down: after moving literals onto roles, run
   feature. Errors use assertive alerts; other feedback uses polite status messages.
   Both features share bottom-center positioning above the dock and safe area.
   Toasts use the chrome surface raised by the `--pwa-toast-*` tokens (a lighter dark fill, stronger border and shadow) so they stand out from cards.
-  Toasts fade in and out over 160ms without moving; reduced motion skips the fade.
+  Toasts fade in and out with the shared fade without moving; reduced motion skips the fade.
   Replacing feedback updates the current toast instead of stacking another one.
   Reading confirms explicit link, tag, and highlight-note saves after local
   persistence; offline confirmations say they are saved on this device. Favorite
@@ -364,20 +364,25 @@ and a count can only go down: after moving literals onto roles, run
   Initialize unvisited features and picker modules after the entrance completes.
   Picker screen handoffs retain their existing focus/keyboard timing; these are
   replacements inside one drawer, not additional stacked dialogs.
-  Stationary tab dissolves use 120ms ease-in-out: short enough that two screens
-  with the same layout never read as doubled text, while the dock's collapse
-  carries the motion. Switching to or from Reading uses that same tab dissolve in
-  both hosts. A Reading tag change dissolves a copy of the departing rows over
-  the new list with the same timing, so rows both tags list stay steady. Content that
-  replaces a loading state fades in over 160ms through `useContentReveal`, so a
+  Every stationary fade uses one shared fade: 140ms ease-in-out, defined once as
+  `--pwa-motion-fade-duration` and `--pwa-motion-fade-ease` in
+  `src/ui/shared/styles/_navigation-motion.scss` and mirrored by `PWA_FADE` and
+  `PWA_FADE_TIMING` in `src/ui/shared/navigation/motion.ts` (a unit test keeps them equal).
+  Never hard-code a fade duration; first visits and returns must look the same.
+  Tab dissolves use it: short enough that two screens with the same layout never
+  read as doubled text, while the dock's collapse carries the motion. Switching to
+  or from Reading uses that same dissolve in both hosts. A Reading tag change
+  dissolves a copy of the departing rows over the new list with the same fade, so
+  rows both tags list stay steady. Content that replaces a loading state fades in
+  with it through `useContentReveal`, as do list rows, empty states and toasts, so a
   Reading section that has to load never pops in; a screen read before draws at
   once without fading, and Reading sections keep their pages through a sync while
   they reload. Switching sections on a visible Reading screen to one the PWA has not read
   yet keeps the current screen, with the dock already on the new tab, until its
   first page answers, then dissolves once; only a section slower than 400ms shows
   a loading state. Arriving from Reminders never shows a stale section, and
-  nothing loads before the user switches. Toasts retain their 160ms fade. Press feedback uses
-  120ms, and control movement uses the shared control spring or 180ms CSS curve.
+  nothing loads before the user switches. Press feedback uses
+  120ms ease-out (`--pwa-motion-feedback-ease`), and control movement uses the shared control spring or 180ms CSS curve.
   The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
   changes retain visible travel instead of spending almost all their time settling.
   Dock expansion uses a spring with a soft overshoot of a few pixels and closes
@@ -503,7 +508,7 @@ as dock navigation, while the heading and segmented control stay mounted.
 Upcoming retains its configured range, date groups, and launch links;
 Both views select Reminders in the default dock; a pinned Upcoming tab has its own selection. The opening shell reserves the chips' final space
 before JavaScript loads. Once the initial reminder snapshot is ready, the counts,
-chips, and list reveal together with the shared 160ms fade. The title, actions,
+chips, and list reveal together with the shared fade. The title, actions,
 and dock stay painted; reduced motion reveals content immediately, and background
 refreshes do not replay the entrance. `tests/browser/pwa/pwa-schedule-test.mjs` checks cold
 and cached launches with overdue reminders, coordinated reveal, selection,

@@ -22,10 +22,13 @@ export const PWA_NAVIGATION_SPRING = {
 	...PWA_SURFACE_SPRING, stiffness: 600, damping: 49,
 } as const;
 
-/** Local feedback and stationary screen/toast dissolves; durations are seconds.
- * CSS counterparts live in ../styles/_navigation-motion.scss. Keyboard timing remains separate
- * because it follows viewport displacement rather than app navigation. */
-export const PWA_FADE = { duration: 0.16, ease: 'easeOut' } as const;
+/** Every stationary fade (screens, content reveals, list rows, empty states and toasts);
+ * durations are seconds. Mirrors --pwa-motion-fade-duration and --pwa-motion-fade-ease in
+ * ../styles/_navigation-motion.scss. Keyboard timing remains separate because it follows
+ * viewport displacement rather than app navigation. */
+export const PWA_FADE = { duration: 0.14, ease: 'easeInOut' } as const;
+/** PWA_FADE for Web Animations, which take milliseconds and CSS easing names. */
+export const PWA_FADE_TIMING = { duration: PWA_FADE.duration * 1000, easing: 'ease-in-out' } as const;
 export const PWA_CONTROL_SPRING = {
 	...PWA_SURFACE_SPRING, stiffness: 700, damping: 53,
 } as const;
@@ -33,9 +36,6 @@ export const PWA_CONTROL_SPRING = {
 /** The picker handoff keeps focus restoration inside the initiating gesture. */
 export const PWA_PICKER_EXIT = { duration: 0.18, ease: [0.4, 0, 1, 1] } as const;
 export const PWA_PICKER_RETURN = { ...PWA_PICKER_EXIT, duration: 0.08 } as const;
-
-/** Empty states and the list rows they replace dissolve together; durations are seconds. */
-export const LIST_FADE_TRANSITION = { duration: 0.12, ease: 'easeOut' } as const;
 
 export const SPRING_CONFIG = {
 	stiffness: 500,

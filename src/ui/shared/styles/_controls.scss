@@ -11,7 +11,7 @@
     opacity: 1;
     overflow: hidden;
     padding-top: 12px;
-    transition: height 240ms ease, opacity 160ms ease, padding-top 240ms ease;
+    transition: height 240ms ease, opacity var(--pwa-motion-fade-duration) var(--pwa-motion-fade-ease), padding-top 240ms ease;
     &[data-starting-style], &[data-ending-style] { height: 0; opacity: 0; padding-top: 0; }
     &[data-no-animation] { transition: none; }
     &[data-open]:not([data-starting-style]) { overflow: visible; }

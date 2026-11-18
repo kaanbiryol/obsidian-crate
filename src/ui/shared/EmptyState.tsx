@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useRef } from 'react';
 import { motion, useIsPresent } from 'motion/react';
 import type { AnimationConfig } from './component-adapter';
-import { LIST_FADE_TRANSITION } from './navigation/motion';
+import { PWA_FADE } from './navigation/motion';
 import { ThemeIcon } from './ThemeIcon';
 import { useReducedMotion } from './useReducedMotion';
 
@@ -41,16 +41,16 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 	const message = isPresent ? currentMessage : lastMessage.current;
 	const reduceMotion = useReducedMotion();
 	const animationsEnabled = animationConfig.enabled && !reduceMotion;
-	const duration = animationConfig.duration ?? LIST_FADE_TRANSITION.duration;
+	const duration = animationConfig.duration ?? PWA_FADE.duration;
 	const variants = {
 		hidden: { opacity: 0 },
 		visible: {
 			opacity: 1,
-			transition: { duration, ease: LIST_FADE_TRANSITION.ease }
+			transition: { duration, ease: PWA_FADE.ease }
 		},
 		exit: {
 			opacity: 0,
-			transition: { ...LIST_FADE_TRANSITION }
+			transition: { ...PWA_FADE }
 		}
 	};
 

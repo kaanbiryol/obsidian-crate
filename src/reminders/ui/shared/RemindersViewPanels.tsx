@@ -7,10 +7,7 @@ import {
 	TodayView,
 	UpcomingView,
 } from "@/reminders/ui/views";
-import {
-	EASE_EXPO_OUT,
-	PAGE_TRANSITION_DURATION,
-} from "@/reminders/ui/shared/layoutConstants";
+import { PWA_FADE } from "@/ui/shared/navigation/motion";
 import type { Reminder as SharedReminder } from "@/reminders/types/reminder";
 import type { Reminder } from "@/reminders/types/reminder";
 import type { ViewMode } from "./remindersViewModel";
@@ -73,10 +70,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
 		initial: pageTransitionsEnabled ? { opacity: 0 } : false,
 		animate: { opacity: 1 },
 		exit: pageTransitionsEnabled ? { opacity: 0 } : undefined,
-		transition: {
-			duration: pageTransitionsEnabled ? PAGE_TRANSITION_DURATION : 0,
-			ease: EASE_EXPO_OUT,
-		},
+		transition: pageTransitionsEnabled ? PWA_FADE : { duration: 0 },
 	};
 
 	// Views are memoized; a fresh object here would re-render each one.

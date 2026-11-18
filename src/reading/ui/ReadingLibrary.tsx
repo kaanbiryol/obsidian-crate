@@ -141,7 +141,7 @@ export function ReadingLibraryPanel({
 		if (!list || !library) return undefined;
 		return [list, ...library.querySelectorAll<HTMLElement>(':scope > .crate-reading__header .view-header-meta, :scope > .crate-reading-tag-filter')];
 	});
-	// A tag swaps the list in place. Like the tab dissolve, a copy of the departing rows
+	// A tag swaps the list in place. With the shared fade, a copy of the departing rows
 	// fades out over the new list once the tag's results show, so rows both tags list stay
 	// steady. Sections and loading states have their own transitions.
 	const reduceMotion = useReducedMotion();
@@ -153,7 +153,7 @@ export function ReadingLibraryPanel({
 		departingList.current = null;
 		if (!previous || loading || previous.section !== shownSection || departing?.tag !== shownTag || !list) return;
 		const owner = list.ownerDocument.defaultView ?? window, style = owner.getComputedStyle(list);
-		const duration = parseFloat(style.getPropertyValue('--pwa-motion-tab-duration'));
+		const duration = parseFloat(style.getPropertyValue('--pwa-motion-fade-duration'));
 		if (!duration) return;
 		const { node } = departing;
 		Object.assign(node.style, {
@@ -161,7 +161,7 @@ export function ReadingLibraryPanel({
 			boxSizing: 'border-box', pointerEvents: 'none', background: opaqueBackground(list, owner),
 		});
 		list.after(node);
-		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-tab-ease').trim() || 'ease-in-out' });
+		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || 'ease-in-out' });
 		animation.onfinish = () => node.remove();
 		return () => { animation.cancel(); node.remove(); };
 	}, [loading, shownSection, shownTag]);

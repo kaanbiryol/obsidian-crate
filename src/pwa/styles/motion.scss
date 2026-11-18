@@ -4,5 +4,5 @@
 .crate-reminders-ui {
   --anim-duration-fast: var(--pwa-motion-feedback-duration);
   --anim-duration-moderate: var(--pwa-motion-control-duration);
-  --anim-motion-baseline: var(--pwa-motion-fade-ease);
+  --anim-motion-baseline: var(--pwa-motion-feedback-ease);
 }

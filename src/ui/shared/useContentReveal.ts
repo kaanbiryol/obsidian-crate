@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
-import { PWA_FADE } from './navigation/motion';
+import { PWA_FADE_TIMING } from './navigation/motion';
 import { useReducedMotion } from './useReducedMotion';
 
 /**
@@ -20,7 +20,7 @@ export function useContentReveal(loading: boolean, regions: () => Iterable<HTMLE
 		if (reduceMotion) return;
 		const animations = Array.from(read.current() ?? [], region => region.animate(
 			[{ opacity: 0 }, { opacity: 1 }],
-			{ duration: PWA_FADE.duration * 1000, easing: 'ease-out' },
+			PWA_FADE_TIMING,
 		));
 		return () => animations.forEach(animation => animation.cancel());
 	}, [loading, reduceMotion]);

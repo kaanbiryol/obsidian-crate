@@ -3,7 +3,7 @@ import { AnimatePresence, LayoutGroup, motion, useIsPresent, type HTMLMotionProp
 import type { Reminder } from '../../types/reminder';
 import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
-import { LIST_FADE_TRANSITION } from '../../../ui/shared/navigation/motion';
+import { PWA_FADE } from '../../../ui/shared/navigation/motion';
 import { useStableReminderScroll } from '../shared/hooks/useStableReminderScroll';
 import { CompletedReminderSection, type CompletedSectionToggleProps } from './CompletedReminderSection';
 
@@ -44,7 +44,7 @@ export function ReminderListLayout({
 	animationConfig,
 }: ReminderListLayoutProps) {
 	const reduceMotion = useReducedMotion();
-	const transition = animationConfig.enabled && !reduceMotion ? LIST_FADE_TRANSITION : { duration: 0 };
+	const transition = animationConfig.enabled && !reduceMotion ? PWA_FADE : { duration: 0 };
 	const layoutGroupId = useId();
 	const scrollRef = useStableReminderScroll(isDragging);
 	const [showCompleted, setShowCompleted] = useState(false);
