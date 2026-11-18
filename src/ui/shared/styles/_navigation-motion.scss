@@ -3,8 +3,10 @@
   --pwa-motion-dismiss-duration: 320ms;
   // Every stationary fade: tab and feature dissolves, content reveals, Reading tag
   // changes, list rows, empty states and toasts. PWA_FADE in navigation/motion.ts mirrors it.
-  --pwa-motion-fade-duration: 140ms;
-  --pwa-motion-fade-ease: ease-in-out;
+  // A strong ease-out: the departing screen is half gone within ~45ms, so two screens
+  // never sit muddled at half strength, then leaves a faint trace that reads as motion.
+  --pwa-motion-fade-duration: 270ms;
+  --pwa-motion-fade-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --pwa-motion-feedback-duration: 120ms;
   --pwa-motion-feedback-ease: ease-out;
   --pwa-motion-control-duration: 180ms;

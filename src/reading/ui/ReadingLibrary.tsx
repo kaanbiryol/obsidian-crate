@@ -16,6 +16,7 @@ import { groupReadingItems, readingSections, readingSource, readingTitle, type R
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { useContentReveal } from '@/ui/shared/useContentReveal';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
+import { PWA_FADE_TIMING } from '@/ui/shared/navigation/motion';
 import { HighlightList } from './HighlightList';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
@@ -161,7 +162,7 @@ export function ReadingLibraryPanel({
 			boxSizing: 'border-box', pointerEvents: 'none', background: opaqueBackground(list, owner),
 		});
 		list.after(node);
-		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || 'ease-in-out' });
+		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || PWA_FADE_TIMING.easing });
 		animation.onfinish = () => node.remove();
 		return () => { animation.cancel(); node.remove(); };
 	}, [loading, shownSection, shownTag]);

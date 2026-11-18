@@ -364,13 +364,15 @@ and a count can only go down: after moving literals onto roles, run
   Initialize unvisited features and picker modules after the entrance completes.
   Picker screen handoffs retain their existing focus/keyboard timing; these are
   replacements inside one drawer, not additional stacked dialogs.
-  Every stationary fade uses one shared fade: 140ms ease-in-out, defined once as
+  Every stationary fade uses one shared fade: 270ms `cubic-bezier(0.22, 1, 0.36, 1)`,
+  fitted to Linear's screen switches. The departing screen is half gone within
+  about 45ms, so two screens never sit muddled at half strength, then leaves a
+  faint trace for the rest of the fade that reads as motion. It is defined once as
   `--pwa-motion-fade-duration` and `--pwa-motion-fade-ease` in
   `src/ui/shared/styles/_navigation-motion.scss` and mirrored by `PWA_FADE` and
   `PWA_FADE_TIMING` in `src/ui/shared/navigation/motion.ts` (a unit test keeps them equal).
   Never hard-code a fade duration; first visits and returns must look the same.
-  Tab dissolves use it: short enough that two screens with the same layout never
-  read as doubled text, while the dock's collapse carries the motion. Switching to
+  Tab dissolves use it while the dock's collapse carries the motion. Switching to
   or from Reading uses that same dissolve in both hosts. A Reading tag change
   dissolves a copy of the departing rows over the new list with the same fade, so
   rows both tags list stay steady. Content that replaces a loading state fades in

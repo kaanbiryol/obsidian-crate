@@ -89,8 +89,8 @@ try {
           await expect(panel(section === 'reading' ? 'reminders' : 'reading')).toHaveCSS('opacity', '0');
           await expect(page.locator('.crate-feature-panel[data-leaving="true"]')).toHaveCount(0);
         };
-        // A transition existing is insufficient: retain visible outgoing content
-        // through the early frames instead of making ordinary dock taps look instant.
+        // A transition existing is insufficient: like Linear, the outgoing screen clears
+        // quickly so two screens never sit muddled, then leaves a faint trace that reads as motion.
         for (const tab of ['today', 'projects', 'inbox', 'projects', 'today', 'inbox']) {
           const dissolve = await page.evaluate(async tab => {
             const panel = document.querySelector('[data-crate-section="reminders"]');
@@ -109,8 +109,8 @@ try {
             fade.finish();
             return result;
           }, tab);
-          assert.ok(dissolve.early >= .7 && dissolve.early < 1, `${name} → ${tab}: keep the outgoing screen visible a quarter of the way in: ${JSON.stringify(dissolve)}`);
-          assert.ok(dissolve.middle >= .35 && dissolve.middle <= .65, `${name} → ${tab}: show both screens halfway: ${JSON.stringify(dissolve)}`);
+          assert.ok(dissolve.early >= .15 && dissolve.early <= .35, `${name} → ${tab}: clear most of the outgoing screen a quarter of the way in: ${JSON.stringify(dissolve)}`);
+          assert.ok(dissolve.middle > 0 && dissolve.middle <= .1, `${name} → ${tab}: leave a faint trace of the outgoing screen halfway: ${JSON.stringify(dissolve)}`);
           assert.ok(dissolve.duration <= 320 && dissolve.interactive && dissolve.covered);
           await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
         }

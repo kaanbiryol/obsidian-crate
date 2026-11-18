@@ -192,7 +192,7 @@ async function checkFeatureFades({ page, name, closed, active, direct }) {
       fade.finish();
       return result;
     }, label);
-    assert.ok(blend.early >= .7 && blend.early < 1 && blend.middle >= .35 && blend.middle <= .65 && blend.inert,
+    assert.ok(blend.early >= .15 && blend.early <= .35 && blend.middle > 0 && blend.middle <= .1 && blend.inert,
       `${name}: all four tabs must share a visible fade to ${label}: ${JSON.stringify(blend)}`);
     await closed(); await active(label);
     await expect(page.locator('.crate-feature-panel[data-entering="true"], .pwa-tab-panel[data-leaving]')).toHaveCount(0);
@@ -222,7 +222,7 @@ async function checkFeatureFades({ page, name, closed, active, direct }) {
         opacity: outgoing.isConnected ? Number(getComputedStyle(outgoing).opacity) : 0 };
       fade?.finish(); outer.finish(); return result;
     }, { label, next });
-    assert.ok(immediate.entering === 'true' && immediate.retained && immediate.opacity >= .35 && immediate.opacity <= .65,
+    assert.ok(immediate.entering === 'true' && immediate.retained && immediate.opacity > 0 && immediate.opacity <= .1,
       `${name}: Reading → ${label} → ${next} must fade immediately: ${JSON.stringify(immediate)}`);
     await closed(); await active(next);
   }
@@ -392,7 +392,7 @@ async function checkLocalFades({ page, dock, closed, active, openViews, direct }
     // scroller before React removes its node (especially with reduced motion).
     if (!interruptWith) assert.ok(samples.filter(frame => frame.outgoing > 0).every(frame => frame.oldTitle && frame.oldScroll),
       'The visible outgoing title and scroll position must remain intact: ' + JSON.stringify({ selector, samples }));
-    assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.14s', 'ease-in-out']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs use the perceptible tab dissolve with reversible opacity transitions');
+    assert.ok(samples.some(frame => frame.animations.some(animation => JSON.stringify(animation) === JSON.stringify(['opacity', reducedMotion ? '0s' : '0.27s', 'cubic-bezier(0.22, 1, 0.36, 1)']))) || (reducedMotion && samples.every(frame => !frame.retained)), 'Tabs use the perceptible tab dissolve with reversible opacity transitions');
     assert.ok(samples.every(frame => frame.x === frame.oldX && frame.y === frame.oldY && frame.transform === 'none' && frame.translate === 'none' && frame.scale === 'none'));
     await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
   };

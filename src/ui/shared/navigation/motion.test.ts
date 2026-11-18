@@ -9,7 +9,6 @@ describe('shared fade', () => {
 	it('matches the CSS fade tokens, so every fade has one timing', () => {
 		expect(token('pwa-motion-fade-duration')).toBe(`${PWA_FADE.duration * 1000}ms`);
 		expect(token('pwa-motion-fade-ease')).toBe(PWA_FADE_TIMING.easing);
-		expect(PWA_FADE.ease).toBe('easeInOut');
 		expect(PWA_FADE_TIMING.duration).toBe(PWA_FADE.duration * 1000);
 	});
 });
