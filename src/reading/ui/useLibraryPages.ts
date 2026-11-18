@@ -77,8 +77,13 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		// A reload of the shown query runs in the background; only a next page shows its spinner.
 		setPages(state => ({ ...state, loading: true, error: null, reloading: replace && state.key === requested }));
 		// A first page also reads its section's tags, unless they were read since the last revision.
+		// Failed tags show what was known before and stay unread, so the next load asks again.
 		const knownTags = saved.tags.get(section), freshTags = knownTags && knownTags.revision === answering ? knownTags.tags : undefined;
-		const tags = replace && !freshTags ? source.loadTags(section).catch(() => knownTags?.tags ?? (shown.current.section === section ? shown.current.tags : [])) : Promise.resolve(freshTags ?? shown.current.tags);
+		let tagsFailed = false;
+		const tags = replace && !freshTags ? source.loadTags(section).catch(() => {
+			tagsFailed = true;
+			return knownTags?.tags ?? (shown.current.section === section ? shown.current.tags : []);
+		}) : Promise.resolve(freshTags ?? shown.current.tags);
 		try {
 			let page = await source.load({ section, q: query, tag, cursor }), items = page.items;
 			for (let follows = 0; !page.items.length && page.cursor && follows < MAX_EMPTY_FOLLOWS && !stale(); follows++) {
@@ -96,7 +101,7 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 			// Unchanged tags keep the shown row.
 			const kept = previous.section === section && JSON.stringify(previous.tags) === JSON.stringify(sectionTags) ? previous.tags : sectionTags;
 			saved.pages.set(requested, { items: listed, cursor: page.cursor, revision: answering, browse: !query && !tag });
-			if (replace) saved.tags.set(section, { tags: kept, revision: answering });
+			if (replace && !tagsFailed) saved.tags.set(section, { tags: kept, revision: answering });
 			setPages({ key: requested, section, q: query, tag, items: listed, cursor: page.cursor, tags: kept, loading: false, error: null });
 		} catch (cause) {
 			if (stale()) return;

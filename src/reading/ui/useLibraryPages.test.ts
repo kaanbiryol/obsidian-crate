@@ -157,6 +157,33 @@ it('shows a first page only with its section\'s tags, and returns to a section r
 	} finally { vi.useRealTimers(); }
 });
 
+it('asks for a section\'s tags again after they failed, rather than keeping none', async () => {
+	vi.useFakeTimers();
+	try {
+		const load = vi.fn(async ({ section }: { section: string }) => ({ items: section === 'archived' ? [item] : [], cursor: null }));
+		let failTags = true;
+		const loadTags = vi.fn(async (section: string) => {
+			if (failTags && section === 'archived') throw new Error('Reading tags response is unreadable.');
+			return [{ name: section, count: 1 }];
+		});
+		let section: 'inbox' | 'archived' = 'archived';
+		const hook = renderHook(() => useLibraryPages({ load, loadTags, revision: 1, present: items => items }, section, '', null));
+		await act(async () => { await vi.runAllTimersAsync(); });
+		// The articles show even though their tags failed.
+		expect(hook.current).toMatchObject({ items: [item], tags: [], loading: false });
+		failTags = false;
+		section = 'inbox';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		section = 'archived';
+		hook.rerender();
+		await act(async () => { await vi.runAllTimersAsync(); });
+		// Before: the failure was kept as an empty tag list until the library changed.
+		expect(hook.current).toMatchObject({ items: [item], tags: [{ name: 'archived', count: 1 }], loading: false });
+		expect(loadTags.mock.calls.filter(([asked]) => asked === 'archived')).toHaveLength(2);
+	} finally { vi.useRealTimers(); }
+});
+
 it('reads a section\'s tags once for every tag and search in it', async () => {
 	vi.useFakeTimers();
 	try {
