@@ -1051,3 +1051,63 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     finally { await new Promise(resolve => server.close(resolve)); }
   }
 });
+
+test('Reading chromium: a tag change dissolves the departing rows over the new list', { timeout: 60000 }, async () => {
+  const { buildPwaPreviewAssets } = await import('../support/preview/pwa-preview-assets.mjs');
+  const { listenPwaPreviewServer } = await import('../support/preview/pwa-preview-server.mjs');
+  const { server, origin } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
+  let browser;
+  try {
+    browser = await chromium.launch();
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    const item = (n, tags) => ({ crate_reading_version: 1, crate_reading_id: `00000000-0000-4000-8000-00000000000${n}`, title: `Tag fixture ${n}`,
+      source_url: `https://example.com/${n}`, saved_at: `2026-09-2${n}T10:00:00.000Z`, reading_status: 'inbox', favorite: false,
+      tags, extraction_status: 'ready', capture_method: 'url', path: `Reading/Tag ${n}.md` });
+    const items = [item(1, ['essays']), item(2, []), item(3, ['essays'])];
+    await page.route('**/reading/session', route => route.fulfill({ json: { id: 'tag-test', folderPath: 'Reading', generation: 'generation', expiresAt: Date.now() + 86400000 } }));
+    await page.route('**/reading/tags*', route => route.fulfill({ json: { tags: ['essays'], counts: [2] } }));
+    await page.route('**/reading/items*', async route => {
+      const tag = new URL(route.request().url()).searchParams.get('tag');
+      // A server answers the tag after a moment; the previous rows stay until then.
+      if (tag) await new Promise(resolve => setTimeout(resolve, 120));
+      await route.fulfill({ json: { items: items.filter(entry => !tag || entry.tags.includes(tag)), issues: [], cursor: null } });
+    });
+    await page.goto(`${origin}/notifications?section=reading`);
+    const list = page.locator('.crate-reading__list-scroll:not([data-departing-list])');
+    await expect(list.getByRole('button', { name: /Tag fixture/ })).toHaveCount(3);
+    await page.evaluate(() => {
+      const samples = window.__departingSamples = [];
+      new MutationObserver(records => {
+        for (const node of records.flatMap(record => [...record.addedNodes])) {
+          if (!(node instanceof HTMLElement) || !node.dataset.departingList) continue;
+          const real = node.previousElementSibling;
+          const sample = () => {
+            if (!node.isConnected) return;
+            const [copy, shown] = [node.getBoundingClientRect(), real.getBoundingClientRect()];
+            samples.push({ opacity: Number(getComputedStyle(node).opacity), background: getComputedStyle(node).backgroundColor,
+              rows: node.querySelectorAll('.crate-reading__item').length, shownRows: real.querySelectorAll('.crate-reading__item').length,
+              inert: node.inert, hidden: node.getAttribute('aria-hidden'), ids: node.querySelectorAll('[id]').length,
+              geometry: [copy.top - shown.top, copy.left - shown.left, copy.width - shown.width, copy.height - shown.height] });
+            requestAnimationFrame(sample);
+          };
+          sample();
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+    await page.getByRole('group', { name: 'Filter by tag' }).getByRole('button', { name: 'essays', exact: true }).click();
+    await expect(list.getByRole('button', { name: /Tag fixture/ })).toHaveCount(2);
+    await expect(page.locator('[data-departing-list]')).toHaveCount(0);
+    const samples = await page.evaluate(() => window.__departingSamples);
+    assert.ok(samples.length >= 3, `the departing rows stayed for the dissolve (${samples.length} frames)`);
+    const [first, last] = [samples[0], samples.at(-1)];
+    assert.ok(first.opacity > 0.8, `the dissolve starts from the old rows (${first.opacity})`);
+    assert.ok(last.opacity < first.opacity, 'the old rows fade out');
+    assert.deepEqual([first.rows, first.shownRows], [3, 2], 'the old rows cover the new list');
+    assert.notEqual(first.background, 'rgba(0, 0, 0, 0)', 'the copy hides the new rows beneath it');
+    assert.deepEqual([first.inert, first.hidden, first.ids], [true, 'true', 0], 'the copy takes no focus, input or ids');
+    assert.ok(first.geometry.every(delta => Math.abs(delta) < 1), `the copy sits over the list (${first.geometry})`);
+  } finally {
+    try { await browser?.close(); }
+    finally { await new Promise(resolve => server.close(resolve)); }
+  }
+});

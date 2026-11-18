@@ -364,9 +364,11 @@ and a count can only go down: after moving literals onto roles, run
   Initialize unvisited features and picker modules after the entrance completes.
   Picker screen handoffs retain their existing focus/keyboard timing; these are
   replacements inside one drawer, not additional stacked dialogs.
-  Stationary tab dissolves use 180ms ease-in-out so outgoing content stays visible
-  through the early frames and both screens blend at the midpoint. Switching
-  to or from Reading uses that same tab dissolve in both hosts. Content that
+  Stationary tab dissolves use 120ms ease-in-out: short enough that two screens
+  with the same layout never read as doubled text, while the dock's collapse
+  carries the motion. Switching to or from Reading uses that same tab dissolve in
+  both hosts. A Reading tag change dissolves a copy of the departing rows over
+  the new list with the same timing, so rows both tags list stay steady. Content that
   replaces a loading state fades in over 160ms through `useContentReveal`, so a
   Reading section that has to load never pops in; a screen read before draws at
   once without fading, and Reading sections keep their pages through a sync while
@@ -375,8 +377,10 @@ and a count can only go down: after moving literals onto roles, run
   The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
   changes retain visible travel instead of spending almost all their time settling.
   Dock expansion uses a spring with a soft overshoot of a few pixels and closes
-  on the surface spring; its choices' icons and labels rise 8px into stationary
-  hit targets. A held switcher swells until the menu opens, the expanded surface
+  on a quicker critically damped spring; its choices' icons and labels rise 8px
+  into stationary hit targets. While the surface changes shape, the choices and
+  tab icons blur with its progress and crossfade where they overlap, so a chosen
+  view visibly collapses back into the bar; resting states carry no filter. A held switcher swells until the menu opens, the expanded surface
   gains a shadow with its progress, and one highlight slides between choices
   under a held finger. Native dragging remains immediate.
   Shared control tokens inherit these PWA defaults without changing Obsidian.

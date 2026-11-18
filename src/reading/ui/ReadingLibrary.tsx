@@ -109,22 +109,30 @@ export function ReadingLibraryPanel({
 		if (!list || !library) return undefined;
 		return [list, ...library.querySelectorAll<HTMLElement>(':scope > .crate-reading__header .view-header-meta, :scope > .crate-reading-tag-filter')];
 	});
-	// A tag swaps the list in place, so it fades in with the tab dissolve's timing once
-	// the tag's results show. Sections and loading states have their own transitions.
+	// A tag swaps the list in place. Like the tab dissolve, a copy of the departing rows
+	// fades out over the new list once the tag's results show, so rows both tags list stay
+	// steady. Sections and loading states have their own transitions.
 	const reduceMotion = useReducedMotion();
 	const shownFilter = useRef<{ section: ReadingSection; tag: string | null } | null>(null);
+	const departingList = useRef<{ tag: string | null; node: HTMLElement } | null>(null);
 	useLayoutEffect(() => {
-		const previous = shownFilter.current;
+		const previous = shownFilter.current, departing = departingList.current, list = lists.current.get(section);
 		shownFilter.current = loading ? null : { section, tag: shownTag };
-		if (!previous || loading || reduceMotion || previous.section !== section || previous.tag === shownTag) return;
-		const list = lists.current.get(section);
-		if (!list) return;
-		const style = (list.ownerDocument.defaultView ?? window).getComputedStyle(list);
+		departingList.current = null;
+		if (!previous || loading || previous.section !== section || departing?.tag !== shownTag || !list) return;
+		const owner = list.ownerDocument.defaultView ?? window, style = owner.getComputedStyle(list);
 		const duration = parseFloat(style.getPropertyValue('--pwa-motion-tab-duration'));
 		if (!duration) return;
-		const animation = list.animate([{ opacity: 0 }, { opacity: 1 }], { duration, easing: style.getPropertyValue('--pwa-motion-tab-ease').trim() || 'ease-in-out' });
-		return () => animation.cancel();
-	}, [loading, section, shownTag, reduceMotion]);
+		const { node } = departing;
+		Object.assign(node.style, {
+			position: 'absolute', top: `${list.offsetTop}px`, left: `${list.offsetLeft}px`, width: `${list.offsetWidth}px`, height: `${list.offsetHeight}px`,
+			boxSizing: 'border-box', pointerEvents: 'none', background: opaqueBackground(list, owner),
+		});
+		list.after(node);
+		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-tab-ease').trim() || 'ease-in-out' });
+		animation.onfinish = () => node.remove();
+		return () => { animation.cancel(); node.remove(); };
+	}, [loading, section, shownTag]);
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
 	useEffect(() => {
@@ -149,6 +157,13 @@ export function ReadingLibraryPanel({
 			.finally(() => { pending.current.delete(key); setBusy(new Set(pending.current)); });
 	};
 	const resetList = () => { setVisible(PAGE_SIZE); lists.current.get(section)?.scrollTo({ top: 0 }); };
+	const selectTag = (value: string | null) => {
+		if (value === tag) return;
+		setTag(value); resetList();
+		// Copy the rows as they now show, scrolled to the top like the incoming list.
+		const list = lists.current.get(section);
+		departingList.current = list && !reduceMotion ? { tag: value, node: copyDepartingList(list) } : null;
+	};
 	const selectSection = (next: ReadingSection) => {
 		setSection(next); setTag(null);
 		if (renderLibraryContent && next !== section) setVisible(PAGE_SIZE);
@@ -178,7 +193,7 @@ export function ReadingLibraryPanel({
 					placeholder={section === 'highlights' ? 'Search highlights and notes' : 'Search your reading'} leadingIcon={<ThemeIcon id="search" size="m" aria-hidden="true" />}
 					value={query} onChange={event => { setQuery(event.target.value); resetList(); }}
 					trailingAction={query && <IconButton size="large" icon="x" label="Clear search" onClick={() => { setQuery(''); resetList(); }} />} />
-				<ReadingTagFilter tags={tags} selected={tag} onChange={value => { if (value === tag) return; setTag(value); resetList(); }} />
+				<ReadingTagFilter tags={tags} selected={tag} onChange={selectTag} />
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1} onScroll={loadNearEnd}>
 					{notice}
@@ -217,6 +232,26 @@ export function ReadingLibraryPanel({
 			}}>{reader ?? (retainReaderOnClose ? exitingReader : null)}</div>
 		</div>
 	</section>;
+}
+
+/** A static, hidden copy of a list's rows for a crossfade; it takes no focus, input or ids. */
+function copyDepartingList(list: HTMLElement): HTMLElement {
+	const node = list.cloneNode(true) as HTMLElement;
+	node.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+	node.removeAttribute('tabindex');
+	node.inert = true;
+	node.setAttribute('aria-hidden', 'true');
+	node.dataset.departingList = 'true';
+	return node;
+}
+
+/** The first painted background behind `element`, so a copy over the list hides it. */
+function opaqueBackground(element: HTMLElement, owner: Window): string {
+	for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+		const color = owner.getComputedStyle(node).backgroundColor;
+		if (color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
+	}
+	return 'Canvas';
 }
 
 /** Empty highlights, either before any are saved or when filters match none. */

@@ -1,5 +1,5 @@
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import { PWA_DOCK_EXPAND_SPRING, PWA_SURFACE_SPRING } from './motion';
+import { PWA_DOCK_COLLAPSE_SPRING, PWA_DOCK_EXPAND_SPRING } from './motion';
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { animate, useMotionValue, useMotionValueEvent } from 'motion/react';
 
@@ -37,9 +37,12 @@ export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) 
 		const dock = element.closest<HTMLElement>('.pwa-dock');
 		dock?.style.setProperty('--dock-menu-inset', `${Math.max(0, menuSize - paintedHeight)}px`);
 		dock?.style.setProperty('--dock-menu-opacity', `${Math.max(0, Math.min(1, (progress - 0.1) / 0.55))}`);
-		dock?.style.setProperty('--dock-tabs-opacity', `${Math.max(0, 1 - progress * 5)}`);
+		// Tabs return through the collapsing choices and reach full strength before the spring's tail.
+		dock?.style.setProperty('--dock-tabs-opacity', `${Math.max(0, Math.min(1, 1 - (progress - 0.06) * 3))}`);
 		// Labels and icons rise into place inside their stationary hit targets.
 		dock?.style.setProperty('--dock-menu-progress', `${progress}`);
+		// Choices and tabs blur only while the surface moves, so resting text stays crisp.
+		dock?.toggleAttribute('data-dock-morphing', progress > 0 && progress < 1);
 	}, [expandedHeight]);
 	useMotionValueEvent(height, 'change', paint);
 	useMotionValueEvent(expandedHeight, 'change', () => paint(height.get()));
@@ -52,7 +55,7 @@ export function useDockMorph(open: boolean, menuHeight: number, inert: boolean) 
 		const target = open && !inert ? menuHeight : 60;
 		if (reduceMotion) height.jump(target);
 		// A new animation continues from the value's current velocity.
-		else animate(height, target, target > 60 ? PWA_DOCK_EXPAND_SPRING : PWA_SURFACE_SPRING);
+		else animate(height, target, target > 60 ? PWA_DOCK_EXPAND_SPRING : PWA_DOCK_COLLAPSE_SPRING);
 	}, [height, expandedHeight, owner, open, menuHeight, inert, reduceMotion]);
 	return useCallback((element: HTMLSpanElement | null) => {
 		surface.current = element;

@@ -6,9 +6,15 @@ export const PWA_SURFACE_SPRING = {
 } as const;
 
 /** The dock grows into its view menu with a soft overshoot of a few pixels,
- * like a native control expanding; closing settles with PWA_SURFACE_SPRING. */
+ * like a native control expanding; closing uses PWA_DOCK_COLLAPSE_SPRING. */
 export const PWA_DOCK_EXPAND_SPRING = {
 	...PWA_SURFACE_SPRING, stiffness: 420, damping: 30,
+} as const;
+
+/** The view menu shrinks back into the bar quickly and without bounce, so the
+ * chosen screen's dissolve reads as following the menu's collapse. */
+export const PWA_DOCK_COLLAPSE_SPRING = {
+	...PWA_SURFACE_SPRING, stiffness: 700, damping: 53,
 } as const;
 
 /** Full-width navigation covers more distance and needs a slightly quicker response. */
