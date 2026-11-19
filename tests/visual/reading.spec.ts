@@ -136,7 +136,8 @@ for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard
 		let active = document.activeElement;
 		while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
 		return { bottom: Math.round(bounds.bottom), inset: host === 'pwa' ? getComputedStyle(surface.parentElement!).paddingBottom : element.closest<HTMLElement>('.base-modal-container')?.style.bottom, active: active?.tagName };
-	}, host)).toEqual({ bottom: 484, inset: '360px', active: 'INPUT' });
+	// A PWA card sheet floats 8px above the keyboard.
+	}, host)).toEqual({ bottom: host === 'pwa' ? 476 : 484, inset: '360px', active: 'INPUT' });
 });
 
 test('a server library loads its next page as the list nears its end', async ({ page }) => {
