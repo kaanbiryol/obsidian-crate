@@ -22,7 +22,7 @@ test('rejects missing or invalid generated assets instead of serving them', asyn
 });
 
 test('a preview server on an ephemeral port reports and resolves requests against its bound origin', async () => {
-	const assets = { createManifestJson: url => JSON.stringify({ url }) };
+	const assets = { createManifestJson: url => JSON.stringify({ url }), createPwaVersionJson: () => JSON.stringify({ assetVersion: 'test' }) };
 	const { server, origin } = await listenPwaPreviewServer({ port: 0, assets });
 	try {
 		assert.notEqual(server.address().port, 0);

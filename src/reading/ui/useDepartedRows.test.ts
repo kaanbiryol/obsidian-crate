@@ -4,8 +4,8 @@ import { renderHook } from '../../test/react-hooks';
 import type { ReadingItem } from '../core/model';
 import { keepDeparted, useDepartedRows } from './useDepartedRows';
 
-const note = (id: string) => ({ crate_reading_id: id, title: id, tags: [], reading_status: 'inbox', saved_at: '2026-01-01T00:00:00.000Z', source_url: `https://example.com/${id}` }) as ReadingItem;
-const [a, b, c, d] = ['a', 'b', 'c', 'd'].map(note);
+const note = (id: string): ReadingItem => ({ crate_reading_version: 1, crate_reading_id: id, title: id, source_url: `https://example.com/${id}`, saved_at: '2026-01-01T00:00:00.000Z', reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready', path: `Reading/${id}.md` });
+const [a, b, c, d] = [note('a'), note('b'), note('c'), note('d')];
 const ids = (rows: ReadingItem[]) => rows.map(row => row.crate_reading_id);
 
 it('keeps departed rows after the row they followed', () => {

@@ -295,6 +295,7 @@ export class MockToggleComponent {
 export class MockDropdownComponent {
 	value = '';
 	disabled = false;
+	readonly selectEl = { title: '' };
 	readonly options = new Map<string, string>();
 	private handler?: (value: string) => unknown;
 	addOption(value: string, label: string): this { this.options.set(value, label); return this; }

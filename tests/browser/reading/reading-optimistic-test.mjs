@@ -182,15 +182,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const opening = hold(`/reading/item?id=${saved.id}`);
     await page.getByRole('button', { name: 'example.invalid Optimistic article', exact: true }).click();
     await opening.started;
-    await openHighlightNote('Add note');
-    await page.getByLabel('Your note').fill('Keep this draft until the article opens');
-    await page.getByRole('button', { name: 'Save note', exact: true }).click();
-    await expect(noteSheet.getByRole('alert')).toHaveText('Open the article before saving highlights.');
-    await expect(page.getByLabel('Your note')).toHaveValue('Keep this draft until the article opens');
-    await expect(toast).toHaveCount(0);
+    // Highlights stay hidden until the article opens, so no note can be written against a loading article.
+    await expect(page.getByRole('button', { name: /^Highlights \(/ })).toHaveCount(0);
     assert.equal((await pending(page)).length, 0);
-    await noteSheet.getByRole('button', { name: 'Close highlight note', exact: true }).click();
-    await closeHighlights();
     opening.release();
     await articleShown();
     // Opening keeps the article in memory only; saving it is a choice.

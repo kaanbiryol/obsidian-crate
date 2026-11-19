@@ -24,7 +24,8 @@ export async function checkWarmTabDestinations(browser, origin) {
           await page.getByRole('dialog', { name: 'More views', exact: true }).getByRole('button', { name: title, exact: true }).click();
         }
         await expect(page.locator('.crate-feature-panel[data-leaving="true"], .pwa-tab-panel[data-leaving]')).toHaveCount(0);
-        await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title')).toHaveText(title);
+        // A Reading section holds the previous screen until it loads, so wait for the dissolve to leave one title.
+        await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title')).toHaveText([title]);
         await expect(page.locator('.crate-feature-panel[data-active="true"] .pwa-dock [data-dock-active="true"]')).toHaveAttribute('aria-label', title);
       };
       // Warm both features before checking remembered tab state.
