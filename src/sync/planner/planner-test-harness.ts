@@ -1,15 +1,15 @@
 import { vi } from 'vitest';
 import type { ChangelogEntry, MutationFailure } from '../../protocol/sync-types';
-import type { CrateSettings } from '../../plugin/settings-types';
+import type { SyncSettings } from '../settings';
 import type { IncrementalSyncPlannerContext } from './types';
 import { updateSyncProgress } from '../settings';
 import { createTestSettings } from '@/test/factories/settings';
 
-export function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
+export function createSettings(overrides: Partial<SyncSettings> = {}): SyncSettings {
 	return createTestSettings({ lastSeq: 10, deviceId: 'dev-1', ignorePatterns: [], ...overrides });
 }
 export function createIncrementalHarness(overrides: Partial<{
-	settings: Partial<CrateSettings>;
+	settings: Partial<SyncSettings>;
 	changes: ChangelogEntry[];
 	lastSeq: number;
 	hasMore: boolean;

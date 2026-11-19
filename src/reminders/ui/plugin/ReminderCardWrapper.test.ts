@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { renderHook } from '@/test/react-hooks';
 import type CratePlugin from '@/plugin/CratePlugin';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 
 const { notices, card } = vi.hoisted(() => ({ notices: [] as string[], card: { toggle: undefined as undefined | (() => Promise<void>), props: undefined as undefined | Record<string, unknown> } }));
 vi.mock('obsidian', () => ({ Notice: class { constructor(message: string) { notices.push(message); } } }));

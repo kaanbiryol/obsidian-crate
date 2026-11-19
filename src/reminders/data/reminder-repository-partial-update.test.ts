@@ -6,7 +6,7 @@ import { createMarkdownWriter } from './markdown-writer';
 import { createReminderRepository } from './reminder-repository';
 import { toReminder } from '../core/toReminder';
 import { buildCreatedReminderBlock, appendCreatedReminderBlock } from '../core/markdownReminderMutation';
-import type { UpdateReminderParams } from '../types/reminder';
+import type { UpdateReminderParams } from '../core/model';
 import { ReminderInputError } from '../core/reminderMutationInput';
 
 const path = 'Reminders/Inbox.md';

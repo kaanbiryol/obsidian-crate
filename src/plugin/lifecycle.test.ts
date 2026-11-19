@@ -49,7 +49,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 		},
 		Platform: platform,
 	}));
-	vi.doMock('./secret-storage', () => ({
+	vi.doMock('../sync/secret-storage', () => ({
 		SecretStorageService: class SecretStorageService {
 			constructor(public readonly app: unknown) {}
 			has = secretStorageHas;
@@ -144,7 +144,7 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('./secret-storage');
+	vi.doUnmock('../sync/secret-storage');
 	vi.doUnmock('./logger');
 	vi.doUnmock('../ui/settings/settings-tab');
 	vi.doUnmock('../reminders/plugin-integration');

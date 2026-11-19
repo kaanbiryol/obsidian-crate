@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SecretStorageService } from '../../plugin/secret-storage';
+import type { SecretStorageService } from '../secret-storage';
 import { type CrateSettings } from '../../plugin/settings-types';
 import { clearSyncConfigurationState, deleteManifestFile } from './config';
 import { SECRET_KEYS } from '../../platform/secret-keys';

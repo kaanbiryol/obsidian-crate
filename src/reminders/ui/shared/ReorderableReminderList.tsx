@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState, forwardRef, memo } from 'react';
 import { motion, Reorder, useIsPresent } from 'motion/react';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../core/model';
 import { ReminderListPresence } from './ReminderListPresence';
 import { REMINDER_DRAG_SCALE, REMINDER_LIST_LAYOUT_TRANSITION, REMINDER_SECTION_TRANSITION } from './layoutConstants';
 import { reminderRowMotion } from './reminderRowMotion';

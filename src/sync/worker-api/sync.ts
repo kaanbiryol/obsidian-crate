@@ -3,10 +3,10 @@ import type { EncryptedFiles, UploadPreconditions } from '../encryption/encrypte
 import { assignPlainPaths, type WireStore } from '../encryption/path-index';
 import type { JournalUpload } from '../durability/upload-intent';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
-import { base64ToArrayBuffer } from '../encoding';
+import { base64ToArrayBuffer } from '@/platform/base64';
 import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import { BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
+import { BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { requestFileVersions } from './version-contract';
 import { parseChanges, parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
@@ -39,7 +39,6 @@ import {
 } from '../../protocol/server-info';
 import { assertPortablePathNames, assertPortablePaths } from '../../protocol/portable-path';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
-import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, REVISION_HEADER } from '../../protocol/http-headers';
 import {
 	getHeader,
@@ -401,7 +400,8 @@ export class SyncWorkerApi {
 		if (!this.encryption) return parseBatchDelete(await this.http.requestJson<unknown>('/sync/batch-delete', { method: 'POST', body: JSON.stringify({ files }) }));
 		const hashes = await this.encryption.expectedHashes(files.map(file => ({ path: file.path, expected: file.expectedHash, revision: file.expectedRevision })));
 		const wires = await Promise.all(files.map(file => this.wireFor(file.path)));
-		const plain = (wire: string) => paths[wires.indexOf(wire)] ?? wire;
+		const plainByWire = new Map(wires.map((wire, index) => [wire, paths[index]!]));
+		const plain = (wire: string) => plainByWire.get(wire) ?? wire;
 		const response = parseBatchDelete(await this.http.requestJson<unknown>('/sync/batch-delete', {
 			method: 'POST',
 			body: JSON.stringify({ files: files.map((file, index) => ({ ...file, path: wires[index]!, expectedHash: hashes[index]! })) }),

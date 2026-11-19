@@ -1,6 +1,6 @@
 import * as chrono from 'chrono-node';
 import { fromDate, parseDateTime, toZoned } from '@internationalized/date';
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../model';
 import type { TextMatch } from './richTextTypes';
 import { parseMarkdownLinks } from './markdownLinks';
 import { findRecurrenceCandidates } from '../recurrence/recurrenceParser';

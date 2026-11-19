@@ -1,6 +1,9 @@
 import { queryRows } from '../d1/db';
 import { parseEncryptedNotification } from '../../../encryption/notification-format';
 import { sha256Hex } from '../../../platform/sha256';
+import { notificationDatetime } from '../../../reminders/core/notification-time';
+import type { NotificationPolicy } from '../../../protocol/notification-policy';
+import type { RemoteReminderRecord } from '../reminders/types';
 
 /** The dispatcher never delivers an occurrence this long after its due time. */
 export { NOTIFICATION_DELIVERY_WINDOW_MS } from '../../../reminders/core/notification-time';
@@ -15,6 +18,30 @@ export interface SchedulePayload {
 export type NotificationOperation =
 	| { id: string; operation: 'schedule'; payload: SchedulePayload }
 	| { id: string; operation: 'cancel'; payload: null };
+
+/** Schedules a reminder only while notifications are on, the reminder is open and due, and
+ * the projection first saw that due time no later than the due time itself. */
+export function notificationOperationFor(reminder: RemoteReminderRecord, firstSeenAt: number | null, policy: NotificationPolicy): NotificationOperation {
+	const dueDatetime = notificationDatetime(reminder, policy);
+	const schedule = policy.enabled !== false && !reminder.completed && dueDatetime
+		&& firstSeenAt !== null && firstSeenAt <= Date.parse(dueDatetime);
+	return schedule ? { id: reminder.id, operation: 'schedule', payload: {
+		reminderId: reminder.id, content: reminder.content, project: reminder.project, dueDatetime,
+	} } : { id: reminder.id, operation: 'cancel', payload: null };
+}
+
+/** How many leading jobs one pass parses within `budget` bytes. A source over `sourceLimit`
+ * counts as zero, since it fails on size without being read. Later jobs wait for the next pass. */
+export function admittedProjectionJobs(sizes: readonly number[], sourceLimit: number, budget: number): number {
+	let bytes = 0, admitted = 0;
+	for (const size of sizes) {
+		const readable = size <= sourceLimit ? size : 0;
+		if (bytes + readable > budget) break;
+		bytes += readable; admitted++;
+	}
+	return admitted;
+}
+
 interface ExistingNotification {
 	id: string;
 	/** Whether the reminder has a projection row at all. */

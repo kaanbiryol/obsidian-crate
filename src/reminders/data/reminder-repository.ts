@@ -2,7 +2,7 @@ import { reminderRevision } from '../core/reminderRevision';
 import { createReminderId } from "../core/reminderIdentity";
 import { buildCreateReminderArgs, buildReminderUpdate } from "../core/reminderMutationPlan";
 import { selectTodayReminders } from "../core/reminderSort";
-import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/reminder";
+import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/core/model";
 import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";
 import type { MarkdownWriter } from "./markdown-writer";
 import type { IndexedReminder, ReminderIndex } from "./reminder-index";

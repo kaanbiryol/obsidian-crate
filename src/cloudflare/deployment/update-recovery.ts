@@ -6,7 +6,7 @@ import type { CloudflareDeploymentArtifacts } from './artifacts';
 import { inspectDeploymentDatabase, recordDeploymentRelease, readDeploymentBuild, releaseUpgradeGuards } from './database';
 import { SERVER_RELEASE } from './database-upgrades';
 import {
-	awaitsPublicationVerification, type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation,
+	type DeploymentFenceRecord, DeploymentRecoveryRequiredError, isPendingAddressActivation,
 	isRejectedWorkerUpload, isSettledStep, isUploadTag, parseFenceRecord, readStoredFence, removeFenceValue, replaceFenceValue, UPDATE_STEPS, withDeploymentFence,
 } from './fence';
 import { provisionCloudflareDeployment } from './provisioner';
@@ -16,6 +16,19 @@ import { verifyWorkerDeployment } from './verify-worker';
 import { parseReleaseWorkerMessage, releaseWorkerMessage, workerStorageBindings } from './discovery';
 
 type RecoveryApi = Pick<CloudflareApiClient, 'queryD1' | 'getWorkerSettings'>;
+
+/** Only verification of the published build remains after these confirmed steps. */
+const FINAL_UPDATE_STEPS = ['resume-upgraded-server', 'enable-server-address', 'record-release', 'verify-deployment'];
+/** Steps a verification-only retry can have reached. */
+const COMPLETION_ONLY_STEPS = ['acquire-deployment', 'record-release', 'verify-deployment'];
+
+/** The update needs only its published Worker and address verified. Callers
+ * still check the live build and storage before taking ownership. */
+function awaitsPublicationVerification(record: Record<string, unknown>): boolean {
+	return isPendingAddressActivation(record)
+		|| record.stepState === 'confirmed' && FINAL_UPDATE_STEPS.includes(String(record.step))
+		|| record.completionOnly === true && isSettledStep(record) && COMPLETION_ONLY_STEPS.includes(String(record.step));
+}
 export interface DeploymentRecoveryResult {
 	status: 'ready' | 'recovered' | 'blocked' | 'resume' | 'verify' | 'completed';
 	title?: string;

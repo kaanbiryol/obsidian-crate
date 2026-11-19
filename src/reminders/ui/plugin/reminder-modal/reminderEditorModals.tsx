@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import type CratePlugin from "@/plugin/CratePlugin";
 import { createLogger } from "@/reminders/logger";
-import type { Reminder } from "@/reminders/types/reminder";
+import type { Reminder } from "@/reminders/core/model";
 import { ReminderModal } from "./ReminderModal";
 import { ModalContext } from "../reminders-context";
 import { PluginRoot } from "../../../../ui/plugin/PluginRoot";

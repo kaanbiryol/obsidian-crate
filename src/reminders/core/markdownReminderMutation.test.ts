@@ -3,7 +3,7 @@ import { scanReminderMarkdownContent } from './markdownScan';
 import { buildCreatedReminderBlock, buildUpdatedReminderBlock } from './markdownReminderMutation';
 import { buildReminderCompletionPlan, planReminderCompletion, setReminderCompletionInContent } from './reminderCompletion';
 import { ReminderInputError } from './reminderMutationInput';
-import type { RecurrenceRule } from '@/reminders/types/reminder';
+import type { RecurrenceRule } from '@/reminders/core/model';
 
 function saved(completed: boolean, recurrence?: RecurrenceRule) {
 	const block = buildCreatedReminderBlock({ content: 'Task', priority: 4, dueDate: new Date('2026-09-21T09:00:00Z'),

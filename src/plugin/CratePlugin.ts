@@ -18,7 +18,7 @@ import { configureSyncLogger } from '../sync/logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { getPluginLifecycleSignal } from './lifecycle-state';
 import { clearSettingsUiState, createSettingsUiState, type SettingsUiState } from '../ui/settings/settings-ui-state';
-import { SecretStorageService } from './secret-storage';
+import { SecretStorageService } from '../sync/secret-storage';
 import { keepLastGoodPluginData, loadPluginData, upgradeLoadedPluginData } from './plugin-data';
 import { PLUGIN_DATA_VERSION } from './plugin-data-version';
 import {

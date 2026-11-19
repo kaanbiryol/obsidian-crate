@@ -13,7 +13,7 @@ import { createLogger } from '@/reminders/logger';
 import { errorMessage } from '@/platform/logger';
 
 const log = createLogger('ReminderCardWrapper');
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 import { PluginContext } from '@/ui/plugin/plugin-context';
 import { openReminderEditModal } from '@/reminders/ui/plugin/reminder-modal/reminderEditorModals';
 import { requireReminderBackend } from '@/reminders/runtime';

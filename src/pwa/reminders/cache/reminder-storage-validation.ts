@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import { validateRecurrence } from '@/reminders/core/recurrence/validateRecurrence';
 import { isStoredReminderDate, isStoredReminderDatetime } from '@/reminders/core/dates/reminderDate';
-import type { RecurrenceRule } from '@/reminders/types/reminder';
+import type { RecurrenceRule } from '@/reminders/core/model';
 import type { ModalDraft, ModalPickerId, ReminderRecord } from '../types';
 import { isSyncPath } from '@/protocol/sync-validation';
 import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-paths';

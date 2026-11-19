@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayBufferToBase64, base64ToArrayBuffer } from './encoding';
+import { arrayBufferToBase64, base64ToArrayBuffer } from './base64';
 
 function toArrayBuffer(view: Uint8Array): ArrayBuffer {
 	const buffer = new ArrayBuffer(view.byteLength);

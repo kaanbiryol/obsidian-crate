@@ -1,4 +1,4 @@
-import type { Priority, RecurrenceRule } from '../../types/reminder';
+import type { Priority, RecurrenceRule } from '../model';
 import { findAllMatches } from './richTextMatchers';
 
 export interface ParsedReminder {

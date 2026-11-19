@@ -1,6 +1,7 @@
 /**
- * Base64 encoding/decoding helpers for batch API transfers.
- * Uses loop-based approach to avoid call stack overflow on large arrays.
+ * Base64 helpers shared by the plugin, deployment and the Worker.
+ * Chunked and per-byte loops avoid call stack overflow on large arrays, and per-byte
+ * callbacks such as `Array.from` exhausted the hosted Free CPU budget in the Worker.
  */
 
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {

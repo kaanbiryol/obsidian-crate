@@ -3,7 +3,7 @@ import { parseReadingNote } from '@/reading/core/notes';
 import { MAX_READING_BYTES } from '@/reading/core/model';
 import { highlightedAt, highlightSearchWords, highlightTerms, readingTerms, searchWords } from '@/reading/core/search-terms';
 import { isReadingCardKind, validateReadingCardData, type ReadingCardData } from '@/reading/core/reading-card';
-import { parseEncryptedFile } from '@/encryption/file-format';
+import { hasCurrentEncryptedFilePrefix, parseEncryptedFile } from '@/encryption/file-format';
 import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
 import { portablePathKey } from '@/protocol/portable-path';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
@@ -70,12 +70,9 @@ function encryptedCard(content: string | ArrayBuffer | null | undefined): Readin
 	} catch { return null; }
 }
 
-const ENCRYPTED_FILE_PREFIX = new TextEncoder().encode('CRATE-E2EE/1\n');
 function isEncryptedContent(content: string | ArrayBuffer | null | undefined): boolean {
 	if (content == null) return false;
-	if (typeof content === 'string') return content.startsWith('CRATE-E2EE/1\n');
-	const bytes = new Uint8Array(content, 0, Math.min(content.byteLength, ENCRYPTED_FILE_PREFIX.length));
-	return bytes.length === ENCRYPTED_FILE_PREFIX.length && bytes.every((byte, index) => byte === ENCRYPTED_FILE_PREFIX[index]);
+	return hasCurrentEncryptedFilePrefix(typeof content === 'string' ? content : new Uint8Array(content));
 }
 
 /** The row for a file revision; `keep: 0` when the file is not a Reading note. */

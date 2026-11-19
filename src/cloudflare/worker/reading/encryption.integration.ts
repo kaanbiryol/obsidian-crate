@@ -9,7 +9,7 @@ import { EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { openFile } from '@/encryption/file-codec';
 import { handleReadingRoute } from '../test-support/reading-route-test-harness';
-import type { CapturedArticle } from '@/reading/extraction/types';
+import type { CapturedArticle } from '@/reading/core/article';
 import type { ReadingItem } from '@/reading/core/model';
 import { sha256Hex } from '@/platform/sha256';
 import { resolveEncryptedPath } from '@/encryption/path-binding';

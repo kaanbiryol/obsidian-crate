@@ -5,7 +5,7 @@ import { EncryptedFiles } from '../encryption/encrypted-files';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 
 it.each(['version_conflict', 'namespace_conflict'])('preserves per-file %s results when ciphertext outgrows a batch', async code => {
 	const api = new SyncWorkerApi({} as WorkerApiHttpClient);

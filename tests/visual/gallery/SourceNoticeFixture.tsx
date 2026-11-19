@@ -3,7 +3,7 @@ import { PluginReminderSourceNotice } from '@/reminders/ui/plugin/PluginReminder
 import { PluginRemindersAppShell } from '@/reminders/ui/plugin/PluginRemindersAppShell';
 import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { IconButton } from '@/ui/shared/IconButton';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 
 const reminders: Reminder[] = [
   'Find a new hiking route', 'Try the new coffee place', 'Find a frame for the Lisbon print',

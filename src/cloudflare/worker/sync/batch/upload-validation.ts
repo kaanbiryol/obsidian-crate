@@ -9,6 +9,7 @@ import type { BatchFile } from './types';
 import { isSha256Hex } from '../../../../platform/validation';
 import { createManagedObjectKey } from '../../../../protocol/storage-keys';
 import { sha256Hex } from '../../../../platform/sha256';
+import { base64ToArrayBuffer } from '../../../../platform/base64';
 
 /** Validate and decode the complete request before receipts, staging or commits. */
 export async function prepareBatchUpload(request: Request) {
@@ -73,9 +74,7 @@ export async function prepareBatchUpload(request: Request) {
 		}
 
 		try {
-			const raw = atob(file.content);
-			const bytes = new Uint8Array(raw.length);
-			for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+			const bytes = new Uint8Array(base64ToArrayBuffer(file.content));
 			const size = bytes.byteLength;
 			if (file.size !== undefined && parseNonNegativeInteger(file.size) === null) {
 				results.push(validationFailure(safePath, 'Invalid declared file size'));

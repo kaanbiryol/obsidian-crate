@@ -4,7 +4,7 @@ import type { WorkerApiHttpClient } from './http';
 import { EncryptedFiles } from '../encryption/encrypted-files';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
 import { sealFile } from '../../encryption/file-codec';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import { sha256Hex } from '../../platform/sha256';
 
 it('decrypts a batch with bounded overlap and returns verified bytes in order', async () => {

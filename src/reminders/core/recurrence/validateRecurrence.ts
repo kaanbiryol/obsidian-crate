@@ -1,4 +1,4 @@
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../model';
 import { normalizeRecurrenceRule } from './recurrenceRule';
 import { isStoredReminderDate, isStoredReminderDatetime } from '../dates/reminderDate';
 

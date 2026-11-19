@@ -198,7 +198,7 @@ export default tseslint.config(
 	{
 		// Shared by the plugin, PWA and Worker.
 		files: [
-			'src/reminders/{core,types}/**/*.{ts,tsx}',
+			'src/reminders/core/**/*.{ts,tsx}',
 			'src/reading/{core,extraction}/**/*.{ts,tsx}',
 			'src/{protocol,encryption,platform}/**/*.{ts,tsx}',
 		],
@@ -230,22 +230,22 @@ export default tseslint.config(
 		rules: { 'obsidianmd/prefer-file-manager-trash-file': 'off' },
 	},
 	{
-		// Sync timers and the Reading list's release timer also run in Node-based unit tests.
-		files: ['src/sync/**/*.{ts,tsx}', 'src/reading/data/library.ts'],
+		// Sync timers and the Reading list's release and refresh timers also run in Node-based unit tests.
+		files: ['src/sync/**/*.{ts,tsx}', 'src/reading/data/library.ts', 'src/reading/data/refresh-batch.ts'],
 		rules: {
 			'obsidianmd/prefer-window-timers': 'off',
 		},
 	},
 	{
-		// Sync stays feature-neutral; features plug in through callbacks the plugin wires.
+		// Sync stays feature-neutral and host-agnostic; features plug in through callbacks the plugin wires.
 		// No earlier no-restricted-imports block covers src/sync, so none is replaced here.
 		files: ['src/sync/**/*.{ts,tsx}'],
 		ignores: ['**/*.test.ts', '**/*.integration.ts', '**/*-test-harness.ts'],
 		rules: {
 			'@typescript-eslint/no-restricted-imports': ['error', {
 				patterns: [{
-					regex: '^(?:@/|(?:\\.\\./)+)(?:reminders|reading)(?:/|$)',
-					message: 'Sync must not import feature code; inject it from src/plugin instead.',
+					regex: '^(?:@/|(?:\\.\\./)+)(?:reminders|reading|plugin)(?:/|$)',
+					message: 'Sync must not import feature or plugin code; inject it from src/plugin instead.',
 				}],
 			}],
 		},

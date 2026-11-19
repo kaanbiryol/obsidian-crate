@@ -2,6 +2,7 @@ import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { BATCH_UPLOAD_MAX_BYTES } from '@/protocol/sync-limits';
 import { fileTransportLimit } from '@/encryption/file-format';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
+import { base64ToArrayBuffer } from '@/platform/base64';
 import { corsResponse } from '../../http/cors';
 import { parseJsonObject, sanitizePath, UPLOAD_BATCH_JSON_BODY_BYTES } from '../../http/request-validation';
 import { loadStoredFileRows, parseExpectedFileHash } from '../storage';
@@ -73,13 +74,7 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
 		let content: ArrayBuffer;
 		try {
 			if (value.content instanceof ArrayBuffer) content = value.content;
-			else {
-				const binary = atob(value.content as string);
-				const bytes = new Uint8Array(binary.length);
-				// Array.from's per-byte callback/iterator exhausted the hosted Free CPU budget.
-				for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
-				content = bytes.buffer;
-			}
+			else content = base64ToArrayBuffer(value.content as string);
 		} catch { return corsResponse({ error: 'Invalid import content' }, 400); }
 		total += content.byteLength;
 		const contentType = typeof value.contentType === 'string' ? value.contentType : 'application/octet-stream';

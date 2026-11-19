@@ -2,7 +2,7 @@ import { INITIAL_IMPORT_CAPABILITY, INITIAL_IMPORT_PRUNE_MAX_FILES, importInvent
 import { normalizeSyncIssues, SyncIssueError } from '../issues';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { transferTimeout, type WorkerApiHttpClient } from './http';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import type { PreparedUpload } from '../transfer/types';
 import { BATCH_FILE_SIZE_LIMIT } from '@/protocol/sync-limits';
 import { FILE_HASH_HEADER, EXPECTED_HASH_HEADER, INITIAL_IMPORT_HEADER } from '@/protocol/http-headers';

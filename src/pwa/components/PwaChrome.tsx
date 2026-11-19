@@ -12,7 +12,7 @@ import { PwaConnectionBanner } from './PwaConnectionBanner';
 import { createPwaOpeningScreenHtml } from '../shell/opening-screen';
 import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
 import { loadPwaPreferences } from '../settings/preferences';
-import { createPwaUpdateScreenHtml } from '../update/update-screen';
+import { createPwaUpdateScreenHtml } from '../shell/update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
 
 function PwaSettingsButton({

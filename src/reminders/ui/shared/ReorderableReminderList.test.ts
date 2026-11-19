@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../core/model';
 import { ReorderableReminderList } from './ReorderableReminderList';
 
 // Retain refs between component renders and keep an earlier animation callback.

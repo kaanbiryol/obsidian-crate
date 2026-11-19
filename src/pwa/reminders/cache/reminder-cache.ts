@@ -8,6 +8,12 @@ import { sealPrivateValue, openPrivateValue, privateStorageUnlocked } from '../p
 import { sha256Hex } from '../../../platform/sha256';
 
 let cacheGeneration = 0;
+/** True while the session that started a cache operation is still signed in and no clear or
+ * rebuild has replaced the cache since. */
+function captureCacheOwner(): () => boolean {
+	const sessionCurrent = capturePwaSession(), generation = cacheGeneration;
+	return () => sessionCurrent() && generation === cacheGeneration;
+}
 
 interface CacheFreshness {
 	folderPath: string;
@@ -16,7 +22,8 @@ interface CacheFreshness {
 }
 
 // Bind disposable content to the actual session even when an old tab blocks
-// logout deletion. No credential is stored in the snapshot.
+// logout deletion. No credential is stored in the snapshot. This reads the
+// current credential directly, so a snapshot belongs to whichever session wrote it.
 async function cacheSessionScope(): Promise<string> {
 	const token = typeof localStorage === 'undefined' ? '' : localStorage.getItem(AUTH_TOKEN_KEY) ?? '';
 	return sha256Hex(token);
@@ -151,7 +158,7 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
  * metadata and every note change commit in one transaction, so the stored note
  * versions come from the metadata alone; unreadable metadata replaces every note. */
 async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise<void> {
-	const sessionCurrent = capturePwaSession();
+	const current = captureCacheOwner();
 	const generation = cacheGeneration;
 	const sessionScope = await cacheSessionScope();
 	const { folderPath } = snapshot;
@@ -165,7 +172,7 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 	}));
 	const database = await openCacheDatabase();
 	try {
-		if (!sessionCurrent() || generation !== cacheGeneration) return;
+		if (!current()) return;
 		const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME, NOTES_STORE_NAME], 'readwrite');
 		const written = new Map<string, PersistedNote>();
 		async function writeNotes(): Promise<void> {
@@ -217,10 +224,9 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 
 export async function loadCachedReminderSnapshot(folderPath: string): Promise<CachedReminderSnapshot | null> {
 	try {
-		const sessionCurrent = capturePwaSession();
-		const generation = cacheGeneration;
+		const current = captureCacheOwner();
 		const snapshot = await readIndexedDbSnapshot(folderPath);
-		return sessionCurrent() && generation === cacheGeneration ? snapshot : null;
+		return current() ? snapshot : null;
 	} catch {
 		if (!reminderCacheHealth.getSnapshot()) reportCacheProblem('unavailable');
 		return null;
@@ -249,11 +255,10 @@ export async function clearCachedReminderSnapshots(isCurrent: () => boolean = ()
 export async function rebuildCachedReminderSnapshot(folderPath: string): Promise<boolean> {
 	cacheGeneration += 1;
 	try {
-		const sessionCurrent = capturePwaSession();
-		const generation = cacheGeneration;
+		const current = captureCacheOwner();
 		const database = await openCacheDatabase();
 		try {
-			if (!sessionCurrent() || generation !== cacheGeneration) return false;
+			if (!current()) return false;
 			await deleteFolderSnapshot(database, folderPath);
 			persisted.delete(folderPath);
 		} finally { database.close(); }
@@ -265,12 +270,11 @@ export async function rebuildCachedReminderSnapshot(folderPath: string): Promise
 /** Persist a successful revalidation without cloning or rewriting reminder contents. */
 export async function refreshCachedReminderSnapshot(folderPath: string, savedAt: number, etag?: string): Promise<void> {
 	if (!etag) return;
-	const sessionCurrent = capturePwaSession();
-	const generation = cacheGeneration;
+	const current = captureCacheOwner();
 	try {
 		const database = await openCacheDatabase();
 		try {
-			if (!sessionCurrent() || generation !== cacheGeneration) return;
+			if (!current()) return;
 			await database.put(FRESHNESS_STORE_NAME, { folderPath, savedAt, etag } satisfies CacheFreshness);
 		} finally {
 			database.close();

@@ -18,7 +18,7 @@ interface ConflictStoreData {
 }
 
 export interface RecordConflictInput {
-	copySide?: 'local' | 'remote';
+	copySide?: 'remote';
 	originalPath: string;
 	conflictPath: string;
 	cause: Exclude<ConflictRecord['cause'], 'unknown'>;

@@ -4,7 +4,7 @@ import { LocalManifest } from '../manifest/manifest';
 import { DurableUploads } from '../durability/durable-uploads';
 import { EncryptedFiles } from './encrypted-files';
 import { createVaultKeyBundle } from '../../encryption/key-bundle';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
 import type { JournalUpload } from '../durability/upload-intent';
 import type { BatchUploadFile } from '../../protocol/sync-types';

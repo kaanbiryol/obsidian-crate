@@ -50,4 +50,3 @@ export function renderServerActions(context: InfrastructureSectionContext): void
 	if (context.isConfigured) renderInfrastructureSyncActions({ ...context, containerEl: advancedEl });
 	renderServerDeleteSetting(advancedEl, plugin);
 }
-export type { InfrastructureSectionContext } from './infrastructure-types';

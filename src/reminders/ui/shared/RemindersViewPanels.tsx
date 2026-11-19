@@ -8,8 +8,8 @@ import {
 	UpcomingView,
 } from "@/reminders/ui/views";
 import { PWA_FADE } from "@/ui/shared/navigation/motion";
-import type { Reminder as SharedReminder } from "@/reminders/types/reminder";
-import type { Reminder } from "@/reminders/types/reminder";
+import type { Reminder as SharedReminder } from "@/reminders/core/model";
+import type { Reminder } from "@/reminders/core/model";
 import type { ViewMode } from "./remindersViewModel";
 import type { ProjectColorScheme } from "@/reminders/ui/format/projectColors";
 

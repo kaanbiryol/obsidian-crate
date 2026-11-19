@@ -27,7 +27,6 @@ import { createSyncIgnoreMatcher, type SyncIgnoreMatcher } from '../local/ignore
 import { createExclusionCleanupReview } from './exclusion-cleanup';
 import { createRawConfigEventHandler } from './raw-config-events';
 import { runForceFullSyncWorkflow } from './force-sync-workflow';
-import { runSyncWorkflow } from './standard-sync-workflow';
 import { AUTH_ERROR_MESSAGE, ReconnectNotice } from '../sync-outcome';
 import { SyncEngineContexts } from './contexts';
 import { runReconcileWorkflow } from './reconcile-workflow';
@@ -75,7 +74,7 @@ export class SyncEngine {
 	private readonly localChanges: LocalChangeDetection;
 	private periodicCheckFailed = false;
 	/** Counts full-sync requests, so a sync clears only the requests made before it read them. */
-	private fullSyncRequests = 0;
+	private fullSyncRequestGeneration = 0;
 	private readonly rawConfigEvents: (path: string) => Promise<void>;
 	private readonly ignore: SyncIgnoreMatcher;
 	private syncActivityRevision = 0;
@@ -189,7 +188,7 @@ export class SyncEngine {
 			conflictStore: this.conflictStore,
 			getSettings: () => this.settings,
 			persistSettings: () => this.hooks.persistSettings(),
-			fullSyncRequest: () => this.fullSyncRequest(),
+			pendingFullSyncRequest: () => this.pendingFullSyncRequest(),
 			getStatus: () => this.state.status,
 			shouldIgnore: this.ignore.shouldIgnore,
 			runConcurrent: (tasks, concurrency) => this.lifecycle.runConcurrent(tasks, concurrency),
@@ -283,16 +282,16 @@ export class SyncEngine {
 	/** Server files under a removed exclusion are already behind the changelog cursor, so
 	 * only a full sync finds them. Saved at once, so a restart still runs it. */
 	private async requestFullSync(): Promise<void> {
-		this.fullSyncRequests++;
+		this.fullSyncRequestGeneration++;
 		this.settings.fullSyncRequested = true;
 		await this.hooks.persistSettings();
 	}
 
 	/** The pending full-sync request. `complete` clears it unless a newer one arrived. */
-	private fullSyncRequest(): { complete(): void } | null {
+	private pendingFullSyncRequest(): { complete(): void } | null {
 		if (!this.settings.fullSyncRequested) return null;
-		const requests = this.fullSyncRequests;
-		return { complete: () => { if (requests === this.fullSyncRequests) delete this.settings.fullSyncRequested; } };
+		const requests = this.fullSyncRequestGeneration;
+		return { complete: () => { if (requests === this.fullSyncRequestGeneration) delete this.settings.fullSyncRequested; } };
 	}
 
 	private async retryReminderScope(): Promise<void> {
@@ -549,14 +548,7 @@ export class SyncEngine {
 	 * unchecked in Sync activity, are left alone in both directions and stay pending. */
 	async sync(progressCallback?: (current: number, total: number) => void, options: { held?: readonly string[] } = {}): Promise<SyncResult> {
 		const held = new Set((options.held ?? []).map(key => decodePendingChange(key).path));
-		const result = await this.runTrackedWorkflow(async () => {
-			this.contexts.clearPlannedContent();
-			try {
-				return await this.contexts.withHeldPaths(held, () => runSyncWorkflow(this.contexts.syncWorkflow, progressCallback));
-			} finally {
-				this.contexts.clearPlannedContent();
-			}
-		});
+		const result = await this.runTrackedWorkflow(() => this.contexts.runStandardSync(held, progressCallback));
 		// The cursor may now be past a remote change to a held file. If that file's local change
 		// is later discarded, only a full comparison with the server finds the change again.
 		if (held.size > 0 && result.success && !this.lifecycle.abortSignal.aborted) {

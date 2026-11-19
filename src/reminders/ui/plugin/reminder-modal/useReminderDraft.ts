@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Reminder, RecurrenceRule } from '../../../types/reminder';
+import type { Reminder, RecurrenceRule } from '../../../core/model';
 import {
 	applyReminderDraftContentUpdate,
 	buildInitialReminderContent,

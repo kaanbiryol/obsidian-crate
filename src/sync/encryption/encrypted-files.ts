@@ -4,7 +4,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, validateFileDescriptor } from '../../encry
 import type { VaultKeyBundle } from '../../encryption/key-bundle';
 import { PathTags } from '../../encryption/path-tags';
 import { resolveEncryptedPath } from '../../encryption/path-binding';
-import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/platform/base64';
 import type { EncryptedUploadWire, JournalUpload } from '../durability/upload-intent';
 import { HttpError, type WorkerApiHttpClient } from '../worker-api/http';
 import { requestFileMetadata } from '../worker-api/read-contracts';

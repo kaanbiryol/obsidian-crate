@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { SecretStorageService } from '../../plugin/secret-storage';
+import { SecretStorageService } from '../secret-storage';
 import { createEncryptionReset, loadEncryptionReset, saveEncryptionReset, type EncryptionReset } from '../encryption/reset';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';

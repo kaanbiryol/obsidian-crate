@@ -98,19 +98,6 @@ export function isSettledStep(record: { stepState?: unknown }): boolean {
 	return ['confirmed', 'rejected', 'settled'].includes(String(record.stepState));
 }
 
-/** Only verification of the published build remains after these confirmed steps. */
-const FINAL_UPDATE_STEPS = ['resume-upgraded-server', 'enable-server-address', 'record-release', 'verify-deployment'];
-/** Steps a verification-only retry can have reached. */
-const COMPLETION_ONLY_STEPS = ['acquire-deployment', 'record-release', 'verify-deployment'];
-
-/** The update needs only its published Worker and address verified. Callers
- * still check the live build and storage before taking ownership. */
-export function awaitsPublicationVerification(record: Record<string, unknown>): boolean {
-	return isPendingAddressActivation(record)
-		|| record.stepState === 'confirmed' && FINAL_UPDATE_STEPS.includes(String(record.step))
-		|| record.completionOnly === true && isSettledStep(record) && COMPLETION_ONLY_STEPS.includes(String(record.step));
-}
-
 /** Protocol 1 always writes { enabled: true, previews_enabled: false } here.
  * A late repeat only applies those same route flags; it cannot publish code or
  * alter data. Recovery must read both flags and verify the published build.

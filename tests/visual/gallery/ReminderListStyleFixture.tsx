@@ -9,7 +9,7 @@ import { HighlightList } from '@/reading/ui/HighlightList';
 import { BrowseView } from '@/reminders/ui/views/BrowseView';
 import { TodayView } from '@/reminders/ui/views/TodayView';
 import type { ReadingMetadata } from '@/reading/core/model';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 
 const sampleReminders: Reminder[] = [
   { id: '1', content: 'Review launch notes', description: 'Check the final copy before sharing.', completed: false, priority: 1, dueDate: '2026-09-04', project: 'Product launch' },

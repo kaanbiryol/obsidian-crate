@@ -1,6 +1,7 @@
 import type { DataAdapter } from 'obsidian';
 import { extractReminderId } from '../core/reminderIdentity';
 import { readDescriptionBlock } from '../core/reminderDescription';
+import { isMarkdownNoteInFolder } from '@/protocol/note-paths';
 
 export interface ReminderMoveRecord {
 	version: 1;
@@ -19,7 +20,7 @@ function validateRecord(value: unknown): ReminderMoveRecord {
 	if (record.version !== 1 || !/^[\da-f-]{36}$/i.test(record.operationId) || !safePath(record.folderPath)
 		|| typeof record.id !== 'string' || !record.id) throw new Error('Invalid reminder move recovery record');
 	for (const side of [record.source, record.destination]) {
-		if (!side || !safePath(side.filePath) || !side.filePath.startsWith(`${record.folderPath}/`) || !side.filePath.endsWith('.md')
+		if (!side || !safePath(side.filePath) || !isMarkdownNoteInFolder(side.filePath, record.folderPath)
 			|| typeof side.block !== 'string' || side.block.length > 1024 * 1024) throw new Error('Invalid reminder move recovery path or block');
 		const lines = side.block.split('\n');
 		if (extractReminderId(lines[0]!) !== record.id) throw new Error('Invalid reminder move recovery identity');

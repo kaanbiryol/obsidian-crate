@@ -44,7 +44,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext, WorkflowComp
 	/** True when this device has synced before and holds a changelog cursor. */
 	hasSyncCursor(): boolean;
 	/** A request to skip the changelog once and compare the whole server inventory. */
-	fullSyncRequest?(): { complete(): void } | null;
+	pendingFullSyncRequest?(): { complete(): void } | null;
 	processDiff(
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,
@@ -65,7 +65,7 @@ export async function runSyncWorkflow(
 	logger.info('Sync started');
 	let result = createEmptySyncResult();
 	let recovering = false;
-	let fullSyncRequest: { complete(): void } | null = null;
+	let pendingFullSyncRequest: { complete(): void } | null = null;
 
 	try {
 		await context.replaceLocalVault?.();
@@ -81,9 +81,9 @@ export async function runSyncWorkflow(
 		context.updateState({ work: { phase: 'server' } });
 		context.signal.throwIfAborted();
 		recovering = context.hasSyncCursor();
-		fullSyncRequest = context.fullSyncRequest?.() ?? null;
+		pendingFullSyncRequest = context.pendingFullSyncRequest?.() ?? null;
 		const incrementalFailures: MutationFailure[] = [];
-		const incrementalResult = fullSyncRequest ? null
+		const incrementalResult = pendingFullSyncRequest ? null
 			: await context.incrementalSync(progressCallback, failure => { incrementalFailures.push(failure); });
 		if (incrementalResult) {
 			result = incrementalResult;
@@ -103,6 +103,6 @@ export async function runSyncWorkflow(
 
 	logger.info('Running full sync');
 	await runFullSync(context, result, recovering, progressCallback);
-	if (finalizeSyncResult(result)) fullSyncRequest?.complete();
+	if (finalizeSyncResult(result)) pendingFullSyncRequest?.complete();
 	return result;
 }

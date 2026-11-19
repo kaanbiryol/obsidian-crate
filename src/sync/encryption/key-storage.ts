@@ -1,5 +1,5 @@
 import { validateVaultKeyBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
-import type { SecretStorageService } from '../../plugin/secret-storage';
+import type { SecretStorageService } from '../secret-storage';
 import { SECRET_KEYS } from '../../platform/secret-keys';
 
 export function loadEncryptionKeys(storage: SecretStorageService): VaultKeyBundle | null {

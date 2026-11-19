@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHarness, toArrayBuffer } from './engine-test-harness';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import { VERIFICATION_FILE_BUDGET } from './content-verifier';
 import { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { sha256Hex } from '../../platform/sha256';

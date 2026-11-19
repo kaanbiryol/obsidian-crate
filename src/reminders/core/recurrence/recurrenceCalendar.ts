@@ -1,5 +1,5 @@
 import { fromDate, parseDateTime, toZoned } from '@internationalized/date';
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../model';
 import { getRecurrenceTimeZone } from './recurrenceRule';
 import { formatLocalDateKey, parseLocalDateKey, formatDateKeyParts } from '../dates/reminderDate';
 

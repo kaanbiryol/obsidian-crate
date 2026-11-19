@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import { sha256Hex } from '../../platform/sha256';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import type { ApiHttpResponse, ApiHttpTransport } from '../worker-api/http';
 import type { FileEntry } from '../../protocol/sync-types';
 import { TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';

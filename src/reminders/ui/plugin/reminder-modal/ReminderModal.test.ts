@@ -2,7 +2,7 @@ import React from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '@/test/react-hooks';
 import type CratePlugin from '@/plugin/CratePlugin';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 
 const { notices, editor } = vi.hoisted(() => ({
 	notices: [] as string[],

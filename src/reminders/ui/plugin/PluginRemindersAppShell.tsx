@@ -15,7 +15,7 @@ import { ThemeIcon } from "@/ui/shared/ThemeIcon";
 
 import { ShadowDOMButton } from "@/reminders/ui/plugin/ShadowDOMButton";
 import { ViewHeader } from "@/ui/shared/ViewHeader";
-import type { Reminder } from "@/reminders/types/reminder";
+import type { Reminder } from "@/reminders/core/model";
 import { RemindersViewPanels } from "@/reminders/ui/shared/RemindersViewPanels";
 import { useReducedMotion } from "@/ui/shared/useReducedMotion";
 import { useRemindersShellModel, type ReminderCardRenderer } from '../shared/useRemindersShellModel';

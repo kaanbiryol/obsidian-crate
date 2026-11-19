@@ -2,7 +2,7 @@ import type { Vault } from 'obsidian';
 import type { BatchUploadFile, RemoteFileVersion } from '../../protocol/sync-types';
 import { DurableUploads } from '../durability/durable-uploads';
 import { DurableRestores } from '../durability/durable-restores';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import type { LocalManifest } from '../manifest/manifest';
 import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { assertRenamePreserved } from '../manifest/rename-dependencies';

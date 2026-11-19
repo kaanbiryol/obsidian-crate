@@ -2,7 +2,7 @@
  * Shared constants used across the plugin
  */
 
-import type { Priority } from '../types/reminder';
+import type { Priority } from './model';
 
 /**
  * Default project name for reminders without a project

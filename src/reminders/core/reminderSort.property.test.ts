@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Reminder } from '../types/reminder';
+import type { Reminder } from './model';
 import { isReminderDueToday, isReminderOverdue, parseReminderDateValue } from './dates/reminderDate';
 import { selectTodayReminders, sortReminders } from './reminderSort';
 

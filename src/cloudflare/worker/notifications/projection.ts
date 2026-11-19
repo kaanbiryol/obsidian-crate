@@ -1,6 +1,6 @@
 import { featureEnabled } from '../server/feature-policy';
 import type { FeaturePolicy } from '../../../protocol/feature-policy';
-import { NOTIFICATION_DELIVERY_WINDOW_MS, planNotificationOperations, readExistingNotifications, schedulePayloadKey, type NotificationOperation } from './projection-plan';
+import { admittedProjectionJobs, NOTIFICATION_DELIVERY_WINDOW_MS, notificationOperationFor, planNotificationOperations, readExistingNotifications, schedulePayloadKey, type NotificationOperation } from './projection-plan';
 import { takeCommittedSource } from './committed-sources';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { recordFileFailure } from './file-retries';
@@ -92,21 +92,8 @@ export async function drainNotificationProjections(env: Env, limit = 4, loaded?:
 	const sourceStates = new Map(states.filter(row => row.file_revision !== null).map(row => [row.file_path, row]));
 	// Parsing shares verification's byte budget; later jobs wait for the next pass.
 	const sourceLimit = reminderSourceByteLimit(encrypted), budget = reparseByteBudget(encrypted);
-	let bytes = 0, admitted = 0;
-	for (const job of jobs) {
-		const size = files.get(job.path)?.size ?? 0;
-		const readable = size <= sourceLimit ? size : 0;
-		if (bytes + readable > budget) break;
-		bytes += readable; admitted++;
-	}
-	const operationFor = (reminder: RemoteReminderRecord, firstSeenAt: number | null): NotificationOperation => {
-		const dueDatetime = notificationDatetime(reminder, policy);
-		const schedule = policy.enabled !== false && !reminder.completed && dueDatetime
-			&& firstSeenAt !== null && firstSeenAt <= Date.parse(dueDatetime);
-		return schedule ? { id: reminder.id, operation: 'schedule', payload: {
-			reminderId: reminder.id, content: reminder.content, project: reminder.project, dueDatetime,
-		} } : { id: reminder.id, operation: 'cancel', payload: null };
-	};
+	const admitted = admittedProjectionJobs(jobs.map(job => files.get(job.path)?.size ?? 0), sourceLimit, budget);
+	const operationFor = (reminder: RemoteReminderRecord, firstSeenAt: number | null) => notificationOperationFor(reminder, firstSeenAt, policy);
 	// Parse every admitted job first, so the reads below serve the whole pass. A job with a
 	// snapshot reads and plans only the reminders whose due key or schedule changed, and checks
 	// identity only for reminders new to its note. One without reads and checks every reminder.

@@ -1,6 +1,6 @@
 import { recordSyncError } from '../issues';
 import { isAbortError } from '../abort';
-import { arrayBufferToBase64 } from "../encoding";
+import { arrayBufferToBase64 } from "@/platform/base64";
 import { createBatchUploadChunks } from "./prepare";
 import { isMarkdownPath } from "../../protocol/note-paths";
 import type { TransferContext } from "./types";

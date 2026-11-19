@@ -1,7 +1,7 @@
 import { ReadingDuplicates } from './ReadingDuplicates';
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { TextField } from '../../ui/shared/TextField';
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ViewHeader } from '../../ui/shared/ViewHeader';
@@ -15,14 +15,13 @@ import type { ReadingSnapshot } from '../data/library';
 import { groupReadingItems, readingSections, readingSource, readingTitle, type ReadingSection } from '../core/reading-presentation';
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { useContentReveal } from '@/ui/shared/useContentReveal';
-import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import { PWA_FADE_TIMING } from '@/ui/shared/navigation/motion';
 import { HighlightList } from './HighlightList';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
 import type { ReadingLibrarySource } from './useLibraryPages';
 import { useReadingLibraryQuery } from './useReadingLibraryQuery';
 import { useDepartedRows } from './useDepartedRows';
+import { useCollapseDepartedRows, useTagCrossfade } from './useReadingListMotion';
 import { ReadingTagFilter } from './ReadingTagFilter';
 
 export interface ReadingLibraryProps {
@@ -114,27 +113,7 @@ export function ReadingLibraryPanel({
 	// the reader has closed, then collapses so the rows below slide up rather than jump.
 	const { rows, departed, settle } = useDepartedRows(items, JSON.stringify([shownSection, listQuery, shownTag]));
 	const holdDeparted = !!reader || readerClosing || !!exitingReader;
-	const collapsing = useRef(new Map<HTMLElement, Animation>());
-	useLayoutEffect(() => {
-		const list = lists.current.get(shownSection);
-		if (holdDeparted || !departed.size || !list) return;
-		const owner = list.ownerDocument.defaultView ?? window, listStyle = owner.getComputedStyle(list);
-		const duration = parseFloat(listStyle.getPropertyValue('--pwa-motion-dismiss-duration'));
-		const easing = listStyle.getPropertyValue('--pwa-motion-surface-ease').trim() || 'ease-out';
-		for (const node of list.querySelectorAll<HTMLElement>('[data-departing="true"]')) {
-			if (collapsing.current.has(node)) continue;
-			const ids = node.dataset.departed ? [node.dataset.departed] : [...node.querySelectorAll<HTMLElement>('[data-departed]')].map(row => row.dataset.departed!);
-			if (!duration) { settle(ids); continue; }
-			const style = owner.getComputedStyle(node);
-			const animation = node.animate([
-				{ height: `${node.offsetHeight}px`, paddingTop: style.paddingTop, paddingBottom: style.paddingBottom, marginBottom: style.marginBottom, opacity: 1 },
-				{ height: '0px', paddingTop: '0px', paddingBottom: '0px', marginBottom: '0px', opacity: 0 },
-			], { duration, easing, fill: 'forwards' });
-			collapsing.current.set(node, animation);
-			animation.onfinish = () => { collapsing.current.delete(node); settle(ids); };
-		}
-	}, [holdDeparted, departed, shownSection, settle]);
-	useEffect(() => () => { for (const animation of collapsing.current.values()) animation.cancel(); }, []);
+	useCollapseDepartedRows(lists, shownSection, departed, settle, holdDeparted);
 	const groups = useMemo(() => groupReadingItems(rows.slice(0, visible)), [rows, visible]);
 	// A section that had to load fades its count, tags and list in instead of popping in.
 	useContentReveal(loading, () => {
@@ -145,32 +124,7 @@ export function ReadingLibraryPanel({
 	// A tag swaps the list in place. With the shared fade, a copy of the departing rows
 	// fades out over the new list once the tag's results show, so rows both tags list stay
 	// steady. Sections and loading states have their own transitions.
-	const reduceMotion = useReducedMotion();
-	const shownFilter = useRef<{ section: ReadingSection; tag: string | null } | null>(null);
-	const departingList = useRef<{ tag: string | null; node: HTMLElement } | null>(null);
-	useLayoutEffect(() => {
-		const previous = shownFilter.current, departing = departingList.current, list = lists.current.get(shownSection);
-		shownFilter.current = loading ? null : { section: shownSection, tag: shownTag };
-		departingList.current = null;
-		if (!previous || loading || previous.section !== shownSection || departing?.tag !== shownTag || !list) return;
-		const owner = list.ownerDocument.defaultView ?? window, style = owner.getComputedStyle(list);
-		const duration = parseFloat(style.getPropertyValue('--pwa-motion-fade-duration'));
-		if (!duration) return;
-		const { node } = departing;
-		Object.assign(node.style, {
-			position: 'absolute', top: `${list.offsetTop}px`, left: `${list.offsetLeft}px`, width: `${list.offsetWidth}px`, height: `${list.offsetHeight}px`,
-			boxSizing: 'border-box', pointerEvents: 'none', background: opaqueBackground(list, owner),
-		});
-		// Rows dimmed while the tag loaded leave from where they were.
-		if (wasWaiting.current) node.dataset.pending = 'true';
-		list.after(node);
-		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || PWA_FADE_TIMING.easing });
-		animation.onfinish = () => node.remove();
-		return () => { animation.cancel(); node.remove(); };
-	}, [loading, shownSection, shownTag]);
-	// Whether the last painted list was dimmed, read above before this updates it.
-	const wasWaiting = useRef(false);
-	useLayoutEffect(() => { wasWaiting.current = waiting; }, [waiting]);
+	const prepareTagCrossfade = useTagCrossfade(lists, shownSection, shownTag, loading, waiting);
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
 	useEffect(() => {
@@ -198,9 +152,7 @@ export function ReadingLibraryPanel({
 	const selectTag = (value: string | null) => {
 		if (value === tag) return;
 		setTag(value); resetList();
-		// Copy the rows as they now show, scrolled to the top like the incoming list.
-		const list = lists.current.get(shownSection);
-		departingList.current = list && !reduceMotion ? { tag: value, node: copyDepartingList(list) } : null;
+		prepareTagCrossfade(value);
 	};
 	const selectSection = (next: ReadingSection) => {
 		// A screen arriving from another feature, or hidden, shows its own section rather than a stale one.
@@ -281,26 +233,6 @@ export function ReadingLibraryPanel({
 			}}>{reader ?? (retainReaderOnClose ? exitingReader : null)}</div>
 		</div>
 	</section>;
-}
-
-/** A static, hidden copy of a list's rows for a crossfade; it takes no focus, input or ids. */
-function copyDepartingList(list: HTMLElement): HTMLElement {
-	const node = list.cloneNode(true) as HTMLElement;
-	node.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
-	node.removeAttribute('tabindex');
-	node.inert = true;
-	node.setAttribute('aria-hidden', 'true');
-	node.dataset.departingList = 'true';
-	return node;
-}
-
-/** The first painted background behind `element`, so a copy over the list hides it. */
-function opaqueBackground(element: HTMLElement, owner: Window): string {
-	for (let node: HTMLElement | null = element; node; node = node.parentElement) {
-		const color = owner.getComputedStyle(node).backgroundColor;
-		if (color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
-	}
-	return 'Canvas';
 }
 
 /** Empty highlights, either before any are saved or when filters match none. */

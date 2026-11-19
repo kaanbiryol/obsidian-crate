@@ -1,4 +1,4 @@
-import type { SecretStorageService } from '../../plugin/secret-storage';
+import type { SecretStorageService } from '../secret-storage';
 import { isEncryptionId } from '../../encryption/encoding';
 import type { EncryptionServerState, ResetReceipt } from '../../encryption/server-state';
 import type { VaultKeyBundle } from '../../encryption/key-bundle';

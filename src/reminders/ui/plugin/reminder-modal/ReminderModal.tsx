@@ -14,7 +14,7 @@ import { type DueDateDefaultSetting, useRemindersSettingsStore } from "@/reminde
 import { PluginContext } from "@/ui/plugin/plugin-context";
 import { ModalContext } from "@/reminders/ui/plugin/reminders-context";
 import { requireReminderBackend } from "@/reminders/runtime";
-import type { Reminder } from "@/reminders/types/reminder";
+import type { Reminder } from "@/reminders/core/model";
 import { useObsidianKeyboardHeight } from "@/ui/plugin/hooks/useObsidianKeyboardHeight";
 
 type ReminderModalProps = {

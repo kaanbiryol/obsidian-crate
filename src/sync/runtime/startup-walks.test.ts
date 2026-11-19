@@ -11,7 +11,7 @@ import { DEFAULT_SETTINGS } from '../../plugin/settings-types';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import type { BatchUploadFile } from '../../protocol/sync-types';
 import { sha256Hex } from '@/platform/sha256';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 
 beforeEach(() => vi.stubGlobal('window', { setTimeout, clearTimeout }));
 afterEach(() => vi.unstubAllGlobals());

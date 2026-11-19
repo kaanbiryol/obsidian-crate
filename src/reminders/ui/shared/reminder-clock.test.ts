@@ -5,7 +5,7 @@ import { buildTodayViewModel, buildUpcomingViewModel } from '../views/viewModels
 import { getRemindersHeaderData } from './remindersViewModel';
 import { formatDueDate } from '../format/dateFormatting';
 import { isReminderOverdue } from '../../core/dates/reminderDate';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../core/model';
 
 const originalTimezone = process.env.TZ;
 const cleanups: Array<() => void> = [];

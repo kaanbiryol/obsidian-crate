@@ -2,11 +2,11 @@ import { uploadPreparedFiles } from '../transfer/upload';
 import { deleteRemoteFiles } from '../transfer/delete';
 import { runConcurrentTasks } from '../concurrency';
 import type { QueueFlushContext } from './flush';
-import { base64ToArrayBuffer } from '../encoding';
+import { base64ToArrayBuffer } from '@/platform/base64';
 import { pendingChangeKey } from '../pending/pending-change';
 import { Notice } from '../../test/mocks/obsidian';
 import { describe, expect, it, vi } from 'vitest';
-import { processPendingChanges } from './flush';
+import { flushQueueBatch } from './flush';
 import { OVERSIZED_LOCAL_FILE_MESSAGE, SkippedFileError } from '../issues';
 import type { SyncState } from '../types';
 import type { PreparedUpload } from '../transfer/types';
@@ -162,7 +162,7 @@ it('records the affected file and preserves earlier uploads if queue preparation
 	});
 	for (let index = 0; index < 128; index++) h.pendingKeys.add(`sent-${index}.md`);
 	h.pendingKeys.add('broken.md');
-	await processPendingChanges(h.context);
+	await flushQueueBatch(h.context);
 	expect(h.state.lastIssues).toEqual([{ path: 'broken.md', message: 'EACCES' }]);
 	expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
 		success: false, uploaded: 128, issues: [{ path: 'broken.md', message: 'EACCES' }], errors: ['broken.md: EACCES'],
@@ -181,11 +181,11 @@ it('backs off after a failed flush and resets after a successful one', async () 
 	});
 	const { retryAfterFailure, flushSucceeded } = h.context;
 	h.pendingKeys.add('note.md');
-	await processPendingChanges(h.context);
+	await flushQueueBatch(h.context);
 	expect(retryAfterFailure).toHaveBeenCalledOnce();
 	expect(h.context.triggerDebouncedSync).not.toHaveBeenCalled();
 	failing = false;
-	await processPendingChanges(h.context);
+	await flushQueueBatch(h.context);
 	expect(flushSucceeded).toHaveBeenCalledOnce();
 });
 
@@ -199,7 +199,7 @@ it('settles an oversized file without failing the rest of its batch', async () =
 	});
 	h.pendingKeys.add('big.bin');
 	h.pendingKeys.add('note.md');
-	await processPendingChanges(h.context);
+	await flushQueueBatch(h.context);
 	expect(h.pendingKeys.size).toBe(0);
 	expect(h.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
 		success: true, uploaded: 1, errors: [], issues: [{ path: 'big.bin', message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' }],
@@ -212,13 +212,13 @@ function createNamedAbortError(message = 'Sync request aborted'): Error {
 	return error;
 }
 
-describe('processPendingChanges', () => {
+describe('flushQueueBatch', () => {
 	it('uploads bounded chunks before preparing the entire queue', async () => {
 		const harness = createFlushHarness({ prepareUploadFromPath: async path => ({
 			path, content: new ArrayBuffer(1), size: 1, hash: 'hash', mtime: 1,
 		}) });
 		for (let i = 0; i < 300; i++) harness.pendingKeys.add(`image-${i}.png`);
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 		expect(harness.uploadFile).toHaveBeenCalledTimes(300);
 		expect(harness.uploadFile.mock.invocationCallOrder[0])
 			.toBeLessThan(harness.prepareUploadFromPath.mock.invocationCallOrder[299]!);
@@ -238,7 +238,7 @@ describe('processPendingChanges', () => {
 		harness.pendingKeys.add('notes/a.md');
 		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/old.md'));
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.uploadFile).toHaveBeenCalledTimes(1);
 		expect(harness.batchDelete).toHaveBeenCalledWith(
@@ -270,7 +270,7 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({ status: 'syncing' });
 		harness.pendingKeys.add('notes/a.md');
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
 		expect(harness.uploadFile).not.toHaveBeenCalled();
@@ -281,7 +281,7 @@ describe('processPendingChanges', () => {
 		const harness = createFlushHarness({ configured: false });
 		harness.pendingKeys.add('notes/a.md');
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.uploadFile).not.toHaveBeenCalled();
 		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
@@ -306,7 +306,7 @@ describe('processPendingChanges', () => {
 		});
 		harness.pendingKeys.add('notes/a.md');
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.state.status).toBe('error');
 		expect(harness.state.lastError).toContain('quota exceeded');
@@ -336,7 +336,7 @@ describe('processPendingChanges', () => {
 		harness.pendingKeys.add('notes/a.md');
 		harness.pendingRevisions.set('notes/a.md', 1);
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.state.status).toBe('error');
 		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
@@ -353,7 +353,7 @@ describe('processPendingChanges', () => {
 		harness.pendingKeys.add('notes/a.md');
 		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/b.md'));
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.batchDelete).not.toHaveBeenCalled();
 		expect(harness.pendingKeys.has(pendingChangeKey('delete', 'notes/b.md'))).toBe(true);
@@ -376,7 +376,7 @@ describe('processPendingChanges', () => {
 		});
 		harness.pendingKeys.add('notes/a.md');
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
@@ -395,7 +395,7 @@ describe('processPendingChanges', () => {
 		vi.mocked(harness.context.recoverUploads).mockRejectedValue(new HttpError('unauthorized', 401));
 		harness.pendingKeys.add('notes/a.md');
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
@@ -410,7 +410,7 @@ describe('processPendingChanges', () => {
 			uploadFile: async () => { throw new HttpError('Rename the conflicting file or parent folder', 409, null, 'namespace_conflict'); },
 		});
 		harness.pendingKeys.add('Projects.md');
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 		expect(harness.pendingKeys.has('Projects.md')).toBe(true);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
@@ -427,7 +427,7 @@ describe('processPendingChanges', () => {
 		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/todo.md'));
 		harness.pendingKeys.add('notes/TODO.md');
 		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/old.md'));
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 		expect(calls).toEqual(['delete notes/todo.md', 'upload notes/TODO.md', 'delete notes/old.md']);
 		expect(harness.pendingKeys.size).toBe(0);
 		expect(harness.state.status).not.toBe('error');
@@ -441,7 +441,7 @@ describe('processPendingChanges', () => {
 		harness.pendingKeys.add(pendingChangeKey('delete', 'todo.md'));
 		harness.pendingKeys.add('TODO.md');
 		harness.pendingKeys.add(pendingChangeKey('delete', 'old.md'));
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 		expect(harness.uploadFile).not.toHaveBeenCalled();
 		// The failed delete retries automatically, so the other delete waits for that retry.
 		expect(harness.batchDelete).toHaveBeenCalledExactlyOnceWith(['todo.md'], expect.anything(), expect.anything());
@@ -459,7 +459,7 @@ describe('processPendingChanges', () => {
 		harness.pendingKeys.add(pendingChangeKey('delete', 'drafts/plan.md'));
 		harness.pendingKeys.add('Projects.md');
 		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/old.md'));
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 		expect(harness.batchDelete).toHaveBeenCalledExactlyOnceWith(['notes/old.md'], expect.anything(), expect.anything());
 		expect([...harness.pendingKeys].sort()).toEqual([pendingChangeKey('delete', 'drafts/plan.md'), 'Projects.md']);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();
@@ -474,7 +474,7 @@ describe('processPendingChanges', () => {
 			harness.pendingKeys.add(pendingChangeKey('delete', `notes/${index}.md`));
 		}
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES, BATCH_DELETE_MAX_FILES, 2]);
 		expect(harness.removeEntry).toHaveBeenCalledTimes(count);
@@ -492,7 +492,7 @@ describe('processPendingChanges', () => {
 		}
 		h.batchDelete.mockImplementationOnce(async deleted => ({ success: true, deleted }))
 			.mockRejectedValueOnce(createNamedAbortError());
-		await processPendingChanges(h.context);
+		await flushQueueBatch(h.context);
 		expect(h.batchDelete.mock.calls.map(([batch]) => batch.length)).toEqual([BATCH_DELETE_MAX_FILES, 1]);
 		expect(h.removeEntry.mock.calls.map((call: unknown[]) => call[0])).toEqual(paths.slice(0, -1));
 		expect(h.context.localManifest.save).toHaveBeenCalledOnce();
@@ -521,7 +521,7 @@ describe('processPendingChanges', () => {
 		harness.pendingKeys.add('notes/a.md');
 		harness.pendingRevisions.set('notes/a.md', 1);
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
 		expect(harness.pendingRevisions.get('notes/a.md')).toBe(2);
@@ -544,7 +544,7 @@ describe('processPendingChanges', () => {
 		});
 		harness.pendingKeys.add('notes/a.md');
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.state.status).not.toBe('error');
 		expect(harness.pendingKeys.has('notes/a.md')).toBe(true);
@@ -565,7 +565,7 @@ describe('processPendingChanges', () => {
 		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/ok.md'));
 		harness.pendingKeys.add(pendingChangeKey('delete', 'notes/fail.md'));
 
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 
 		expect(harness.removeEntry).toHaveBeenCalledWith('notes/ok.md');
 		expect(harness.removeEntry).not.toHaveBeenCalledWith('notes/fail.md');
@@ -585,7 +585,7 @@ describe('queued deletion revalidation', () => {
 		const harness = createFlushHarness();
 		harness.pendingKeys.add(pendingChangeKey('delete', 'note.md'));
 		harness.context.assertLocalFileAbsent.mockRejectedValue(new LocalFilePresentError('note.md'));
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 		expect(harness.batchDelete).not.toHaveBeenCalled();
 		expect(harness.removeEntry).not.toHaveBeenCalled();
 		expect(harness.pendingKeys.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
@@ -596,7 +596,7 @@ describe('queued deletion revalidation', () => {
 		const harness = createFlushHarness();
 		harness.pendingKeys.add(pendingChangeKey('delete', 'note.md'));
 		harness.context.assertLocalFileAbsent.mockRejectedValue(new Error('adapter unavailable'));
-		await processPendingChanges(harness.context);
+		await flushQueueBatch(harness.context);
 		expect(harness.batchDelete).not.toHaveBeenCalled();
 		expect(harness.removeEntry).not.toHaveBeenCalled();
 		expect(harness.pendingKeys.has(pendingChangeKey('delete', 'note.md'))).toBe(true);
@@ -610,7 +610,7 @@ it('uploads a delete-prefixed filename while deleting its unprefixed neighbor', 
 	}) });
 	h.pendingKeys.add(pendingChangeKey('delete', 'note.md'));
 	h.pendingKeys.add('delete:note.md');
-	await processPendingChanges(h.context);
+	await flushQueueBatch(h.context);
 	expect(h.prepareUploadFromPath).toHaveBeenCalledExactlyOnceWith('delete:note.md');
 	expect(h.uploadFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'delete:note.md' }));
 	expect(h.batchDelete).toHaveBeenCalledExactlyOnceWith(['note.md'], { 'note.md': 'd'.repeat(64) }, { 'note.md': 'version-1' });

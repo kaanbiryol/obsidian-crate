@@ -1,5 +1,5 @@
 import { validateRecurrence } from './validateRecurrence';
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../model';
 import { recurrenceToText } from './recurrenceText';
 import { normalizeRecurrenceRule } from './recurrenceRule';
 

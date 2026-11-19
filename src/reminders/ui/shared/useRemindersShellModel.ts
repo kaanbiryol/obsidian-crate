@@ -1,5 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from 'react';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 import {
 	getCurrentHeaderData,
 	getReminderCreateProject,

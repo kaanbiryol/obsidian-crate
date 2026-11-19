@@ -12,7 +12,7 @@ import { TABS } from '@/reminders/ui/shared/layoutConstants';
 import { Button } from '@/ui/shared/Button';
 import { ViewHeader } from '@/ui/shared/ViewHeader';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 import type { TabId } from '@/reminders/ui/shared/layoutConstants';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { useContentReveal } from '@/ui/shared/useContentReveal';

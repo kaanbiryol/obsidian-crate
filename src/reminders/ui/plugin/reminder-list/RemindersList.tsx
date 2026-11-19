@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { LayoutGroup } from "motion/react";
 import { ReminderMotionRow } from "@/reminders/ui/shared/ReminderMotionRow";
 
-import type { Reminder } from "@/reminders/types/reminder";
+import type { Reminder } from "@/reminders/core/model";
 import { PluginContext } from "@/ui/plugin/plugin-context";
 import { useReminderRepository } from "@/reminders/ui/plugin/hooks/useReminderRepository";
 import { useObsidianDarkMode } from "@/reminders/ui/plugin/hooks/useObsidianDarkMode";

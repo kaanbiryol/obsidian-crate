@@ -1,4 +1,4 @@
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../../core/model';
 import { normalizeRecurrenceRule } from '../../core/recurrence/recurrenceRule';
 import { getUiLocale } from '../format/uiLocale';
 import { formatOrdinal } from '../../core/recurrence/recurrenceText';

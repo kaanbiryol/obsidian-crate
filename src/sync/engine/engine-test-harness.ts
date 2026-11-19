@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 import { SyncEngine, type SyncEngineHooks } from './engine';
 import { ConflictStore } from '../conflict/store';
 import { createEmptySyncResult } from '../sync-result';
-import type { CrateSettings } from '../../plugin/settings-types';
+import type { SyncSettings } from '../settings';
 import type { FileManifest, UploadResult } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
 import { LocalManifest } from '../manifest/manifest';
@@ -57,7 +57,7 @@ export function createNamedAbortError(message = 'Sync request aborted'): Error {
 }
 
 /** Orchestration tests only; use the persistent harness for file transfer and recovery. */
-export function createHarness(settingsOverrides: Partial<CrateSettings> = {}) {
+export function createHarness(settingsOverrides: Partial<SyncSettings> = {}) {
 	const settings = createTestSettings({ deviceId: 'dev-1', ignorePatterns: ['.trash/', '*.tmp'], ...settingsOverrides });
 
 	const stored = new Map<string, string>();

@@ -1,5 +1,5 @@
 import { requestUrl } from 'obsidian';
-import type { CapturedArticle } from './extraction/types';
+import type { CapturedArticle } from '@/reading/core/article';
 import { extractionUrl } from './extraction/url';
 import { decodeHtml } from './extraction/charset';
 import { youtubeVideoId } from './core/youtube';

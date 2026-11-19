@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Reminder } from '../../../types/reminder';
+import type { Reminder } from '../../../core/model';
 import { buildReminderSubmission, executeReminderAction } from './reminderMutation';
 import { buildReminderUpdate } from '../../../core/reminderMutationPlan';
 import { buildUpdatedReminderBlock } from '../../../core/markdownReminderMutation';

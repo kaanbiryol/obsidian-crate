@@ -1,7 +1,7 @@
 import React from 'react';
 import { expect, it, vi } from 'vitest';
 import { renderHook } from '@/test/react-hooks';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 
 const projectDetailRenders = vi.hoisted(() => ({ count: 0 }));
 vi.mock('@/reminders/ui/views', async () => {

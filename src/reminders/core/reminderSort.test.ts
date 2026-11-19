@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Reminder } from '../types/reminder';
+import type { Reminder } from './model';
 import { selectTodayReminders, sortReminders, sortRemindersByFileOrder } from './reminderSort';
 
 const reminder = (id: string, fields: Partial<Reminder> = {}): Reminder => ({ id, content: id, priority: 4, completed: false, ...fields });

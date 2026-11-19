@@ -1,7 +1,7 @@
 import { normalizeReminderProjectPath } from './reminderProjectPath';
 import { validateRecurrence } from './recurrence/validateRecurrence';
 import { isStoredReminderDate, isStoredReminderDatetime } from './dates/reminderDate';
-import type { RecurrenceRule, UpdateReminderParams } from '../types/reminder';
+import type { RecurrenceRule, UpdateReminderParams } from './model';
 
 const REMINDER_TITLE_MAX_LENGTH = 1024;
 const REMINDER_DESCRIPTION_MAX_LENGTH = 4096;

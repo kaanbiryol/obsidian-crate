@@ -1,4 +1,4 @@
-import type { CapturedArticle } from './types';
+import type { CapturedArticle } from '../core/article';
 import { MAX_READING_BYTES } from '../core/model';
 import { transcriptSegments } from '../core/transcript';
 

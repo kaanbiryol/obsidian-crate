@@ -4,7 +4,7 @@ import {
 import { compareProjects } from "@/reminders/core/reminder-list";
 import { getUpcomingReminders, selectTodayReminders } from "@/reminders/core/reminderSort";
 import { isReminderOverdue } from "@/reminders/core/dates/reminderDate";
-import type { Reminder } from "@/reminders/types/reminder";
+import type { Reminder } from "@/reminders/core/model";
 import type { TabId } from "@/reminders/ui/shared/layoutConstants";
 import { reminderProject } from "@/reminders/core/reminderProjectPath";
 

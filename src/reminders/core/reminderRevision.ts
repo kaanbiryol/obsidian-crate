@@ -1,4 +1,4 @@
-import type { Reminder } from '../types/reminder';
+import type { Reminder } from './model';
 import { sha256Hex } from '../../platform/sha256';
 import { DEFAULT_PROJECT } from './constants';
 

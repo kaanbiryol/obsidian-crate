@@ -1,5 +1,5 @@
 import { buildDescriptionBlock, readDescriptionBlock } from './reminderDescription';
-import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
+import type { Priority, RecurrenceRule } from "@/reminders/core/model";
 import { parseCheckboxLine, readCheckboxCompletion } from "@/reminders/core/grammar/checkboxParser";
 import { buildStoredReminderDates } from "@/reminders/core/dates/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/core/recurrence/recurrenceRule";

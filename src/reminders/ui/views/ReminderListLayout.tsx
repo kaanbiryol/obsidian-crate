@@ -1,6 +1,6 @@
 import React, { forwardRef, useCallback, useId, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, type HTMLMotionProps } from 'motion/react';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../core/model';
 import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 import { PWA_FADE } from '../../../ui/shared/navigation/motion';

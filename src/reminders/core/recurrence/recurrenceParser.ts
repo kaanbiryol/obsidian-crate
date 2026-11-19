@@ -1,4 +1,4 @@
-import type { RecurrenceFrequency, RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceFrequency, RecurrenceRule } from '../model';
 import { normalizeRecurrenceRule } from './recurrenceRule';
 import { parseRecurrenceTime } from '../dates/reminderTime';
 

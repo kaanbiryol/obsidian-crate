@@ -4,7 +4,7 @@ import {
 	reconcileReminderDraftMetadata,
 	type ReminderDraftContentMetadata,
 } from '@/reminders/core/reminderDraft';
-import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
+import type { Priority, RecurrenceRule } from '@/reminders/core/model';
 import { formatDueDate } from '@/reminders/ui/format/dateFormatting';
 import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/core/dates/reminderDate';
 import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '@/reminders/core/recurrence/recurrenceRule';

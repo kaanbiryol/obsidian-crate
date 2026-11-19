@@ -1,4 +1,4 @@
-import type { CapturedArticle } from './types';
+import type { CapturedArticle } from '../core/article';
 
 export const YOUTUBE_METADATA_MAX_BYTES = 64 * 1024;
 

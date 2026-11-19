@@ -5,7 +5,7 @@ import { createTransferHarness } from '../transfer/transfer-test-harness';
 import { parallelDownloadAndSaveFiles } from '../transfer/download';
 import { runConcurrentTasks } from '../concurrency';
 import { createAbortError } from '../abort';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import { sha256Hex } from '../../platform/sha256';
 
 it('cancels without advancing the cursor when stopped between download batches', async () => {

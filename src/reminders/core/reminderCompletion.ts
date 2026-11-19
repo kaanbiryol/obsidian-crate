@@ -1,5 +1,5 @@
 import { anchorRecurrence, recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
-import type { RecurrenceRule } from '@/reminders/types/reminder';
+import type { RecurrenceRule } from '@/reminders/core/model';
 import { rebuildCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
 import { calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';
 import { buildStoredReminderDates, parseStoredReminderDate, reminderHasTime } from '@/reminders/core/dates/reminderDate';

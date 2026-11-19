@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ReminderMotionRow } from '../shared/ReminderMotionRow';
 import { ReminderListPresence } from '../shared/ReminderListPresence';
 import type { AnimationConfig } from '../../../ui/shared/component-adapter';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../core/model';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import { REMINDER_SECTION_TRANSITION } from '../shared/layoutConstants';
 import { PWA_FADE } from '../../../ui/shared/navigation/motion';

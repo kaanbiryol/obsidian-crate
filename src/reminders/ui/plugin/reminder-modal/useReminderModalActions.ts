@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { Priority, Reminder, RecurrenceRule } from '../../../types/reminder';
+import type { Priority, Reminder, RecurrenceRule } from '../../../core/model';
 import { createLogger } from '../../../logger';
 import { buildDeleteConfirmationMessage } from '../../reminder-editor/deleteConfirmation';
 import {

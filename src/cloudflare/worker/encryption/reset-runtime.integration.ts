@@ -7,7 +7,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { SyncRuntime } from '../../../sync/runtime/runtime';
 import { DEFAULT_SETTINGS } from '../../../plugin/settings-types';
-import { SecretStorageService } from '../../../plugin/secret-storage';
+import { SecretStorageService } from '../../../sync/secret-storage';
 import { createEncryptionFixture } from '../test-support/encryption-test-harness';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { loadEncryptionReset } from '../../../sync/encryption/reset';

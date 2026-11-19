@@ -8,6 +8,7 @@ import {
 	type FileStorageRow,
 } from '../storage';
 import { mapBounded } from '@/platform/map-bounded';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../../d1/platform-limits';
 
 export async function handleBatchDownload(
@@ -96,18 +97,11 @@ export async function handleBatchDownload(
 				return null;
 			}
 
-			const arrayBuffer = await object.arrayBuffer();
-			const bytes = new Uint8Array(arrayBuffer);
-			const chunkSize = 8192;
-			let binary = '';
-			for (let i = 0; i < bytes.length; i += chunkSize) {
-				const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-				binary += String.fromCharCode(...chunk);
-			}
+			const content = arrayBufferToBase64(await object.arrayBuffer());
 
 			return {
 				path: safePath,
-				content: btoa(binary),
+				content,
 				revision: storedFile?.storageKey,
 				hash: storedFile?.hash || object.customMetadata?.hash || '',
 				size: object.size,

@@ -3,7 +3,7 @@ import type { App, TFile } from "obsidian";
 import type {
 	Priority,
 	RecurrenceRule,
-} from "@/reminders/types/reminder";
+} from "@/reminders/core/model";
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
 import type { ReminderMoveJournal } from '../reminder-move-journal';
 

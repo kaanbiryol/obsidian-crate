@@ -1,6 +1,6 @@
 import type { DevelopmentBuild } from '../../protocol/server-build';
 import { sha256Hex } from '../../platform/sha256';
-import { base64ToArrayBuffer } from '../../sync/encoding';
+import { base64ToArrayBuffer } from '@/platform/base64';
 
 export interface CloudflareDeploymentArtifacts {
 	development?: DevelopmentBuild;

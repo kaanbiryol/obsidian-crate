@@ -4,7 +4,7 @@ import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
 import { isMarkdownPath } from '../../protocol/note-paths';
 import type { BatchUploadFile, BatchUploadResponse, UploadResult } from '@/protocol/sync-types';
 import type { LocalManifest } from '../manifest/manifest';
-import { base64ToArrayBuffer } from '../encoding';
+import { base64ToArrayBuffer } from '@/platform/base64';
 import { mergeUploadIntent, uploadWire, type IntendedUpload, type JournalUpload, type PrepareUploadWire } from './upload-intent';
 import { UNVERIFIED_MODIFIED } from '../transfer/applied-content';
 import type { UploadApplyPhase, UploadPhase } from '../diagnostics/upload-diagnostics';

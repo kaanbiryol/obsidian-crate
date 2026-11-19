@@ -1,6 +1,5 @@
-import { applyLocalArticle } from '../../reading/core/article';
+import { applyLocalArticle, type CapturedArticle } from '../../reading/core/article';
 import { planReadingFileCommand, readingFileCommandRefusal } from '../../reading/core/reading-file-command';
-import type { CapturedArticle } from '../../reading/extraction/types';
 import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import { decryptJson, encryptJson } from '@/encryption/envelope';
 import { createReadingNote, parseReadingNote, readingImportId } from '../../reading/core/notes';

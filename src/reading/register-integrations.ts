@@ -6,6 +6,7 @@ import { CRATE_READER_ICON_ID, CRATE_READER_ICON_SVG } from '../ui/crate-icon';
 import { AddReadingLinkModal } from './ui/plugin/add-link-modal';
 import { ReadingView } from './ui/plugin/reading-view';
 import { createArticleMarkerHiding } from './data/editor-article-markers';
+import { isPathInFolder } from '@/protocol/note-paths';
 
 const READING_ID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
@@ -22,7 +23,7 @@ async function openReading(plugin: CratePlugin, itemId?: string, replace?: Works
 /** The reading id of a note in the reading folder. The reader verifies the identity when it opens the item. */
 function readingIdForFile(plugin: CratePlugin, file: TAbstractFile | null): string | undefined {
 	if (!plugin.settings.reading.enabled || !(file instanceof TFile) || file.extension !== 'md') return;
-	if (!file.path.startsWith(`${plugin.settings.reading.folderPath.trim()}/`)) return;
+	if (!isPathInFolder(file.path, plugin.settings.reading.folderPath.trim())) return;
 	const id: unknown = plugin.app.metadataCache.getFileCache(file)?.frontmatter?.crate_reading_id;
 	return typeof id === 'string' && READING_ID.test(id) ? id.toLowerCase() : undefined;
 }
@@ -69,7 +70,7 @@ export function registerReading(plugin: CratePlugin): void {
 	registerReaderHeaderActions(plugin);
 	plugin.registerEditorExtension(createArticleMarkerHiding(state => {
 		const path = state.field(editorInfoField, false)?.file?.path;
-		return Boolean(plugin.settings.reading.enabled && path?.startsWith(`${plugin.settings.reading.folderPath.trim()}/`));
+		return Boolean(plugin.settings.reading.enabled && path && isPathInFolder(path, plugin.settings.reading.folderPath.trim()));
 	}));
 	try { startReading(plugin); }
 	catch (error) { new Notice(error instanceof Error ? error.message : 'Could not start reading.'); }

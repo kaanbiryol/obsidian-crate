@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/ui/shared/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/ui/shared/useReminderCardInteractions';
-import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
+import type { Reminder as SharedReminder } from '@/reminders/core/model';
 import type { ListStyle } from '@/ui/shared/list-style';
 import type { ProjectColorScheme } from '@/reminders/ui/format/projectColors';
 

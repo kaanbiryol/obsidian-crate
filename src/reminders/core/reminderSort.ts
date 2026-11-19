@@ -3,7 +3,7 @@
  * Shared sorting logic for consistent ordering in the plugin
  */
 
-import type { Reminder } from '../types/reminder';
+import type { Reminder } from './model';
 import { formatLocalDateKey, isDateOnlyString, isReminderDueToday, isReminderOverdue, parseReminderDateValue } from './dates/reminderDate';
 
 /**

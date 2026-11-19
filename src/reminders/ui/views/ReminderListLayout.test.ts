@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../core/model';
 import { InboxView } from './InboxView';
 import { TodayView } from './TodayView';
 import { UpcomingView } from './UpcomingView';

@@ -1,4 +1,4 @@
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../../core/model';
 import { formatLocalDateKey, parseReminderDateValue } from '../../core/dates/reminderDate';
 import { getUiLocale, sentenceCaseLocalized } from './uiLocale';
 

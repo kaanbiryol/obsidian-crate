@@ -1,4 +1,4 @@
-import type { CapturedArticle } from '@/reading/extraction/types';
+import type { CapturedArticle } from '@/reading/core/article';
 
 const text = (value: unknown) => value === undefined || typeof value === 'string';
 

@@ -5,7 +5,7 @@ import {
 } from "@/reminders/core/reminderSort";
 import { isReminderOverdue } from "@/reminders/core/dates/reminderDate";
 import type { ReminderRepository } from "@/reminders/data/reminder-repository";
-import type { Reminder } from "@/reminders/types/reminder";
+import type { Reminder } from "@/reminders/core/model";
 import { DEFAULT_PROJECT } from "../../../core/constants";
 import { reminderProject } from "@/reminders/core/reminderProjectPath";
 

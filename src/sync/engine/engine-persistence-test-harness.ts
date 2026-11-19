@@ -1,6 +1,7 @@
 import type { Plugin } from 'obsidian';
 import { afterEach } from 'vitest';
-import { DEFAULT_SETTINGS, type CrateSettings } from '../../plugin/settings-types';
+import type { SyncSettings } from '../settings';
+import { createTestSettings } from '@/test/factories/settings';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
 import { SyncApiClient } from '../worker-api/client';
 import { SyncEngine, type SyncEngineHooks } from './engine';
@@ -16,8 +17,8 @@ afterEach(async () => {
 });
 
 /** Keep the engine's actual manifest, journals and file operations bound together. */
-export async function createPersistentEngineHarness(transport: ApiHttpTransport, overrides: Partial<CrateSettings> = {}, disk = new PersistentTestVault()) {
-	const settings = { ...structuredClone(DEFAULT_SETTINGS), workerUrl: 'https://server.test', syncInterval: 0, ...overrides };
+export async function createPersistentEngineHarness(transport: ApiHttpTransport, overrides: Partial<SyncSettings> = {}, disk = new PersistentTestVault()) {
+	const settings = createTestSettings({ automaticSync: false, workerUrl: 'https://server.test', ...overrides });
 	const api = new SyncApiClient(settings.workerUrl, 'test-token', transport);
 	const plugin = {
 		manifest: { dir: TEST_PLUGIN_DIR },

@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BaseModal } from '../../../../ui/shared/BaseModal';
 import type { AnimationConfig } from '../../../../ui/shared/component-adapter';
 import { useReducedMotion } from '../../../../ui/shared/useReducedMotion';
-import { RecurrenceRule } from '../../../types/reminder';
+import { RecurrenceRule } from '../../../core/model';
 import { getPickerModalProps } from '../glassStyles';
 import {
 	buildRecurrencePickerState,

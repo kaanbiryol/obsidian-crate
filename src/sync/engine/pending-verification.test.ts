@@ -1,6 +1,6 @@
 import { pendingChangeKey } from '../pending/pending-change';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import { createHarness, createSyncResult, spyOnIncrementalSync, toArrayBuffer, type Harness } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';

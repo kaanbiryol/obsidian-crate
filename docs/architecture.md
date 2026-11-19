@@ -649,11 +649,12 @@ Reading policy requests.
 `sync/connection/shared-settings.ts` applies them to plugin settings and rebases this device's
 changes onto the server's version before a conditional write. Production Worker modules
 may import only an allowlist: `protocol/`, `encryption/`, `platform/`, the shared
-reminder and Reading domain folders, release metadata and the PWA shell in
-`pwa/shell/`, plus the update screen and transition keys in `pwa/update/`.
-`scripts/worker-import-boundary.mjs` enforces it through ESLint.
-Production `sync/` modules do not import `reminders/` or `reading/`, which ESLint also
-enforces. In an encrypted vault, `plugin/note-projection.ts` builds each note's public
+reminder and Reading domain folders, release metadata, and the PWA shell modules the
+Worker renders, including the update screen and update markers in `pwa/shell/`.
+`scripts/worker-import-boundary.mjs` enforces it through ESLint, and also follows the
+runtime imports of allowed modules so a shared file cannot pull host code in indirectly.
+Production `sync/` modules do not import `reminders/`, `reading/` or `plugin/`, which
+ESLint also enforces. In an encrypted vault, `plugin/note-projection.ts` builds each note's public
 data (its Reading card, else its reminder schedules) and the plugin passes it to
 `SyncRuntime`, which hands it to `SyncApiClient.configureEncryption`.
 

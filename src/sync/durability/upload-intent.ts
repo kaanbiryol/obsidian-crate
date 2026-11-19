@@ -3,7 +3,7 @@ import { isRecord, isSha256Hex } from '../../platform/validation';
 import { isUploadSession } from '../diagnostics/upload-diagnostics';
 import { isSyncDate, isSyncPath, isSyncSequence } from '../../protocol/sync-validation';
 import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
-import { arrayBufferToBase64, base64ToArrayBuffer } from '../encoding';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/platform/base64';
 import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES, parseEncryptedFile } from '../../encryption/file-format';
 import { sha256Hex } from '../../platform/sha256';
 import { isWirePath } from '../../protocol/encrypted-path';

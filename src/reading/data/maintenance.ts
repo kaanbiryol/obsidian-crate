@@ -1,6 +1,7 @@
 import { adoptReadingClip, parseReadingNote, recordMarkdownHighlights } from '../core/notes';
 import { MAX_READING_BYTES } from '../core/model';
 import type { ReadingFile, ReadingVault } from './library';
+import { isMarkdownNoteInFolder } from '@/protocol/note-paths';
 
 type MaintenanceVault = Pick<ReadingVault, 'files' | 'read' | 'process' | 'editing' | 'cachedProperties' | 'file'>;
 const SYNC_WAIT = 'Note is waiting for import after sync.';
@@ -30,7 +31,7 @@ export class ReadingMaintenance {
 	/** True while a note waits for its editor to close. */
 	get waitingForEditor(): boolean { return this.editorWait.size > 0; }
 	subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
-	private isNotePath(path: string): boolean { return path.startsWith(`${this.folder}/`) && /\.md$/i.test(path); }
+	private isNotePath(path: string): boolean { return isMarkdownNoteInFolder(path, this.folder); }
 	/** Finds clips waiting for import from cached properties, without reading notes. A note the
 	 * host has not indexed yet is checked when its index arrives, or now without a cache. */
 	start(): Promise<void> {

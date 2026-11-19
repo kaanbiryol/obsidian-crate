@@ -48,6 +48,15 @@ export function encodeEncryptedFile(packet: EncryptedFilePacket): Uint8Array<Arr
 	return bytes;
 }
 
+const ENCRYPTED_FILE_PREFIX_BYTES = new TextEncoder().encode(ENCRYPTED_FILE_PREFIX);
+
+/** True only for the current `CRATE-E2EE/1` format; `isEncryptedFile` accepts any version. */
+export function hasCurrentEncryptedFilePrefix(content: Uint8Array | string): boolean {
+	if (typeof content === 'string') return content.startsWith(ENCRYPTED_FILE_PREFIX);
+	return content.length >= ENCRYPTED_FILE_PREFIX_BYTES.length
+		&& ENCRYPTED_FILE_PREFIX_BYTES.every((byte, index) => content[index] === byte);
+}
+
 export function isEncryptedFile(bytes: Uint8Array | string): boolean {
 	if (typeof bytes === 'string') return bytes.startsWith('CRATE-E2EE/');
 	return bytes.length >= 11 && bytes[0] === 67 && bytes[1] === 82 && bytes[2] === 65

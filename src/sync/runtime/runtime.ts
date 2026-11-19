@@ -10,7 +10,7 @@ import type { SyncActivityProgress } from '../types';
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
-import type { SecretStorageService } from '../../plugin/secret-storage';
+import type { SecretStorageService } from '../secret-storage';
 import { loadEncryptionKeys } from '../encryption/key-storage';
 import { runEncryptionReset, syncBeforeEncryptionReset, type EncryptionResetRequest } from './encryption-reset-workflow';
 import { configureClientEncryption } from './api-client-setup';
@@ -476,7 +476,7 @@ export class SyncRuntime {
 		expected: { workerUrl: string; authToken: string }, signal?: AbortSignal): Promise<void> {
 		return this.changeConfiguration(transition => runEncryptionReset({
 			...this.configurationWorkflowContext(transition, signal),
-			getResetEngine: () => {
+			pauseEventsAndGetResetEngine: () => {
 				this.vaultEvents.pause();
 				if (!this.syncEngine || !this.apiClient) throw new Error('Could not start the new sync connection');
 				return this.syncEngine;

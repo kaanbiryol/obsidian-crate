@@ -1,6 +1,6 @@
 import { assertReminderMutationInput } from './reminderMutationInput';
 import type { MarkdownReminderUpdate } from './markdownReminderMutation';
-import type { Priority, Reminder, UpdateReminderParams } from '../types/reminder';
+import type { Priority, Reminder, UpdateReminderParams } from './model';
 import { parseReminderDateValue } from './dates/reminderDate';
 import { normalizeRecurrenceRule } from './recurrence/recurrenceRule';
 import { DEFAULT_PRIORITY, DEFAULT_PROJECT } from './constants';

@@ -1,5 +1,5 @@
 import { ConnectionSetupError } from '../connection/connection-errors';
-import type { SecretStorageService } from '../../plugin/secret-storage';
+import type { SecretStorageService } from '../secret-storage';
 import { prepareEncryptedAddressChange } from '../encryption/encrypted-connection';
 import { loadEncryptionReset, saveEncryptionReset, verifyEncryptionResetAddress } from '../encryption/reset';
 import type { RuntimeConfigurationTransition } from './runtime';

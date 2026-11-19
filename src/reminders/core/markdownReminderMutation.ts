@@ -1,5 +1,5 @@
 import { anchorRecurrence, recurrenceCalendarDate } from './recurrence/recurrenceCalendar';
-import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
+import type { Priority, RecurrenceRule } from '@/reminders/core/model';
 import { parseCheckboxLine, rebuildCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
 import { UnresolvedReminderScheduleError } from '@/reminders/core/grammar/reminderParser';
 import { calculateFirstOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';

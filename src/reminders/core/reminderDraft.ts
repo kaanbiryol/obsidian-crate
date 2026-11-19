@@ -1,4 +1,4 @@
-import type { Priority, Reminder, RecurrenceRule } from '../types/reminder';
+import type { Priority, Reminder, RecurrenceRule } from './model';
 import { recurrenceToEditorText } from './recurrence/recurrenceText';
 import { formatReminderDateText, parseReminderDateValue, serializeReminderDateValue } from './dates/reminderDate';
 import { findProjectMatches } from './grammar/richTextMatchers';

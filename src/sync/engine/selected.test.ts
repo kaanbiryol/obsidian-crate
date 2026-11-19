@@ -4,7 +4,7 @@ import { CRATE_PLUGIN_PROTOCOL } from '../../protocol/server-info';
 import type { BatchUploadFile, FileEntry } from '../../protocol/sync-types';
 import { TEST_PLUGIN_DIR } from '../../test/factories/sync-vault';
 import { createPersistentEngineHarness } from './engine-persistence-test-harness';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import type { ApiHttpResponse, ApiHttpTransport } from '../worker-api/http';
 import { formatSyncProgress } from '../../ui/activity/progress-label';
 import { sha256Hex } from '../../platform/sha256';

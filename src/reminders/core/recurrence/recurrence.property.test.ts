@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { fromDate, getDayOfWeek } from '@internationalized/date';
 import { describe, expect, it } from 'vitest';
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../model';
 import { calculateNextOccurrence } from './recurrenceCalculator';
 import { appendRecurrenceMetadata, readRecurrenceMetadata } from './recurrenceMetadata';
 import { parseRecurrenceFromContent } from './recurrenceParser';

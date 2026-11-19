@@ -4,7 +4,7 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { ReminderListLayout } from './ReminderListLayout';
 
 import type { AnimationConfig } from '../../../ui/shared/component-adapter';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../core/model';
 import { formatDateHeader } from '../format/dateFormatting';
 import { ReminderListPresence } from '../shared/ReminderListPresence';
 import { ReminderCard } from '../shared/ReminderCard';

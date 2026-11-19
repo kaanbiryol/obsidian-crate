@@ -1,6 +1,6 @@
 import { OVERSIZED_REMOTE_FILE_MESSAGE, recordDeferredChange, recordSyncError } from '../issues';
 import { isAbortError } from "../abort";
-import { base64ToArrayBuffer } from "../encoding";
+import { base64ToArrayBuffer } from "@/platform/base64";
 import { applyRemoteContentIfUnchanged, incomingReviewMessage } from "../local/local-apply";
 import { unsupportedLocalPathIssue } from '../local/local-path-safety';
 import { recordAppliedContent } from './applied-content';

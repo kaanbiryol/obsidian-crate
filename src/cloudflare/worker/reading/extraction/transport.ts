@@ -2,7 +2,7 @@ import { extractionUrl } from '@/reading/extraction/url';
 import { decodeHtml } from '@/reading/extraction/charset';
 import { youtubeVideoId } from '@/reading/core/youtube';
 import { youtubeMetadata, youtubeMetadataUrl, YOUTUBE_METADATA_MAX_BYTES } from '@/reading/extraction/youtube';
-import type { CapturedArticle } from '@/reading/extraction/types';
+import type { CapturedArticle } from '@/reading/core/article';
 export { extractionUrl, isPublicIPv4 } from '@/reading/extraction/url';
 
 const MAX_BYTES = 2 * 1024 * 1024;

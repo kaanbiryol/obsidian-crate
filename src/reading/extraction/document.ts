@@ -1,4 +1,4 @@
-import type { CapturedArticle } from './types';
+import type { CapturedArticle } from '../core/article';
 import Defuddle from 'defuddle/full';
 import { parseHTML } from 'linkedom';
 import { MAX_READING_BYTES } from '@/reading/core/model';

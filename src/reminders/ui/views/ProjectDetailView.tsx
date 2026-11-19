@@ -4,7 +4,7 @@ import { ReminderListLayout } from './ReminderListLayout';
 
 import type { AnimationConfig } from '../../../ui/shared/component-adapter';
 import { Button } from '../../../ui/shared/Button';
-import type { Reminder } from '../../types/reminder';
+import type { Reminder } from '../../core/model';
 import { ReminderCard } from '../shared/ReminderCard';
 import { ReorderableReminderList } from '../shared/ReorderableReminderList';
 import { EmptyState } from '../../../ui/shared/EmptyState';

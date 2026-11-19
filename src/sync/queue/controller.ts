@@ -2,7 +2,7 @@ import { pendingChangeKey, decodePendingChange, type PendingChange, type Pending
 import { PendingSet } from './pending-set';
 import type { SyncResult, VaultEntry } from '../types';
 import {
-	processPendingChanges as flushPendingQueueChanges,
+	flushQueueBatch,
 	type QueueFlushBatch,
 	type QueueFlushContext,
 } from './flush';
@@ -282,7 +282,7 @@ export class SyncQueueController {
 		if (this.context.automaticSyncEnabled?.() === false) return;
 		const now = Date.now();
 		if ([...this.pending.queuedKeys()].every(key => this.largeUploadReadyAt(key, now) !== null) && this.scheduleHeldUploads(now)) return;
-		const task = flushPendingQueueChanges(this.getQueueFlushContext());
+		const task = flushQueueBatch(this.getQueueFlushContext());
 		this.flushTasks.add(task);
 		try { await task; } finally { this.flushTasks.delete(task); }
 	}

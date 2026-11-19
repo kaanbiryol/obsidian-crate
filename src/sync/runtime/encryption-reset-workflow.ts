@@ -3,7 +3,7 @@ import { createEncryptionState, type EncryptionServerState } from '../../encrypt
 import { sealRecoveryBundle, type VaultKeyBundle } from '../../encryption/key-bundle';
 import { loadEncryptionKeys, saveEncryptionKeys } from '../encryption/key-storage';
 import { fitsEncryptedPathLimit } from '../../encryption/path-tags';
-import type { SecretStorageService } from '../../plugin/secret-storage';
+import type { SecretStorageService } from '../secret-storage';
 import { createEncryptionReset, createEncryptionSetup, loadEncryptionReset, saveEncryptionReset, resetRemoteEncryption, EncryptionResetRejectedError } from '../encryption/reset';
 import type { SyncEngine } from '../engine/engine';
 import type { SyncApiClient } from '../worker-api/client';
@@ -20,7 +20,7 @@ interface EncryptionResetContext {
 	persistSettings: (update?: Partial<SyncSettings>) => Promise<void>;
 	clearLocalState: () => Promise<void>;
 	/** Also pauses vault event capture until resumeEvents runs. */
-	getResetEngine: () => Pick<SyncEngine, 'sync' | 'updateSettings'>;
+	pauseEventsAndGetResetEngine: () => Pick<SyncEngine, 'sync' | 'updateSettings'>;
 	pushSharedSettings: () => Promise<boolean>;
 	/** Sync once more so the wipe cannot discard changes that exist only on the server.
 	 * Returns the paths this device syncs. */
@@ -61,7 +61,7 @@ export type EncryptionResetRequest = { target: 'plain'; state: EncryptionServerS
 /** Keep remote reset, local invalidation and reconciliation in their durable order. A
  * saved reset always resumes in its own direction, whatever the request. */
 export async function runEncryptionReset(
-	{ settings, secretStorage, transition, persistSettings, clearLocalState, getResetEngine, pushSharedSettings, syncBeforeReset, resumeEvents, reportError }: EncryptionResetContext,
+	{ settings, secretStorage, transition, persistSettings, clearLocalState, pauseEventsAndGetResetEngine, pushSharedSettings, syncBeforeReset, resumeEvents, reportError }: EncryptionResetContext,
 	request: EncryptionResetRequest, progress: (message: string) => void,
 	expected: { workerUrl: string; authToken: string }, signal?: AbortSignal,
 ): Promise<void> {
@@ -140,7 +140,7 @@ export async function runEncryptionReset(
 		}
 		await transition.initialize(true);
 		verify();
-		const engine = getResetEngine();
+		const engine = pauseEventsAndGetResetEngine();
 		progress(encrypting ? 'Encrypting and uploading this device’s vault…' : 'Uploading this device’s vault without end-to-end encryption…');
 		// The wipe is complete. Another reconnected device may already have
 		// edited the new server copy; retries must retain the normal sync baseline.

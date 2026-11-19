@@ -30,7 +30,7 @@ export * from './src/sync/encryption/encrypted-files';
 export * from './src/sync/worker-api/sync';
 export * from './src/sync/durability/durable-restores';
 export { sha256Hex } from './src/platform/sha256';
-export { arrayBufferToBase64, base64ToArrayBuffer } from './src/sync/encoding';
+export { arrayBufferToBase64, base64ToArrayBuffer } from './src/platform/base64';
 export * from './src/pwa/encryption/encrypted-push';
 export * from './src/pwa/encryption/encryption-keys';
 export * from './src/pwa/reminders/encrypted-reminder-attempts';

@@ -1,4 +1,4 @@
-import type { Priority, RecurrenceRule } from '../types/reminder';
+import type { Priority, RecurrenceRule } from './model';
 import { preserveReminderInstant } from './preserveReminderInstant';
 import { buildStoredReminderDates, parseReminderDateValue, serializeReminderDateValue } from './dates/reminderDate';
 import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from './recurrence/recurrenceRule';

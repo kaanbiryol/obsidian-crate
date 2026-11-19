@@ -29,7 +29,7 @@ import { finishInitialSetup } from './initial-setup';
 import type { InitialConfigPull } from '../manifest/initial-config-pull';
 import { MAX_DEBOUNCE_WAIT_MS, updateSyncProgress, type SyncSettings } from '../settings';
 import type { ReconnectNotice, WorkflowCompletionContext } from '../sync-outcome';
-import type { SyncWorkflowContext } from './standard-sync-workflow';
+import { runSyncWorkflow, type SyncWorkflowContext } from './standard-sync-workflow';
 import type { ForceSyncWorkflowContext } from './force-sync-workflow';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
@@ -56,7 +56,7 @@ interface SyncEngineContextDependencies {
 	getSettings: () => SyncSettings;
 	/** Saves the settings `getSettings` returns, as the runtime does after each sync. */
 	persistSettings: () => Promise<void>;
-	fullSyncRequest: () => { complete(): void } | null;
+	pendingFullSyncRequest: () => { complete(): void } | null;
 	getStatus: () => SyncState['status'];
 	shouldIgnore: (path: string) => boolean;
 	runConcurrent: <T>(tasks: (() => Promise<T>)[], concurrency: number) => Promise<T[]>;
@@ -81,7 +81,7 @@ interface SyncEngineContextDependencies {
 export class SyncEngineContexts {
 	private readonly plannedContent = new PlannedContent();
 	/** Paths the running sync leaves alone in both directions, at the user's request.
-	 * Empty outside `withHeldPaths`. */
+	 * Empty outside `runStandardSync`. */
 	private held: ReadonlySet<string> = new Set();
 	private readonly isHeld = (path: string): boolean => this.held.has(path);
 	/** Planners skip held paths as they skip ignored ones; other ignore checks, such as the
@@ -154,7 +154,7 @@ export class SyncEngineContexts {
 			}, result, progress),
 			// Resolved per call so tests can replace the incremental planner.
 			incrementalSync: (progressCallback, onFailure) => this.incrementalSync(progressCallback, onFailure),
-			fullSyncRequest: d.fullSyncRequest,
+			pendingFullSyncRequest: d.pendingFullSyncRequest,
 			hasSyncCursor: () => d.getSettings().lastSeq > 0,
 			createFullSyncPlan: (remoteFiles, concurrency, options) => createFullSyncPlan({
 				...this.localDiffPlanner,
@@ -206,13 +206,16 @@ export class SyncEngineContexts {
 		};
 	}
 
-	clearPlannedContent(): void { this.plannedContent.clear(); }
-
-	/** Runs a standard sync that leaves `held` paths alone, then clears them. */
-	async withHeldPaths<T>(held: ReadonlySet<string>, run: () => Promise<T>): Promise<T> {
+	/** Runs a standard sync that leaves `held` paths alone. Planned content and held paths
+	 * last only for this run. */
+	async runStandardSync(held: ReadonlySet<string>, progress?: (current: number, total: number) => void): Promise<SyncResult> {
+		this.plannedContent.clear();
 		this.held = held;
-		try { return await run(); }
-		finally { this.held = new Set(); }
+		try { return await runSyncWorkflow(this.syncWorkflow, progress); }
+		finally {
+			this.held = new Set();
+			this.plannedContent.clear();
+		}
 	}
 
 	readonly prepareUploadFromPath = (path: string): Promise<PreparedUpload | null> =>

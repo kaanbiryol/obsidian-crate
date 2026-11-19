@@ -1,7 +1,7 @@
 import { parseCheckboxLine, type ParsedCheckbox } from "@/reminders/core/grammar/checkboxParser";
 import { buildStoredReminderDates } from "@/reminders/core/dates/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/core/recurrence/recurrenceRule";
-import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
+import type { Priority, RecurrenceRule } from "@/reminders/core/model";
 import { readDescriptionBlock } from "./reminderDescription";
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
 import { extractReminderId } from './reminderIdentity';

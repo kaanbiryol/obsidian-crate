@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import type { Reminder } from '../../../types/reminder';
+import type { Reminder } from '../../../core/model';
 
 /** Keep live card data while a drag or its disk write owns the visible order. */
 export function reconcileReminderOrder(reminders: Reminder[], ids: string[]): Reminder[] {

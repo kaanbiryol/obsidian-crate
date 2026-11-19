@@ -2,7 +2,20 @@ import { youtubeVideoId } from './youtube';
 import { ARTICLE_START, ARTICLE_END, MAX_READING_BYTES, MAX_READING_TITLE_LENGTH, type ReadingItem, type ReadingMetadata } from './model';
 import { inertTemplater, parseReadingNote } from './notes';
 import { patchReadingFrontmatter } from './frontmatter';
-import { transcriptMetadata, type CapturedArticle } from '../extraction/types';
+
+/** An article fetched by any host (plugin, PWA or Worker), before it is written into a note. */
+export interface CapturedArticle {
+	markdown: string;
+	title?: string;
+	author?: string;
+	faviconUrl?: string;
+	transcript?: { source: 'youtube'; language?: string };
+}
+
+function transcriptMetadata(article: CapturedArticle): Record<string, string> {
+	return article.transcript ? { transcript_source: article.transcript.source,
+		...(article.transcript.language ? { transcript_language: article.transcript.language } : {}) } : {};
+}
 
 export function managedArticle(content: string): { start: number; end: number; text: string } | null {
 	const start = content.indexOf(ARTICLE_START), end = content.indexOf(ARTICLE_END);

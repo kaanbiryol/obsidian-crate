@@ -169,7 +169,7 @@ async function reportFlushResult(context: QueueFlushContext, result: SyncResult)
 	}
 }
 
-export async function processPendingChanges(
+export async function flushQueueBatch(
 	context: QueueFlushContext,
 ): Promise<void> {
 	if (context.signal.aborted) return;
@@ -203,9 +203,11 @@ export async function processPendingChanges(
 	try {
 		await context.recoverUploads();
 		if (context.signal.aborted) throw createAbortError('Queue recovery aborted');
+		// Unlike createDeleteCandidates, a queued delete with no baseline is dropped quietly:
+		// the file never reached the server, so there is nothing to delete or report.
 		const deletes = deletedPaths.flatMap(path => {
-			const expectedHash = context.localManifest.getEntry(path)?.hash;
-			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
+			const entry = context.localManifest.getEntry(path);
+			return entry?.hash ? [{ path, expectedHash: entry.hash, expectedRevision: entry.revision }] : [];
 		});
 		const failures: Array<{ path: string; error: string; status?: number }> = [];
 		const failedUploads = new Set<string>();
@@ -312,6 +314,7 @@ export async function processPendingChanges(
 			if (reconciliationKeys.size > 0) context.requestReconciliation([...reconciliationKeys]);
 		}
 	} finally {
+		// Backstop only: each path above releases before it publishes idle or error. Release is idempotent.
 		batch.release();
 		if (
 			!context.signal.aborted

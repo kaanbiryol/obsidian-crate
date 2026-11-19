@@ -1,4 +1,4 @@
-import type { CreateReminderParams, Priority, Reminder, RecurrenceRule } from '../../../types/reminder';
+import type { CreateReminderParams, Priority, Reminder, RecurrenceRule } from '../../../core/model';
 import { resolveReminderSubmission } from '../../../core/reminderSubmission';
 
 export interface ReminderSubmissionInput {

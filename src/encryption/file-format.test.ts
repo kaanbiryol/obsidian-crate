@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ENCRYPTED_FILE_CONTENT_TYPE, encodeEncryptedFile, fileTransportLimit, isEncryptedFile, MAX_ENCRYPTED_FILE_BYTES, MAX_ENCRYPTED_PUBLIC_DATA_BYTES, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
+import { ENCRYPTED_FILE_CONTENT_TYPE, encodeEncryptedFile, fileTransportLimit, hasCurrentEncryptedFilePrefix, isEncryptedFile, MAX_ENCRYPTED_FILE_BYTES, MAX_ENCRYPTED_PUBLIC_DATA_BYTES, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 const descriptor: EncryptedFileDescriptor = { version: 1, vaultId: 'vault-a', scopeId: 'vault', objectId: 'object-a', keyId: 'key-a', metadata: 'A'.repeat(184) };
@@ -19,6 +19,13 @@ describe('encrypted file framing', () => {
 		expect(isEncryptedFile(new TextEncoder().encode('CRATE-E2EE'))).toBe(false);
 		expect(isEncryptedFile(new TextEncoder().encode('CRATE-E2EF/1'))).toBe(false);
 		expect(isEncryptedFile(new TextEncoder().encode('CRATE-E2EE/1'))).toBe(true);
+	});
+
+	it('matches only the current format prefix', () => {
+		expect(hasCurrentEncryptedFilePrefix('CRATE-E2EE/1\n{}')).toBe(true);
+		expect(hasCurrentEncryptedFilePrefix('CRATE-E2EE/2\n')).toBe(false);
+		expect(hasCurrentEncryptedFilePrefix(new TextEncoder().encode('CRATE-E2EE/1\n{}'))).toBe(true);
+		expect(hasCurrentEncryptedFilePrefix(new TextEncoder().encode('CRATE-E2EE/1'))).toBe(false);
 	});
 
 	it('uses the larger transport limit only for encrypted content', () => {

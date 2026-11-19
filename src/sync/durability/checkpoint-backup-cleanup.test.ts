@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import type { DataAdapter } from 'obsidian';
 import { pruneCheckpointBackups, registerCheckpointBackupCleanup } from './checkpoint-backup-cleanup';
-import { arrayBufferToBase64 } from '../encoding';
+import { arrayBufferToBase64 } from '@/platform/base64';
 import type { SyncState } from '../types';
 import { sha256Hex } from '../../platform/sha256';
 

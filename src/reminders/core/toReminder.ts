@@ -1,4 +1,4 @@
-import type { Reminder } from "@/reminders/types/reminder";
+import type { Reminder } from "@/reminders/core/model";
 import { normalizeRecurrenceRule } from "./recurrence/recurrenceRule";
 import { reminderProject } from "./reminderProjectPath";
 

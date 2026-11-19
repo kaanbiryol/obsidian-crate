@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 import { useReminderDraft } from '@/reminders/ui/plugin/reminder-modal/useReminderDraft';
 
 const projects = ['Inbox', 'Work'];

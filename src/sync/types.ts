@@ -71,7 +71,8 @@ export interface ConflictRecord {
 	createdAt: string;
 	cause: 'concurrent-create' | 'concurrent-edit' | 'incoming-review' | 'unknown';
 	status: 'active' | 'resolved';
-	copySide?: 'local' | 'remote';
+	/** Set only when the conflict copy holds the incoming server version. */
+	copySide?: 'remote';
 	localHash?: string;
 	remoteHash?: string;
 	baseHash?: string;

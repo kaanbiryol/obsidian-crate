@@ -1,6 +1,6 @@
 import type { InferOutput } from 'valibot';
 import type { reminderDraftSchema, reminderRecordSchema } from './cache/reminder-storage-validation';
-import type { RecurrenceRule } from '@/reminders/types/reminder';
+import type { RecurrenceRule } from '@/reminders/core/model';
 import type { ReminderSourceIssue } from '@/reminders/core/reminder-list';
 
 export type { ReminderSourceIssue };

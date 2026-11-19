@@ -1,5 +1,5 @@
 import { recurrenceToText } from './recurrenceText';
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../model';
 import { timezone as getLocalTimeZone } from '../dates/time';
 import { canonicalReminderTimezone } from '../dates/reminderTimezone';
 

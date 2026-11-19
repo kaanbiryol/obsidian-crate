@@ -4,7 +4,7 @@ import {
 	now as zonedNow,
 	type ZonedDateTime,
 } from '@internationalized/date';
-import type { RecurrenceRule } from '../../types/reminder';
+import type { RecurrenceRule } from '../model';
 import { getRecurrenceTimeZone } from './recurrenceRule';
 import { isDateOnlyString } from '../dates/reminderDate';
 

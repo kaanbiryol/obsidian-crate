@@ -1,11 +1,11 @@
 import { youtubeVideoId } from '../core/youtube';
 import { enrichReadingBookmark } from '../core/duplicates';
 import { findSavedReadingLink, READING_DUPLICATE_ID_ISSUE } from '../core/inventory';
-import { applyLocalArticle } from '../core/article';
+import { applyLocalArticle, type CapturedArticle } from '../core/article';
 import { isEmptyReadingCapture, readingUpdateIssue } from '../core/mutation-policy';
-import type { CapturedArticle } from '../extraction/types';
 import { readingCapturePath, retitledCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
+import { isMarkdownNoteInFolder } from '@/protocol/note-paths';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
 import { MAX_READING_BYTES, readingUrlIdentity, validateReadingMetadata, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontmatter';
@@ -159,7 +159,10 @@ export class ReadingLibrary {
 	}
 	// Before the list is built or being built, the next scan takes every note from the cache anyway.
 	invalidate(path: string): void { if (this.active) this.stale.add(path); }
-	private isNotePath(path: string): boolean { return path.startsWith(`${this.folder}/`) && /\.md$/i.test(path); }
+	private isNotePath(path: string): boolean { return isMarkdownNoteInFolder(path, this.folder); }
+	private assertListed(item: ReadingItem, hint = ''): void {
+		if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error(`This note moved or has an identity conflict.${hint}`);
+	}
 	private findFile(path: string): ReadingFile | undefined {
 		return (this.vault.file ? this.vault.file(path) ?? undefined : this.vault.files().find(file => file.path === path));
 	}
@@ -364,10 +367,12 @@ export class ReadingLibrary {
 			// Network work runs outside the mutation queue: saved notes remain editable.
 			const file = await this.enqueue(async () => {
 				await this.reload([item.path]);
-				if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict.');
+				this.assertListed(item);
 				const file = this.findFile(item.path);
 				if (!file) throw new Error('This reading note was moved or deleted.');
 				const content = await this.vault.read(file), metadata = parseReadingNote(content);
+				// Stricter than the server retry rule: a local download also needs a status that is not
+				// `ready` (YouTube links excepted), so this device never overwrites a finished capture.
 				if (metadata?.crate_reading_id !== item.crate_reading_id || metadata.source_url !== item.source_url
 					|| !(['unavailable', 'pending'].includes(metadata.extraction_status) || youtubeVideoId(metadata.source_url)) || !isEmptyReadingCapture(content, metadata)) throw new Error('Only empty saved links can be downloaded.');
 				return file;
@@ -376,7 +381,7 @@ export class ReadingLibrary {
 			const article = await capture(item.source_url, this.signal);
 			return this.enqueue(async () => {
 				await this.reload([item.path]);
-				if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict.');
+				this.assertListed(item);
 				const written: { before?: ReadingMetadata | null } = {};
 				const saved = parseReadingNote(await this.vault.process(file, content => {
 					this.assertActive();
@@ -427,7 +432,7 @@ export class ReadingLibrary {
 		if (!item.path) return Promise.reject(new Error('The article is still being saved. Try again after it syncs.'));
 		return this.enqueue(async () => {
 			await this.reload([item.path]);
-			if (!this.snapshot.items.some(current => current.path === item.path && current.crate_reading_id === item.crate_reading_id)) throw new Error('This note moved or has an identity conflict. Refresh before trying again.');
+			this.assertListed(item, ' Refresh before trying again.');
 			const file = this.findFile(item.path);
 			if (!file) throw new Error('This reading note was moved or deleted.');
 			await this.vault.process(file, content => {

@@ -4,7 +4,7 @@ import { PluginWorkspaceNavigation } from '@/ui/plugin/PluginWorkspaceNavigation
 import { PluginRemindersAppShell } from '@/reminders/ui/plugin/PluginRemindersAppShell';
 import { DEFAULT_DOCK_TABS, type DockTab } from '@/ui/shared/navigation/dock-destinations';
 import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';
-import type { Reminder } from '@/reminders/types/reminder';
+import type { Reminder } from '@/reminders/core/model';
 import { ReadingFixture } from './ReadingFixture';
 import { TabTransition } from '@/ui/shared/navigation/TabTransition';
 import { RemindersLoading } from '@/reminders/ui/plugin/RemindersLoading';

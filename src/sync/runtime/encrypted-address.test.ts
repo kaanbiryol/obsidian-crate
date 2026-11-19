@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../../encryption/key-bundle';
 import { createEncryptionState } from '../../encryption/server-state';
-import { SecretStorageService } from '../../plugin/secret-storage';
+import { SecretStorageService } from '../secret-storage';
 import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugin/settings';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { LocalManifest } from '../manifest/manifest';

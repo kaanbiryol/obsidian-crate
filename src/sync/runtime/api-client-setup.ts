@@ -1,6 +1,6 @@
 import { createLogger } from '../logger';
 import { errorMessage } from '../../platform/logger';
-import type { SecretStorageService } from '../../plugin/secret-storage';
+import type { SecretStorageService } from '../secret-storage';
 import { loadEncryptionKeys } from '../encryption/key-storage';
 import type { NoteProjectionFactory, SyncApiClient } from '../worker-api/client';
 import type { SyncSettings } from '../settings';

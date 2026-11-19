@@ -1,4 +1,4 @@
-import { type Reminder } from "@/reminders/types/reminder";
+import { type Reminder } from "@/reminders/core/model";
 import { getProjectColor, type ProjectColorScheme } from "@/reminders/ui/format/projectColors";
 import { getUpcomingReminders, selectTodayReminders, sortReminders, sortRemindersByFileOrder } from "@/reminders/core/reminderSort";
 import { DEFAULT_PROJECT } from "@/reminders/core/constants";
