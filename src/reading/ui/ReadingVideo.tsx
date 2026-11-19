@@ -110,7 +110,8 @@ export function ReadingVideo({ id, source, body, content, hasTranscript, pinned,
 			lastTime.current = seconds;
 			if (changed) { active.current?.removeAttribute('data-playing'); next?.setAttribute('data-playing', 'true'); active.current = next; }
 			const root = body.current, selection = root && getEditorSelectionRange(root);
-			const editing = root?.closest('.crate-reading-reader')?.querySelector('.crate-reading-reader__highlight-editor');
+			// An editor animating out is inert and no longer holds the transcript in place.
+			const editing = root?.closest('.crate-reading-reader')?.querySelector('.crate-reading-reader__highlight-editor:not([inert])');
 			if (following.current && next && (changed || jumped) && !held.current && !size.resizing.current && (!selection || selection.collapsed) && !editing) reveal(next);
 		}, () => setFailed(true));
 		bridge.current = player;
