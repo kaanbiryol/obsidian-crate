@@ -11,10 +11,10 @@ export const bundleBudgets = {
 	},
 	{
 		path: 'dist/styles.css',
-		// 0.12.0 onboarding checklist and dialog spacing styles measure
-		// 385.8 KB raw / 47.8 KB gzip across the plugin and shared PWA surfaces.
-		maxBytes: 390000,
-		maxGzipBytes: 48500,
+		// 0.14.0 floating sheets, list motion and history period styles measure
+		// 391.3 KB raw / 48.6 KB gzip across the plugin and shared PWA surfaces.
+		maxBytes: 391500,
+		maxGzipBytes: 48700,
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
@@ -27,10 +27,10 @@ export const bundleBudgets = {
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// Every feature loads at startup. Reading the Reading card index in the web app
-		// measures 1.186 MB raw / 388.3 KB gzip.
-		maxBytes: 1188000,
-		maxGzipBytes: 389000,
+		// Every feature loads at startup. Floating card sheets, reader menu motion and
+		// held Reading section switches measure 1.191 MB raw / 390.9 KB gzip.
+		maxBytes: 1192000,
+		maxGzipBytes: 391500,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
