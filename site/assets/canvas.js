@@ -86,6 +86,18 @@ document.querySelectorAll('.reminder-recording video, .notification-preview vide
   recording.muted = true;
   recording.loop = false;
 
+  // Firefox stops drawing the poster as soon as playback starts loading, which flashes
+  // the empty video box. Paint the poster underneath until the first frame is shown.
+  if (recording.poster) {
+    recording.style.setProperty('--recording-poster', `url("${recording.poster}")`);
+    recording.classList.add('has-poster-underlay');
+    const clearPoster = () => recording.classList.remove('has-poster-underlay');
+    recording.addEventListener('playing', () => {
+      if ('requestVideoFrameCallback' in recording) recording.requestVideoFrameCallback(clearPoster);
+      else clearPoster();
+    }, { once: true });
+  }
+
   // Keep a copy of the opening frame to dissolve into from the last one.
   recording.addEventListener('loadeddata', () => {
     if (firstFrame || recording.currentTime > 0.1) return;
