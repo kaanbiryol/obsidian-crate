@@ -5,7 +5,7 @@ import { bundleServiceWorkerRuntime } from '../../../scripts/service-worker-buil
 /** The production push listener and crypto run inside an actual service worker.
  * Only push transport and native notification display are simulated. */
 // The worker installs only for the version it was built with (99edb335).
-const ENCRYPTED_PUSH_TEST_VERSION = 'encrypted-push-test';
+export const ENCRYPTED_PUSH_TEST_VERSION = 'encrypted-push-test';
 
 export async function buildEncryptedPushWorker() {
   const runtime = await bundleServiceWorkerRuntime(process.cwd());

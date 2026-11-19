@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { build } from 'esbuild';
 import { chromium, webkit } from '@playwright/test';
 import { verifyBlockedEncryptionStorage } from './pwa-encryption-blocked-storage-checks.mjs';
-import { buildEncryptedPushWorker, verifyEncryptedPushWorker } from './pwa-encrypted-push-checks.mjs';
+import { ENCRYPTED_PUSH_TEST_VERSION, buildEncryptedPushWorker, verifyEncryptedPushWorker } from './pwa-encrypted-push-checks.mjs';
 
 // Exercise the production session hook and native CryptoKey/IDB persistence.
 // Only cache completion is delayed, to make the logout/re-enrollment race deterministic.
@@ -41,6 +41,8 @@ platform: 'browser', target: 'es2022', alias: { obsidian: resolve('src/test/mock
 } }] })).outputFiles[0].text;
 const pushWorker = await buildEncryptedPushWorker();
 const server = createServer((req, res) => {
+	// Like the Worker, every response names its app version; the push worker caches only its own.
+	res.setHeader('X-Crate-Asset-Version', ENCRYPTED_PUSH_TEST_VERSION);
 	if (req.url?.split('?')[0] === '/encrypted-push-worker.js') {
 		res.setHeader('Content-Type', 'application/javascript'); res.end(pushWorker); return;
 	}
