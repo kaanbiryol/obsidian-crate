@@ -113,7 +113,7 @@ export function ReadingLibraryPanel({
 	// the reader has closed, then collapses so the rows below slide up rather than jump.
 	const { rows, departed, settle } = useDepartedRows(items, JSON.stringify([shownSection, listQuery, shownTag]));
 	const holdDeparted = !!reader || readerClosing || !!exitingReader;
-	useCollapseDepartedRows(lists, shownSection, departed, settle, holdDeparted);
+	useCollapseDepartedRows(lists, shownSection, departed, settle, holdDeparted, !loading && !listContent);
 	const groups = useMemo(() => groupReadingItems(rows.slice(0, visible)), [rows, visible]);
 	// A section that had to load fades its count, tags and list in instead of popping in.
 	useContentReveal(loading, () => {

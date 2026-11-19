@@ -828,7 +828,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   favoriteUpdate.release();
   await assertNoPendingBanner(page);
   await expect(readingSync).toHaveAttribute('data-sync-state','synced');
-  await page.getByRole('button',{name:/pending.example.invalid pending.example.invalid/}).waitFor();
+  // The queued row collapses as the saved one replaces it.
+  await expect(page.getByRole('button',{name:/pending.example.invalid pending.example.invalid/})).toHaveCount(1);
   // A committed save with a lost response must resend exactly the persisted operation.
   sent.length = 0; fixture.faults.loseCaptureReply = true;
   await page.getByRole('button',{name:'Save a link',exact:true}).click();

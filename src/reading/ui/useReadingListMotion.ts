@@ -6,13 +6,17 @@ import { PWA_FADE_TIMING } from '@/ui/shared/navigation/motion';
 type SectionLists = RefObject<Map<ReadingSection, HTMLDivElement>>;
 
 /** Collapses rows that left `section`'s list, unless `hold` keeps them in place (as while the
- * reader that archived one closes), then `settle`s them so the rows below slide up. */
+ * reader that archived one closes), then `settle`s them so the rows below slide up. Rows that
+ * left while the list was not `listed`, as behind a loading state, settle at once. */
 export function useCollapseDepartedRows(lists: SectionLists, section: ReadingSection, departed: ReadonlySet<string>,
-	settle: (ids: readonly string[]) => void, hold: boolean): void {
+	settle: (ids: readonly string[]) => void, hold: boolean, listed: boolean): void {
 	const collapsing = useRef(new Map<HTMLElement, Animation>());
 	useLayoutEffect(() => {
+		if (hold || !departed.size) return;
+		// No row is painted to collapse, and the effect would not run again once one is.
+		if (!listed) { settle([...departed]); return; }
 		const list = lists.current.get(section);
-		if (hold || !departed.size || !list) return;
+		if (!list) return;
 		const owner = list.ownerDocument.defaultView ?? window, listStyle = owner.getComputedStyle(list);
 		const duration = parseFloat(listStyle.getPropertyValue('--pwa-motion-dismiss-duration'));
 		const easing = listStyle.getPropertyValue('--pwa-motion-surface-ease').trim() || 'ease-out';
@@ -28,7 +32,7 @@ export function useCollapseDepartedRows(lists: SectionLists, section: ReadingSec
 			collapsing.current.set(node, animation);
 			animation.onfinish = () => { collapsing.current.delete(node); settle(ids); };
 		}
-	}, [lists, hold, departed, section, settle]);
+	}, [lists, hold, listed, departed, section, settle]);
 	useEffect(() => () => { for (const animation of collapsing.current.values()) animation.cancel(); }, []);
 }
 
