@@ -127,4 +127,13 @@ describe('pending change actions', () => {
 		menu.dispatchEvent(new Event('click'));
 		expect(obsidian.shown.at(-1)?.titles).toEqual(['Discard 1 item…']);
 	});
+
+	it('counts a lone Crate update row as an item, since it stands for the plugin', () => {
+		const items = groupPendingItems(['.obsidian/crate-update/0.14.2.json'], '.obsidian');
+		const sidebar = new FakeElement('div'), heading = new FakeElement('div');
+		const actions = { sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: vi.fn() }, discard: vi.fn() };
+		createPendingActions(sidebar as never, heading as never, items, new Set(), actions, { contextTargets: () => [] } as never);
+		expect(sidebar.querySelector('.crate-browser-sync')!.collectText()).toContain('Sync 1 item');
+		expect(heading.collectText()).toContain('1 of 1 items selected');
+	});
 });

@@ -45,8 +45,8 @@ export function createPendingActions(
 	const checkable = !actions.automaticSync;
 	const keys = items.flatMap(item => item.keys);
 	const byKey = new Map(items.map(item => [item.key, item]));
-	// Rows count as files until a plugin row groups several.
-	const noun = items.every(item => !item.plugin) ? 'file' : 'item';
+	// Rows count as files until a plugin row, including Crate's own update, stands for a plugin.
+	const noun = items.every(item => !item.plugin && !item.crateUpdate) ? 'file' : 'item';
 	const included = (item: PendingItem) => item.keys.every(key => !excluded.has(key));
 	const include = (item: PendingItem, on: boolean) => { for (const key of item.keys) { if (on) excluded.delete(key); else excluded.add(key); } };
 	let all: HTMLInputElement | undefined;
