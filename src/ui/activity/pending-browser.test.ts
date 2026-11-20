@@ -147,6 +147,8 @@ it('locks the selection and shows sync progress in the footer, then restores it'
 	expect(sync.style.getPropertyValue('--crate-sync-progress')).toBe('0.5');
 	expect(boxes().every(box => box.disabled)).toBe(true);
 	expect(panel.querySelector('.crate-browser-file-name')?.textContent).toBe('a.md');
+	const list = panel.querySelector<HTMLElement>('.crate-browser-files')!;
+	expect(list.inert).toBe(true);
 
 	action = { label: 'Stopping…', disabled: true, idle: false };
 	checks.updateAction();
@@ -158,6 +160,7 @@ it('locks the selection and shows sync progress in the footer, then restores it'
 	expect(sync.textContent).toBe('Sync 2 files');
 	expect(sync.disabled).toBe(false);
 	expect(boxes().some(box => box.disabled)).toBe(false);
+	expect(list.inert).toBe(false);
 	checks.dispose();
 });
 

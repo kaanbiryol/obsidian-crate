@@ -24,6 +24,7 @@
     font-weight: var(--font-medium);
 }
 .crate-browser-files { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 0 sync-review.$list-inset 8px; }
+.crate-pending-browser.is-syncing .crate-browser-files { overflow: hidden; touch-action: none; }
 .crate-pending-browser .crate-browser-file {
     display: flex;
     align-items: flex-start;

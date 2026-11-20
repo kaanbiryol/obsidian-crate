@@ -277,6 +277,8 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		dispose: () => { resize.disconnect(); comparisons.dispose(); },
 		setSyncProgress: progress => {
 			browser.classList.toggle('is-syncing', !!progress);
+			// The list holds still while a sync runs: no taps, keys or scrolling.
+			list.inert = !!progress;
 			selection?.setProgress(progress);
 		},
 		updateAction: () => selection?.update(),
