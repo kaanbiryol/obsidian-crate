@@ -18,7 +18,7 @@ import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-p
 const INDEX_FORMAT = 1;
 /** The upsert's unindexed columns for a note with a current card or metadata, from `committed c`. */
 const UNINDEXED = `storage_key = c.storage_key, hash = c.hash, size = c.size, metadata_json = c.metadata_json,
-        error = c.error, words = c.words, terms = c.terms, card = c.card, highlighted = c.highlighted, highlighted_at = c.highlighted_at`;
+        error = c.error, words = c.words, terms = c.terms, card = c.card, highlighted_at = c.highlighted_at`;
 const REBUILD_PAGE = 25;
 /** Bytes one rebuild step reads, so up to 25 notes of up to 4 MB stay within Worker memory. */
 const REBUILD_BYTES = 16 * 1024 * 1024;
@@ -45,7 +45,7 @@ interface IndexRow {
 	path: string; portable: string; storage_key: string | null; keep: 0 | 1;
 	hash?: string; size?: number; item_id?: string | null; url?: string | null;
 	metadata_json?: string | null; error?: string | null; article_hash?: string | null; article_edited?: 0 | 1; saved_at?: string;
-	status?: string | null; favorite?: 0 | 1; highlighted?: 0 | 1; terms?: string | null;
+	status?: string | null; favorite?: 0 | 1; terms?: string | null;
 	/** An unencrypted note's title words, which confirm a search's candidates. */
 	words?: string | null;
 	/** An encrypted note's card from its public data, as JSON `{ card }`. */
@@ -88,7 +88,7 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 		if (!data) return { ...row, stale: 1 };
 		const { fields } = data;
 		const highlights = { highlighted_at: data.highlighted_at, highlight_terms: JSON.stringify(data.highlight_terms), tag_names: JSON.stringify(data.tag_names) };
-		return { ...row, item_id: fields.item_id, saved_at: fields.saved_at, status: fields.status, favorite: fields.favorite ? 1 : 0, highlighted: fields.highlighted ? 1 : 0,
+		return { ...row, item_id: fields.item_id, saved_at: fields.saved_at, status: fields.status, favorite: fields.favorite ? 1 : 0,
 			terms: JSON.stringify(data.terms), card: JSON.stringify({ card: data.card }), ...highlights };
 	}
 	if (size > MAX_READING_BYTES) return { ...row, error: READING_SIZE_ERROR };
@@ -106,7 +106,7 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 	}
 	return { ...row, item_id: metadata.crate_reading_id, url: metadata.source_url || null,
 		metadata_json: JSON.stringify(metadata), article_hash, article_edited, saved_at: metadata.saved_at,
-		status: metadata.reading_status, favorite: metadata.favorite ? 1 : 0, highlighted: metadata.highlights?.length ? 1 : 0,
+		status: metadata.reading_status, favorite: metadata.favorite ? 1 : 0,
 		terms: JSON.stringify(readingTerms(metadata)), words: JSON.stringify(searchWords(metadata.title)),
 		highlighted_at: highlightedAt(metadata), highlight_terms: JSON.stringify(highlightTerms(metadata)), highlight_words: JSON.stringify(highlightSearchWords(metadata)) };
 }
@@ -135,7 +135,7 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
       json_extract(value, '$.url') AS url, json_extract(value, '$.metadata_json') AS metadata_json, json_extract(value, '$.error') AS error,
       json_extract(value, '$.article_hash') AS article_hash, COALESCE(json_extract(value, '$.article_edited'), 0) AS article_edited,
       COALESCE(json_extract(value, '$.saved_at'), '') AS saved_at, json_extract(value, '$.status') AS status,
-      COALESCE(json_extract(value, '$.favorite'), 0) AS favorite, COALESCE(json_extract(value, '$.highlighted'), 0) AS highlighted,
+      COALESCE(json_extract(value, '$.favorite'), 0) AS favorite,
       json_extract(value, '$.terms') AS terms, json_extract(value, '$.words') AS words, json_extract(value, '$.card') AS card,
       COALESCE(json_extract(value, '$.stale'), 0) AS stale, json_extract(value, '$.highlighted_at') AS highlighted_at,
       json_extract(value, '$.highlight_terms') AS highlight_terms, json_extract(value, '$.highlight_words') AS highlight_words,
@@ -216,14 +216,13 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
         FROM committed c WHERE c.keep = 1 AND c.stale = 1 AND reading_items.portable_path = c.portable AND (reading_items.path, reading_items.stale) IS NOT (c.path, 1)`)] : []),
 		...(keeps.length ? [
 			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, error, article_hash, article_edited, saved_at,
-          status, favorite, highlighted, stale, terms, words, card, highlighted_at)
+          status, favorite, stale, terms, words, card, highlighted_at)
         SELECT portable, path, storage_key, hash, size, item_id, metadata_json, error, article_hash, article_edited, saved_at,
-          status, favorite, highlighted, stale, terms, words, card, highlighted_at FROM committed WHERE keep = 1
+          status, favorite, stale, terms, words, card, highlighted_at FROM committed WHERE keep = 1
         ON CONFLICT(portable_path) DO UPDATE SET storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
           metadata_json = excluded.metadata_json, error = excluded.error, words = excluded.words,
           terms = CASE WHEN excluded.stale = 1 THEN reading_items.terms ELSE excluded.terms END,
           card = CASE WHEN excluded.stale = 1 THEN reading_items.card ELSE excluded.card END,
-          highlighted = CASE WHEN excluded.stale = 1 THEN reading_items.highlighted ELSE excluded.highlighted END,
           highlighted_at = CASE WHEN excluded.stale = 1 THEN reading_items.highlighted_at ELSE excluded.highlighted_at END
         WHERE reading_items.storage_key IS NOT excluded.storage_key OR excluded.stale = 1`),
 		] : []),

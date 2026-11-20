@@ -279,7 +279,7 @@ CREATE TABLE IF NOT EXISTS reading_items (
  hash TEXT NOT NULL, size INTEGER NOT NULL, item_id TEXT,
  metadata_json TEXT, error TEXT, article_hash TEXT, article_edited INTEGER NOT NULL DEFAULT 0,
  duplicate INTEGER NOT NULL DEFAULT 0, saved_at TEXT NOT NULL DEFAULT '',
- status TEXT, favorite INTEGER NOT NULL DEFAULT 0, highlighted INTEGER NOT NULL DEFAULT 0,
+ status TEXT, favorite INTEGER NOT NULL DEFAULT 0,
  card TEXT, stale INTEGER NOT NULL DEFAULT 0, terms TEXT, words TEXT, highlighted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS reading_items_status_idx ON reading_items(status, saved_at, portable_path);

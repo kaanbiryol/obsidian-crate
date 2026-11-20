@@ -74,7 +74,7 @@ const SECTION_FILTERS: Record<Exclude<ReadingSection, 'highlights'> | 'all', str
 };
 /** An encrypted page sends each card with the fields it was sorted and filtered by; a plaintext
  * page reads `ROW_COLUMNS`. */
-const CARD_COLUMNS = 'portable_path, path, saved_at, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted';
+const CARD_COLUMNS = 'portable_path, path, saved_at, card, storage_key, stale, hash, size, item_id, status, favorite, highlighted_at';
 // A search starts from its rarest term, found by counting each term's notes up to these caps:
 // a small one first, and a larger one only when every term reaches it.
 const TERM_PROBES = [50, 500];
@@ -126,7 +126,7 @@ export function parseReadingItemsQuery(params: URLSearchParams, encrypted: boole
 	return { ...common, terms };
 }
 
-interface CardRow extends Pick<ReadingRow, 'portable_path' | 'path' | 'saved_at'> { card: string | null; storage_key: string; stale: number; hash: string; size: number; item_id: string; status: string; favorite: number; highlighted: number }
+interface CardRow extends Pick<ReadingRow, 'portable_path' | 'path' | 'saved_at'> { card: string | null; storage_key: string; stale: number; hash: string; size: number; item_id: string; status: string; favorite: number; highlighted_at: string | null }
 
 type PageRows = [Array<ReadingRow | CardRow>, string | null];
 
@@ -217,7 +217,7 @@ const wordStart = (word: string) => JSON.stringify(word).slice(0, -1);
 function listedResponse(current: ReadingPolicy, encrypted: boolean, results: Array<ReadingRow | CardRow>, cursor: string | null, queued: Array<{ note: string }> = [], issues?: ReadingRow[]) {
 	// The device checks the fields the page was sorted and filtered by against each card.
 	const card = (row: CardRow) => ({ path: row.path, revision: row.storage_key, hash: row.hash, size: row.size, ...JSON.parse(row.card!) as { card: string }, stale: row.stale === 1,
-		fields: { item_id: row.item_id, saved_at: row.saved_at, status: row.status, favorite: row.favorite === 1, highlighted: row.highlighted === 1 } });
+		fields: { item_id: row.item_id, saved_at: row.saved_at, status: row.status, favorite: row.favorite === 1, highlighted: row.highlighted_at !== null } });
 	if (encrypted) return { cards: (results as CardRow[]).map(card), cursor };
 	const listed = listedPage(current, results as ReadingRow[], queued);
 	return { items: listed.items, issues: issues ? listedPage(current, issues, []).issues : [], cursor };
@@ -238,7 +238,7 @@ const HIGHLIGHT_PAGE_BYTES = 512 * 1024;
 async function highlightPage(env: Env, encrypted: boolean, query: ReadingItemsQuery, after: [string, string] | null): Promise<PageRows> {
 	const visible = encrypted ? 'i.card IS NOT NULL' : 'i.metadata_json IS NOT NULL AND i.duplicate = 0';
 	const words = encrypted ? [] : searchWords(query.q ?? '', MAX_QUERY_WORDS), terms = queryTerms(encrypted, query, words);
-	const columns = [...(encrypted ? CARD_COLUMNS : ROW_COLUMNS).split(', '), 'highlighted_at'];
+	const columns = [...new Set([...(encrypted ? CARD_COLUMNS : ROW_COLUMNS).split(', '), 'highlighted_at'])];
 	const range = after ? 'WHERE (highlighted_at, portable_path) < (?, ?)' : '', rangeArgs = after ?? [];
 	type HighlightRow = Partial<ReadingRow & CardRow> & Pick<ReadingRow, 'portable_path'> & { highlighted_at: string };
 	const listed = columns.map(column => column === 'highlighted_at' ? 'h.highlighted_at' : `i.${column}`).join(', ');
@@ -293,9 +293,9 @@ export function parseReadingTagsSection(params: URLSearchParams): ReadingSection
  * note count. That reads every tagged note entry once, plus its note. */
 export async function readingTags(env: Env, encrypted: boolean, section: ReadingSection | null = null): Promise<ReadingTagsResponse> {
 	if (section) {
-		const sectionFilter = section === 'highlights' ? 'highlighted = 1 AND status IS NOT NULL' : SECTION_FILTERS[section];
+		const sectionFilter = section === 'highlights' ? 'highlighted_at IS NOT NULL AND status IS NOT NULL' : SECTION_FILTERS[section];
 		const visible = encrypted ? 'card IS NOT NULL' : 'metadata_json IS NOT NULL AND duplicate = 0';
-		const where = [sectionFilter, visible].map(clause => clause.replace(/\b(status|favorite|highlighted|card|metadata_json|duplicate)\b/g, 'i.$1')).join(' AND ');
+		const where = [sectionFilter, visible].map(clause => clause.replace(/\b(status|favorite|highlighted_at|card|metadata_json|duplicate)\b/g, 'i.$1')).join(' AND ');
 		if (encrypted) {
 			const { results } = await env.DB.prepare(`SELECT r.term, r.name, count(*) AS count FROM reading_tags r
       CROSS JOIN note_terms t ON t.term = r.term CROSS JOIN reading_items i ON i.portable_path = t.portable_path

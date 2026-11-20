@@ -105,8 +105,8 @@ it('stops a highlight search after a bounded scan and continues it from the curs
 	// 2,100 highlighted notes; only the oldest has the word, so the first page scans its cap and finds none.
 	for (let n = 0; n < 2100; n++) {
 		const path = `reading/${n}.md`, at = new Date(Date.UTC(2025, 0, 1) + n * 60_000).toISOString(), term = n === 0 ? 'p:rar' : 'p:com';
-		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, highlighted, highlighted_at, terms, words)
-      VALUES (?, ?, 'r', 'h', 1, ?, ?, ?, 'inbox', 1, ?, '[]', '[]')`).bind(path, `Reading/${n}.md`, crypto.randomUUID(),
+		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, highlighted_at, terms, words)
+      VALUES (?, ?, 'r', 'h', 1, ?, ?, ?, 'inbox', ?, '[]', '[]')`).bind(path, `Reading/${n}.md`, crypto.randomUUID(),
 			JSON.stringify({ crate_reading_version: 1, crate_reading_id: '00000000-0000-4000-8000-000000000001', title: `Note ${n}`, source_url: 'https://example.invalid/', saved_at: at,
 				reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' }), at, at));
 		statements.push(env.DB.prepare('INSERT INTO highlight_index(highlighted_at, portable_path, terms, words) VALUES (?, ?, ?, ?)')
@@ -132,8 +132,8 @@ it('ends a Highlights page before its cards pass the size budget', async () => {
 	const statements: D1PreparedStatement[] = [];
 	for (let n = 0; n < 4; n++) {
 		const path = `reading/${n}.md`, at = new Date(Date.UTC(2025, 0, 1) + n * 60_000).toISOString();
-		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, saved_at, status, highlighted, highlighted_at, card)
-      VALUES (?, ?, 'r', 'h', 1, ?, ?, 'inbox', 1, ?, ?)`).bind(path, `Reading/${n}.md`, crypto.randomUUID(), at, at, JSON.stringify({ card: 'a'.repeat(200_000) })));
+		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, saved_at, status, highlighted_at, card)
+      VALUES (?, ?, 'r', 'h', 1, ?, ?, 'inbox', ?, ?)`).bind(path, `Reading/${n}.md`, crypto.randomUUID(), at, at, JSON.stringify({ card: 'a'.repeat(200_000) })));
 		statements.push(env.DB.prepare("INSERT INTO highlight_index(highlighted_at, portable_path, terms) VALUES (?, ?, '[]')").bind(at, path));
 	}
 	await env.DB.batch(statements);
