@@ -76,14 +76,14 @@ async function openStep(plugin: ReturnType<typeof fixture>) {
 	return { done, modal, rows, row, finish };
 }
 
-it('starts empty or missing folders on and says what will be stored there', async () => {
+it('starts empty or missing folders off and says what will be stored there', async () => {
 	serverPolicy({ reading: false, reminders: false });
 	const plugin = fixture([folder('Reminders', [])]);
 	const { done, modal, row } = await openStep(plugin);
 	expect(modal.titleEl.textContent).toBe('Choose what Crate manages in this vault');
-	expect(row('Reminders').toggles[0]?.value).toBe(true);
+	expect(row('Reminders').toggles[0]?.value).toBe(false);
 	expect(row('Reminders').descEl.textContent).toBe('Reminders/ · Crate stores your reminders and projects here as Markdown notes.');
-	expect(row('Reading').toggles[0]?.value).toBe(true);
+	expect(row('Reading').toggles[0]?.value).toBe(false);
 	expect(row('Reading').descEl.textContent).toBe('Reading/ · Crate saves your articles and highlights here as Markdown notes.');
 	expect(modal.contentEl.collectText()).toContain('You can change these later in Crate settings.');
 	modal.close();
@@ -135,7 +135,7 @@ it('treats a fresh server policy, which no device has saved, as unused by other 
 	const { done, modal, row } = await openStep(plugin);
 	expect(row('Reminders').toggles[0]?.value).toBe(false);
 	expect(row('Reminders').descEl.textContent).toBe('Reminders/ · 1 note. Turning this on adds a small ID comment to each task and turns dates like "tomorrow" into fixed dates.');
-	expect(row('Reading').toggles[0]?.value).toBe(true);
+	expect(row('Reading').toggles[0]?.value).toBe(false);
 	modal.close();
 	await done;
 });
@@ -161,9 +161,7 @@ it('finish turns on and confirms only the selected features, without a second co
 it('saves features left off so other devices do not ask again, without confirming them here', async () => {
 	serverPolicy({ reading: true, reminders: false });
 	const plugin = fixture();
-	const { done, row, finish } = await openStep(plugin);
-	row('Reading').toggles[0]?.change(false);
-	row('Reminders').toggles[0]?.change(false);
+	const { done, finish } = await openStep(plugin);
 	finish().click();
 	await done;
 	expect(serverRequest).toHaveBeenCalledWith(plugin, '/features', { feature: 'reading', enabled: false, revision: null }, expect.anything());
@@ -210,7 +208,7 @@ it('opens with this device folders when the server cannot be reached', async () 
 	const plugin = fixture();
 	const { done, modal, row } = await openStep(plugin);
 	expect(row('Reading').descEl.textContent).toMatch(/^Reading\/ · /);
-	expect(row('Reminders').toggles[0]?.value).toBe(true);
+	expect(row('Reminders').toggles[0]?.value).toBe(false);
 	modal.close();
 	await done;
 });

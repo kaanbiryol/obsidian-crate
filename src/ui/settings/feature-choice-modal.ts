@@ -22,11 +22,6 @@ const CHANGES: Record<Feature, string> = {
 	reading: 'Turning this on adds Crate frontmatter to each note.',
 };
 
-/** A new or empty folder starts on. */
-function defaultFeatureChoice({ notes }: FeatureChoice): boolean {
-	return notes === 0;
-}
-
 function describeFeatureChoice(choice: FeatureChoice): string {
 	const { feature, folder, notes } = choice;
 	const change = notes === 0 ? STORED[feature] : `${notes} ${notes === 1 ? 'note' : 'notes'}. ${CHANGES[feature]}`;
@@ -43,7 +38,8 @@ class FeatureChoiceModal extends SharedModal {
 	onOpen(): void {
 		this.modalEl.addClass('crate-feature-choice-modal');
 		this.openLayout('Choose what Crate manages in this vault');
-		const selected = new Set(this.choices.filter(defaultFeatureChoice).map(choice => choice.feature));
+		// Every feature starts off, so nothing changes in this vault until the user turns one on.
+		const selected = new Set<Feature>();
 		for (const choice of this.choices) {
 			new Setting(this.bodyEl).setName(NAMES[choice.feature]).setDesc(describeFeatureChoice(choice))
 				.addToggle(toggle => toggle.setValue(selected.has(choice.feature)).onChange(on => {
