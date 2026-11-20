@@ -105,3 +105,19 @@
 .crate-diff-word { border-radius: 2px; }
 .crate-diff-stats { gap: 8px; padding: 3px 6px; border-radius: 0; background: transparent; font-size: 10px; }
 .crate-browser-detail .crate-browser-file-folder { font-size: 10px; color: var(--text-faint); margin-top: 3px; }
+
+.crate-plugin-summary { display: flex; flex-direction: column; gap: 16px; padding: 4px sync-review.$panel-inset 16px; overflow-y: auto; }
+.crate-plugin-summary-text { margin: 0; color: var(--text-muted); line-height: 1.5; }
+.crate-plugin-files {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--text-muted);
+    li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+}
+.crate-plugin-file-icon { display: flex; flex-shrink: 0; color: var(--text-faint); svg { width: 16px; height: 16px; } }
+.crate-plugin-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crate-plugin-file-deleted { flex-shrink: 0; color: var(--crate-diff-removed); }

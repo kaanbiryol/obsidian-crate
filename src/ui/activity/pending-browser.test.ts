@@ -178,7 +178,7 @@ it('shows a Crate update bundle as a Crate plugin row listing its files, without
 	expect([...panel.querySelectorAll('.crate-browser-file-path')].map(path => path.textContent)).toEqual(['Plugin updated', 'Older update removed']);
 	expect(statuses(panel)).toEqual(['', '']);
 	panel.querySelector<HTMLButtonElement>('.crate-browser-file')!.click();
-	expect([...panel.querySelectorAll('.crate-file-diff li')].map(item => item.textContent)).toEqual(['styles.css', 'main.js', 'manifest.json']);
+	expect([...panel.querySelectorAll('.crate-plugin-file-name')].map(item => item.textContent)).toEqual(['styles.css', 'main.js', 'manifest.json']);
 	expect(load).not.toHaveBeenCalled();
 	checks.dispose();
 });
@@ -203,7 +203,7 @@ it('shows a plugin\'s code files as one row named from its manifest, and syncs t
 	expect(readPluginName).toHaveBeenCalledTimes(2);
 	panel.querySelector<HTMLButtonElement>('.crate-browser-file')!.click();
 	await vi.waitFor(() => expect(panel.querySelector('.crate-browser-file-title')?.textContent).toBe('Dataview'));
-	expect([...panel.querySelectorAll('.crate-file-diff li')].map(item => item.textContent)).toEqual(['main.js', 'manifest.json']);
+	expect([...panel.querySelectorAll('.crate-plugin-file-name')].map(item => item.textContent)).toEqual(['main.js', 'manifest.json']);
 	// Only data.json has a comparison; plugin rows are described.
 	await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
 	expect(load).toHaveBeenCalledWith('.obsidian/plugins/dataview/data.json', false, expect.anything());

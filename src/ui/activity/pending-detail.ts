@@ -93,24 +93,31 @@ export function createPendingDetail(browser: HTMLElement, id: string, showFiles:
 
 /** A plugin's code changes together, so it is described rather than diffed file by file. */
 function renderPlugin(preview: HTMLElement, plugin: NonNullable<PendingDetailRequest['plugin']>, deleted: boolean): void {
-	const message = preview.createDiv({ cls: 'crate-diff-message', attr: { role: 'status' } });
+	const summary = preview.createDiv({ cls: 'crate-plugin-summary' });
+	const text = (value: string) => summary.createEl('p', { cls: 'crate-plugin-summary-text', text: value });
+	const files = () => summary.createEl('ul', { cls: 'crate-plugin-files' });
+	const file = (list: HTMLElement, name: string, deleted = false) => {
+		const item = list.createEl('li');
+		setIcon(item.createSpan({ cls: 'crate-plugin-file-icon', attr: { 'aria-hidden': 'true' } }), 'file-code');
+		item.createSpan({ cls: 'crate-plugin-file-name', text: name });
+		if (deleted) item.createSpan({ cls: 'crate-plugin-file-deleted', text: 'Deleted' });
+	};
 	if (plugin.crateUpdate) {
 		if (deleted) {
-			message.createDiv({ text: 'Removes an older Crate update that a newer one replaced, so no device installs it.' });
+			text('Removes an older Crate update that a newer one replaced, so no device installs it.');
 			return;
 		}
-		message.createDiv({ text: "Your other devices install this Crate update on their next sync. Crate's settings and sync state stay on each device." });
-		const files = message.createEl('ul');
-		for (const name of CRATE_UPDATE_FILES) files.createEl('li', { text: name });
+		text("Your other devices install this Crate update on their next sync. Crate's settings and sync state stay on each device.");
+		const list = files();
+		for (const name of CRATE_UPDATE_FILES) file(list, name);
 		return;
 	}
-	message.createDiv({ text: deleted
+	text(deleted
 		? 'Syncing removes this plugin from your other devices too.'
-		: 'Your other devices get this plugin on their next sync. Its files sync together, so no device gets only part of it. Its settings sync separately.' });
-	const files = message.createEl('ul');
+		: 'Your other devices get this plugin on their next sync. Its files sync together, so no device gets only part of it. Its settings sync separately.');
+	const list = files();
 	for (const key of plugin.keys) {
 		const { kind, path } = decodePendingChange(key);
-		const name = path.slice(path.lastIndexOf('/') + 1);
-		files.createEl('li', { text: kind === 'delete' ? `${name} (deleted)` : name });
+		file(list, path.slice(path.lastIndexOf('/') + 1), !deleted && kind === 'delete');
 	}
 }
