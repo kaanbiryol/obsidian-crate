@@ -8,7 +8,7 @@ function harness(pushEnabled = true) {
 	const api = { ensureNotificationPolicy };
 	const plugin = {
 		settings: { pushEnabled },
-		remindersSettings: { remindersFolderPath: 'Tasks', allDayNotificationTime: '09:00' },
+		remindersSettings: { enabled: true, remindersFolderPath: 'Tasks', allDayNotificationTime: '09:00' },
 		syncRuntime: { getApiClient: () => api },
 	} as unknown as CratePlugin;
 	return { plugin, ensureNotificationPolicy };

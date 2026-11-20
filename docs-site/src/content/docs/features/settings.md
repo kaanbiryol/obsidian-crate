@@ -5,7 +5,7 @@ description: Turn Crate features on or off, understand which devices a setting a
 
 Crate does several things: vault sync, Reading, and Reminders. Use one, two, or all three. Notifications and encryption are optional extras you can add whenever you like.
 
-Everything lives under **Settings → Crate** in Obsidian. Expand **Reading** or **Reminders** to see their controls, with or without a server. **Notifications** and the **Sync** controls appear once a server is connected.
+Everything lives under **Settings → Crate** in Obsidian. Expand **Reading** or **Reminders** to see their controls, with or without a server. The **Sync** controls appear once a server is connected, and **Notifications** once Reminders is on too.
 
 ## What starts on?
 

@@ -71,7 +71,8 @@ export class CrateSettingTab extends PluginSettingTab {
 		createSettingsSectionHeading(containerEl, 'Features');
 		this.renderSection(renderRemindersSettings, containerEl.createDiv({ cls: 'crate-reminders-settings' }));
 		this.renderSection(renderReadingSettings, containerEl);
-		if (isConfigured) this.renderSection(renderNotificationsSection, containerEl);
+		// Notifications are reminder settings, which the server refuses while Reminders is off.
+		if (isConfigured && this.plugin.remindersSettings.enabled) this.renderSection(renderNotificationsSection, containerEl);
 		this.renderSection(renderShowGetStartedSetting, containerEl);
 
 		if (showInfrastructure) {

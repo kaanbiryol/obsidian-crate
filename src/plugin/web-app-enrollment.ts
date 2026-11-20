@@ -22,7 +22,8 @@ export async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 		}
 	};
 
-	if (plugin.settings.pushEnabled) await api.ensureNotificationPolicy(policySettings(plugin));
+	// The server refuses reminder settings while Reminders is off; Reading still gets its link.
+	if (plugin.settings.pushEnabled && plugin.remindersSettings.enabled) await api.ensureNotificationPolicy(policySettings(plugin));
 	assertCurrent();
 	const { token, browserToken } = await api.createRemindersEnrollmentToken(folder);
 	assertCurrent();

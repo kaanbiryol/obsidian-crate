@@ -243,3 +243,16 @@ it('refuses to save over a policy it could not read, and reads it again next tim
 	openNotificationPolicy(h.plugin);
 	expect(getNotificationPolicy).toHaveBeenCalledTimes(2);
 });
+
+it('leaves the server policy alone while Reminders is off, so a strict first sync does not fail on a paused feature', async () => {
+	const h = harness();
+	await h.plugin.writeRemindersSettings({ enabled: false });
+	h.ensureNotificationPolicy.mockRejectedValue(new Error('Reminders are paused. Enable them in Crate settings.'));
+	await expect(ensureReminderNotificationPolicy(h.plugin, true)).resolves.toBeUndefined();
+	expect(h.ensureNotificationPolicy).not.toHaveBeenCalled();
+
+	h.ensureNotificationPolicy.mockResolvedValue({ policy: { ...h.policy() } });
+	await h.plugin.writeRemindersSettings({ enabled: true });
+	await ensureReminderNotificationPolicy(h.plugin, true);
+	expect(h.ensureNotificationPolicy).toHaveBeenCalledOnce();
+});

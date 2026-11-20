@@ -132,6 +132,8 @@ async function synchronizePolicy(plugin: CratePlugin, state: PolicySyncState): P
 }
 
 export async function ensureReminderNotificationPolicy(plugin: CratePlugin, strict = false): Promise<void> {
+	// The server refuses reminder routes while Reminders is off; turning it on checks again.
+	if (!plugin.remindersSettings.enabled) return;
 	const api = plugin.syncRuntime.getApiClient();
 	if (!api) { states.delete(plugin); return; }
 	const signal = getPluginLifecycleSignal(plugin);

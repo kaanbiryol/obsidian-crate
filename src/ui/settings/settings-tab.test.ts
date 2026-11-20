@@ -11,7 +11,7 @@ afterEach(() => {
 	vi.doUnmock('obsidian');
 });
 
-async function display(isConfigured: boolean): Promise<string[]> {
+async function display(isConfigured: boolean, reminders = true): Promise<string[]> {
 	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), PluginSettingTab: class {
 		readonly containerEl = new FakeElement('div');
 		constructor(public readonly app: unknown, public readonly plugin: unknown) {}
@@ -37,7 +37,7 @@ async function display(isConfigured: boolean): Promise<string[]> {
 	vi.doMock('./settings-view-state', () => ({ captureSettingsView: vi.fn(), restoreSettingsView: vi.fn() }));
 	vi.doMock('../../plugin/shared-settings-sync', () => ({ sharedSettingsSync: () => ({ observe: vi.fn(), push: vi.fn() }) }));
 	const { CrateSettingTab } = await import('./settings-tab');
-	const plugin = { manifest: { version: '1.0.0' }, settings: { cloudflareDeployment: null }, syncRuntime: { isConfigured: () => isConfigured } };
+	const plugin = { manifest: { version: '1.0.0' }, settings: { cloudflareDeployment: null }, remindersSettings: { enabled: reminders }, syncRuntime: { isConfigured: () => isConfigured } };
 	new CrateSettingTab({} as never, plugin as never).update();
 	return rendered;
 }
@@ -53,6 +53,12 @@ it('keeps notifications with the feature controls once connected', async () => {
 	const sections = await display(true);
 	const features = sections.indexOf('reminders');
 	expect(sections.slice(features, features + 3)).toEqual(['reminders', 'reading', 'notifications']);
+});
+
+it('hides notifications while Reminders is off, since the server refuses reminder settings then', async () => {
+	const sections = await display(true, false);
+	expect(sections).toEqual(expect.arrayContaining(['reminders', 'reading']));
+	expect(sections).not.toContain('notifications');
 });
 
 it('puts the get started checklist first and its show row after the features', async () => {

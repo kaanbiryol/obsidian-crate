@@ -5,7 +5,7 @@ import { endPluginLifecycle } from './lifecycle-state';
 import { createVaultKeyBundle, generateRecoveryCode } from '../encryption/key-bundle';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
-async function setup({ encrypted = false, pushEnabled = false } = {}) {
+async function setup({ encrypted = false, pushEnabled = false, reminders = true } = {}) {
 	const recovery = await generateRecoveryCode();
 	const secrets = new Map<string, string>([[SECRET_KEYS.AUTH_TOKEN, 'device-token']]);
 	if (encrypted) {
@@ -19,7 +19,7 @@ async function setup({ encrypted = false, pushEnabled = false } = {}) {
 	};
 	const plugin = {
 		settings: { workerUrl: 'https://crate.example', pushEnabled, reading: { folderPath: 'Reading' } },
-		remindersSettings: { remindersFolderPath: 'Reminders', upcomingDaysDefault: 7, allDayNotificationTime: '09:00' as string | null },
+		remindersSettings: { enabled: reminders, remindersFolderPath: 'Reminders', upcomingDaysDefault: 7, allDayNotificationTime: '09:00' as string | null },
 		secretStorage: { get: (key: string) => secrets.get(key) ?? null },
 		syncRuntime: { getApiClient: vi.fn((): typeof api | null => api) },
 	};
@@ -88,4 +88,11 @@ it.each(['token', 'server', 'client', 'reminders folder', 'Reading folder', 'plu
 	if (change === 'plugin lifetime') endPluginLifecycle(plugin as unknown as CratePlugin);
 	finish();
 	await expect(link).rejects.toThrow();
+});
+
+it('creates a Reading link without saving reminder settings the server refuses while Reminders is off', async () => {
+	const { api, build } = await setup({ pushEnabled: true, reminders: false });
+	api.ensureNotificationPolicy.mockRejectedValue(new Error('Reminders are paused. Enable them in Crate settings.'));
+	await expect(build()).resolves.toContain('token=install-token');
+	expect(api.ensureNotificationPolicy).not.toHaveBeenCalled();
 });

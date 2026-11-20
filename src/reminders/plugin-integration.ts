@@ -59,7 +59,10 @@ export async function setRemindersEnabled(plugin: CratePlugin, enabled: boolean,
 	await plugin.writeRemindersSettings({ enabled }, assertCurrent);
 	assertCurrent?.();
 	if (enabled) {
-		try { await initializeReminders(plugin); }
+		try {
+			await initializeReminders(plugin);
+			void ensureReminderNotificationPolicy(plugin);
+		}
 		catch (error) {
 			assertCurrent?.();
 			stopReminderBackend(plugin);
