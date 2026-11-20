@@ -144,6 +144,7 @@ export class ActivityModal extends BaseUiModal {
 		this.pendingChecks?.dispose();
 		this.pendingPanel.empty();
 		this.pendingBrowserState.configDir = this.app.vault.configDir;
+		this.pendingBrowserState.readPluginName ??= folder => readPluginName(this.app, folder);
 		this.pendingChecks = renderPendingPanel(this.pendingPanel, {
 			paths, loadDiff: (path, deleted, options) => this.deps.loadPendingDiff(path, deleted, options), state, progress,
 			lastSyncLabel: this.getActivityStatus().lastSyncLabel, browserState: this.pendingBrowserState,
@@ -324,4 +325,11 @@ export class ActivityModal extends BaseUiModal {
 		this.contentEl.empty();
 		this.contentEl.removeClasses(['crate-reminder-editor-modal__content', 'crate-reminders-ui']);
 	}
+}
+
+/** A plugin's display name from its manifest in the config folder, which the vault API does not index. */
+async function readPluginName(app: App, folder: string): Promise<string | undefined> {
+	const manifest: unknown = JSON.parse(await app.vault.adapter.read(`${app.vault.configDir}/plugins/${folder}/manifest.json`));
+	const name = typeof manifest === 'object' && manifest !== null ? (manifest as { name?: unknown }).name : undefined;
+	return typeof name === 'string' && name.trim() ? name.trim() : undefined;
 }

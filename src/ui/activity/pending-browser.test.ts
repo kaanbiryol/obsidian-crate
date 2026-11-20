@@ -164,7 +164,7 @@ it('locks the selection and shows sync progress in the footer, then restores it'
 	checks.dispose();
 });
 
-it('shows a Crate update bundle as an update listing its files, without diffing it', async () => {
+it('shows a Crate update bundle as a Crate plugin row listing its files, without diffing it', async () => {
 	const { renderPendingBrowser } = await import('./pending-browser');
 	const { pendingChangeKey } = await import('../../sync/pending/pending-change');
 	const load = vi.fn(async () => modified);
@@ -174,12 +174,47 @@ it('shows a Crate update bundle as an update listing its files, without diffing 
 	const checks = renderPendingBrowser(panel, ['.obsidian/crate-update/0.11.0.json', pendingChangeKey('delete', '.obsidian/crate-update/0.10.0.json')], load, state);
 	await new Promise(resolve => setTimeout(resolve, 0));
 	const names = [...panel.querySelectorAll('.crate-browser-file-name')].map(name => name.textContent);
-	expect(names).toEqual(['Crate 0.11.0 update', 'Crate 0.10.0 update']);
-	expect([...panel.querySelectorAll('.crate-browser-file-path')].map(path => path.textContent)).toEqual(['styles.css, main.js, manifest.json', 'styles.css, main.js, manifest.json']);
-	expect(statuses(panel)).toEqual(['New version', 'Replaced']);
+	expect(names).toEqual(['Crate', 'Crate']);
+	expect([...panel.querySelectorAll('.crate-browser-file-path')].map(path => path.textContent)).toEqual(['Plugin updated', 'Older update removed']);
+	expect(statuses(panel)).toEqual(['', '']);
 	panel.querySelector<HTMLButtonElement>('.crate-browser-file')!.click();
 	expect([...panel.querySelectorAll('.crate-file-diff li')].map(item => item.textContent)).toEqual(['styles.css', 'main.js', 'manifest.json']);
 	expect(load).not.toHaveBeenCalled();
+	checks.dispose();
+});
+
+it('shows a plugin\'s code files as one row named from its manifest, and syncs them together', async () => {
+	const { renderPendingBrowser } = await import('./pending-browser');
+	const { pendingChangeKey } = await import('../../sync/pending/pending-change');
+	const load = vi.fn(async () => modified);
+	const run = vi.fn();
+	const readPluginName = vi.fn(async (folder: string) => folder === 'dataview' ? 'Dataview' : undefined);
+	const state: PendingBrowserState = { configDir: '.obsidian', readPluginName };
+	const panel = document.createElement('div');
+	document.body.replaceChildren(panel);
+	const keys = ['.obsidian/plugins/dataview/main.js', '.obsidian/plugins/dataview/data.json', '.obsidian/plugins/dataview/manifest.json',
+		pendingChangeKey('delete', '.obsidian/plugins/old/main.js')];
+	const checks = renderPendingBrowser(panel, keys, load, state, { sync: { describe: () => idle, run }, discard: vi.fn() });
+	const names = () => [...panel.querySelectorAll('.crate-browser-file-name')].map(name => name.textContent);
+	// A plugin shows its folder until its manifest name is read, and a removed plugin keeps its folder.
+	await vi.waitFor(() => expect(names()).toEqual(['Dataview', 'data.json', 'old']));
+	expect([...panel.querySelectorAll('.crate-browser-file-path')].map(path => path.textContent))
+		.toEqual(['Plugin updated', '.obsidian/plugins/dataview', 'Plugin removed']);
+	expect(readPluginName).toHaveBeenCalledTimes(2);
+	panel.querySelector<HTMLButtonElement>('.crate-browser-file')!.click();
+	await vi.waitFor(() => expect(panel.querySelector('.crate-browser-file-title')?.textContent).toBe('Dataview'));
+	expect([...panel.querySelectorAll('.crate-file-diff li')].map(item => item.textContent)).toEqual(['main.js', 'manifest.json']);
+	// Only data.json has a comparison; plugin rows are described.
+	await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+	expect(load).toHaveBeenCalledWith('.obsidian/plugins/dataview/data.json', false, expect.anything());
+
+	const checkbox = panel.querySelector<HTMLInputElement>('.crate-browser-file-check input')!;
+	checkbox.checked = false;
+	checkbox.dispatchEvent(new window.Event('change'));
+	const sync = panel.querySelector<HTMLButtonElement>('.crate-browser-sync')!;
+	expect(sync.textContent).toBe('Sync 2 items');
+	sync.click();
+	expect(run).toHaveBeenCalledWith(['.obsidian/plugins/dataview/main.js', '.obsidian/plugins/dataview/manifest.json']);
 	checks.dispose();
 });
 

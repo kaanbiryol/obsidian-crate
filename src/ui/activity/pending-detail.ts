@@ -3,14 +3,14 @@ import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { renderDiffPreview } from './pending-diff';
 import { renderBackButton } from './rendering';
 import { CRATE_UPDATE_FILES } from '../../plugin/crate-update/bundle';
-
-export const crateUpdateTitle = (version: string) => `Crate ${version} update`;
+import { decodePendingChange } from '../../sync/pending/pending-change';
+import { pendingPluginStatus } from './pending-items';
 
 interface PendingDetailRequest {
 	path: string;
 	deleted: boolean;
-	/** Set for a Crate update bundle, which is described rather than compared. */
-	updateVersion: string | null;
+	/** Set for a plugin row or Crate update bundle, which is described rather than compared. */
+	plugin: { name: string; crateUpdate: boolean; keys: string[] } | null;
 	/** Moves focus to the back button when the detail replaces the list. */
 	moveFocus: boolean;
 	read: () => Promise<PendingDiff>;
@@ -51,17 +51,17 @@ export function createPendingDetail(browser: HTMLElement, id: string, showFiles:
 	});
 
 	let requestRevision = 0;
-	const show = async ({ path, deleted, updateVersion, moveFocus, read, failed, retry }: PendingDetailRequest) => {
+	const show = async ({ path, deleted, plugin, moveFocus, read, failed, retry }: PendingDetailRequest) => {
 		const parts = path.split('/');
-		fileName.textContent = updateVersion ? crateUpdateTitle(updateVersion) : parts.pop() ?? path;
-		filePath.textContent = updateVersion ? 'Plugin update' : parts.join('/') || 'Vault root';
+		fileName.textContent = plugin ? plugin.name : parts.pop() ?? path;
+		filePath.textContent = plugin ? pendingPluginStatus({ deleted, crateUpdate: plugin.crateUpdate }) : parts.join('/') || 'Vault root';
 		filePath.title = path;
 		toolbar.hidden = false;
 		comparisonHeader.empty();
 		preview.empty();
-		if (updateVersion) {
+		if (plugin) {
 			++requestRevision;
-			renderCrateUpdate(preview, updateVersion, deleted);
+			renderPlugin(preview, plugin, deleted);
 			if (moveFocus && back.getClientRects().length > 0) back.focus({ preventScroll: true });
 			return;
 		}
@@ -91,14 +91,26 @@ export function createPendingDetail(browser: HTMLElement, id: string, showFiles:
 	return { id, show };
 }
 
-/** A bundle holds a whole release, so it is described rather than diffed. */
-function renderCrateUpdate(preview: HTMLElement, version: string, deleted: boolean): void {
+/** A plugin's code changes together, so it is described rather than diffed file by file. */
+function renderPlugin(preview: HTMLElement, plugin: NonNullable<PendingDetailRequest['plugin']>, deleted: boolean): void {
 	const message = preview.createDiv({ cls: 'crate-diff-message', attr: { role: 'status' } });
-	if (deleted) {
-		message.createDiv({ text: `Removes the Crate ${version} update. A newer version replaced it, so no device installs it.` });
+	if (plugin.crateUpdate) {
+		if (deleted) {
+			message.createDiv({ text: 'Removes an older Crate update that a newer one replaced, so no device installs it.' });
+			return;
+		}
+		message.createDiv({ text: "Your other devices install this Crate update on their next sync. Crate's settings and sync state stay on each device." });
+		const files = message.createEl('ul');
+		for (const name of CRATE_UPDATE_FILES) files.createEl('li', { text: name });
 		return;
 	}
-	message.createDiv({ text: `Your other devices install Crate ${version} on their next sync. Crate's settings and sync state stay on each device.` });
+	message.createDiv({ text: deleted
+		? 'Syncing removes this plugin from your other devices too.'
+		: 'Your other devices get this plugin on their next sync. Its files sync together, so no device gets only part of it. Its settings sync separately.' });
 	const files = message.createEl('ul');
-	for (const name of CRATE_UPDATE_FILES) files.createEl('li', { text: name });
+	for (const key of plugin.keys) {
+		const { kind, path } = decodePendingChange(key);
+		const name = path.slice(path.lastIndexOf('/') + 1);
+		files.createEl('li', { text: kind === 'delete' ? `${name} (deleted)` : name });
+	}
 }

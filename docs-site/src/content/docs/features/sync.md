@@ -47,6 +47,8 @@ The web app and reminder notifications keep working either way, because they use
 
 Run **Crate: Show sync activity** and open **Pending** to see every file waiting to sync. Select a file to see what you changed since this device last synced it.
 
+A plugin's code files (`main.js`, `manifest.json` and `styles.css`) show as one row with the plugin's name, such as **Dataview** with **Plugin updated** or **Plugin removed**. They're checked and synced together, so another device never gets only part of a plugin. A plugin's settings (`data.json`) stay a separate row. When the list has plugin rows, the button counts items, such as **Sync 3 items**.
+
 ![Sync activity with one pending note, showing the line that changed since the last sync](../../../assets/screenshots/crate-sync-pending.png)
 
 - Select the sync button below the list. It sends the checked files and gets changes from your other devices. Its label says what it sends, such as **Sync 3 files**.

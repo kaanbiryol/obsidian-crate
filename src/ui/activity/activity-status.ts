@@ -61,13 +61,13 @@ export function describeActivityStatus(
 	};
 }
 
-/** The idle sync button's label and description for `checked` of `total` pending files.
- * Every sync gets remote changes; unchecked files stay on this device. */
-export function describeSyncSelection(checked: number, total: number): { label: string; title: string } {
+/** The idle sync button's label and description for `checked` of `total` pending rows, named
+ * by `noun`. Every sync gets remote changes; unchecked rows stay on this device. */
+export function describeSyncSelection(checked: number, total: number, noun: 'file' | 'item' = 'file'): { label: string; title: string } {
 	if (total === 0) return { label: 'Sync', title: 'Get changes from your other devices.' };
-	if (checked === 0) return { label: 'Get remote changes', title: 'Get changes from your other devices. Unchecked files stay on this device.' };
-	const label = `Sync ${checked} ${checked === 1 ? 'file' : 'files'}`;
+	if (checked === 0) return { label: 'Get remote changes', title: `Get changes from your other devices. Unchecked ${noun}s stay on this device.` };
+	const label = `Sync ${checked} ${checked === 1 ? noun : `${noun}s`}`;
 	return checked < total
-		? { label, title: 'Upload the checked files and get changes from your other devices. Unchecked files stay on this device.' }
+		? { label, title: `Upload the checked ${noun}s and get changes from your other devices. Unchecked ${noun}s stay on this device.` }
 		: { label, title: 'Upload these files and get changes from your other devices.' };
 }

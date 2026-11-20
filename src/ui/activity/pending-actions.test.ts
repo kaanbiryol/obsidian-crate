@@ -25,13 +25,15 @@ vi.mock('obsidian', () => {
 });
 
 const { createPendingActions } = await import('./pending-actions');
+const { groupPendingItems } = await import('./pending-items');
+const { pendingChangeKey } = await import('../../sync/pending/pending-change');
 
 function setup() {
 	const key = 'Notes/Today.md';
 	const rows = { contextTargets: vi.fn(() => [key]) };
 	const actions = { sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: vi.fn() }, discard: vi.fn() };
 	const selection = createPendingActions(
-		new FakeElement('div') as never, new FakeElement('div') as never, [key], new Set(), actions, rows as never,
+		new FakeElement('div') as never, new FakeElement('div') as never, groupPendingItems([key]), new Set(), actions, rows as never,
 	);
 	const row = new FakeElement('div');
 	selection.addMenuButton(row as never, key);
@@ -42,9 +44,10 @@ function setupSelection(automaticSync: boolean) {
 	const keys = ['Notes/Today.md', 'Notes/Draft.md'];
 	const sidebar = new FakeElement('div'), heading = new FakeElement('div');
 	const actions = { sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: vi.fn() }, discard: vi.fn(), automaticSync };
-	const selection = createPendingActions(sidebar as never, heading as never, keys, new Set([keys[1]!]), actions, { contextTargets: () => [] } as never);
+	const items = groupPendingItems(keys);
+	const selection = createPendingActions(sidebar as never, heading as never, items, new Set([keys[1]!]), actions, { contextTargets: () => [] } as never);
 	const row = new FakeElement('div');
-	selection.addCheckbox(row as never, keys[0]!);
+	selection.addCheckbox(row as never, items[0]!);
 	const button = sidebar.querySelector('.crate-browser-sync')!;
 	return { selection, heading, row, button, run: actions.sync.run };
 }
@@ -94,5 +97,34 @@ describe('pending change actions', () => {
 
 		// A selection left from before automatic sync was on holds nothing back.
 		expect(run).toHaveBeenCalledWith([]);
+	});
+
+	it('checks, counts and holds back a plugin row as one item covering all of its code files', () => {
+		const plugin = ['.obsidian/plugins/dataview/main.js', '.obsidian/plugins/dataview/manifest.json', pendingChangeKey('delete', '.obsidian/plugins/dataview/styles.css')];
+		const items = groupPendingItems([...plugin, 'Notes/Today.md'], '.obsidian');
+		const sidebar = new FakeElement('div'), heading = new FakeElement('div');
+		const discard = vi.fn();
+		const actions = { sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: vi.fn() }, discard };
+		const selection = createPendingActions(sidebar as never, heading as never, items, new Set(), actions, { contextTargets: () => [items[0]!.key] } as never);
+		const row = new FakeElement('div');
+		selection.addCheckbox(row as never, items[0]!);
+		const button = sidebar.querySelector('.crate-browser-sync')!;
+		expect(button.collectText()).toContain('Sync 2 items');
+		expect(heading.collectText()).toContain('2 of 2 items selected');
+
+		const input = row.querySelector('input') as unknown as { checked: boolean; dispatchEvent(event: Event): void };
+		input.checked = false;
+		input.dispatchEvent(new Event('change'));
+		expect(button.collectText()).toContain('Sync 1 item');
+		button.dispatchEvent(new Event('click'));
+		expect(actions.sync.run).toHaveBeenCalledWith(plugin);
+
+		obsidian.isMobile = true;
+		const menuRow = new FakeElement('div');
+		selection.addMenuButton(menuRow as never, items[0]!.key);
+		const menu = menuRow.children.find(child => child.classNames.has('crate-browser-file-menu'))!;
+		Object.assign(menu, { getBoundingClientRect: () => ({ right: 0, bottom: 0 }) });
+		menu.dispatchEvent(new Event('click'));
+		expect(obsidian.shown.at(-1)?.titles).toEqual(['Discard 1 item…']);
 	});
 });

@@ -1,20 +1,22 @@
 import { Notice, setIcon } from 'obsidian';
 import type { PendingDiff } from '../../sync/pending/pending-diff';
 import { isBinaryPreviewPath } from '../../sync/history/preview-format';
-import { decodePendingChange } from '../../sync/pending/pending-change';
 import { countDiff } from './diff-model';
-import { createPendingDetail, crateUpdateTitle } from './pending-detail';
+import { createPendingDetail } from './pending-detail';
 import { PendingComparisons } from './pending-comparisons';
 import { createPendingActions, type PendingActions } from './pending-actions';
 import { createPendingRowSelection, type PendingRowSelectionState } from './pending-row-selection';
-import { CRATE_UPDATE_FILES, crateUpdateVersion } from '../../plugin/crate-update/bundle';
+import { groupPendingItems, pendingPluginStatus, type PendingItem, type PluginNameReader } from './pending-items';
 
 /** `localOnly` skips fetching a last-synced copy that is not cached on this device. */
 export type PendingDiffLoader = (path: string, deleted: boolean, options?: { localOnly?: boolean }) => Promise<PendingDiff>;
 export interface PendingBrowserState extends PendingRowSelectionState {
 	selectedKey?: string;
-	/** The vault's config folder, so a Crate update bundle shows as an update rather than a JSON file. */
+	/** The vault's config folder, so plugin files and Crate update bundles show as plugin rows. */
 	configDir?: string;
+	readPluginName?: PluginNameReader;
+	/** Plugin names by folder, read once per open activity view. */
+	pluginNames?: Map<string, Promise<string | undefined>>;
 	excludedKeys?: Set<string>;
 	/** Finished file statuses by pending key, so a rebuild checks only files it has not checked. */
 	statusLabels?: Map<string, string>;
@@ -55,8 +57,10 @@ export function pendingRowWindow(scrollTop: number, viewport: number, rowPx: num
 }
 
 /** Check file statuses on opening, or on selection in long lists; keep one selected comparison in view. */
-export function renderPendingBrowser(container: HTMLElement, paths: string[], load: PendingDiffLoader, state: PendingBrowserState = {}, actions?: PendingActions): PendingChecks {
-	const changes = paths.map(decodePendingChange);
+export function renderPendingBrowser(container: HTMLElement, pendingKeys: string[], load: PendingDiffLoader, state: PendingBrowserState = {}, actions?: PendingActions): PendingChecks {
+	const items = groupPendingItems(pendingKeys, state.configDir);
+	// Rows are keyed by item: a plugin row covers several pending keys.
+	const paths = items.map(item => item.key);
 	const browser = container.createDiv({ cls: 'crate-pending-browser' });
 	const sidebar = browser.createDiv({ cls: 'crate-browser-sidebar' });
 	const heading = sidebar.createDiv({ cls: 'crate-browser-list-heading' });
@@ -67,7 +71,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	list.setAttribute('aria-describedby', listHint.id);
 
 	const rowSelection = createPendingRowSelection(sidebar, paths, state);
-	const selection = actions ? createPendingActions(sidebar, heading, paths, state.excludedKeys ??= new Set(), actions, rowSelection) : undefined;
+	const selection = actions ? createPendingActions(sidebar, heading, items, state.excludedKeys ??= new Set(), actions, rowSelection) : undefined;
 
 	let selectedIndex = -1;
 	const detail = createPendingDetail(browser, `crate-pending-detail-${nextBrowserId}`, () => {
@@ -76,9 +80,12 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		focusRow(selectedIndex);
 	});
 
-	// Binary files have no text diff; load their metadata only when selected.
-	const updateVersions = changes.map(({ path }) => state.configDir === undefined ? null : crateUpdateVersion(path, state.configDir));
-	const canPreview = (index: number) => !updateVersions[index] && !isBinaryPreviewPath(changes[index]!.path);
+	// Plugin rows are described rather than compared. Binary files have no text diff; load their metadata only when selected.
+	const isPlugin = (item: PendingItem) => !!item.plugin || !!item.crateUpdate;
+	const canPreview = (index: number) => !isPlugin(items[index]!) && !isBinaryPreviewPath(items[index]!.path);
+	const names = state.pluginNames ??= new Map<string, Promise<string | undefined>>();
+	const resolvedNames = new Map<string, string>();
+	const pluginName = (item: PendingItem) => item.crateUpdate ? 'Crate' : item.plugin ? resolvedNames.get(item.plugin.folder) ?? item.plugin.folder : '';
 	const labels = state.statusLabels ??= new Map<string, string>();
 	// A file that left the pending set may return with other changes.
 	const pending = new Set(paths);
@@ -96,8 +103,8 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		status.classList.toggle('is-unchanged', text === 'Unchanged');
 	};
 	const comparisons = new PendingComparisons(paths.length, (index, localOnly) => {
-		const { kind, path } = changes[index]!;
-		return load(path, kind === 'delete', { localOnly });
+		const { deleted, path } = items[index]!;
+		return load(path, deleted, { localOnly });
 	}, (index, snapshot) => {
 		const label = describeSnapshot(snapshot);
 		labels.set(paths[index]!, label);
@@ -116,9 +123,10 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		if (moveFocus) state.showDetail = true;
 		browser.classList.toggle('is-reviewing', !!state.showDetail);
 		setFocusIndex(index);
-		const { kind, path } = changes[index]!;
+		const item = items[index]!;
 		await detail.show({
-			path, deleted: kind === 'delete', updateVersion: updateVersions[index] ?? null, moveFocus,
+			path: item.path, deleted: item.deleted, moveFocus,
+			plugin: isPlugin(item) ? { name: pluginName(item), crateUpdate: !!item.crateUpdate, keys: item.keys } : null,
 			read: () => comparisons.read(index),
 			failed: () => {
 				unavailable.add(index);
@@ -135,26 +143,27 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 	let focusIndex = 0;
 	const mountRow = (index: number) => {
 		const key = paths[index]!;
-		const { kind, path } = changes[index]!;
-		const deleted = kind === 'delete';
+		const item = items[index]!;
+		const { deleted, path } = item;
 		const parts = path.split('/');
-		const updateVersion = updateVersions[index];
+		const plugin = isPlugin(item);
 		const row = actions ? list.createDiv({ cls: 'crate-browser-file-row' }) : list;
-		selection?.addCheckbox(row, key);
+		selection?.addCheckbox(row, item);
 		selection?.bindContextMenu(row, key);
 		const button = row.createEl('button', { cls: 'crate-browser-file', attr: {
-			type: 'button', 'aria-label': updateVersion ? `Review ${crateUpdateTitle(updateVersion)}` : `${deleted ? 'Review deletion of' : 'Review changes for'} ${path}`,
+			type: 'button', 'aria-label': plugin ? `Review ${pluginName(item)}, ${pendingPluginStatus(item).toLowerCase()}` : `${deleted ? 'Review deletion of' : 'Review changes for'} ${path}`,
 			'aria-pressed': 'false', 'aria-controls': detail.id,
 		} });
 		button.tabIndex = index === focusIndex ? 0 : -1;
 		if (selection?.checkable) button.setAttribute('aria-keyshortcuts', 'Space');
-		if (!actions) setIcon(button.createSpan({ cls: 'crate-browser-file-icon', attr: { 'aria-hidden': 'true' } }), deleted ? 'trash-2' : updateVersion ? 'package' : 'file-text');
+		if (!actions) setIcon(button.createSpan({ cls: 'crate-browser-file-icon', attr: { 'aria-hidden': 'true' } }), deleted ? 'trash-2' : plugin ? 'package' : 'file-text');
 		const info = button.createSpan({ cls: 'crate-browser-file-info' });
-		info.createSpan({ cls: 'crate-browser-file-name', text: updateVersion ? crateUpdateTitle(updateVersion) : parts.pop() ?? path, attr: { title: path } });
+		const name = info.createSpan({ cls: 'crate-browser-file-name', text: plugin ? pluginName(item) : parts.pop() ?? path, attr: { title: path } });
 		const meta = info.createSpan({ cls: 'crate-browser-file-meta' });
-		meta.createSpan({ cls: 'crate-browser-file-path', text: updateVersion ? CRATE_UPDATE_FILES.join(', ') : parts.join('/') || 'Vault root' });
-		const status = meta.createSpan({ cls: 'crate-browser-file-status', text: updateVersion ? deleted ? 'Replaced' : 'New version'
+		meta.createSpan({ cls: 'crate-browser-file-path', text: plugin ? pendingPluginStatus(item) : parts.join('/') || 'Vault root' });
+		const status = meta.createSpan({ cls: 'crate-browser-file-status', text: plugin ? ''
 			: !canPreview(index) ? 'No preview' : autoCheck ? 'Checking…' : 'Not checked' });
+		if (item.plugin) void readName(item.plugin.folder, index, name);
 		const label = labels.get(key);
 		if (unavailable.has(index)) status.textContent = 'Unavailable';
 		else if (label) showStatus(status, label);
@@ -168,7 +177,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 			void select(index, !event.shiftKey && !event.metaKey && !event.ctrlKey);
 		});
 		button.addEventListener('dblclick', () => {
-			const action = actions?.fileActions?.(path).find(action => action.id === 'open');
+			const action = plugin ? undefined : actions?.fileActions?.(path).find(action => action.id === 'open');
 			if (action) void action.run().catch((error: unknown) => {
 				new Notice(error instanceof Error ? error.message : 'Could not open this file.');
 			});
@@ -179,6 +188,24 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 		const entry = { element: actions ? row : button, button, status };
 		rows.set(index, entry);
 		return entry;
+	};
+	// A plugin row shows its folder until its manifest name is read, then its name.
+	const readName = async (folder: string, index: number, element: HTMLElement) => {
+		if (!state.readPluginName) return;
+		let read = names.get(folder);
+		if (!read) {
+			read = state.readPluginName(folder).catch(() => undefined);
+			names.set(folder, read);
+		}
+		const value = await read;
+		// A row mounted after the name was read already shows it.
+		if (!value || !browser.isConnected || resolvedNames.get(folder) === value) return;
+		resolvedNames.set(folder, value);
+		if (element.isConnected) {
+			element.textContent = value;
+			rows.get(index)?.button.setAttribute('aria-label', `Review ${value}, ${pendingPluginStatus(items[index]!).toLowerCase()}`);
+		}
+		if (selectedIndex === index) void select(index, false);
 	};
 	const unmountRow = (index: number) => {
 		const row = rows.get(index)!;

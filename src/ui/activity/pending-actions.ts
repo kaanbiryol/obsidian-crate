@@ -1,6 +1,6 @@
 import { Menu, Notice, Platform, setIcon } from 'obsidian';
-import { decodePendingChange } from '../../sync/pending/pending-change';
 import type { PendingFileAction } from './file-actions';
+import type { PendingItem } from './pending-items';
 import type { PendingRowSelection } from './pending-row-selection';
 import { describeSyncSelection } from './activity-status';
 
@@ -37,11 +37,18 @@ export function renderPendingSyncButton(parent: HTMLElement, action: PendingSync
 	return update;
 }
 
-/** Selection belongs to this open activity view, never to sync settings. */
+/** Selection belongs to this open activity view, never to sync settings. Each row checks
+ * all of its pending keys together; `excluded` holds pending keys, not rows. */
 export function createPendingActions(
-	sidebar: HTMLElement, heading: HTMLElement, keys: string[], excluded: Set<string>, actions: PendingActions, rows: PendingRowSelection,
+	sidebar: HTMLElement, heading: HTMLElement, items: PendingItem[], excluded: Set<string>, actions: PendingActions, rows: PendingRowSelection,
 ) {
 	const checkable = !actions.automaticSync;
+	const keys = items.flatMap(item => item.keys);
+	const byKey = new Map(items.map(item => [item.key, item]));
+	// Rows count as files until a plugin row groups several.
+	const noun = items.every(item => !item.plugin) ? 'file' : 'item';
+	const included = (item: PendingItem) => item.keys.every(key => !excluded.has(key));
+	const include = (item: PendingItem, on: boolean) => { for (const key of item.keys) { if (on) excluded.delete(key); else excluded.add(key); } };
 	let all: HTMLInputElement | undefined;
 	let count: HTMLSpanElement | undefined;
 	if (checkable) {
@@ -64,19 +71,18 @@ export function createPendingActions(
 	// A running sync locks the selection and shows its progress on the button.
 	let progress: { label: string; fraction?: number } | undefined;
 	const locked = () => !!progress || !actions.sync.describe().idle;
-	const checked = () => keys.filter(key => !excluded.has(key));
 	const update = () => {
-		const selected = checked();
+		const selected = items.filter(included);
 		const action = actions.sync.describe();
 		if (all && count) {
-			all.checked = selected.length === keys.length;
-			all.indeterminate = selected.length > 0 && selected.length < keys.length;
+			all.checked = selected.length === items.length;
+			all.indeterminate = selected.length > 0 && selected.length < items.length;
 			all.disabled = locked();
-			count.textContent = `${selected.length} of ${keys.length} files selected`;
+			count.textContent = `${selected.length} of ${items.length} ${noun}s selected`;
 		}
-		for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = locked(); }
+		for (const [key, input] of checkboxes) { input.checked = included(byKey.get(key)!); input.disabled = locked(); }
 		const { label, title } = !action.idle ? { label: action.label, title: action.label }
-			: checkable ? describeSyncSelection(selected.length, keys.length)
+			: checkable ? describeSyncSelection(selected.length, items.length, noun)
 				: { label: 'Sync now', title: 'Upload these files and get changes from your other devices.' };
 		// Only Stop sync carries the detail; Stopping… stands alone.
 		const detail = action.idle || action.disabled ? '' : progress?.label ?? '';
@@ -89,24 +95,25 @@ export function createPendingActions(
 		sync.setCssProps({ '--crate-sync-progress': progress?.fraction === undefined ? '0' : String(progress.fraction) });
 	};
 	all?.addEventListener('change', () => {
-		for (const key of keys) { if (all.checked) excluded.delete(key); else excluded.add(key); }
+		for (const item of items) include(item, all.checked);
 		update();
 	});
 	sync.addEventListener('click', () => {
 		if (!sync.disabled) actions.sync.run(checkable ? keys.filter(key => excluded.has(key)) : []);
 	});
 	const contextMenu = (key: string) => {
-		const targets = rows.contextTargets(key);
-		const { path } = decodePendingChange(key);
+		const targets = rows.contextTargets(key).map(target => byKey.get(target)!);
+		const item = byKey.get(key)!;
 		const menu = new Menu();
-		const fileActions = actions.fileActions?.(path) ?? [];
+		// A plugin row stands for several files, so it has no single file to open.
+		const fileActions = item.plugin ? [] : actions.fileActions?.(item.path) ?? [];
 		for (const action of fileActions) menu.addItem(item => item.setTitle(action.title).setIcon(action.icon).onClick(() => {
 			void action.run().catch((error: unknown) => new Notice(error instanceof Error ? error.message : 'Could not open this file.'));
 		}));
 		if (fileActions.length) menu.addSeparator();
 		if (targets.length) menu.addItem(item => item
 			.setTitle(`Discard ${targets.length} item${targets.length === 1 ? '' : 's'}…`)
-			.setIcon('undo-2').setDisabled(locked()).onClick(() => actions.discard(targets)));
+			.setIcon('undo-2').setDisabled(locked()).onClick(() => actions.discard(targets.flatMap(target => target.keys))));
 		return menu;
 	};
 	update();
@@ -117,19 +124,17 @@ export function createPendingActions(
 		update,
 		toggleChecked: (key: string) => { checkboxes.get(key)?.click(); },
 		removeRow: (key: string) => { checkboxes.delete(key); },
-		addCheckbox: (row: HTMLElement, key: string) => {
+		addCheckbox: (row: HTMLElement, item: PendingItem) => {
 			if (!checkable) return;
-			const { path } = decodePendingChange(key);
 			const label = row.createEl('label', { cls: 'crate-browser-file-check' });
-			const input = label.createEl('input', { attr: { type: 'checkbox', 'aria-label': `Sync ${path}` } });
-			checkboxes.set(key, input); input.checked = !excluded.has(key);
-			input.addEventListener('change', () => { if (input.checked) excluded.delete(key); else excluded.add(key); update(); });
+			const input = label.createEl('input', { attr: { type: 'checkbox', 'aria-label': `Sync ${item.path}` } });
+			checkboxes.set(item.key, input); input.checked = included(item);
+			input.addEventListener('change', () => { include(item, input.checked); update(); });
 		},
 		// Touch hosts have no reliable context menu, so each row gets a visible menu button.
 		addMenuButton: (row: HTMLElement, key: string) => {
 			if (!Platform.isMobile) return;
-			const { path } = decodePendingChange(key);
-			const button = row.createEl('button', { cls: 'crate-browser-file-menu', attr: { type: 'button', 'aria-label': `More actions for ${path}`, 'aria-haspopup': 'menu' } });
+			const button = row.createEl('button', { cls: 'crate-browser-file-menu', attr: { type: 'button', 'aria-label': `More actions for ${byKey.get(key)!.path}`, 'aria-haspopup': 'menu' } });
 			setIcon(button, 'more-horizontal');
 			button.addEventListener('click', event => {
 				event.stopPropagation();
