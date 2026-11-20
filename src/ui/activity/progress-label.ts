@@ -56,13 +56,14 @@ const shortLabels: Record<SyncWork['phase'], string> = {
 	reminders: 'Reminders…',
 };
 
-/** A few words for the running sync, beside Stop sync: a file count while files
+/** A few words for the running sync, in place of Stop sync: a file count while files
  * transfer, otherwise the phase. The full text from `formatSyncProgress` shows above. */
 export function formatShortSyncProgress(progress?: SyncActivityProgress | null, work?: SyncWork): string {
 	work ??= progress?.work;
 	if (!work) return '';
 	if (['uploading', 'downloading', 'deleting'].includes(work.phase) && work.total && work.current !== undefined) {
-		return `${work.current.toLocaleString()} / ${work.total.toLocaleString()}`;
+		const action = { uploading: 'Uploading', downloading: 'Downloading', deleting: 'Deleting' }[work.phase as 'uploading' | 'downloading' | 'deleting'];
+		return `${action} ${work.current.toLocaleString()} of ${work.total.toLocaleString()}`;
 	}
 	return shortLabels[work.phase];
 }

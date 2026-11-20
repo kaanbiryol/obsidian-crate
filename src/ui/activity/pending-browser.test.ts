@@ -138,10 +138,15 @@ it('locks the selection and shows sync progress in the footer, then restores it'
 
 	// The running sync's button stops it and shows a short count; nothing renders below it.
 	action = { label: 'Stop sync', disabled: false, idle: false };
-	checks.setSyncProgress({ label: '1 / 2', fraction: 0.5 });
+	checks.setSyncProgress({ label: 'Uploading 1 of 2', fraction: 0.5 });
 	expect(panel.querySelector('.crate-pending-browser')?.classList.contains('is-syncing')).toBe(true);
-	expect(sync.textContent).toBe('Stop sync1 / 2');
-	expect(sync.getAttribute('aria-label')).toBe('Stop sync, 1 / 2');
+	// The progress stands in for the label, and the whole button still stops the sync.
+	expect(sync.querySelector('.crate-browser-sync-detail')?.textContent).toBe('Uploading 1 of 2');
+	expect(sync.querySelector('.crate-browser-sync-label')?.textContent).toBe('Stop sync');
+	expect(sync.querySelector('.crate-browser-sync-stop')).not.toBeNull();
+	expect(sync.classList.contains('has-detail')).toBe(true);
+	expect(sync.getAttribute('aria-label')).toBe('Stop sync, Uploading 1 of 2');
+	expect(sync.title).toBe('Stop sync');
 	expect(panel.querySelector('.crate-browser-actions')?.children).toHaveLength(1);
 	expect(sync.disabled).toBe(false);
 	expect(sync.style.getPropertyValue('--crate-sync-progress')).toBe('0.5');

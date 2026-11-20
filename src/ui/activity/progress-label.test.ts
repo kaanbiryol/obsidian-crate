@@ -38,8 +38,9 @@ it('marks reminder setup counts that reached the server cap as a lower bound', (
 });
 
 it.each([
-	[{ phase: 'uploading', current: 12, total: 38 }, '12 / 38'],
-	[{ phase: 'downloading', current: 1200, total: 3400 }, '1,200 / 3,400'],
+	[{ phase: 'uploading', current: 12, total: 38 }, 'Uploading 12 of 38'],
+	[{ phase: 'downloading', current: 1200, total: 3400 }, `Downloading ${(1200).toLocaleString()} of ${(3400).toLocaleString()}`],
+	[{ phase: 'deleting', current: 0, total: 1 }, 'Deleting 0 of 1'],
 	[{ phase: 'uploading' }, 'Uploading…'],
 	[{ phase: 'reminders', reminderSetup: { scanning: false, remainingFiles: 9, remainingSchedules: 0 } }, 'Reminders…'],
 	[{ phase: 'saving' }, 'Saving…'],

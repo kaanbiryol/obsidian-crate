@@ -227,7 +227,26 @@
         &:active:enabled { background: color-mix(in srgb, var(--text-normal) 14%, var(--background-primary)); }
         min-width: 0;
         .crate-browser-sync-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .crate-browser-sync-detail { flex-shrink: 0; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; &:empty { display: none; } }
+        .crate-browser-sync-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; &:empty { display: none; } }
+        .crate-browser-sync-stop { display: none; }
+        // While a sync runs, its progress fills the button and a square marks it as the
+        // stop control. The label still names the action for the tooltip and screen readers.
+        &.has-detail {
+            padding-right: 5px;
+            .crate-browser-sync-label { display: none; }
+            .crate-browser-sync-detail { flex: 1; color: var(--text-normal); }
+            .crate-browser-sync-stop {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 26px;
+                height: 26px;
+                border-radius: 4px;
+                background: color-mix(in srgb, var(--text-normal) 12%, var(--background-primary));
+                color: var(--text-normal);
+                svg { width: 10px; height: 10px; fill: currentColor; }
+            }
+        }
         &.is-syncing {
             position: relative;
             overflow: hidden;

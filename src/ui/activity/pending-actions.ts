@@ -64,9 +64,12 @@ export function createPendingActions(
 	}
 	const footer = sidebar.createDiv({ cls: 'crate-browser-actions' });
 	const sync = footer.createEl('button', { cls: 'crate-browser-sync', attr: { type: 'button' } });
-	const syncLabel = sync.createSpan({ cls: 'crate-browser-sync-label', text: 'Sync' });
 	// A few words on the running sync, such as a file count; the header names the phase.
 	const syncDetail = sync.createSpan({ cls: 'crate-browser-sync-detail' });
+	const syncLabel = sync.createSpan({ cls: 'crate-browser-sync-label', text: 'Sync' });
+	// While the detail shows, it replaces the Stop sync label and this square marks the
+	// button as a stop control. The whole button stops the sync, not just the square.
+	setIcon(sync.createSpan({ cls: 'crate-browser-sync-stop', attr: { 'aria-hidden': 'true' } }), 'square');
 	const checkboxes = new Map<string, HTMLInputElement>();
 	// A running sync locks the selection and shows its progress on the button.
 	let progress: { label: string; fraction?: number } | undefined;
@@ -92,6 +95,7 @@ export function createPendingActions(
 		sync.title = title;
 		sync.disabled = action.disabled;
 		sync.toggleClass('is-syncing', !!progress);
+		sync.toggleClass('has-detail', !!detail);
 		sync.setCssProps({ '--crate-sync-progress': progress?.fraction === undefined ? '0' : String(progress.fraction) });
 	};
 	all?.addEventListener('change', () => {
