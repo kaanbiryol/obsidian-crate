@@ -11,9 +11,9 @@ export const bundleBudgets = {
 	},
 	{
 		path: 'dist/styles.css',
-		// 0.14.0 floating sheets, list motion and history period styles measure
-		// 391.3 KB raw / 48.6 KB gzip across the plugin and shared PWA surfaces.
-		maxBytes: 391500,
+		// 0.14.3 pending plugin rows and their detail pane measure
+		// 392.0 KB raw / 48.6 KB gzip across the plugin and shared PWA surfaces.
+		maxBytes: 392500,
 		maxGzipBytes: 48700,
 	}],
 	worker: [{
