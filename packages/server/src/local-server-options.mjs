@@ -10,12 +10,14 @@
  * @property {string} [origin]
  * @property {string} [output]
  * @property {string} [backup]
+ * @property {string} [keep]
  * @property {string} [hostname]
  * @property {string} [name]
  * @property {string} [id]
  * @property {boolean} [local]
  * @property {boolean} [quick]
  * @property {boolean} [tailscale]
+ * @property {boolean} [off]
  * @property {boolean} [help]
  */
 
@@ -36,7 +38,7 @@
  * @typedef {(context: CommandContext, resources: import('./local-server-lifecycle.mjs').CommandResources) => Promise<void>} Command
  */
 
-const COMMANDS = ['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'status', 'backup', 'restore', 'check-upgrade', 'upgrade'];
+const COMMANDS = ['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'status', 'backup', 'auto-backup', 'restore', 'check-upgrade', 'upgrade'];
 const LOOPBACK_HOSTS = ['127.0.0.1', '::1', 'localhost'];
 
 /** Rejects an unknown command or conflicting options. `dockerWithoutTailscale` reports a
@@ -54,6 +56,7 @@ export function validateCommandOptions(positionals, values, { dockerWithoutTails
 	if (values.tailscale && dockerWithoutTailscale()) throw new Error('In Docker, start Tailscale Funnel with compose.tailscale.yaml. See docs/self-hosting.md.');
 	if (command === 'add-device' && !values.name?.trim()) throw new Error('Provide --name for this device.');
 	if (values.name !== undefined && (!values.name.trim() || values.name.trim().length > 128)) throw new Error('Provide a device name between 1 and 128 characters.');
+	if ((values.keep !== undefined || values.off) && command !== 'auto-backup') throw new Error('--keep and --off belong to auto-backup.');
 }
 
 /** Chooses a Quick Tunnel, Tailscale Funnel, saved named tunnel or local listener from the

@@ -37,6 +37,7 @@ npx @kaanbiryol/crate-server pair --name "My phone"
 npx @kaanbiryol/crate-server devices
 npx @kaanbiryol/crate-server revoke --id TOKEN_ID
 npx @kaanbiryol/crate-server status
+npx @kaanbiryol/crate-server auto-backup --output /path/to/backups
 npx @kaanbiryol/crate-server --data-dir /path/to/another-vault
 ```
 
@@ -47,12 +48,15 @@ storage. The server stores only its hash. Long-lived tokens are not printed by
 normal startup. An expired or lost code can be replaced with the pair command. List and revoke
 device credentials from the server computer with the devices and revoke commands.
 The status command reports whether the server runs, how many runtime crashes it
-recovered from, and the last verified backup.
+recovered from, the last verified backup and the automatic backup setting.
 
 The launcher reports public access as ready only after an HTTPS probe reaches
 this running instance. It keeps retrying while DNS or the tunnel is unavailable.
 
-Use backup --output PATH while stopped to create a checksum-verified backup.
+Use backup --output PATH to create a checksum-verified backup; a running server
+pauses sync for a moment while its database is copied. Use auto-backup --output
+DIR [--keep 7] to back up daily while the server runs and keep the newest, and
+auto-backup --off to stop.
 Use restore --backup PATH --data-dir EMPTY_PATH to validate and restore it, and
 check-upgrade to check compatibility without changing stored data. If it reports
 a database migration, run upgrade --output NEW_BACKUP_PATH while stopped; it

@@ -102,7 +102,8 @@ export async function startQuickServer({ dataDir, port = 0, name = hostname().sl
 		signal?.throwIfAborted();
 		/** @type {{ count: number }} */
 		const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
-		pairing = createPairing({ db: runtime.db });
+		const serving = runtime;
+		pairing = createPairing({ db: () => serving.db });
 		const pairingCode = existing.count === 0 ? pairing.issue(name) : null;
 		control = await startLocalControl({ dataDir, pairing, origin: runtime.origin, runtime });
 		active = runtime;

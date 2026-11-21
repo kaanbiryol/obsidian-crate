@@ -148,17 +148,18 @@ memory and invalidated by a restart. Existing device tokens remain valid.
 
 ### Verified backups, restore, and updates
 
-Stop the server to take a consistent backup. This creates a directory with a
-manifest and SHA-256 checksum for every database, file, and remote configuration
-file, then verifies the copied bytes. Copy the completed backup outside Docker's
-volume so losing the volume does not also lose the backup:
+Back up while Crate runs. The backup copies stored files first, then pauses sync
+for a moment while it copies the database; devices wait and continue. It creates
+a directory with a manifest and SHA-256 checksum for every database, file, and
+remote configuration file, then verifies the copied bytes. Copy the completed
+backup outside Docker's volume so losing the volume does not also lose the backup:
 
 ```sh
-docker compose stop
-docker compose run --rm crate backup --output /data/backups/before-update
+docker compose exec crate crate backup --output /data/backups/before-update
 docker compose run --rm -T --entrypoint tar crate -C /data/backups -czf - before-update > crate-backup.tgz
-docker compose up -d
 ```
+
+For daily backups without these steps, see [automatic backups](#automatic-backups).
 
 Choose a new backup directory name each time; existing backups are not replaced.
 Keep backups private. To restore into a fresh, separately named Docker project,
@@ -687,11 +688,12 @@ Tailscale is not ready at boot, Crate exits and systemd retries it 30 seconds la
 
 Check a server with `npm run server -- status` (or `crate-server status`,
 `docker compose exec crate crate status`). It reports whether Crate is running,
-how many runtime crashes it recovered from, and the last verified backup.
+how many runtime crashes it recovered from, the last verified backup, and the automatic backup setting.
 
 ## Backups, restore, and updates
 
-For a source installation, stop the server and use the verified backup commands:
+For a source installation, use the verified backup commands. Backup works while
+the server runs and pauses sync briefly; restore needs an empty directory:
 
 ```sh
 npm run server -- backup --data-dir /path/to/crate-data --output /path/to/crate-backup
@@ -737,49 +739,43 @@ uses the directory before removing only that lock file and restarting. The
 launcher does not guess whether another process is safe to interrupt.
 
 
-### Nightly backups
+### Automatic backups
 
-Backups need a stopped server, so a nightly job stops Crate for the few seconds a
-backup takes, then starts it again. Devices and the PWA retry through the pause.
-Save this as `~/crate-backup.sh`, set the paths, and choose a backup folder on
-another disk or in a synced cloud folder:
+Turn on daily backups once. Choose a folder on another disk or in a synced cloud
+folder; it must be outside the data directory:
 
 ```sh
-#!/bin/sh
-# Stop Crate, take a dated verified backup, start Crate, keep the newest 7.
-set -eu
-NODE=/path/to/node
-CRATE=/path/to/crate-server.mjs
-DATA="$HOME/.crate/server"
-BACKUPS=/path/to/backups/crate
-STOP="launchctl kill SIGTERM gui/$(id -u)/local.crate.server"   # systemd: systemctl --user stop crate
-START="launchctl kickstart gui/$(id -u)/local.crate.server"     # systemd: systemctl --user start crate
-
-trap '$START' EXIT
-$STOP
-while "$NODE" "$CRATE" status --data-dir "$DATA" | grep -q '^Status: running'; do sleep 1; done
-mkdir -p "$BACKUPS"
-"$NODE" "$CRATE" backup --data-dir "$DATA" --output "$BACKUPS/$(date +%Y-%m-%d-%H%M)"
-ls -1d "$BACKUPS"/????-??-??-???? | sort -r | tail -n +8 | while read -r old; do rm -rf "$old"; done
+npm run server -- auto-backup --output /path/to/backups --keep 7
 ```
 
-Crate starts again even when the backup fails. Run it daily at 03:30:
+Use `crate-server auto-backup` for the npx package. While Crate runs, it makes a
+verified backup every day, in a folder named `crate-` and the time, and deletes
+the oldest beyond `--keep` (7 by default, at most 30). If the server was off or
+asleep, it catches up within an hour of starting. Each backup pauses sync for a
+moment while the database is copied.
 
-- **macOS:** save `~/Library/LaunchAgents/local.crate.backup.plist` with the label
-  `local.crate.backup`, `ProgramArguments` `/bin/sh` and the script's absolute path,
-  and a `StartCalendarInterval` of `Hour` 3 and `Minute` 30. Load it with
-  `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.crate.backup.plist`.
-- **Linux:** create `~/.config/systemd/user/crate-backup.service` with
-  `Type=oneshot` and `ExecStart=/bin/sh /home/you/crate-backup.sh`, and
-  `crate-backup.timer` with `OnCalendar=*-*-* 03:30` and `Persistent=true`, then run
-  `systemctl --user enable --now crate-backup.timer`.
-- **Docker:** run the [Docker backup commands](#verified-backups-restore-and-updates)
-  from the host's scheduler with a dated name each time. Remove the copy inside
-  the volume after exporting it with
-  `docker compose run --rm --entrypoint rm crate -rf /data/backups/NAME`.
+Backups share unchanged files through hard links, so seven daily backups take
+about as much space as one plus each day's changes. Each one still restores on
+its own, and deleting one never affects the others. A backup that would leave
+less than 1 GB free is refused. Crate never deletes anything else in the folder,
+including backups you made yourself with **backup**.
 
-Check the result with `status`, and test a restore into an empty directory now
-and then.
+`status` shows the setting and the last failure, if any; a failed backup is retried
+every hour. Turn it off with `npm run server -- auto-backup --off`. The setting
+stays with the data directory and is not part of backups, so a restored copy does
+not touch the original server's backups.
+
+With Docker, mount a host folder for backups, because a volume backup is lost
+together with the volume. Create `backups` next to `compose.yaml` (on Linux, make it
+writable by user ID 1000), uncomment the `./backups:/backups` line in
+`compose.yaml`, run `docker compose up -d`, then:
+
+```sh
+docker compose exec crate crate auto-backup --output /backups --keep 7
+```
+
+Copying backups to another computer is still up to you; test a restore into an
+empty directory now and then.
 
 ## If the server is lost
 

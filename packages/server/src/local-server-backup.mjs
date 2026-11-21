@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { copyFile, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { copyFile, link, lstat, mkdir, readFile, readdir, realpath, rename, rm, statfs, writeFile } from 'node:fs/promises';
+import { pipeline } from 'node:stream/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { assertLocalMigrationPath } from './local-server-migrations.mjs';
 import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocalRuntime } from './local-server-runtime.mjs';
@@ -20,8 +21,9 @@ import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocal
  * @property {BackupFile[]} remote
  */
 
-// A backup describes its own source, so the record of the last backup stays out of it.
-const ephemeral = new Set(['server.lock', 'control.json', 'control.sock', 'status.json', 'last-backup.json', '.DS_Store']);
+// A backup describes its own source, so the record of the last backup stays out of it, and so
+// do automatic backup settings: a restored copy must not prune the original server's backups.
+const ephemeral = new Set(['server.lock', 'control.json', 'control.sock', 'status.json', 'last-backup.json', 'auto-backup.json', '.DS_Store']);
 const inside = (/** @type {string} */ parent, /** @type {string} */ child) => { const path = relative(parent, child); return path === '' || (!path.startsWith('..') && !isAbsolute(path)); };
 /** @param {string} path */
 async function digest(path) {
@@ -62,8 +64,66 @@ export async function checkLocalUpgrade(dataDir) {
 	return { from: current.serverRevision, to: next.serverRevision, runtime: next.runtimeVersion, requiresMigration: migration };
 }
 
-/** @param {string} dataDir @param {string} output @param {boolean} [alreadyLocked] @returns {Promise<string>} The backup directory. */
-export async function backupLocalServer(dataDir, output, alreadyLocked = false) {
+// Miniflare stores R2 object bytes in write-once files with unguessable names: a blob is
+// only ever created or deleted, never changed (BlobStore in miniflare's shared worker).
+const isBlob = (/** @type {string} */ path) => /(?:^|\/)blobs\/[^/]+$/.test(path);
+const GiB = 1024 ** 3;
+
+/** @param {string} directory @param {string} [prefix]
+ * @returns {Promise<{ path: string, size: number, mtimeMs: number }[]>} Files in `inventory` order. */
+async function listFiles(directory, prefix = '') {
+	/** @type {{ path: string, size: number, mtimeMs: number }[]} */
+	const files = [];
+	for (const name of (await readdir(join(directory, prefix))).sort()) {
+		const path = prefix ? `${prefix}/${name}` : name;
+		if (!prefix && ephemeral.has(name)) continue;
+		const stat = await lstat(join(directory, path));
+		if (stat.isDirectory()) files.push(...await listFiles(directory, path));
+		else if (stat.isFile()) files.push({ path, size: stat.size, mtimeMs: stat.mtimeMs });
+		else throw new Error('Backups cannot contain symlinks or special files.');
+	}
+	return files;
+}
+/** @param {string} directory */
+const listOptional = directory => listFiles(directory).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
+
+/** Copies a file, hashing the bytes read from the source. Never writes through an existing
+ * target: it may be a hard link into an earlier backup. @param {string} source @param {string} target */
+async function copyHashed(source, target) {
+	await rm(target, { force: true });
+	await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+	const hash = createHash('sha256');
+	await pipeline(createReadStream(source), async function* (chunks) { for await (const chunk of chunks) { hash.update(chunk); yield chunk; } }, createWriteStream(target, { flags: 'wx', mode: 0o600 }));
+	return hash.digest('hex');
+}
+
+/** @param {string} source @param {string} target @returns {Promise<boolean>} False when the filesystem cannot link them. */
+async function tryLink(source, target) {
+	await rm(target, { force: true });
+	await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+	try { await link(source, target); return true; }
+	catch (error) { if (['EXDEV', 'EPERM', 'ENOTSUP', 'EMLINK', 'ENOENT'].includes(error.code)) return false; throw error; }
+}
+
+/** @param {string} directory */
+async function freeBytes(directory) {
+	const stats = await statfs(directory);
+	return stats.bavail * stats.bsize;
+}
+
+/**
+ * Creates a verified backup. A running server passes `pause`: write-once blobs are copied
+ * while it serves, and only the rest is copied while its runtime is stopped.
+ * @param {string} dataDir
+ * @param {string} output A new directory.
+ * @param {object} [options]
+ * @param {boolean} [options.alreadyLocked] The caller holds the data directory lock.
+ * @param {() => Promise<() => Promise<void>>} [options.pause] Stops writes; returns a resume.
+ * @param {string} [options.linkFrom] An earlier backup whose unchanged blobs are hard-linked, not copied.
+ * @param {(directory: string) => Promise<number>} [options.available] Free bytes where the backup goes.
+ * @returns {Promise<string>} The backup directory.
+ */
+export async function backupLocalServer(dataDir, output, { alreadyLocked = false, pause, linkFrom, available = freeBytes } = {}) {
 	dataDir = await realpath(dataDir);
 	output = resolve(output);
 	await mkdir(dirname(output), { recursive: true, mode: 0o700 });
@@ -73,15 +133,51 @@ export async function backupLocalServer(dataDir, output, alreadyLocked = false) 
 	const unlock = alreadyLocked ? async () => {} : await lockLocalData(dataDir);
 	const staging = `${output}.tmp-${randomUUID()}`;
 	try {
-		/** @type {import('./local-server-runtime.mjs').ServerMetadata} */
-		const metadata = JSON.parse(await readFile(join(dataDir, 'server.json'), 'utf8'));
-		const data = await inventory(dataDir);
-		const remote = await inventory(`${dataDir}.remote`).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
+		/** @type {Map<string, BackupFile>} Blobs an earlier backup holds, by path. */
+		const linkable = new Map();
+		if (linkFrom) {
+			const previous = await readBackupManifest(linkFrom).catch(() => null);
+			for (const file of previous?.data ?? []) if (isBlob(file.path)) linkable.set(file.path, file);
+		}
+		/** @param {{ path: string, size: number }} file @returns {Promise<string>} Its SHA-256. */
+		const place = async file => {
+			const target = join(staging, 'data', file.path);
+			const earlier = linkable.get(file.path);
+			if (linkFrom && earlier?.size === file.size && await tryLink(join(linkFrom, 'data', file.path), target)) return earlier.sha256;
+			return copyHashed(join(dataDir, file.path), target);
+		};
+		const before = await listFiles(dataDir);
+		const needed = [...before, ...await listOptional(`${dataDir}.remote`)]
+			.reduce((sum, file) => sum + (linkable.get(file.path)?.size === file.size ? 0 : file.size), 0);
+		const free = await available(dirname(output));
+		if (free < needed + GiB) throw new Error(`Not enough free space for a backup at ${dirname(output)}: it needs about ${Math.ceil(needed / 1024 ** 2)} MB plus 1 GB to spare, and ${Math.floor(free / 1024 ** 2)} MB is free.`);
 		await mkdir(staging, { mode: 0o700 });
 		await mkdir(join(staging, 'data'), { mode: 0o700 });
 		await mkdir(join(staging, 'remote'), { mode: 0o700 });
-		await copyInventory(dataDir, join(staging, 'data'), data);
-		await copyInventory(`${dataDir}.remote`, join(staging, 'remote'), remote);
+		/** @type {Map<string, { size: number, mtimeMs: number, sha256: string }>} */
+		const early = new Map();
+		if (pause) for (const file of before.filter(file => isBlob(file.path))) early.set(file.path, { ...file, sha256: await place(file) });
+		const resume = pause ? await pause() : null;
+		/** @type {import('./local-server-runtime.mjs').ServerMetadata} */
+		let metadata;
+		/** @type {BackupFile[]} */
+		const data = [];
+		/** @type {BackupFile[]} */
+		const remote = [];
+		try {
+			metadata = JSON.parse(await readFile(join(dataDir, 'server.json'), 'utf8'));
+			for (const file of await listFiles(dataDir)) {
+				const copied = early.get(file.path);
+				early.delete(file.path);
+				const unchanged = copied && copied.size === file.size && copied.mtimeMs === file.mtimeMs;
+				data.push({ path: file.path, size: file.size, sha256: unchanged ? copied.sha256 : await place(file) });
+			}
+			for (const file of await listOptional(`${dataDir}.remote`)) {
+				remote.push({ path: file.path, size: file.size, sha256: await copyHashed(join(`${dataDir}.remote`, file.path), join(staging, 'remote', file.path)) });
+			}
+		} finally { await resume?.(); }
+		// Blobs deleted after they were copied.
+		for (const path of early.keys()) await rm(join(staging, 'data', path), { force: true });
 		// Re-read copied bytes before publishing a completed backup.
 		if (JSON.stringify(await inventory(join(staging, 'data'))) !== JSON.stringify(data)
 			|| JSON.stringify(await inventory(join(staging, 'remote'))) !== JSON.stringify(remote)) throw new Error('Backup verification failed. No completed backup was created.');
@@ -93,6 +189,13 @@ export async function backupLocalServer(dataDir, output, alreadyLocked = false) 
 			.catch(error => console.warn(`Backup completed, but its time could not be recorded: ${error.message}`));
 		return output;
 	} finally { await rm(staging, { recursive: true, force: true }); await unlock(); }
+}
+
+/** @param {string} backup @returns {Promise<BackupManifest>} */
+export async function readBackupManifest(backup) {
+	const manifest = JSON.parse(await readFile(join(backup, 'backup.json'), 'utf8'));
+	if (manifest?.format !== 1 || !Array.isArray(manifest.data) || !Array.isArray(manifest.remote) || typeof manifest.createdAt !== 'string') throw new Error('Unsupported backup format.');
+	return manifest;
 }
 
 /** The most recent verified backup of this data directory, or null if none was recorded.

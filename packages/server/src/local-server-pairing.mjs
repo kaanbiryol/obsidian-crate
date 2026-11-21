@@ -2,8 +2,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer, request as httpRequest } from 'node:http';
 import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { readLastBackup } from './local-server-backup.mjs';
+import { startBackups } from './local-server-backup-schedule.mjs';
 import { issueLocalDevice, listLocalDevices, readResetGeneration, revokeLocalDevice } from './local-server-runtime.mjs';
 
 const hash = (/** @type {string} */ value) => createHash('sha256').update(value).digest('hex');
@@ -14,13 +15,15 @@ const socketPathLimit = 103;
 /**
  * Single-use pairing codes, kept only in memory and only as hashes.
  * @param {object} options
- * @param {import('./local-server-runtime.mjs').LocalD1Database} options.db
+ * @param {import('./local-server-runtime.mjs').LocalD1Database | (() => import('./local-server-runtime.mjs').LocalD1Database)} options.db
+ * The database, or a getter for a runtime that a backup restarts.
  * @param {() => number} [options.now]
  * @param {number} [options.lifetime] Milliseconds a code stays valid.
  */
 export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
 	/** @type {Map<string, { name: string, expiresAt: number, resetGeneration: Promise<string | undefined> }>} */
 	const codes = new Map();
+	const database = () => typeof db === 'function' ? db() : db;
 	return {
 		issue(name = 'Obsidian device') {
 			if (typeof name !== 'string' || !name.trim() || name.trim().length > 128) throw new Error('Provide a device name between 1 and 128 characters.');
@@ -28,7 +31,7 @@ export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
 			if (codes.size >= 20) throw new Error('Too many pending pairings. Wait for a code to expire before creating another.');
 			const code = `crate-pair-${randomBytes(32).toString('hex')}`;
 			// An encryption reset replaces every credential, so a code issued before it is void.
-			const resetGeneration = readResetGeneration(db).catch(() => undefined);
+			const resetGeneration = readResetGeneration(database()).catch(() => undefined);
 			const entry = { name: name.trim(), expiresAt: now() + lifetime, resetGeneration };
 			codes.set(hash(code), entry);
 			return { code, expiresAt: entry.expiresAt };
@@ -44,7 +47,7 @@ export function createPairing({ db, now = Date.now, lifetime = 10 * 60_000 }) {
 			if (!entry || entry.expiresAt <= now()) return null;
 			const resetGeneration = await entry.resetGeneration;
 			if (resetGeneration === undefined) return null;
-			return issueLocalDevice(db, entry.name, resetGeneration);
+			return issueLocalDevice(database(), entry.name, resetGeneration);
 		},
 	};
 }
@@ -85,22 +88,43 @@ export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 	// The caller holds the data directory lock, so a socket already there was left by a crash.
 	if (socket === inData) await unlink(socket).catch(error => { if (error.code !== 'ENOENT') throw error; });
 	const secret = randomBytes(32).toString('hex');
+	const backups = startBackups({ dataDir, runtime });
+	/** @template T @param {() => Promise<T>} task @returns {Promise<T>} */
+	const withRuntime = async task => {
+		const release = await runtime.request();
+		if (!release) throw new Error('Crate is finishing a backup. Try again shortly.');
+		try { return await task(); } finally { release(); }
+	};
 	const server = createServer(async (request, response) => {
 		if (request.headers.authorization !== `Bearer ${secret}`) { sendJson(response, 403, { error: 'Not authorized' }); return; }
 		if (request.method === 'GET' && request.url === '/devices') {
-			try { sendJson(response, 200, { devices: await listLocalDevices(runtime.db) }); }
+			try { sendJson(response, 200, { devices: await withRuntime(() => listLocalDevices(runtime.db)) }); }
 			catch { sendJson(response, 500, { error: 'Could not list devices.' }); }
 			return;
 		}
 		if (request.method === 'GET' && request.url === '/status') {
-			sendJson(response, 200, { origin, uptimeSeconds: Math.round(process.uptime()), crashes: runtime.crashes, lastBackup: await readLastBackup(dataDir) });
+			sendJson(response, 200, { origin, uptimeSeconds: Math.round(process.uptime()), crashes: runtime.crashes,
+				lastBackup: await readLastBackup(dataDir), autoBackup: await backups.status() });
 			return;
 		}
 		if (request.method === 'POST' && request.url === '/revoke') {
 			try {
 				const { id } = await readSmallJson(request);
-				sendJson(response, 200, { revoked: await revokeLocalDevice(runtime, id) });
+				sendJson(response, 200, { revoked: await withRuntime(() => revokeLocalDevice(runtime, id)) });
 			} catch (error) { sendJson(response, 400, { error: error.message }); }
+			return;
+		}
+		if (request.method === 'POST' && request.url === '/backup') {
+			try {
+				const { output } = await readSmallJson(request, 8192);
+				if (typeof output !== 'string' || !isAbsolute(output)) throw new Error('Provide an absolute backup path.');
+				sendJson(response, 200, await backups.run(output));
+			} catch (error) { sendJson(response, error.code === 'EBUSY' ? 409 : 400, { error: error.message }); }
+			return;
+		}
+		if (request.method === 'POST' && request.url === '/auto-backup') {
+			void backups.check();
+			sendJson(response, 200, { checking: true });
 			return;
 		}
 		if (request.method !== 'POST' || request.url !== '/pair') { sendJson(response, 404, { error: 'Not found' }); return; }
@@ -115,8 +139,10 @@ export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 		if (process.platform !== 'win32') await chmod(socket, 0o600);
 		await writeFile(file, JSON.stringify({ socket, secret }), { mode: 0o600 });
 		await chmod(file, 0o600);
-	} catch (error) { server.close(); throw error; }
+	} catch (error) { server.close(); await backups.close(); throw error; }
 	return { async close() {
+		// A running backup holds the runtime paused; it finishes before storage closes.
+		await backups.close();
 		server.closeAllConnections();
 		await new Promise(resolve => server.close(resolve));
 		await unlink(file).catch(error => { if (error.code !== 'ENOENT') throw error; });
@@ -129,13 +155,14 @@ export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 /** Sends one request to the running server's private control socket. Rejects with
  * code ENOENT when no server is running for this data directory.
  * @param {string} dataDir @param {string} method @param {string} path @param {unknown} [body]
+ * @param {number} [timeout] Milliseconds to wait for the server.
  * @returns {Promise<any>} The parsed JSON response. */
-export async function requestLocalControl(dataDir, method, path, body) {
+export async function requestLocalControl(dataDir, method, path, body, timeout = 5000) {
 	/** @type {LocalControlFile} */
 	const { socket, secret } = JSON.parse(await readFile(join(dataDir, 'control.json'), 'utf8'));
 	return new Promise((resolve, reject) => {
 		const request = httpRequest({ socketPath: socket, path, method,
-			headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' }, timeout: 5000,
+			headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' }, timeout,
 		}, async response => {
 			try {
 				const result = await readSmallJson(response, 1024 * 1024);

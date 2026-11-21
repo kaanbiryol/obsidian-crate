@@ -73,8 +73,52 @@ const { armReminderDispatcher, revokeCoordinatedCredential } = await import(path
  * @property {(id: string) => Promise<boolean>} revoke
  * @property {Promise<never>} failed Rejects when a serving runtime stops responding; never settles for administrative runtimes.
  * @property {number} crashes Unexpected workerd exits Miniflare recovered from.
+ * @property {RequestGate['request']} request Hold the result while using `mf` or `db`; a pause waits for it.
+ * @property {() => Promise<() => Promise<void>>} pause Stops workerd once running requests finish, so its files
+ * can be copied. The returned resume starts it again; a failed resume rejects `failed`.
  * @property {() => Promise<void>} close
  */
+
+/** @typedef {ReturnType<typeof createRequestGate>} RequestGate */
+
+/** Admits requests to the runtime. Closing waits for admitted ones and holds new ones
+ * until it opens again.
+ * @param {{ hold?: number, drain?: number }} [options] Milliseconds a new request waits
+ * for a closed gate, and a closing gate waits for running requests. */
+export function createRequestGate({ hold = 30_000, drain = 15_000 } = {}) {
+	let running = 0;
+	/** @type {Promise<void> | null} */
+	let closed = null;
+	let reopen = () => {};
+	let idle = () => {};
+	/** @param {Promise<unknown>} promise @param {number} ms */
+	const within = async (promise, ms) => {
+		/** @type {NodeJS.Timeout | undefined} */
+		let timer;
+		try { return await Promise.race([promise.then(() => true), new Promise(resolve => { timer = setTimeout(resolve, ms, false); })]); }
+		finally { clearTimeout(timer); }
+	};
+	return {
+		/** @returns {Promise<(() => void) | null>} A release, or null when the gate stayed closed too long. */
+		async request() {
+			while (closed) if (!await within(closed, hold)) return null;
+			running++;
+			let released = false;
+			return () => {
+				if (released) return;
+				released = true;
+				if (--running === 0) idle();
+			};
+		},
+		async close() {
+			if (closed) throw new Error('The runtime is already paused.');
+			closed = new Promise(resolve => { reopen = resolve; });
+			if (running) await within(new Promise(resolve => { idle = () => resolve(undefined); }), drain);
+			idle = () => {};
+		},
+		open() { closed = null; reopen(); },
+	};
+}
 
 /** @param {string} value */
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -284,7 +328,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
         if (current.schemaHash !== expected.schemaHash) assertLocalMigrationPath(current.schemaVersion, release);
         assertCompatibleLocalMetadata({ ...current, schemaHash: expected.schemaHash }, expected);
         const { backupLocalServer } = await import('./local-server-backup.mjs');
-        await backupLocalServer(dataDir, upgradeBackup, true);
+        await backupLocalServer(dataDir, upgradeBackup, { alreadyLocked: true });
       }
     }
 
@@ -330,28 +374,43 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		let crashes = 0;
 		/** @type {() => Promise<void>} */
 		let wakeReminders = async () => {};
+		const serving = { ...options,
+			r2Buckets: { [bindings.bucket]: 'crate-local-files' },
+			durableObjects: { [bindings.reminderAlarms]: { className: durableObjectClass, useSQLite: true } },
+			ratelimits: { [bindings.notificationRateLimiter]: { namespace_id: '1001', simple: notificationRateLimit } },
+			// Miniflare restarted a crashed workerd; reminders may have come due meanwhile.
+			unsafeHandleRuntimeRestart: async () => { crashes++; await wakeReminders(); },
+		};
 		if (!administrative) {
 			await mf.dispose();
-			mf = createRuntime({ ...options,
-				r2Buckets: { [bindings.bucket]: 'crate-local-files' },
-				durableObjects: { [bindings.reminderAlarms]: { className: durableObjectClass, useSQLite: true } },
-				ratelimits: { [bindings.notificationRateLimiter]: { namespace_id: '1001', simple: notificationRateLimit } },
-				// Miniflare restarted a crashed workerd; reminders may have come due meanwhile.
-				unsafeHandleRuntimeRestart: async () => { crashes++; await wakeReminders(); },
-			});
+			mf = createRuntime(serving);
 			await mf.ready;
 			db = await mf.getD1Database(bindings.database);
 		}
-		const live = /** @type {import('miniflare').Miniflare} */ (mf);
+		let live = /** @type {import('miniflare').Miniflare} */ (mf);
 		// Miniflare types the namespace with workers types this repository does not install.
 		const alarms = async () => ({ REMINDER_ALARMS: /** @type {DurableObjectNamespace} */ (/** @type {unknown} */ (
 			await live.getDurableObjectNamespace(bindings.reminderAlarms))) });
 		let closed = false;
+		let disposed = false;
 		// Administrative runtimes register no Durable Objects, so they revoke directly.
 		/** @type {(id: string) => Promise<boolean>} */
 		const revoke = administrative ? id => revokeCredential(db, id) : async id => revokeCoordinatedCredential(await alarms(), id);
+		/** @type {(error: unknown) => void} */
+		let fail = () => {};
+		/** @type {Promise<never>} */
+		const failed = new Promise((_, reject) => { fail = reject; });
+		failed.catch(() => {});
 		/** @type {ReturnType<typeof watchRuntime> | undefined} */
 		let watchdog;
+		const watch = () => {
+			watchdog = watchRuntime({ async probe(signal) {
+				const response = await live.dispatchFetch(`${origin}/.well-known/crate`, { signal });
+				await response.arrayBuffer();
+				if (!response.ok) throw new Error(`health check returned ${response.status}`);
+			} });
+			watchdog.failed.catch(fail);
+		};
 		if (!administrative) {
 			// Otherwise only a commit or enabling Reminders arms delivery, so a reminder that
 			// came due while the server was down would wait for the next sync.
@@ -359,20 +418,40 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 				if (!await armReminderDispatcher(await alarms())) console.warn('Could not wake reminder delivery. It resumes with the next sync.');
 			};
 			await wakeReminders();
-			watchdog = watchRuntime({ async probe(signal) {
-				const response = await live.dispatchFetch(`${origin}/.well-known/crate`, { signal });
-				await response.arrayBuffer();
-				if (!response.ok) throw new Error(`health check returned ${response.status}`);
-			} });
+			watch();
 		}
-		return { mf: live, db, dataDir, origin, revoke,
-			failed: watchdog?.failed ?? new Promise(() => {}),
+		const gate = createRequestGate();
+		return { get mf() { return live; }, get db() { return db; }, dataDir, origin, revoke, failed,
 			get crashes() { return crashes; },
+			request: gate.request,
+			async pause() {
+				if (administrative) return async () => {};
+				await gate.close();
+				watchdog?.close();
+				disposed = true;
+				await live.dispose();
+				return async () => {
+					try {
+						if (closed) return;
+						const next = createRuntime(serving);
+						await next.ready;
+						if (closed) { await next.dispose(); return; }
+						live = next;
+						db = await next.getD1Database(bindings.database);
+						disposed = false;
+						await wakeReminders();
+						watch();
+					} catch (error) {
+						fail(new Error(`The Workers runtime could not restart after a backup (${error instanceof Error ? error.message : String(error)}). Crate is stopping so its service manager can restart it.`, { cause: error }));
+						throw error;
+					} finally { gate.open(); }
+				};
+			},
 			async close() {
 				if (closed) return;
 				closed = true;
 				watchdog?.close();
-				await live.dispose();
+				if (!disposed) await live.dispose();
 				await unlock();
 			} };
 	} catch (error) {

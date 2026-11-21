@@ -16,6 +16,8 @@ services:
       - no-new-privileges:true
     volumes:
       - crate-data:/data
+      # For automatic backups outside the data volume (see docs/self-hosting.md):
+      # - ./backups:/backups
     logging:
       driver: local
       options:

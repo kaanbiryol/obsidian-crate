@@ -1,14 +1,37 @@
-// Stopped-server data maintenance: backup, restore, upgrade and the upgrade check.
+// Data maintenance: backup (online or stopped), automatic backups, and the stopped-server
+// restore, upgrade and upgrade check.
 import { resolve } from 'node:path';
 import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from '../local-server-backup.mjs';
+import { saveAutoBackup } from '../local-server-backup-schedule.mjs';
+import { requestLocalControl } from '../local-server-pairing.mjs';
 import { openLocalRuntime } from '../local-server-runtime.mjs';
+import { describeAutoBackup } from './status.mjs';
 
 /** @typedef {import('../local-server-options.mjs').Command} Command */
 
-/** @type {Command} */
+/** Backs up through the running server, pausing its writes briefly, or directly when it is stopped. @type {Command} */
 export async function backup({ dataDir, values }) {
-	if (!values.output) throw new Error('Provide --output with a new backup directory. Stop the server before backing up.');
-	console.log(`Backup verified: ${await backupLocalServer(dataDir, values.output)}`);
+	if (!values.output) throw new Error('Provide --output with a new backup directory.');
+	const output = resolve(values.output);
+	/** @type {{ output: string, pausedMs: number }} */
+	let online;
+	try { online = await requestLocalControl(dataDir, 'POST', '/backup', { output }, 60 * 60_000); }
+	catch (error) {
+		if (error.code !== 'ENOENT') throw new Error(`The running Crate server could not back up: ${error.message}`);
+		console.log(`Backup verified: ${await backupLocalServer(dataDir, output)}`);
+		return;
+	}
+	console.log(`Backup verified: ${online.output}\nSync paused for ${(online.pausedMs / 1000).toFixed(1)} s while the database was copied.`);
+}
+
+/** Turns daily automatic backups on (`--output`, `--keep`) or off (`--off`). @type {Command} */
+export async function autoBackup({ dataDir, values }) {
+	if (values.off === Boolean(values.output)) throw new Error('Provide --output with a backup directory, or --off.');
+	const keep = values.keep === undefined ? 7 : Number(values.keep);
+	const settings = await saveAutoBackup(dataDir, values.off ? null : { dir: /** @type {string} */ (values.output), keep });
+	console.log(describeAutoBackup(settings));
+	// A running server checks hourly; ask it to check now. A stopped one checks when it starts.
+	if (settings) await requestLocalControl(dataDir, 'POST', '/auto-backup').catch(() => {});
 }
 
 /** @type {Command} */

@@ -53,35 +53,44 @@ export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 87
 			if (url.pathname === '/__crate/ready' && request.method === 'GET' && instance) {
 				sendJson(response, 200, { instance }); return;
 			}
-			if (url.pathname === '/__crate/pair' && pairing) {
-				if (request.method !== 'POST') { sendJson(response, 405, { error: 'Use POST' }); return; }
-				let credential;
-				try { credential = await pairing.exchange((await readSmallJson(request)).code); }
-				catch { sendJson(response, 400, { error: 'Could not redeem this pairing code. Generate a new code and try again.' }); return; }
-				if (!credential) { sendJson(response, 401, { error: 'Pairing code expired or already used. Generate a new code on your server.' }); return; }
-				sendJson(response, 200, { authToken: credential.token }); return;
+			// A backup pauses the runtime briefly; hold the request until it resumes.
+			const release = await active.request();
+			if (!release) {
+				response.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Retry-After': '5' });
+				response.end(JSON.stringify({ error: 'Crate is finishing a backup. Try again shortly.' }));
+				return;
 			}
-			const headers = new Headers();
-			for (const [name, value] of Object.entries(request.headers)) {
-				if (value !== undefined && !['host', 'connection', 'transfer-encoding'].includes(name)
-					&& !name.startsWith('mf-') && !name.startsWith('cf-') && !name.startsWith('x-forwarded-') && !name.startsWith('x-crate-internal-')) {
-					headers.set(name, Array.isArray(value) ? value.join(', ') : value);
+			try {
+				if (url.pathname === '/__crate/pair' && pairing) {
+					if (request.method !== 'POST') { sendJson(response, 405, { error: 'Use POST' }); return; }
+					let credential;
+					try { credential = await pairing.exchange((await readSmallJson(request)).code); }
+					catch { sendJson(response, 400, { error: 'Could not redeem this pairing code. Generate a new code and try again.' }); return; }
+					if (!credential) { sendJson(response, 401, { error: 'Pairing code expired or already used. Generate a new code on your server.' }); return; }
+					sendJson(response, 200, { authToken: credential.token }); return;
 				}
-			}
-			headers.set('CF-Connecting-IP', clientAddress(request, tunnel));
-			const abort = new AbortController();
-			response.on('close', () => { if (!response.writableFinished) abort.abort(); });
-			const result = await active.mf.dispatchFetch(url.href, {
-				method: request.method, headers, redirect: 'manual', signal: abort.signal,
-				...(['GET', 'HEAD'].includes(/** @type {string} */ (request.method)) ? {} : { body: Readable.toWeb(request), duplex: 'half' }),
-			});
-			const responseHeaders = new Headers(result.headers);
-			// dispatchFetch transparently decodes upstream compression.
-			if (responseHeaders.has('MF-Content-Encoding')) responseHeaders.delete('Content-Length');
-			for (const name of ['MF-Content-Encoding', 'Content-Encoding', 'Transfer-Encoding', 'Connection']) responseHeaders.delete(name);
-			response.writeHead(result.status, Object.fromEntries(responseHeaders));
-			if (result.body) await pipeline(Readable.fromWeb(result.body), response);
-			else response.end();
+				const headers = new Headers();
+				for (const [name, value] of Object.entries(request.headers)) {
+					if (value !== undefined && !['host', 'connection', 'transfer-encoding'].includes(name)
+						&& !name.startsWith('mf-') && !name.startsWith('cf-') && !name.startsWith('x-forwarded-') && !name.startsWith('x-crate-internal-')) {
+						headers.set(name, Array.isArray(value) ? value.join(', ') : value);
+					}
+				}
+				headers.set('CF-Connecting-IP', clientAddress(request, tunnel));
+				const abort = new AbortController();
+				response.on('close', () => { if (!response.writableFinished) abort.abort(); });
+				const result = await active.mf.dispatchFetch(url.href, {
+					method: request.method, headers, redirect: 'manual', signal: abort.signal,
+					...(['GET', 'HEAD'].includes(/** @type {string} */ (request.method)) ? {} : { body: Readable.toWeb(request), duplex: 'half' }),
+				});
+				const responseHeaders = new Headers(result.headers);
+				// dispatchFetch transparently decodes upstream compression.
+				if (responseHeaders.has('MF-Content-Encoding')) responseHeaders.delete('Content-Length');
+				for (const name of ['MF-Content-Encoding', 'Content-Encoding', 'Transfer-Encoding', 'Connection']) responseHeaders.delete(name);
+				response.writeHead(result.status, Object.fromEntries(responseHeaders));
+				if (result.body) await pipeline(Readable.fromWeb(result.body), response);
+				else response.end();
+			} finally { release(); }
 		} catch {
 			if (!response.headersSent) response.writeHead(503, { 'Content-Type': 'application/json' });
 			response.end(JSON.stringify({ error: 'Local server unavailable' }));
