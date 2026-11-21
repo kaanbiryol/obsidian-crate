@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 -- redeems, or the pairing ID of a `web_pairing`. Maintenance deletes expired rows, and every
 -- redemption checks the expiry itself.
 CREATE TABLE IF NOT EXISTS grants (
-	kind TEXT NOT NULL CHECK (kind IN ('web_enrollment', 'reading_enrollment', 'reading_handoff', 'device_pairing', 'web_pairing')),
+	-- The Worker names each kind, so a new one needs no migration.
+	kind TEXT NOT NULL CHECK (length(kind) BETWEEN 1 AND 32),
 	key TEXT NOT NULL,
 	payload TEXT NOT NULL,
 	expires_at INTEGER NOT NULL,
@@ -129,7 +130,8 @@ CREATE TABLE IF NOT EXISTS server_state (
 	settings TEXT,
 	settings_version TEXT,
 	-- Days replaced and deleted versions and shared checkpoints are kept. NULL means 30.
-	history_retention_days INTEGER CHECK (history_retention_days IN (7, 30, 60, 90))
+	-- The Worker limits the choices, so offering another needs no migration.
+	history_retention_days INTEGER CHECK (history_retention_days BETWEEN 1 AND 365)
 );
 
 CREATE TABLE IF NOT EXISTS reminder_file_cache (
@@ -144,7 +146,8 @@ CREATE TABLE IF NOT EXISTS reminder_file_cache (
 -- Receipts of reminder, upload and Reading commands. Operation IDs sort by creation day,
 -- so each kind is pruned by key range. A Reading receipt also names its principal and generation.
 CREATE TABLE IF NOT EXISTS operations (
-    kind TEXT NOT NULL CHECK (kind IN ('reminder', 'upload', 'reading')),
+    -- The Worker names each kind, and maintenance prunes each one it knows.
+    kind TEXT NOT NULL CHECK (length(kind) BETWEEN 1 AND 32),
     operation_id TEXT NOT NULL,
     request_hash TEXT NOT NULL,
     response_json TEXT NOT NULL,

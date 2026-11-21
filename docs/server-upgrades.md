@@ -48,6 +48,8 @@ Every server runs its migrations on its owner's own Cloudflare account, in one D
 - add indexes on small tables
 - rebuild small tables (`server_state`, `auth_tokens`, `grants`) through a copy, drop and rename
 
+Keep product choices out of CHECK lists. Columns whose values the Worker chooses (`history_retention_days`, `grants.kind`, `operations.kind`) check a range or length, so a new choice ships as a Worker change. Token scopes and sync state (`auth_tokens.scope`, `file_versions.reason`, `import_state`, `upload_leases.state`) keep exact lists, because a new value there needs review anyway.
+
 Data changes on large tables (`files`, `file_versions`, `changelog`, `note_terms`, `highlight_index`), including a new index on one, go through a resumable, batched Worker backfill instead, the way the encryption import resumes after the daily limit resets. Expand the schema in one release (a nullable column or a new table that current code tolerates), backfill in bounded batches with a cursor saved in D1 so an interrupted or rate-limited run continues where it stopped, and contract (drop the old column or table, add constraints) in a later release once every server has finished. A column added with `ALTER TABLE ... ADD COLUMN` is appended, so add it at the end of its table in `schema.sql` too.
 
 `src/cloudflare/deployment/database-migrations.integration.ts` (in `npm run test:worker-runtime`) enforces both rules through the provisioner's real runner:

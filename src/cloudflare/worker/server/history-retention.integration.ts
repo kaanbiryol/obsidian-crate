@@ -43,8 +43,10 @@ const backdate = (path: string, days: number, retention: number) => env.DB.prepa
 
 it('defaults to 30 days, accepts only offered periods and limits it to vault credentials', async () => {
 	expect(await retention()).toBe(30);
-	expect((await setRetention(14)).status).toBe(400);
+	expect((await setRetention(45)).status).toBe(400);
 	expect((await setRetention('7')).status).toBe(400);
+	expect((await setRetention(14)).status).toBe(200);
+	expect(await retention()).toBe(14);
 	expect((await setRetention(7)).status).toBe(200);
 	expect(await retention()).toBe(7);
 	for (const method of ['GET', 'POST']) {

@@ -608,11 +608,13 @@ and a mismatching final inventory is never reported as a successful restore.
 
 ## History retention
 
-One server-wide setting, `server_state.history_retention_days` (7, 30, 60 or 90; NULL
+One server-wide setting, `server_state.history_retention_days` (7, 14, 30, 60 or 90; NULL
 means 30), sets how long replaced and deleted versions and shared checkpoints are kept.
 Vault credentials read it with `GET /history-retention` and change it with
 `POST /history-retention { days }`; the plugin shows it under **Sync options** →
-**Keep history for** and confirms before shortening it. Statements that keep a version read
+**Keep history for** and confirms before shortening it. The Worker accepts only the
+offered periods, and the column allows 1 to 365 days, so offering another needs no
+migration. Statements that keep a version read
 the setting in the same statement, so a version is kept for the period in force when it
 was committed. Changing the period re-times kept versions to their commit time plus the
 new period in the same D1 batch: a shorter period lets maintenance remove older history,
