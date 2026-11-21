@@ -21,13 +21,59 @@ codes; this socket is never forwarded through the public tunnel. The gateway
 does not enable device registration on Cloudflare-hosted Workers. Existing vault
 tokens and scoped PWA enrollment keep their current behavior.
 
+## Admission before database work
+
+Unknown routes and unsupported methods return 404 before authentication or
+coordinator work. Public static assets and OPTIONS remain available without an
+API budget. Other requests with unrecognized credentials, plus the sensitive
+Reading/notification actions, use the edge admission binding: 60 requests per
+minute per hashed source address and deployment host. Invalid rotating bearer
+tokens share that budget. The local server replaces client-supplied forwarding
+headers with the socket address. Behind its managed Cloudflare Tunnel or Tailscale
+Funnel, where every request arrives from loopback, it uses the client address that
+tunnel forwards: `CF-Connecting-IP` from Cloudflare, `X-Forwarded-For` from Tailscale.
+
+A successful D1 authentication records only a bounded, 60-second credential-hash
+hint in the isolate. Subsequent ordinary requests use a separate local budget
+of 6,000 per minute per credential so vault bootstrap can proceed. Every request
+still checks token validity, expiry and authorization against D1; an authentication
+failure removes the hint. This is not an authentication cache. Coordinator routes
+forward a hinted credential, which authenticates under the coordinator lock, and
+uploads forward it to a transfer object, which authenticates it after queuing. Any
+other credential authenticates at the edge first, so an invalid one never waits for
+that lock or queue, and then again inside.
+
+Action/day limits remain enforced after authentication. Each route's per-minute
+action limit is its `rateLimit` in `routes/policy.ts`. Daily action budgets belong
+to each credential (1,000 per UTC day for management and push actions, 500 for
+Reading), so one token cannot exhaust another's. Enrollment exchanges share one
+1,000-per-day pool, because each grant is single-use. A per-minute denial returns
+429 with `Retry-After: 60`; a denial because the daily budget is spent returns 429
+with a `Retry-After` that counts the seconds to 00:00 UTC (`admission/rate-limit.ts`).
+
+When a Cloudflare Free plan account has used its daily D1 read or write allowance,
+any route that reaches D1 returns 429 with `code: "d1_daily_limit"`. It sends no
+Retry-After: the allowance resets at 00:00 UTC, beyond the clients' retry delays.
+
+Without the edge binding, the restrictive budget also runs in bounded isolate
+memory keyed by the original D1 binding, before request-local metering wrappers.
+The authenticated sync budget and fallback are per isolate, not global quotas;
+Cloudflare's [edge limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) are also location-scoped abuse protection, not exact
+account-wide billing caps. Keep Cloudflare account usage alerts enabled.
+Ordinary Reading requests authenticate and authorize before entering the shared
+coordinator; list and item reads enter it only to rebuild the index or list a page. Public one-use Reading grants enter it after admission because
+redemption and capture must be serialized together.
+
 ## Endpoints
+
+The scope column lists the token scopes `routes/policy.ts` declares for each route. `vault` is an Obsidian device token. `reminders` is a web app token; it is also the Reading library credential once a Reading folder is configured. `reading_capture` is a Shortcut capture token. Grant routes take a one-use grant instead of a bearer, and public routes take no credential. Routes marked plaintext only return 428 in an encrypted vault, where clients use the encrypted routes instead.
+
+### Sync endpoints
+
+All sync routes require `vault`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/.well-known/crate` | Public service, version, protocol range, and capability metadata |
-| `GET` | `/health` | Health check, returns `{ status, timestamp }` |
-| `POST` | `/links/title` | Authenticated page-title lookup `{ url }`, returns `{ title: string \| null }`; allowed for vault and reminder tokens |
 | `GET` | `/sync/check?since=<seq>` | Lightweight check: are there changes since this sequence? |
 | `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (limit 5000 per page) |
 | `GET` | `/sync/manifest?limit=<n>&after=<path>&snapshotSeq=<seq>` | Stable, cursor-paginated remote manifest |
@@ -37,230 +83,120 @@ tokens and scoped PWA enrollment keep their current behavior.
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 32 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 32 files) |
+| `POST` | `/sync/import` | Start or resume the initial import of a never-populated server; returns `{ import }` or `{ import: null }` |
+| `POST` | `/sync/import/upload` | Upload up to 32 base64 files into the open initial import |
+| `PUT` | `/sync/import/upload?path=<path>` | Upload one binary file into the open initial import |
+| `POST` | `/sync/import/prune` | Remove up to 50 imported files that were deleted locally while the import was paused |
+| `POST` | `/sync/import/complete` | Verify the imported inventory page by page and seal it on the final page |
+| `POST` | `/sync/import/readiness` | Poll and acknowledge reminder setup after the initial import |
 | `GET` | `/sync/checkpoints` | List up to 20 unexpired shared checkpoints |
 | `POST` | `/sync/checkpoints` | Capture the authoritative server inventory; unchanged generations reuse their checkpoint |
 | `GET` | `/sync/checkpoint?id=<id>` | Read the complete inventory of a live shared checkpoint |
-| `GET` | `/sync/checkpoint-file?id=<id>&path=<path>&revision=<revision>` | Stream an exact current/retained file revision while the checkpoint remains live; vault scope only. Replacing a revision that was live at the latest checkpoint always keeps it; a revision that is no longer kept returns 410 with `code: "version_unavailable"` |
+| `GET` | `/sync/checkpoint-file?id=<id>&path=<path>&revision=<revision>` | Stream an exact current/retained file revision while the checkpoint remains live. Replacing a revision that was live at the latest checkpoint always keeps it; a revision that is no longer kept returns 410 with `code: "version_unavailable"` |
 | `GET` | `/sync/versions?path=<path>&search=<text>&cursor=<cursor>` | Page through unexpired recoverable file versions (100 per page) |
+| `GET` | `/sync/version-preview?path=<path>&storageKey=<key>` | Read one retained version for preview |
 | `POST` | `/sync/restore-version` | Restore a retained version with expected-hash compare-and-swap |
-| `GET` | `/diagnostics` | Backend counts, delivery failures, queue pressure, and scheduled-maintenance state |
-| `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
-| `GET` | `/auth/tokens` | List all registered auth tokens |
-| `DELETE` | `/auth/session` | Atomically revoke the current bearer token and its owned push subscriptions |
-| `GET` | `/settings` | Get shared settings |
-| `PUT` | `/settings` | Store shared settings |
-| `GET` | `/reminders/list?folderPath=<path>` | List reminders and projects from synced Markdown files |
-| `POST` | `/reminders/create` | Create a reminder in a project Markdown file |
-| `POST` | `/reminders/update` | Update or move a reminder |
-| `POST` | `/reminders/set-completed` | Toggle reminder completion |
-| `DELETE` | `/reminders/delete` | Delete a reminder from Markdown |
-| `POST` | `/reminders/reorder` | Reorder reminders inside a project file |
-| `GET`, `POST`, `PUT` | `/reminders/notification-policy` | Read, initialize, or explicitly update shared notification policy (vault scope) |
-| `POST` | `/notifications/reminders-enrollment-token` | Create one-time browser and install tokens for a reminders web app link (vault tokens only) |
-| `POST` | `/notifications/subscribe` | Save a push subscription |
-| `DELETE` | `/notifications/subscribe` | Remove a push subscription |
-| `GET` | `/notifications/subscriptions` | List push subscriptions |
-| `POST` | `/notifications/test` | Send a test push notification |
 
-## Public and PWA Endpoints
+### Account, settings and server endpoints
+
+| Method | Path | Scope | Purpose |
+|---|---|---|---|
+| `GET` | `/health` | `vault`, `reminders` | Health check, returns `{ status, timestamp }` |
+| `GET` | `/diagnostics` | `vault` | Backend counts, delivery failures, queue pressure, and scheduled-maintenance state |
+| `POST` | `/links/title` | `vault`, `reminders` | Page-title lookup `{ url }`, returns `{ title: string \| null }` |
+| `GET` | `/auth/tokens` | `vault` | List all registered auth tokens |
+| `DELETE` | `/auth/tokens` | `vault` | Revoke an auth token `{ id }` |
+| `DELETE` | `/auth/session` | `vault`, `reminders` | Atomically revoke the current bearer token and its owned push subscriptions |
+| `GET` | `/settings` | `vault` | Get shared settings |
+| `PUT` | `/settings` | `vault` | Store shared settings |
+| `GET` | `/features` | `vault`, `reminders` | Read the shared feature policy |
+| `POST` | `/features` | `vault` | Change the shared feature policy |
+| `GET`, `POST` | `/history-retention` | `vault` | Read or change how long file history is kept |
+
+### Reminders and notifications endpoints
+
+| Method | Path | Scope | Purpose |
+|---|---|---|---|
+| `GET` | `/reminders/list?folderPath=<path>` | `vault`, `reminders` | List reminders and projects from synced Markdown files (plaintext only) |
+| `POST` | `/reminders/create` | `vault`, `reminders` | Create a reminder in a project Markdown file (plaintext only) |
+| `POST` | `/reminders/update` | `vault`, `reminders` | Update or move a reminder (plaintext only) |
+| `POST` | `/reminders/set-completed` | `vault`, `reminders` | Toggle reminder completion (plaintext only) |
+| `DELETE` | `/reminders/delete` | `vault`, `reminders` | Delete a reminder from Markdown (plaintext only) |
+| `POST` | `/reminders/reorder` | `vault`, `reminders` | Reorder reminders inside a project file (plaintext only) |
+| `GET`, `POST`, `PUT` | `/reminders/notification-policy` | `vault` | Read, initialize, or explicitly update shared notification policy |
+| `POST` | `/notifications/reminders-enrollment-token` | `vault` | Create one-time browser and install tokens for a reminders web app link |
+| `POST` | `/notifications/subscribe` | `vault`, `reminders` | Save a push subscription |
+| `DELETE` | `/notifications/subscribe` | `vault`, `reminders` | Remove a push subscription |
+| `GET` | `/notifications/subscriptions` | `vault` | List push subscriptions |
+| `POST` | `/notifications/test` | `vault` | Send a test push notification |
+
+### Reading endpoints
+
+| Method | Path | Scope | Purpose |
+|---|---|---|---|
+| `GET` | `/reading/policy` | `vault` | Read the Reading folder, extraction state and generation |
+| `POST` | `/reading/policy` | `vault` | Set the Reading folder and extraction state `{ folderPath, enabled, revision }` |
+| `GET` | `/reading/session` | `vault`, `reminders` | Return the credential's `{ id, folderPath, generation, expiresAt, day }` for the Reading app |
+| `GET` | `/reading/items?section=&cursor=` | `vault`, `reminders` | One page of the library, or encrypted cards |
+| `GET` | `/reading/tags` | `vault`, `reminders` | List library tags, optionally for one section with counts |
+| `GET` | `/reading/taken?path=…` | `vault`, `reminders` | Which of up to 20 server paths are taken, for naming encrypted notes (encrypted vaults only) |
+| `GET` | `/reading/item` | `vault`, `reminders` | Read one indexed note or queued capture (plaintext only) |
+| `GET` | `/reading/file?path=…` | `vault`, `reminders` | Read one image file in the Reading folder (plaintext only) |
+| `POST` | `/reading/capture` | `vault`, `reminders`, `reading_capture` | Save a link `{ url, title?, fetchArticle?, operationId }` (plaintext only) |
+| `POST` | `/reading/update` | `vault`, `reminders` | Change a note's status, favorite, tags or highlights against its `before` values (plaintext only) |
+| `POST` | `/reading/retry` | `vault`, `reminders` | Retry article extraction for a note (plaintext only) |
+| `POST` | `/reading/delete` | `vault`, `reminders` | Delete a note and its images (plaintext only) |
+| `POST` | `/reading/shortcut-pairing` | `vault`, `reminders` | Issue a Save to Crate pairing code |
+| `POST` | `/reading/shortcut/v1/prepare` | `reading_capture` | Prepare a Shortcut save and return its launch URL |
+| `POST` | `/reading/shortcut/v1/exchange` | Grant | Redeem a Shortcut pairing code for a capture token |
+| `POST` | `/reading/handoff` | Grant | Redeem a prepared save through `X-Crate-Capture` (plaintext only) |
+
+### Encryption endpoints
+
+| Method | Path | Scope | Purpose |
+|---|---|---|---|
+| `GET` | `/encryption` | `vault`, `reminders` | Public encryption configuration and encrypted recovery bundle |
+| `POST` | `/encryption/metadata` | `vault` | Descriptors for up to 1,000 listed revisions |
+| `GET` | `/encryption/deletion-precondition?path=…&revision=…` | `vault` | Resolve an accepted encrypted deletion |
+| `GET`, `POST` | `/encryption/reset?id=<id>` | `vault` | Start, advance or read a destructive encryption reset |
+| `GET`, `POST` | `/encryption/pairing` | `vault`, `reminders` | Encrypted web app approval |
+| `GET` | `/reminders/encrypted-files` | `vault`, `reminders` | Encrypted reminder folder inventory or delta |
+| `GET` | `/reminders/encrypted-file` | `vault`, `reminders` | One encrypted reminder note at a revision |
+| `POST` | `/reminders/encrypted-files/download` | `vault`, `reminders` | Up to 50 encrypted reminder notes |
+| `POST` | `/reminders/encrypted-commit` | `vault`, `reminders` | Commit encrypted reminder note changes |
+| `GET` | `/reading/encryption` | `vault`, `reminders` | Encryption configuration after validating Reading enrollment |
+| `GET` | `/reading/encrypted-files` | `vault`, `reminders` | Encrypted Reading folder inventory or delta |
+| `GET` | `/reading/encrypted-file` | `vault`, `reminders` | One encrypted Reading file at a revision |
+| `POST` | `/reading/encrypted-files/download` | `vault`, `reminders` | Up to 50 encrypted Reading notes |
+| `POST` | `/reading/encrypted-commit` | `vault`, `reminders` | Commit encrypted Reading note changes |
+| `POST` | `/reading/encrypted-extract` | `vault`, `reminders` | Download an article for the encrypted web app without storing it |
+
+### Public and PWA endpoints
+
+These routes are answered by `routes/public.ts` before authentication.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/` | Returns public service, version, protocol range, and capability metadata |
+| `GET` | `/.well-known/crate` | Public service, version, protocol range, and capability metadata |
+| `GET` | `/` | Returns the same metadata as `/.well-known/crate` |
 | `GET` | `/notifications` | Serves the reminders PWA HTML |
 | `GET` | `/notifications/app.js` | Serves the bundled PWA client |
+| `GET` | `/notifications/assets/<file>` | Serves a PWA client asset |
 | `GET` | `/notifications/sw.js` | Serves the PWA service worker |
 | `GET` | `/notifications/manifest.json` | Serves the PWA manifest |
 | `GET` | `/notifications/version.json` | Returns the current PWA asset version |
 | `GET` | `/notifications/icon.svg` | Serves the PWA icon |
-| `GET` | `/notifications/open-obsidian` | Serves the browser handoff page for opening Obsidian |
-| `GET` | `/notifications/pair` | Serves the device pairing page, which hands the code in its fragment to Obsidian |
+| `GET` | `/notifications/crate-icon-192.png`, `/notifications/crate-icon-512.png`, `/notifications/crate-mark-256.png`, `/notifications/apple-touch-icon-180.png` | Serve the app icons and brand mark |
+| `GET` | `/notifications/open-obsidian`, `/notifications/open-obsidian.js` | Serve the browser handoff page for opening Obsidian and its script |
+| `GET` | `/notifications/pair`, `/notifications/pair.js` | Serve the device pairing page, which hands the code in its fragment to Obsidian, and its script |
+| `GET` | `/notifications/save-reading`, `/notifications/save-reading.js` | Serve the live, uncached Save to Crate page that performs the Shortcut handoff, and its script |
+| `POST` | `/notifications/share/reading` | Web share target fallback: before a service worker controls the PWA, returns a page that keeps the shared form (up to 16 KiB) and stores it locally |
 | `GET` | `/notifications/vapid-public-key` | Returns the Web Push VAPID public key |
 | `POST` | `/notifications/reminders-exchange` | Exchanges a one-time web enrollment token for a PWA auth token |
 | `POST` | `/auth/device-pairing` | Redeems a one-use device pairing code for a vault device token |
+| `GET` | `/shortcuts/development/`, `/shortcuts/development/Save%20to%20Crate.shortcut` | Development builds only: the Shortcut signed from the working tree; other builds return 404 |
 
-## Request/Response Details
-
-### Page titles
-
-`POST /links/title` is a read operation and does not require mutation protocol negotiation. Pasting a standalone web URL automatically uses it. It accepts public HTTP(S) DNS names on standard ports, excludes credentials and fragments, validates each redirect (maximum three), and reads at most 256 KiB of HTML within five seconds. It returns the HTML title as text with entities retained; clients decode entities as text. Missing titles, unsupported responses, and network failures return `title: null`. Invalid destinations return 400; the edge request limiter can return 429. No page scripts execute, no caller credentials are forwarded, and responses are not cached.
-
-Self-hosted title requests use the native public-network binding, including every
-redirect. A rejected connection returns `title: null` without retrying through
-another transport. The local server also forwards global Worker fetches through
-that binding; Miniflare's default outbound service is not the security boundary.
-Hosted Workers retain `global_fetch_strictly_public`. URL validation alone does
-not protect against a public-looking hostname resolving to a private address.
-
-### Reading capture handoffs
-
-The Reading index (`reading_items`) holds one row per Reading note in the Reading
-folder. Every file commit, deletion, move, restore and initial import writes that
-row and its search terms in the same D1 batch as the file, from the bytes it commits, so
-page and item reads never re-check `files`, and `GET /reading/item` reads the note's R2
-object by the revision its row names. Update and retry responses add
-`article: { item, etag, markdownHash }`: the committed item, its `GET /reading/item` ETag and
-the SHA-256 of its article body. A client keeps a saved body whose hash matches under the
-new ETag. A replayed receipt omits `article`.
-
-`GET /reading/item` answers an indexed note with an `ETag` derived from the index format,
-Reading folder scope, item ID, path and the file revision its row names. A matching
-`If-None-Match` returns 304 before R2 is read. A queued capture has no file revision and no
-ETag. The web app sends the ETag of its offline copy and keeps that copy on 304.
-
-Page and item reads authenticate in the public Worker and read the Reading policy, index row
-and (for an item) its capture queue and index rows in one D1 batch, a single snapshot, so they
-do not wait behind writes in the coordinator. While the index is complete, the public Worker
-answers them itself; it forwards to the coordinator a read that must continue an index
-rebuild, which writes.
-
-### Reading library pages and cards
-
-`GET /reading/items?section=&cursor=` (library credential) returns one page of up to 50 notes,
-newest `saved_at` first. `section` is `inbox`, `archived`, `favorites`, `highlights` or `all`;
-`id` finds one Reading ID. An unencrypted vault also takes `q` (each word of 3 or more letters
-matches the start of a title word, a shorter one a whole word), `tag` and `url`, and answers
-`{ items, issues, cursor }`; the first unfiltered inbox page carries the capture queue and
-issues. An encrypted vault takes up to 10 hashed `term` values, every one of which must match,
-and answers `{ cards, cursor }`: each card's server path, revision, hash, size, sealed `card`,
-`stale` and the plaintext list `fields`. Terms live in `note_terms`, one per
-title word, tag and link, keyed by saved date: a search walks its rarest term (by counts capped
-at 50, then 500) newest first and stops after a page. It checks the other terms by key lookups in
-`note_terms` and, unencrypted, the title words on the notes that have every term. See [Reading search](reading-search.md).
-
-`section=highlights` pages `highlight_index` instead: highlighted notes, newest highlight first.
-There `q` (or the hashed `term` values) and `tag` match each note's highlight terms: the words of
-its title, highlight text and highlight notes, and its tags. A filtered page scans at most 2,000
-rows, so a page can come back short or empty with a `cursor` that continues the scan. A Highlights
-page also ends before its notes or cards pass 512 KB.
-
-`GET /reading/tags` (library credential) lists every tag for the tags view, up to 5,000. An
-unencrypted vault answers `{ tags }`, lowercased, stepping through the distinct `t:` terms with
-one index seek each. An encrypted vault answers `{ sealed: [{ term, name }] }` from `reading_tags`,
-each name sealed by a device for its hashed term; the device opens them.
-
-`GET /reading/tags?section=inbox|favorites|archived|highlights` lists only the tags of notes in
-that section, most used first, with each tag's note count: `{ tags, counts }` unencrypted (the two
-arrays align), or `{ sealed: [{ term, name, count }] }` encrypted. It reads every tagged note entry
-once plus its note, so the web app asks once per section and keeps the answer until the library's
-next sync. Another section value receives HTTP 400. A client that receives no counts (a server
-from before section counts) shows the tags without them.
-
-In an encrypted vault, each Reading note's upload carries its card as the file's public data
-(`{ kind: 'reading-card', version: 1, card, terms, fields, highlighted_at, highlight_terms, tag_names }`), from Obsidian's sync and the web
-app's encrypted commits alike; the server validates it and lists the note from it in the commit's
-batch. An upload without a card keeps the row's last card, marked `stale`. `GET /reading/taken?path=…`
-(up to 20 server paths) tells a device which names are stored, for naming new notes.
-
-Encrypted vaults do not offer Save to Crate: the Shortcut's pairing, exchange and prepare routes
-answer `409` with code `shortcut_encrypted_vault`.
-
-`POST /reading/delete` accepts `{ id, before, markdownHash, operationId }` from a library credential.
-`before` holds the `reading_status`, `favorite`, `tags` and `highlights` values the client
-last saw, and `markdownHash` is the lowercase SHA-256 of the article body (the `markdown` of
-`GET /reading/item`) its reader showed. Any mismatch, including notes added in Obsidian since,
-returns 409 `reading_conflict` and leaves the note untouched. The web app offers delete only
-once the article has loaded. The encrypted web app checks the same values before it commits. The
-note is deleted as an ordinary sync deletion of that exact revision, keeping a `deleted`
-file version, and the receipt commits in the same batch. Then the files in its image folder
-(`<Reading folder>/attachments/<Reading ID>/`) are deleted at the revisions listed, in one more
-batch; a failure there leaves them in place. Synced Obsidian devices move the
-note to their trash. A note still in the capture queue has no file and returns 409.
-
-### Reading images
-
-While `readingImages` is `save`, server captures and article jobs download up to 10 `https`
-images per article (PNG, JPEG, GIF, WebP or AVIF by their bytes, 5 MiB each, 20 MiB in all, one
-redirect each) in the Reading alarm, and put them in R2 under one upload lease. The publication
-sent to the coordinator carries only their object keys. Under the lock, each image still inside
-the current folder's `attachments/<Reading ID>/` commits as a new file (or is kept when that exact
-content is already live) before the note, which links only the committed ones; every other
-image keeps its web link and its object is queued for cleanup.
-
-#### Image limits
-
-| Saved by | Images per article | Each | In all | Set in |
-| --- | --- | --- | --- | --- |
-| Obsidian | No count limit | 10 MiB | 40 MiB | `READING_IMAGE_LIMITS` in `src/reading/core/article-images.ts` |
-| Server, plaintext vault | 10 | 5 MiB | 20 MiB | `WORKER_IMAGE_LIMITS` in `src/cloudflare/worker/reading/extraction/images.ts` |
-| Server, encrypted vault | 10 | 2 MiB | 8 MiB | `ENCRYPTED_IMAGE_LIMITS` in the same file |
-
-Obsidian downloads on the device, so only file size bounds it. The server limits come from the
-Cloudflare Free plan:
-
-- An invocation may make 50 subrequests. Fetches, R2 calls and D1 queries all count (a
-  `db.batch()` counts once), and so does each redirect. Each image costs several (its fetch, any
-  redirect and its R2 write), so one alarm run fits about 10 images next to the capture itself.
-  `reading/image-budget.integration.ts` checks that the alarm run and the publication each stay
-  within 50.
-- A Worker isolate has 128 MiB of memory, which bounds the total held during a run.
-- Each saved image writes about 3 D1 rows and reads about 45, against 100,000 rows written and
-  5 million read per day.
-- In an encrypted vault, `POST /reading/encrypted-extract` returns every image in one response and
-  they commit beside the new note, under the 24 MiB encrypted commit limit.
-
-The Paid plan allows 10,000 subrequests, but the limits stay the same on every plan. Saving more
-on Free would need each group of images in its own invocation, for example a Durable Object
-request per batch.
-
-`GET /reading/file?path=…` (library credential, plaintext vaults) returns one image file inside
-the Reading folder, typed by its name with `X-Content-Type-Options: nosniff` and a sandboxing
-CSP. Other paths return 400.
-
-A new Reading folder or generation, an index format change, a restore or an index
-whose bytes were unavailable at commit time rebuilds the index from R2, 25 files
-per step. Reading list and mutation requests return 503 until that rebuild finishes
-or while source bytes cannot be verified. A temporary R2 failure keeps the rebuild
-position and does not permit capture deduplication against an incomplete index.
-Background storage-failure retries use a 30-second delay; ordinary rebuild steps
-continue immediately. Verified malformed or oversized notes instead produce stable
-source issues until the source changes.
-
-`POST /reading/shortcut/v1/prepare` accepts only capture credentials when the
-Reading library is configured and available. Its five-minute launch URL
-contains an opaque capability in the fragment. `POST /reading/handoff` redeems it
-through `X-Crate-Capture`, using the same issuer-scope policy. Redemption checks
-issuer revocation/expiry, capability expiry, the Reading folder generation, and
-feature availability. Repeating a live capability reuses its exact operation ID;
-it does not create another note. Revoking the issuer blocks even a committed
-capability's subsequent replay.
-
-### Native Shortcut compatibility
-
-`POST /reading/shortcut/v1/prepare` accepts only capture credentials and
-`{ url, title? }`. `POST /reading/shortcut/v1/exchange` redeems the same one-use
-pairing code with `{ token }`. These routes do not require the app wire header.
-`X-Crate-Shortcut-Revision` identifies the installed template; it defaults to 1.
-The capture contract version is in the path. Metadata at `/.well-known/crate`
-exposes `shortcut: { version, revision, minimumRevision }` and the
-`reading-shortcut-transport-v1` capability.
-
-Recognized native requests return `shortcut: { version, revision,
-updateAvailable, downloadUrl }`. Preparation successes return the opaque launch
-URL; failures return an error launch URL even for authentication, admission, or
-compatibility rejection. Its fragment contains only allowlisted diagnostic
-fields. Only the current contract's routes are admitted; other contract
-versions receive 404. A template below the supported minimum revision receives
-426 `shortcut_update_required`. The live, uncached save page performs the handoff
-with the server's current app wire protocol.
-
-Only the versioned shortcut routes bypass the general app protocol. Other routes enforce the normal protocol checks.
-
-See [shortcut maintenance](reading-shortcuts.md) for release and support rules.
-
-### POST /sync/import/readiness
-
-Request: `{ token }`, using the completed initial-import token. Returns `{ ready }`,
-optional `{ progress: { scanning, remainingFiles, remainingSchedules } }` (each count
-stops at 1,000 so a poll reads a bounded number of rows), and an
-`error` string when reminder setup needs attention. Source failures additionally
-return `issues: [{ path, message, code?, line? }]` (up to 20 notes) and `moreIssues`.
-These fields are additive; responses without source failures contain only `error`.
-Paths identify vault notes; malformed description messages include a one-based
-source line, also returned as `line`. `code` is one of the
-[stable issue codes](protocol.md#initial-import-readiness) when the Worker recognizes
-the failure. Repairing a note and syncing again resumes setup without repeating
-completed file uploads. See [initial import readiness](protocol.md#initial-import-readiness).
+## Sync requests and responses
 
 ### PUT /sync/upload
 
@@ -310,7 +246,7 @@ Content is base64-encoded. The Worker rejects a batch before reading R2 if D1 me
 
 ### POST /sync/batch-delete
 
-`{ files: [{ path, expectedHash, expectedRevision }, ...] }` (max 4) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
+`{ files: [{ path, expectedHash, expectedRevision }, ...] }` (max 32, `BATCH_DELETE_MAX_FILES` in `src/protocol/sync-limits.ts`) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
 
 Uploads compare the observed D1 content hash. Deletes also compare the original opaque revision, rejecting same-content recreations. Reminder edits compare a semantic revision captured by the client, then apply file-level preconditions. D1 commits the file row, changelog, retention, operation receipt, and notification projection intent atomically; stale writers receive `409`.
 
@@ -356,6 +292,76 @@ Request: `{ paths: ["notes/file.md", ...] }` (max 50, no duplicates)
 
 Response: `{ files: { "notes/file.md": { hash, size, modified } } }`. Missing paths are omitted. Queue conflict recovery uses this endpoint so a version race does not require loading the entire remote manifest.
 
+### Sync read validation
+
+Authoritative manifest, targeted metadata and changelog reads are validated at runtime, including required maps, version and cursor framing, path/hash/size/date fields and ordering. Missing or malformed state aborts synchronization before file changes. A valid empty map remains an explicit empty state. Known historical changelog entries may lack revisions; current file metadata must include one.
+
+### Initial import
+
+Only a server with no files, changelog, history or upload receipts can enter import mode: a plaintext vault before its first sync, or an encrypted one after the reset that turned encryption on. `POST /sync/import` starts the import, or returns the open one, as `{ import: { token, state } }`; repeated starts are read-only. Upload routes take the import token in `X-Crate-Import` and run in a transfer object: `POST /sync/import/upload` takes up to 32 base64 files within the batch upload limit, and `PUT /sync/import/upload?path=<path>` takes one binary file within the single-file limit. `POST /sync/import/prune` takes `{ token, files: [{ path, hash }] }` (up to 50) and removes those files. `POST /sync/import/complete` verifies the inventory page by page and seals it; see [initial import readiness](protocol.md#initial-import-readiness) and [the sync pipeline](sync-pipeline.md) for the client flow.
+
+### POST /sync/import/readiness
+
+Request: `{ token }`, using the completed initial-import token. Returns `{ ready }`,
+optional `{ progress: { scanning, remainingFiles, remainingSchedules } }` (each count
+stops at 1,000 so a poll reads a bounded number of rows), and an
+`error` string when reminder setup needs attention. Source failures additionally
+return `issues: [{ path, message, code?, line? }]` (up to 20 notes) and `moreIssues`.
+These fields are additive; responses without source failures contain only `error`.
+Paths identify vault notes; malformed description messages include a one-based
+source line, also returned as `line`. `code` is one of the
+[stable issue codes](protocol.md#initial-import-readiness) when the Worker recognizes
+the failure. Repairing a note and syncing again resumes setup without repeating
+completed file uploads. See [initial import readiness](protocol.md#initial-import-readiness).
+
+### Retained file history pagination
+
+`GET /sync/versions` returns `{ versions, hasMore, nextCursor? }`. `path` is an optional exact filename and `search` is an optional literal substring (ASCII case insensitive), including folder names. Results for one `path` sort by `(created_at, storage_key)` descending; without `path` they sort by when each copy was kept, descending, which is the same order except that a deleted file's copy sorts by its deletion. Each version's `expires_at` is when it was kept plus the current retention. `nextCursor` continues that ordering without offset shifts when newer rows arrive. Reuse the same search and path with the opaque cursor; a changed query or malformed cursor receives HTTP 400. Expired versions are omitted from every page. Replaced copies are coalesced at commit time: one is retained only if it was live for at least 10 minutes, was live when the latest shared checkpoint was created, or its path has no version retained in the last 10 minutes (60 minutes for files of 1 MiB or more); other replaced copies are queued for reference-aware cleanup in the same transaction. Deleted copies and the copy replaced by `POST /sync/restore-version` are always retained. See [remote recovery](sync-pipeline.md#error-recovery). The plugin’s **File history** view requests pages for one exact file path; search remains available in the API. In an encrypted vault, paths are keyed tags, so `path` names the file's server path and clients never send `search`. Restores retain their existing conditional-write and integrity checks.
+
+### GET /sync/version-preview
+
+Vault-authenticated, read-only access to one unexpired retained version. Query parameters `path` and `storageKey` must identify the same retained record. Returns integrity-verified binary content with `X-File-Hash`, `Content-Length`, and `Cache-Control: private, no-store`. Missing, expired, or mismatched entries return 404; versions larger than 256 KB return 413; missing or corrupt content returns 503. Arbitrary R2 keys are never served. No file, changelog, or retention state is modified.
+
+File history decodes text locally and compares the saved version with a snapshot of the current local file. Binary/large files can still be restored without a preview.
+
+The **History** view groups retained update/deletion versions by day, rather than presenting whole-vault snapshots or inferring restore events. **Files** reads the existing paginated manifest and replays subsequent changes to list current synced files, including those with no retained versions. Its current preview reads targeted metadata and downloads the remote copy only for text files up to 256 KB, verifying the size, hash and revision before display. It never substitutes unsynced local contents. The file list renders in batches of 200; **Refresh files** refreshes the remote inventory. Historical comparisons continue to use the local snapshot and never modify the sync manifest or queue.
+
+### Shared history checkpoints
+
+The server advertises `shared-history-checkpoints-v1`. Checkpoints store metadata in R2, not extra copies of vault
+files. Creation snapshots the complete server inventory, not a client-supplied list.
+The 20-entry index uses conditional ETags, and stale inventory captures receive 409.
+Expired or evicted IDs receive 410, and an index write deletes the inventories it drops. A read that found an inventory in the index just before it was dropped also receives 410. Captures are bounded to 100,000 files and 32 MiB of
+metadata (413 beyond that limit), and in-progress initial imports receive 409. The Worker
+encodes inventory pages as it reads them and streams stored documents after matching the
+object's metadata to the index, so neither path parses the whole inventory.
+All routes require vault credentials and return private, non-cacheable responses.
+See [the sync pipeline](sync-pipeline.md#returning-to-a-history-checkpoint) for
+retention, cleanup, and restore validation.
+
+### Changelog pruning
+
+Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Expired retained versions are deleted 500 per pass, oldest first: the R2 objects, then their rows, so the expired row is the cleanup intent until both are gone. Copies that were never kept drain from the cleanup queue at the same rate. While either advances, passes continue every five seconds beyond the ten-pass limit, up to 200 passes (100,000 objects) per episode. Cleanup writes at most about 20,000 D1 rows per UTC day (`MAINTENANCE_DAILY_WRITE_BUDGET`), a fifth of the Free plan's daily allowance; a backlog past it, or a D1 daily-limit error, resumes after 00:00 UTC. Failures are recorded for diagnostics.
+
+When a client's `since` cursor points to pruned entries, the `cursorExpired` flag is returned so the plugin falls back to full sync.
+
+### Path sanitization
+
+`sanitizePath()` rejects null bytes, traversal, empty segments, backslashes, Windows-reserved names and characters, and trailing dots/spaces. A normalized unique D1 key additionally prevents case-insensitive and Unicode-normalizing collisions.
+
+## Account and settings
+
+### Page titles
+
+`POST /links/title` is a read operation and does not require mutation protocol negotiation. Pasting a standalone web URL automatically uses it. It accepts public HTTP(S) DNS names on standard ports, excludes credentials and fragments, validates each redirect (maximum three), and reads at most 256 KiB of HTML within five seconds. It returns the HTML title as text with entities retained; clients decode entities as text. Missing titles, unsupported responses, and network failures return `title: null`. Invalid destinations return 400; the edge request limiter can return 429. No page scripts execute, no caller credentials are forwarded, and responses are not cached.
+
+Self-hosted title requests use the native public-network binding, including every
+redirect. A rejected connection returns `title: null` without retrying through
+another transport. The local server also forwards global Worker fetches through
+that binding; Miniflare's default outbound service is not the security boundary.
+Hosted Workers retain `global_fetch_strictly_public`. URL validation alone does
+not protect against a public-looking hostname resolving to a private address.
+
 ### DELETE /auth/tokens
 
 Revoke a token by its ID, with the Shortcut capture credentials it paired.
@@ -397,7 +403,39 @@ Response: `{ success: true, settingsVersion }`. A stale version returns `409` in
 
 Closing Crate settings writes only the shared settings changed on this device since it last synced them. It merges those changes onto the server's settings as it last read or wrote them, reading first when it has not, and writes against that version. A newer version, or a setting both devices changed, loads the server's settings with a short notice instead of overwriting them. The plugin saves the server's settings as it last reconciled them in its plugin data (`sharedSettingsBase`, cleared when the server address changes), so a change that could not be saved is still written on a later close after a restart. The periodic refresh loads other devices' changes, keeps this device's unsaved ones, and waits while Crate settings are open.
 
-Reminder handlers live in `src/cloudflare/worker/reminders/handlers/`. Mutations apply the shared Markdown command described in the [architecture](architecture.md).
+### Shared feature policy
+
+The server advertises `shared-features-v1`. `GET /features` returns
+`{ reading: boolean, reminders: boolean, revision: string | null, readingImages?: "remote" }`. Vault,
+Reading-library and reminders credentials can read; only vault credentials can
+POST `{ feature: "reading" | "reminders", enabled: boolean, revision }` or
+`{ readingImages: "save" | "remote", revision }`. A missing `readingImages` means `save`, which is
+never stored, so older servers and clients agree on the default. Capture-only
+credentials cannot access this policy. Stale writes return 409. Writes are
+serialized through the projection coordinator, and a successful write wakes
+background work; reads return the last committed policy without entering the
+coordinator. Both features default on until explicitly changed.
+`src/protocol/feature-policy.ts` defines and validates this response for the
+Worker, plugin and PWA.
+
+Paused feature APIs return 423 with `code: feature_paused`; sync and feature-policy
+access remain available. Reading policy and capture operations cannot override
+the shared pause. Push opt-in remains unchanged by reminder pause/resume. Queued
+operations, saved content, library identity, and scoped credentials are retained.
+
+### History retention
+
+`GET /history-retention` returns `{ days }`, one of 7, 14, 30, 60 or 90 (30 until changed).
+Only vault credentials can read it or POST `{ days }` to change it; other values return
+400. Writes run in the coordinator and store only the value in `server_state`; kept file
+versions expire by the current value, so a change rewrites no history rows. See [history retention](sync-pipeline.md#history-retention).
+`src/protocol/history-retention.ts` defines the values for the Worker and plugin.
+
+## Reminders
+
+Reminder handlers live in `src/cloudflare/worker/reminders/handlers/`. Mutations apply the shared Markdown command described in the [architecture](architecture.md#shared-reminder-rules).
+
+### Reminder mutation responses
 
 Create, update and set-completed respond with the saved reminder as `{ success: true, reminder }`. `reminder` has the fields of a listed reminder: `revision`, `id`, `content`, optional `description`, `dueDate` and `dueDatetime`, `priority`, `completed`, `project`, optional `recurrence`, `filePath` and `lineNumber`. A retried operation returns its original response.
 
@@ -463,7 +501,7 @@ Vault credentials only. GET reads the shared folder, IANA timezone, all-day time
 
 Schedules derive from committed Markdown and the shared notification policy. File commits enqueue projection intent in the same D1 transaction. The Durable Object coordinator verifies and then projects at most eight files and 2 MiB of stored source (one note when it is larger) per alarm, wakes the notification dispatcher after releasing its lock when a schedule may have changed, fences stale work with file and job revisions, and rearms while work remains. See [notification processing](notification-processing.md).
 
-## Notifications and PWA Endpoints
+## Notifications and PWA endpoints
 
 ### GET /notifications (public)
 
@@ -523,7 +561,7 @@ and must not infer that delivery is enabled from device registration alone.
 
 Authenticated. Remove a push subscription.
 
-Request: `{ id }`
+Request: `{ id }` or `{ endpoint }`
 
 Response: `{ success: true }`
 
@@ -531,74 +569,104 @@ Response: `{ success: true }`
 
 Authenticated. List all push subscriptions.
 
-Response: `{ subscriptions: [{ id, device_name, created_at }] }`
+Response: `{ subscriptions: [{ id, device_name, created_at, disabled_at, last_error }] }`
 
 ### POST /notifications/test
 
 Authenticated. Send a test push to all subscriptions.
 
-Response: `{ sent, failed, pruned, errors }`
+Response: `{ sent, failed, pruned, quarantined, errors }`
 
-## ReminderAlarm Durable Object
+## Reading
 
-Exported class `ReminderAlarm` from the worker. Named instances of it run the coordinator, maintenance, Reading, transfer and notification dispatcher roles. The dispatcher keeps one alarm at the earliest scheduled reminder in `reminder_projections`. When it fires, it sends Web Push notifications for a bounded batch of due reminders to all subscribed devices via `web-push-browser` and records each delivered occurrence in its D1 row.
+Encrypted vaults use the encrypted Reading routes instead; see [Encrypted Reading](#encrypted-reading).
 
-Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarative `exports.ReminderAlarm` entry with SQLite storage on deploy.
+### Reading index and item reads
 
-## D1 database schema
+The Reading index (`reading_items`) holds one row per Reading note in the Reading
+folder. Every file commit, deletion, move, restore and initial import writes that
+row and its search terms in the same D1 batch as the file, from the bytes it commits, so
+page and item reads never re-check `files`, and `GET /reading/item` reads the note's R2
+object by the revision its row names. Update and retry responses add
+`article: { item, etag, markdownHash }`: the committed item, its `GET /reading/item` ETag and
+the SHA-256 of its article body. A client keeps a saved body whose hash matches under the
+new ETag. A replayed receipt omits `article`.
 
-The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 1; no migrations are registered. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
+`GET /reading/item` answers an indexed note with an `ETag` derived from the index format,
+Reading folder scope, item ID, path and the file revision its row names. A matching
+`If-None-Match` returns 304 before R2 is read. A queued capture has no file revision and no
+ETag. The web app sends the ETag of its offline copy and keeps that copy on 304.
 
-The schema stores file metadata, changelog entries, retained versions, upload/deletion receipts and cleanup work; device credentials and one-time grants (`grants`: web enrollment links, Reading pairing codes and save links, device and app pairings); operation receipts of uploads, reminders and Reading (`operations`, with `operation_chunks` for large encrypted responses) and identity reservations; vault-wide state in one row (`server_state`: encryption, features, reset generation, changelog floor, initial import and shared settings); shared notification policy and projections, which carry the delivery schedule of each scheduled reminder; authenticated push subscriptions and request limits. Derived schedules are rebuilt from committed Markdown during an isolated restore.
+Page and item reads authenticate in the public Worker and read the Reading policy, index row
+and (for an item) its capture queue and index rows in one D1 batch, a single snapshot, so they
+do not wait behind writes in the coordinator. While the index is complete, the public Worker
+answers them itself; it forwards to the coordinator a read that must continue an index
+rebuild, which writes.
 
-Reminder mutations replay a matching operation receipt before rereading a moved or deleted source; a different payload under the same operation ID returns 409. Notification time comes from the saved server policy. Successful create/update/completion responses include the acknowledged `reminder` and its new revision.
+### Reading index rebuilds
 
-## Path Sanitization
+A new Reading folder or generation, an index format change, a restore or an index
+whose bytes were unavailable at commit time rebuilds the index from R2, 25 files
+per step. Reading list and mutation requests return 503 until that rebuild finishes
+or while source bytes cannot be verified. A temporary R2 failure keeps the rebuild
+position and does not permit capture deduplication against an incomplete index.
+Background storage-failure retries use a 30-second delay; ordinary rebuild steps
+continue immediately. Verified malformed or oversized notes instead produce stable
+source issues until the source changes.
 
-`sanitizePath()` rejects null bytes, traversal, empty segments, backslashes, Windows-reserved names and characters, and trailing dots/spaces. A normalized unique D1 key additionally prevents case-insensitive and Unicode-normalizing collisions.
+### Reading library pages and cards
 
-## Changelog Pruning
+`GET /reading/items?section=&cursor=` (library credential) returns one page of up to 50 notes,
+newest `saved_at` first. `section` is `inbox`, `archived`, `favorites`, `highlights` or `all`;
+`id` finds one Reading ID. An unencrypted vault also takes `q` (each word of 3 or more letters
+matches the start of a title word, a shorter one a whole word), `tag` and `url`, and answers
+`{ items, issues, cursor }`; the first unfiltered inbox page carries the capture queue and
+issues. An encrypted vault takes up to 10 hashed `term` values, every one of which must match,
+and answers `{ cards, cursor }`: each card's server path, revision, hash, size, sealed `card`,
+`stale` and the plaintext list `fields`. Terms live in `note_terms`, one per
+title word, tag and link, keyed by saved date: a search walks its rarest term (by counts capped
+at 50, then 500) newest first and stops after a page. It checks the other terms by key lookups in
+`note_terms` and, unencrypted, the title words on the notes that have every term. See [Reading search](reading-search.md).
 
-Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Expired retained versions are deleted 500 per pass, oldest first: the R2 objects, then their rows, so the expired row is the cleanup intent until both are gone. Copies that were never kept drain from the cleanup queue at the same rate. While either advances, passes continue every five seconds beyond the ten-pass limit, up to 200 passes (100,000 objects) per episode. Cleanup writes at most about 20,000 D1 rows per UTC day (`MAINTENANCE_DAILY_WRITE_BUDGET`), a fifth of the Free plan's daily allowance; a backlog past it, or a D1 daily-limit error, resumes after 00:00 UTC. Failures are recorded for diagnostics.
+`section=highlights` pages `highlight_index` instead: highlighted notes, newest highlight first.
+There `q` (or the hashed `term` values) and `tag` match each note's highlight terms: the words of
+its title, highlight text and highlight notes, and its tags. A filtered page scans at most 2,000
+rows, so a page can come back short or empty with a `cursor` that continues the scan. A Highlights
+page also ends before its notes or cards pass 512 KB.
 
-When a client's `since` cursor points to pruned entries, the `cursorExpired` flag is returned so the plugin falls back to full sync.
+`GET /reading/tags` (library credential) lists every tag for the tags view, up to 5,000. An
+unencrypted vault answers `{ tags }`, lowercased, stepping through the distinct `t:` terms with
+one index seek each. An encrypted vault answers `{ sealed: [{ term, name }] }` from `reading_tags`,
+each name sealed by a device for its hashed term; the device opens them.
 
-## Bindings Table
+`GET /reading/tags?section=inbox|favorites|archived|highlights` lists only the tags of notes in
+that section, most used first, with each tag's note count: `{ tags, counts }` unencrypted (the two
+arrays align), or `{ sealed: [{ term, name, count }] }` encrypted. It reads every tagged note entry
+once plus its note, so the web app asks once per section and keeps the answer until the library's
+next sync. Another section value receives HTTP 400. A client that receives no counts (a server
+from before section counts) shows the tags without them.
 
-See `docs/architecture.md` for the full bindings table. When adding new bindings, update the Worker upload metadata in `src/cloudflare/cloudflare-api.ts` and the deployment flow in `src/cloudflare/deployment/provisioner.ts`.
+In an encrypted vault, each Reading note's upload carries its card as the file's public data
+(`{ kind: 'reading-card', version: 1, card, terms, fields, highlighted_at, highlight_terms, tag_names }`), from Obsidian's sync and the web
+app's encrypted commits alike; the server validates it and lists the note from it in the commit's
+batch. An upload without a card keeps the row's last card, marked `stale`. `GET /reading/taken?path=…`
+(up to 20 server paths) tells a device which names are stored, for naming new notes.
 
-### Retained file history pagination
+### POST /reading/delete
 
-`GET /sync/versions` returns `{ versions, hasMore, nextCursor? }`. `path` is an optional exact filename and `search` is an optional literal substring (ASCII case insensitive), including folder names. Results for one `path` sort by `(created_at, storage_key)` descending; without `path` they sort by when each copy was kept, descending, which is the same order except that a deleted file's copy sorts by its deletion. Each version's `expires_at` is when it was kept plus the current retention. `nextCursor` continues that ordering without offset shifts when newer rows arrive. Reuse the same search and path with the opaque cursor; a changed query or malformed cursor receives HTTP 400. Expired versions are omitted from every page. Replaced copies are coalesced at commit time: one is retained only if it was live for at least 10 minutes, was live when the latest shared checkpoint was created, or its path has no version retained in the last 10 minutes (60 minutes for files of 1 MiB or more); other replaced copies are queued for reference-aware cleanup in the same transaction. Deleted copies and the copy replaced by `POST /sync/restore-version` are always retained. See [remote recovery](sync-pipeline.md#error-recovery). The plugin’s **File history** view requests pages for one exact file path; search remains available in the API. In an encrypted vault, paths are keyed tags, so `path` names the file's server path and clients never send `search`. Restores retain their existing conditional-write and integrity checks.
+`POST /reading/delete` accepts `{ id, before, markdownHash, operationId }` from a library credential.
+`before` holds the `reading_status`, `favorite`, `tags` and `highlights` values the client
+last saw, and `markdownHash` is the lowercase SHA-256 of the article body (the `markdown` of
+`GET /reading/item`) its reader showed. Any mismatch, including notes added in Obsidian since,
+returns 409 `reading_conflict` and leaves the note untouched. The web app offers delete only
+once the article has loaded. The encrypted web app checks the same values before it commits. The
+note is deleted as an ordinary sync deletion of that exact revision, keeping a `deleted`
+file version, and the receipt commits in the same batch. Then the files in its image folder
+(`<Reading folder>/attachments/<Reading ID>/`) are deleted at the revisions listed, in one more
+batch; a failure there leaves them in place. Synced Obsidian devices move the
+note to their trash. A note still in the capture queue has no file and returns 409.
 
-Authoritative manifest, targeted metadata and changelog reads are validated at runtime, including required maps, version and cursor framing, path/hash/size/date fields and ordering. Missing or malformed state aborts synchronization before file changes. A valid empty map remains an explicit empty state. Known historical changelog entries may lack revisions; current file metadata must include one.
-
-### GET /sync/version-preview
-
-Vault-authenticated, read-only access to one unexpired retained version. Query parameters `path` and `storageKey` must identify the same retained record. Returns integrity-verified binary content with `X-File-Hash`, `Content-Length`, and `Cache-Control: private, no-store`. Missing, expired, or mismatched entries return 404; versions larger than 256 KB return 413; missing or corrupt content returns 503. Arbitrary R2 keys are never served. No file, changelog, or retention state is modified.
-
-File history decodes text locally and compares the saved version with a snapshot of the current local file. Binary/large files can still be restored without a preview.
-
-The **History** view groups retained update/deletion versions by day, rather than presenting whole-vault snapshots or inferring restore events. **Files** reads the existing paginated manifest and replays subsequent changes to list current synced files, including those with no retained versions. Its current preview reads targeted metadata and downloads the remote copy only for text files up to 256 KB, verifying the size, hash and revision before display. It never substitutes unsynced local contents. The file list renders in batches of 200; **Refresh files** refreshes the remote inventory. Historical comparisons continue to use the local snapshot and never modify the sync manifest or queue.
-
-### Shared history checkpoints
-
-The server advertises `shared-history-checkpoints-v1`. Checkpoints store metadata in R2, not extra copies of vault
-files. Creation snapshots the complete server inventory, not a client-supplied list.
-The 20-entry index uses conditional ETags, and stale inventory captures receive 409.
-Expired or evicted IDs receive 410, and an index write deletes the inventories it drops. A read that found an inventory in the index just before it was dropped also receives 410. Captures are bounded to 100,000 files and 32 MiB of
-metadata (413 beyond that limit), and in-progress initial imports receive 409. The Worker
-encodes inventory pages as it reads them and streams stored documents after matching the
-object's metadata to the index, so neither path parses the whole inventory.
-All routes require vault credentials and return private, non-cacheable responses.
-See [the sync pipeline](sync-pipeline.md#returning-to-a-history-checkpoint) for
-retention, cleanup, and restore validation.
-
-### Reading shortcut pairing
-
-Server revision 67 advertises `reading-shortcut-pairing-v1`. `POST /reading/shortcut-pairing` requires an active Reading or vault credential and HTTPS. It returns `{ pairingCode, expiresAt }`, with a ten-minute, single-use secret in the code’s URL fragment. Only one outstanding code per issuer is retained. The browser cannot issue library or vault access through this route.
-
-`POST /reading/shortcut/v1/exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. The token records its issuer in `auth_tokens.device_id`, so revoking the issuer revokes it too. Replacing a web app session with a fresh link moves it to the new session. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Pairing creation requires the app protocol; exchange uses the independent shortcut contract. Both have separate per-minute action limits and return `Cache-Control: no-store`. Grant hashes are `reading_enrollment` rows in `grants` with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
+### Reading highlights
 
 Reading updates also accept optional `highlights` alongside their `before.highlights`
 precondition. Each entry contains `start`, `end` (UTF-16 offsets in sanitized reader
@@ -629,6 +697,89 @@ without these explicit fallback flags. The writer verifies rendered structure as
 well as text and falls back to text annotations when new markers would alter it.
 See [Reading highlights](reading-highlights.md).
 
+### Reading images
+
+While `readingImages` is `save`, server captures and article jobs download up to 10 `https`
+images per article (PNG, JPEG, GIF, WebP or AVIF by their bytes, 5 MiB each, 20 MiB in all, one
+redirect each) in the Reading alarm, and put them in R2 under one upload lease. The publication
+sent to the coordinator carries only their object keys. Under the lock, each image still inside
+the current folder's `attachments/<Reading ID>/` commits as a new file (or is kept when that exact
+content is already live) before the note, which links only the committed ones; every other
+image keeps its web link and its object is queued for cleanup.
+
+#### Image limits
+
+| Saved by | Images per article | Each | In all | Set in |
+| --- | --- | --- | --- | --- |
+| Obsidian | No count limit | 10 MiB | 40 MiB | `READING_IMAGE_LIMITS` in `src/reading/core/article-images.ts` |
+| Server, plaintext vault | 10 | 5 MiB | 20 MiB | `WORKER_IMAGE_LIMITS` in `src/cloudflare/worker/reading/extraction/images.ts` |
+| Server, encrypted vault | 10 | 2 MiB | 8 MiB | `ENCRYPTED_IMAGE_LIMITS` in the same file |
+
+Obsidian downloads on the device, so only file size bounds it. The server limits come from the
+Cloudflare Free plan:
+
+- An invocation may make 50 subrequests. Fetches, R2 calls and D1 queries all count (a
+  `db.batch()` counts once), and so does each redirect. Each image costs several (its fetch, any
+  redirect and its R2 write), so one alarm run fits about 10 images next to the capture itself.
+  `reading/image-budget.integration.ts` checks that the alarm run and the publication each stay
+  within 50.
+- A Worker isolate has 128 MiB of memory, which bounds the total held during a run.
+- Each saved image writes about 3 D1 rows and reads about 45, against 100,000 rows written and
+  5 million read per day.
+- In an encrypted vault, `POST /reading/encrypted-extract` returns every image in one response and
+  they commit beside the new note, under the 24 MiB encrypted commit limit.
+
+The Paid plan allows 10,000 subrequests, but the limits stay the same on every plan. Saving more
+on Free would need each group of images in its own invocation, for example a Durable Object
+request per batch.
+
+`GET /reading/file?path=…` (library credential, plaintext vaults) returns one image file inside
+the Reading folder, typed by its name with `X-Content-Type-Options: nosniff` and a sandboxing
+CSP. Other paths return 400.
+
+### Reading capture handoffs
+
+`POST /reading/shortcut/v1/prepare` accepts only capture credentials when the
+Reading library is configured and available. Its five-minute launch URL
+contains an opaque capability in the fragment. `POST /reading/handoff` redeems it
+through `X-Crate-Capture`, using the same issuer-scope policy. Redemption checks
+issuer revocation/expiry, capability expiry, the Reading folder generation, and
+feature availability. Repeating a live capability reuses its exact operation ID;
+it does not create another note. Revoking the issuer blocks even a committed
+capability's subsequent replay.
+
+### Native Shortcut compatibility
+
+`POST /reading/shortcut/v1/prepare` accepts only capture credentials and
+`{ url, title? }`. `POST /reading/shortcut/v1/exchange` redeems the same one-use
+pairing code with `{ token }`. These routes do not require the app wire header.
+`X-Crate-Shortcut-Revision` identifies the installed template; it defaults to 1.
+The capture contract version is in the path. Metadata at `/.well-known/crate`
+exposes `shortcut: { version, revision, minimumRevision }` and the
+`reading-shortcut-transport-v1` capability.
+
+Recognized native requests return `shortcut: { version, revision,
+updateAvailable, downloadUrl }`. Preparation successes return the opaque launch
+URL; failures return an error launch URL even for authentication, admission, or
+compatibility rejection. Its fragment contains only allowlisted diagnostic
+fields. Only the current contract's routes are admitted; other contract
+versions receive 404. A template below the supported minimum revision receives
+426 `shortcut_update_required`. The live, uncached save page performs the handoff
+with the server's current app wire protocol.
+
+Only the versioned shortcut routes bypass the general app protocol. Other routes enforce the normal protocol checks.
+
+Encrypted vaults do not offer Save to Crate: the Shortcut's pairing, exchange and prepare routes
+answer `409` with code `shortcut_encrypted_vault`.
+
+See [shortcut maintenance](reading-shortcuts.md) for release and support rules.
+
+### Reading shortcut pairing
+
+The server advertises `reading-shortcut-pairing-v1`. `POST /reading/shortcut-pairing` requires an active Reading or vault credential and HTTPS. It returns `{ pairingCode, expiresAt }`, with a ten-minute, single-use secret in the code’s URL fragment. Only one outstanding code per issuer is retained. The browser cannot issue library or vault access through this route.
+
+`POST /reading/shortcut/v1/exchange` accepts `{ token }` without a bearer credential. The Shortcut strips the fragment locally and sends it only in this body. Atomic redemption rechecks the issuer, policy, folder and generation and returns `{ endpoint, authorization }` for a new capture-only token. Its expiry is the earlier of 90 days and the issuer’s expiry. The token records its issuer in `auth_tokens.device_id`, so revoking the issuer revokes it too. Replacing a web app session with a fresh link moves it to the new session. Replay, expiry, issuer revocation or a changed policy generation returns 410. A lost reply requires a new code. Pairing creation requires the app protocol; exchange uses the independent shortcut contract. Both have separate per-minute action limits and return `Cache-Control: no-store`. Grant hashes are `reading_enrollment` rows in `grants` with scope `reading_capture:<issuer-id>`; normal library/install exchanges reject this scope.
+
 ### Article fetching permission
 
 The server advertises `reading-fetching-consent-v1`. Reading libraries remain
@@ -641,81 +792,32 @@ fetching switch.
 
 With fetching off, new URL captures become bookmarks (`extraction_status: unavailable`),
 existing articles remain readable and editable, and retries are rejected. In an
-encrypted vault the Shortcut saves the link without downloading it, and
-`/reading/encrypted-extract` refuses, so the web app saves a bookmark. Capture
+encrypted vault `/reading/encrypted-extract` refuses, so the web app saves a bookmark. Capture
 requests may also supply `fetchArticle: false` to save a bookmark regardless of the
 shared permission, including when an offline save is replayed later. Omitting the
 field applies the shared permission.
 
-### Shared feature policy
+## ReminderAlarm Durable Object
 
-The server advertises `shared-features-v1`. `GET /features` returns
-`{ reading: boolean, reminders: boolean, revision: string | null, readingImages?: "remote" }`. Vault,
-Reading-library and reminders credentials can read; only vault credentials can
-POST `{ feature: "reading" | "reminders", enabled: boolean, revision }` or
-`{ readingImages: "save" | "remote", revision }`. A missing `readingImages` means `save`, which is
-never stored, so older servers and clients agree on the default. Capture-only
-credentials cannot access this policy. Stale writes return 409. Writes are
-serialized through the projection coordinator, and a successful write wakes
-background work; reads return the last committed policy without entering the
-coordinator. Both features default on until explicitly changed.
-`src/protocol/feature-policy.ts` defines and validates this response for the
-Worker, plugin and PWA.
+Exported class `ReminderAlarm` from the worker. Named instances of it run the coordinator, maintenance, Reading, transfer and notification dispatcher roles. The dispatcher keeps one alarm at the earliest scheduled reminder in `reminder_projections`. When it fires, it sends Web Push notifications for a bounded batch of due reminders to all subscribed devices via `web-push-browser` and records each delivered occurrence in its D1 row.
 
-Paused feature APIs return 423 with `code: feature_paused`; sync and feature-policy
-access remain available. Reading policy and capture operations cannot override
-the shared pause. Push opt-in remains unchanged by reminder pause/resume. Queued
-operations, saved content, library identity, and scoped credentials are retained.
+Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarative `exports.ReminderAlarm` entry with SQLite storage on deploy.
 
-### History retention
+## D1 database schema
 
-`GET /history-retention` returns `{ days }`, one of 7, 14, 30, 60 or 90 (30 until changed).
-Only vault credentials can read it or POST `{ days }` to change it; other values return
-400. Writes run in the coordinator and store only the value in `server_state`; kept file
-versions expire by the current value, so a change rewrites no history rows. See [history retention](sync-pipeline.md#history-retention).
-`src/protocol/history-retention.ts` defines the values for the Worker and plugin.
+The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 1; no migrations are registered. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
 
-## Admission before database work
+The schema stores file metadata, changelog entries, retained versions, upload/deletion receipts and cleanup work; device credentials and one-time grants (`grants`: web enrollment links, Reading pairing codes and save links, device and app pairings); operation receipts of uploads, reminders and Reading (`operations`, with `operation_chunks` for large encrypted responses) and identity reservations; vault-wide state in one row (`server_state`: encryption, features, reset generation, changelog floor, initial import and shared settings); shared notification policy and projections, which carry the delivery schedule of each scheduled reminder; authenticated push subscriptions and request limits. Derived schedules are rebuilt from committed Markdown during an isolated restore.
 
-Unknown routes and unsupported methods return 404 before authentication or
-coordinator work. Public static assets and OPTIONS remain available without an
-API budget. Other requests with unrecognized credentials, plus the sensitive
-Reading/notification actions, use the edge admission binding: 60 requests per
-minute per hashed source address and deployment host. Invalid rotating bearer
-tokens share that budget. The local server replaces client-supplied forwarding
-headers with the socket address. Behind its managed Cloudflare Tunnel or Tailscale
-Funnel, where every request arrives from loopback, it uses the client address that
-tunnel forwards: `CF-Connecting-IP` from Cloudflare, `X-Forwarded-For` from Tailscale.
+Reminder mutations replay a matching operation receipt before rereading a moved or deleted source; a different payload under the same operation ID returns 409. Notification time comes from the saved server policy. Successful create/update/completion responses include the acknowledged `reminder` and its new revision.
 
-A successful D1 authentication records only a bounded, 60-second credential-hash
-hint in the isolate. Subsequent ordinary requests use a separate local budget
-of 6,000 per minute per credential so vault bootstrap can proceed. Every request
-still checks token validity, expiry and authorization against D1; an authentication
-failure removes the hint. This is not an authentication cache. Coordinator routes
-forward a hinted credential, which authenticates under the coordinator lock, and
-uploads forward it to a transfer object, which authenticates it after queuing. Any
-other credential authenticates at the edge first, so an invalid one never waits for
-that lock or queue, and then again inside. Action/day limits
-remain enforced after authentication. Denial returns 429 with Retry-After: 60.
-Daily action budgets belong to each credential (1,000 per UTC day for management
-and push actions, 500 for Reading), so one token cannot exhaust another's.
-Enrollment exchanges share one 1,000-per-day pool, because each grant is single-use.
+## Bindings
 
-When a Cloudflare Free plan account has used its daily D1 read or write allowance,
-any route that reaches D1 returns 429 with `code: "d1_daily_limit"`. It sends no
-Retry-After: the allowance resets at 00:00 UTC, beyond the clients' retry delays.
+Deployment builds the Worker's bindings in `src/cloudflare/deployment/worker-upload-payload.ts` from the names in `src/cloudflare/worker-runtime.json`; [architecture](architecture.md#worker-bindings) lists every binding.
 
-Without the edge binding, the restrictive budget also runs in bounded isolate
-memory keyed by the original D1 binding, before request-local metering wrappers.
-The authenticated sync budget and fallback are per isolate, not global quotas;
-Cloudflare's [edge limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) are also location-scoped abuse protection, not exact
-account-wide billing caps. Keep Cloudflare account usage alerts enabled.
-Ordinary Reading requests authenticate and authorize before entering the shared
-coordinator; list and item reads enter it only to rebuild the index or list a page. Public one-use Reading grants enter it after admission because
-redemption and capture must be serialized together.
 ## Encryption API
 
-`GET /encryption` returns the public configuration (`vaultId`, `generation`, `mode`, vault `keyId`, `notificationKeyId`, the seal key's `keyId` and `publicKey`) and an encrypted recovery bundle to every credential; `/reading/encryption` does the same after validating Reading enrollment. The user’s recovery code decrypts the bundle locally and is never uploaded. Session route permissions remain scoped; sharing this ciphertext does not grant sync, settings or device-management access. Encrypted files must use the vault key (`scopeId: "vault"`). Any file may carry no scheduling metadata; a `.md` file may carry schedules whose notifications use `notificationKeyId`. For a Reminders credential in an encrypted vault, `GET /encryption` also returns `folderPath` (the enrolled folder's tag) and `folderLabel`; `/reading/encryption` adds the Reading folder's `folderLabel`. The web app opens the label with the vault key to recover the plaintext folder name.
+`GET /encryption` returns the public configuration (`vaultId`, `generation`, `mode`, vault `keyId`, `notificationKeyId`, the seal key's `keyId` and `publicKey`) and an encrypted recovery bundle to every vault and web app credential (not to Shortcut capture tokens); `/reading/encryption` does the same after validating Reading enrollment. The user’s recovery code decrypts the bundle locally and is never uploaded. Session route permissions remain scoped; sharing this ciphertext does not grant sync, settings or device-management access. Encrypted files must use the vault key (`scopeId: "vault"`). Any file may carry no scheduling metadata; a `.md` file may carry schedules whose notifications use `notificationKeyId`. For a Reminders credential in an encrypted vault, `GET /encryption` also returns `folderPath` (the enrolled folder's tag) and `folderLabel`; `/reading/encryption` adds the Reading folder's `folderLabel`. The web app opens the label with the vault key to recover the plaintext folder name.
 
 Every file and folder name in an encrypted vault is a 26-character lowercase base32 tag, with `.md` kept for Markdown, so every `path` and `folderPath` the server sees is a tagged server path. Uploads and commits of encrypted content at a readable path return 428. `POST /reading/policy`, `POST` and `PUT /reminders/notification-policy`, and `POST /notifications/reminders-enrollment-token` require a tagged `folderPath` plus a `folderLabel` (the folder's plaintext path and tag encrypted under the vault key, at most 8,192 characters) and return 428 without them; a plaintext vault rejects `folderLabel`. The server stores the label in `maintenance_state` under `e2ee:folder:<tag>`, and policy reads return it as `folder_label` (Reading) or `folderLabel` (notifications). Maintenance deletes a label once no policy, credential, push subscription or enrollment link names its folder. There is no in-place conversion API: turning encryption on uses the [destructive reset](#destructive-encryption-reset).
 
@@ -745,8 +847,8 @@ ciphertext to an already authenticated app; it never issues login credentials.
   device. A vault device may omit the ID to list pending requests other than its
   own. Other app credentials cannot inspect or cancel that request.
 - `POST { action: "start", context, commitment }` creates an app request. Context
-  contains `version: 1`, unique `id`, canonical `origin`, `vaultId`, `generation`
-  and `generation`. A vault device without keys, such as a newly paired one, may
+  contains `version: 1`, unique `id`, canonical `origin`, `vaultId` and
+  `generation`. A vault device without keys, such as a newly paired one, may
   start a request too; Reading capture credentials cannot. No device can accept
   its own request. Approval transfers `{ bundle }`, the full vault key bundle.
 - `accept` supplies `{ id, key }` from one vault device; `reveal` supplies the
@@ -773,7 +875,7 @@ Using the replacement token, `GET /encryption/reset?id=…` reads the receipt an
 
 Authenticated `GET /reading/encryption` returns the public configuration and, in an encrypted vault, the Reading folder's `folderLabel`. It and the public feature/session control-plane reads can bootstrap without encryption headers; content operations still require the current vault and generation.
 
-`GET /reading/encrypted-files?folderPath=…&after=…&since=…`, `GET /reading/encrypted-file?folderPath=…&path=…&revision=…`, `POST /reading/encrypted-files/download` and `POST /reading/encrypted-commit` reuse the conditional encrypted-file protocol above. Inventory entries of both features also carry `modified`, the server's time of the file's last write, which the server already knows; the Reading app uses it to open the most recently changed notes of a library over its device limit. Reading authority additionally fixes the folder to the current Reading policy and rejects capture-only credentials. A Reading commit with `remove` renames a note, for example when **Try again** finds the title of a note that still has its link-based name. A commit with an empty `files` list and one `remove` deletes that exact note revision. `POST /reading/encrypted-extract` accepts `{ url }` from a library credential while encryption is active, downloads the page through the same public-only transport as server captures, and returns `{ article }` without storing the link or article. While `readingImages` is `save`, it also returns `images: [{ url, type, data }]`, base64 bytes of up to 10 images (2 MiB each, 8 MiB in all), stored nowhere. A Reading commit may then carry `attachments: [{ path, content }]`, up to 10 sealed non-note files beside exactly one new note: each commits as a new file before the note, an existing one is kept, and non-note files must have no public data. A delete commit (empty `files`, one `remove`) may carry `removeAttachments: [path]`, the tags of up to 30 non-note files the deleted note linked to; after the note's deletion commits they are deleted at their current revisions, and a failure leaves them in place. `GET /reading/encrypted-file` also returns non-note files in the Reading folder, up to the encrypted file limit. It runs outside the coordinator, returns 422 when the download fails, 403 `reading_fetching_off` while article fetching is off, and 409 without encryption. It has its own limit of 30 requests per minute per credential and counts toward the Reading daily budget. In an active encrypted vault, the shortcut preparation route downloads the shared page outside the coordinator (with article fetching off, it keeps only the link), then the coordinator seals the note to the vault seal key and commits it as a new `.md` file directly inside the tagged Reading folder. Without the path key, the server names it with a random 26-character tag and seals the titled name inside. It responds with `launchUrl` `…/notifications/save-reading#saved` and stores nothing readable. Only that path may commit a sealed descriptor, and only as a create. Reading plaintext list/item/capture/update/retry/delete, handoff and background extraction paths fail closed while any encryption state exists.
+`GET /reading/encrypted-files?folderPath=…&after=…&since=…`, `GET /reading/encrypted-file?folderPath=…&path=…&revision=…`, `POST /reading/encrypted-files/download` and `POST /reading/encrypted-commit` reuse the conditional encrypted-file protocol above. Inventory entries of both features also carry `modified`, the server's time of the file's last write, which the server already knows; the Reading app uses it to open the most recently changed notes of a library over its device limit. Reading authority additionally fixes the folder to the current Reading policy and rejects capture-only credentials. A Reading commit with `remove` renames a note, for example when **Try again** finds the title of a note that still has its link-based name. A commit with an empty `files` list and one `remove` deletes that exact note revision. `POST /reading/encrypted-extract` accepts `{ url }` from a library credential while encryption is active, downloads the page through the same public-only transport as server captures, and returns `{ article }` without storing the link or article. While `readingImages` is `save`, it also returns `images: [{ url, type, data }]`, base64 bytes of up to 10 images (2 MiB each, 8 MiB in all), stored nowhere. A Reading commit may then carry `attachments: [{ path, content }]`, up to 10 sealed non-note files beside exactly one new note: each commits as a new file before the note, an existing one is kept, and non-note files must have no public data. A delete commit (empty `files`, one `remove`) may carry `removeAttachments: [path]`, the tags of up to 30 non-note files the deleted note linked to; after the note's deletion commits they are deleted at their current revisions, and a failure leaves them in place. `GET /reading/encrypted-file` also returns non-note files in the Reading folder, up to the encrypted file limit. It runs outside the coordinator, returns 422 when the download fails, 403 `reading_fetching_off` while article fetching is off, and 409 without encryption. It has its own limit of 30 requests per minute per credential and counts toward the Reading daily budget. Save to Crate is not offered: the Shortcut's routes answer 409 `shortcut_encrypted_vault` before reading the request body. The plaintext-only Reading routes (item, file, capture, update, retry, delete and handoff) and background extraction fail closed while any encryption state exists.
 
 Reset clears Reading policy, sources, jobs, receipts, captures, enrollments and handoffs at both boundaries.
 

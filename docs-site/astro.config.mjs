@@ -35,6 +35,7 @@ export default defineConfig({
             'getting-started/cloudflare',
             'getting-started/self-hosting',
             'getting-started/devices',
+            'getting-started/faq',
           ],
         },
         {
@@ -48,6 +49,8 @@ export default defineConfig({
             'features/reading',
             'features/web-app',
             'features/encryption',
+            'features/commands',
+            'features/move-or-remove',
           ],
         },
         {
@@ -58,6 +61,7 @@ export default defineConfig({
             'troubleshooting/recovery',
             'troubleshooting/notifications',
             'troubleshooting/updates',
+            'troubleshooting/get-help',
           ],
         },
         {

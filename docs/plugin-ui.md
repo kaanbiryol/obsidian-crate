@@ -2,6 +2,36 @@
 
 Obsidian-only presentation: dialogs and the settings tab. Shared tokens, components and visual rules are in [UI styling](ui-styling.md).
 
+## Sync status
+
+`plugin/sync-status.ts` owns the sync indicator's lifetime. It shows a status bar item
+on desktop (`ui/sync-status/status.ts`) and view header actions on mobile (see below).
+The indicator appears once the sync runtime is initialized, while it initializes, or
+after an initialization error. A state change and a progress tick render together once,
+and a one-minute interval keeps "Synced 5m ago" current.
+
+Both hosts render the React `StatusBarIndicator` (`ui/sync-status/StatusBarIndicator.tsx`),
+which picks a state for the shared `SyncIndicator` dot; neither shows text. The label is
+the element's `aria-label`, which Obsidian also shows as its tooltip. On desktop it reads
+"Open sync activity. {label}." with a longer explanation for some states. Selecting the
+item, or pressing Enter or Space, opens Sync activity; a mouse press keeps focus in the
+editor.
+
+| Indicator | When | Label |
+|---|---|---|
+| Error | The last sync failed, or conflict copies need review | "Last sync had errors"; "1 conflict" or "{N} conflicts" while idle with conflicts |
+| Offline | The server cannot be reached | "Server unavailable", with the last error in the tooltip |
+| Syncing | A sync runs, or startup is still checking local files | The current phase from `formatSyncProgress` in `ui/activity/progress-label.ts`, such as "Uploading 3 of 10 files"; "Checking local files…" during startup checks |
+| Pending | Local changes wait to sync | "1 change pending" or "{N} changes pending" |
+| Synced | A sync has completed | "Synced just now", "Synced 5m ago", "Synced 2h ago" |
+| Cached | No sync has run yet | "Not synced yet" |
+
+Labels come from `describeSyncStatus` in `ui/activity/activity-status.ts`, which Sync
+activity uses for the same phrases; only the conflict count is added by the indicator.
+Indicator styles key off the SVG's `data-visual-state`, which `useSyncIndicatorMotion`
+derives from the state. The status bar element also sets `data-status`, which no
+stylesheet reads.
+
 ## Sync status on mobile
 
 Obsidian mobile hides plugin status bar items, so `ui/sync-status/header-status.ts` adds the

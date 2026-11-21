@@ -39,11 +39,11 @@ On the first device you connect, Crate ends setup with **Choose what Crate manag
 - **An empty or new folder** shows what Crate will store there.
 - **A folder that already has notes** shows how many notes it has and what turning the feature on changes: Reminders adds a small ID comment to each task and turns dates like "tomorrow" into fixed dates, and Reading adds Crate frontmatter to each note.
 
-Select **Finish** to turn on what you chose. Crate saves the choice for the vault, so devices you connect later use it without asking. Features you leave off don't change any notes, and closing the step without **Finish** changes nothing. You can change these later in **Settings → Crate**.
+Select **Finish** to turn on what you chose. Crate saves the features you turned on for the vault, so devices you connect later turn them on without asking. If you leave both off, the next device you connect asks again. Features you leave off don't change any notes, and closing the step without **Finish** changes nothing. You can change these later in **Settings → Crate**.
 
 ## One server for each vault
 
-Connect copies of the **same vault** to the same server, and give each unrelated vault its own server. Vault names don't keep data apart: connecting two different vaults to one server merges their files when they sync.
+Connect copies of the **same vault** to the same server, and give each unrelated vault its own server. Vault names don't keep data apart: when you connect a vault that has files to a server that already has files, Crate asks to replace the vault with the server's contents. Select **Cancel** to keep the vault as it is.
 
 ## Privacy
 

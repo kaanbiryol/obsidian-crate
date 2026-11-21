@@ -37,13 +37,17 @@ OBSIDIAN_DEV_VAULTS='["./test-vault", "/path/to/another/vault"]'
 | --- | --- |
 | Plugin lifecycle, settings and commands | `src/plugin/`; `src/main.ts` stays a small entry shell |
 | Sync planning, local checkpoints and transfers | `src/sync/` |
-| Shared Markdown identity, mutation and recurrence rules | `src/reminders/core/`, `src/reminders/utils/` |
+| Shared Markdown identity, mutation and recurrence rules | `src/reminders/core/` |
 | Vault-backed reminder indexing and writing | `src/reminders/data/` |
 | CodeMirror reminder extensions (hidden markers, descriptions, date chips) | `src/reminders/editor/` |
+| Reading capture, library and highlights | `src/reading/` |
+| End-to-end encryption formats, keys and pairing | `src/encryption/` |
+| Plugin UI and shared React/Sass components | `src/ui/` ([UI styling](docs/ui-styling.md)) |
 | Browser session, cache, outbox and client UI | `src/pwa/` |
 | Deployment authorization and provisioning | `src/cloudflare/` |
 | Authenticated API, D1 publication, R2 and notifications | `src/cloudflare/worker/` |
 | Wire formats and compatibility | `src/protocol/` |
+| Standalone local and Docker server | `packages/server/` ([self-hosting](docs/self-hosting.md)) |
 | Paired backup and restore tools | `scripts/recovery/` |
 
 Keep shared reminder rules in shared modules so plugin, PWA predictions and Worker mutations agree. A successful request must preserve byte, revision and operation-identity invariants under response loss and retries. File deletion requires verified absence; recovery must retain local-only intent. Use focused regression tests that reproduce the actual failure through the relevant boundary, including D1/R2 tests for publication guarantees.

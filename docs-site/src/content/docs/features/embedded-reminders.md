@@ -37,6 +37,6 @@ show-completed: true
 
 ## Seeing code instead of a list?
 
-Switch to Reading view or Live Preview, and check that Crate is enabled.
+Switch to Reading view or Live Preview, and check that **Settings → Crate → Reminders → Enable reminders** is on.
 
 For every option and more examples, see the [embedded-reminders reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/embedded-reminders.md).

@@ -9,10 +9,12 @@ Crate has three parts to update: the Obsidian plugin, your server, and the web a
 
 ## Update the plugin
 
-- **Installed with BRAT:** use BRAT's update controls.
-- **Installed by hand:** download all the plugin files from the same release, replace the installed files together, then reload Obsidian.
+Update Crate on one Obsidian device:
 
-Update Crate on every Obsidian device you use. [Installation](/docs/getting-started/installation/) shows where the files go.
+- **Installed with BRAT:** use BRAT's update controls.
+- **Installed by hand:** download all the plugin files from the same release, replace the installed files together, then reload Obsidian. [Installation](/docs/getting-started/installation/) shows where the files go.
+
+Your other devices get the same version on their next sync, because **Sync Crate updates** is on by default. Restart Obsidian on each one to load it. In an encrypted vault the update installs on its own; otherwise Crate asks you to select **Install update**. To update each device yourself instead, turn off **Settings → Crate → Sync → Sync options → Sync Crate updates** on that device. [Crate updates](/docs/features/sync/#crate-updates) explains the details.
 
 ## Update a Cloudflare server
 
@@ -27,9 +29,12 @@ Crate reuses your saved Cloudflare sign-in when it can, and asks you to sign in 
 
 ## Update a Docker or local server
 
-1. Make a verified backup, and keep a copy of your current installation.
-2. Check that the new version is compatible with your existing storage before you start it.
-3. Follow the [self-hosting backup and update instructions](/docs/reference/self-hosting/#verified-backups-restore-and-updates) and the [compatibility reference](/docs/reference/compatibility/#local-server-storage).
+Obsidian shows **Server update available** when your plugin includes a newer server than the one you run. Update it on the computer that runs it:
+
+- **Docker:** follow [Update the server](/docs/getting-started/self-hosting/#update-the-server).
+- **Started with Node:** follow the [update and migrate steps](/docs/reference/self-hosting/#update-and-migrate).
+
+Each way makes a backup first and checks that the new version can open your existing data before it starts.
 
 <details>
 <summary>Good to know</summary>

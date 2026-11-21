@@ -149,7 +149,7 @@ Entry point: `engine/engine.ts:sync()` -> `engine/initial-import.ts:runInitialIm
 
 ### 6. Force Full Sync
 
-Uploads all local files regardless of hash, conditioned on the server's current hash, and only then deletes remote-only files. The exception is a remote-only file the server cannot store beside a local file, such as `todo.md` after a local rename to `TODO.md` (see [case-only renames](#case-only-renames)): it is deleted before the uploads. Files over 25 MB are reported as skipped, and their server copy is neither replaced nor deleted. The local manifest keeps its baselines throughout and each acknowledged upload replaces its entry, so a failed, stopped or interrupted run leaves correct baselines for every file it did not reach. If any upload fails or the operation is aborted, remote deletion never begins. Only after a run without errors does it drop manifest entries for paths that are no longer local. Replaced and deleted remote objects remain recoverable for 30 days, with replaced copies coalesced as described under [error recovery](#error-recovery). Restoring a retained version verifies its bytes and stages them under a fresh immutable object key before the conditional metadata commit. The retained key stays eligible for its original expiry, so cleanup cannot remove the newly restored content. An uncertain commit response leaves the staged object for reference-aware orphan cleanup. Orphan reference lookups check at most 50 keys per query (100 D1 bindings across live files and retained versions).
+Uploads all local files regardless of hash, conditioned on the server's current hash, and only then deletes remote-only files. The exception is a remote-only file the server cannot store beside a local file, such as `todo.md` after a local rename to `TODO.md` (see [case-only renames](#case-only-renames)): it is deleted before the uploads. Files over 25 MB are reported as skipped, and their server copy is neither replaced nor deleted. The local manifest keeps its baselines throughout and each acknowledged upload replaces its entry, so a failed, stopped or interrupted run leaves correct baselines for every file it did not reach. If any upload fails or the operation is aborted, remote deletion never begins. Only after a run without errors does it drop manifest entries for paths that are no longer local. Replaced and deleted remote objects remain recoverable for the server's history period, with replaced copies coalesced as described under [error recovery](#error-recovery). Restoring a retained version verifies its bytes and stages them under a fresh immutable object key before the conditional metadata commit. The retained key stays eligible for its original expiry, so cleanup cannot remove the newly restored content. An uncertain commit response leaves the staged object for reference-aware orphan cleanup. Orphan reference lookups check at most 50 keys per query (100 D1 bindings across live files and retained versions).
 
 Entry point: `engine/engine.ts:forceFullSync()`
 
@@ -321,15 +321,16 @@ Release and transfer values are also checked against source in [current contract
 
 | Constant | Value | Location |
 |---|---|---|
-| `debounceDelay` default | 5 seconds | `types.ts` |
-| `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `types.ts` |
+| `debounceDelay` default | 5 seconds | `settings.ts` |
+| `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `settings.ts` |
 | Large upload quiet / maximum wait | 1 MiB files: 60 s / 5 min | `queue/controller.ts` |
-| `MAX_FILE_SIZE_BYTES` | 25 MB | `types.ts` |
+| `MAX_FILE_SIZE_BYTES` | 25 MB | `protocol/sync-limits.ts` |
 | `BATCH_UPLOAD_MAX_FILES` | 32 | `protocol/sync-limits.ts` |
 | `BATCH_DELETE_MAX_FILES` | 32 | `protocol/sync-limits.ts` |
 | `BATCH_DOWNLOAD_MAX_FILES` | 50 | `protocol/sync-limits.ts` |
-| `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
-| `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
+| `BATCH_UPLOAD_MAX_BYTES` | 10 MB | `protocol/sync-limits.ts` |
+| `ENCRYPTED_BATCH_MAX_BYTES` | 8 MiB | `worker-api/sync.ts` |
+| `BATCH_FILE_SIZE_LIMIT` | 1 MB | `protocol/sync-limits.ts` |
 | `UPLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `DOWNLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `PREPARE_CONCURRENCY` | 2 | `transfer/constants.ts` |
@@ -337,8 +338,8 @@ Release and transfer values are also checked against source in [current contract
 | Large transfers on mobile | Files of 8 MiB or more transfer one at a time | `transfer/budget.ts` |
 | File transfer timeout | 120 s plus 1 s per 32 KiB of body, so an upload still completes at about 0.26 Mbit/s | `worker-api/http.ts` |
 | Batch upload concurrency | 2 mobile / 4 desktop | `transfer/budget.ts` |
-| `BATCH_DOWNLOAD_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
-| `DOWNLOAD_APPLY_CONCURRENCY` | 2 mobile / 4 desktop | `transfer/constants.ts` |
+| Batch download concurrency (`getBatchDownloadConcurrency()`) | 2 mobile / 4 desktop | `transfer/budget.ts` |
+| Download apply concurrency (`getDownloadApplyConcurrency()`) | 2 mobile / 4 desktop | `transfer/budget.ts` |
 | `BATCH_DELETE_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `MAX_RETRIES` | 3 | `engine/lifecycle.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine/lifecycle.ts` |
@@ -349,13 +350,13 @@ Manual, selected-file, incremental, forced and edit-triggered automatic
 sync use `transfer/upload.ts:uploadPreparedFiles()` for ordinary uploads. Files
 are prepared in byte-bounded chunks and split at `BATCH_FILE_SIZE_LIMIT` (1 MB):
 
-- **< 1 MB:** batched into JSON payloads with base64-encoded content. Batches contain up to 32 files. New files are batched apart from edits, so an all-new batch can use one bulk commit when the server supports it. Each request respects `BATCH_MAX_BYTES` (10 MB). Sent via `POST /sync/batch-upload`, with up to 4 requests in flight on desktop or 2 on mobile. Per-path failures retain their code and status for targeted reconciliation or terminal failure handling. Staging reads every receipt in one D1 query and each file then commits in its own coordinator invocation, so a batch stays within Workers Free D1 query limits.
+- **< 1 MB:** batched into JSON payloads with base64-encoded content. Batches contain up to 32 files. New files are batched apart from edits, so an all-new batch can use one bulk commit when the server supports it. Each request respects `BATCH_UPLOAD_MAX_BYTES` (10 MB). Sent via `POST /sync/batch-upload`, with up to 4 requests in flight on desktop or 2 on mobile. Per-path failures retain their code and status for targeted reconciliation or terminal failure handling. Staging reads every receipt in one D1 query and each file then commits in its own coordinator invocation, so a batch stays within Workers Free D1 query limits.
 - **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload`, with up to 2 requests in flight. Each mode retains its retry policy.
 
-`protocol/sync-limits.ts:maxUploadBatchFiles()` defines the per-request file limit.
-Chunk planning assumes new files are eligible for a new-file import; the request
-client applies the rule again with the server capability and encryption state, and
-splits a chunk the server cannot accept in one request.
+`BATCH_UPLOAD_MAX_FILES` in `protocol/sync-limits.ts` is the per-request file limit,
+and `worker-api/sync.ts:batchUpload()` splits a larger list into requests of that size.
+With encryption, a batch holding a file of 1 MB or more, or more than
+`ENCRYPTED_BATCH_MAX_BYTES` (8 MiB) in all, is sent as individual uploads instead.
 
 Remote deletes in manual, selected-file, incremental, forced and automatic sync
 use `transfer/delete.ts:deleteRemoteFiles()`. It waits for preceding uploads and

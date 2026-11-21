@@ -103,7 +103,7 @@ literals are counted per rule and file in `scripts/style-token-baseline.json`,
 and a count can only go down: after moving literals onto roles, run
 `node scripts/check-style-tokens.mjs --write`.
 
-## Ownership
+## Style files and host themes
 
 - `src/ui/shared/styles/_tokens.scss` defines the semantic Crate tokens for
   surfaces, controls, typography, radii, selection, and motion. Both hosts include
@@ -117,115 +117,25 @@ and a count can only go down: after moving literals onto roles, run
   names (`--text`, `--bg`, `--accent`, etc.) alias this palette; do not give them
   separate colors in feature styles. Existing names
   such as `--background-primary` and `--font-ui-medium` are compatibility inputs;
-  using them does not import the Obsidian runtime into the browser.
-- `src/pwa/components/PwaThemeProvider.tsx`, mounted once by `FeatureShell`, owns
-  system-theme and cross-tab subscriptions, theme preferences, document colors,
-  the light stylesheet, and browser theme-color metadata. `usePwaColorScheme`
-  only reads that shared context. Keep the early launch theme in the HTML shell
-  and the parsing/persistence helpers in `src/pwa/shell/theme.ts` so first paint stays
-  correct before React loads.
+  using them does not import the Obsidian runtime into the browser. The PWA's
+  theme provider is described in [PWA UI](pwa-ui.md#theme).
+- `src/pwa/styles/foundation.scss` installs the shared tokens, controls, modal
+  primitives, and PWA header defaults for every feature. The PWA stylesheet
+  entry point loads it independently of the reminder layout stylesheet.
 - `src/ui/shared/styles/_list-item.scss` owns the surface, interaction states,
   primary spacing, and title typography shared by reminder and Reading items.
-  Reading uses the same list presentation on desktop and phones, retaining its source icon
-  and one stacked library/reader flow at every width in both hosts.
-  Favorite actions are available only inside the article reader.
-  Reading uses bottom navigation, floating Highlights, and sheets; do not introduce
-  desktop sidebars, split panes, or centered dialogs. Desktop support is separate
-  future work. Covered library cards keep their resting surface on return. Shared Sass mixins preserve each
-  feature's existing DOM and interaction semantics. Flat surfaces are reusable
-  mixins here. Reminders, projects, Reading articles, and Highlights use spacing
-  between flat rows without dividers.
+  Shared Sass mixins preserve each feature's existing DOM and interaction
+  semantics. Flat surfaces are reusable mixins here. Reminders, projects, Reading
+  articles, and Highlights use spacing between flat rows without dividers.
   Existing reminder surface tokens remain host-theme inputs.
 - `src/reminders/ui/shared/styles/_reminder-cards.scss` owns reminder cards,
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
   list-screen density and hierarchy. The plugin's `_card-presentation.scss`
   only handles embedded-list spacing and keyboard focus.
-  **Appearance → List style** in Obsidian and **General → List style** in the PWA
-  select **Flat** (the default) or **Cards** for reminders, projects, and Reading locally in each
-  host. Existing saved choices are retained. The plugin setting applies immediately to open views,
-  project lists, embedded notes, and Reading; the PWA stores its own preference and updates
-  open tabs. Flat rows retain completion targets, priority, keyboard focus,
-  press/drag feedback, and theme colors while removing card surfaces and metadata
-  pill outlines. Flat reminder and project rows have no dividers, including expanded
-  subproject groups; the main header separator remains. Inbox hides its redundant project
-  label while retaining dates and recurrence; mixed-project views keep project labels.
-  Reading articles follow the same divider-free flat/card preference. Highlight
-  passages always use compact rows separated by inset hairlines, in both styles.
-  The Highlights library groups passages by article, ordered by the newest highlight.
-  Article disclosure headers use flat rows at rest with rounded hover/press feedback,
-  or card surfaces when Cards is selected. The newest group starts expanded; older
-  groups expand on selection. Article reader highlights use the same rows.
-  Reading dialogs opened inside the Obsidian workspace portal into a pane-local
-  overlay outside clipped tab and feature layers. Sheets and their backdrops stay
-  inside the pane, above its dock, without covering the rest of Obsidian.
-  Project cards and subproject groups share this setting, retaining their colored
-  accents, progress, disclosures, and focus/press feedback in either presentation.
-  Project counts use smaller, regular-weight text with a dot separator. Flat project
-  rows share the reminders’ rounded hover/press fills; expanded parent rows have
-  no persistent background. Subproject rows use tighter vertical padding, with
-  extra space after an expanded top-level group to distinguish the next project.
-  Flat reminder rows share the common row padding and text spacing, with
-  slightly smaller metadata icons and slightly larger checkbox
-  circles. They retain 44px completion targets and softly rounded hover/press fills;
-  row motion reads `--crate-reminder-row-gap` so it preserves the selected style.
-  Today shows overdue reminders and those due today in one continuous list,
-  ordered by due date without section headings. Flat Upcoming and Completed sections
-  hide their decorative separators while preserving group spacing, date headings,
-  and the Completed toggle. Header, settings, picker, toolbar, and article-content
-  separators retain their existing treatment. Metadata and overdue dates use the host's
-  original text and error colors; only hover/press fills add surface blending.
-- Shared text fields use one rounded style in both hosts: 16px corners, 48px
-  minimum height, and 16px horizontal padding. Their filled surfaces, borders,
-  and focus cues retain shared theme colors. Plugin Save a link uses the reminder
-  header Save action, with no footer actions. Flat Reading rows use the same 8px
-  hover/press corners as reminder rows.
-- `src/ui/shared/` owns buttons, icon buttons, text fields, and headers.
-  Obsidian modal shells, native modal controls and stylesheet/React mounting
-  helpers live in `src/ui/plugin/`. Shared controls remain independent of these
-  host APIs; ESLint enforces the import boundary for shared UI and the PWA.
-  `usePressFeedback` owns momentary interaction state for buttons, reminder cards,
-  and native picker rows. Style it with `data-press-active`; never use CSS
-  `:active` or Base UI's persistent toggle `data-pressed` for that feedback.
-  Release, cancellation, scrolling, pointer exit, blur, activation, and app
-  backgrounding clear the press. Scope hover effects to `(hover: hover) and
-  (pointer: fine)`. PWA project cards restore their resting styles immediately
-  on touch release so native Back previews cannot capture a release fade.
-  Keep actual selection, checked states, keyboard focus, and
-  native field editing independent of press feedback. Icons use the
-  existing `ThemeIcon` provider; the plugin adapters supply Obsidian icons.
-  Compound fields use `focus.within` from `src/ui/shared/styles/_focus.scss`
-  for one focus cue around the whole control. Text inputs, textareas and compound
-  text fields change their existing border color on focus without an outer ring.
-  Buttons, links, tabs and non-text selectors retain visible keyboard-focus rings.
-  Settings selectors, number fields, and search boxes share the focus mixin. The PWA enables that outline only after keyboard
-  navigation through `--crate-compound-focus-style`; touch and mouse focus stay
-  undecorated without blurring controls. Obsidian retains its normal focus cue.
-  Reading form actions use `crate-dialog-actions`
-  for the plugin confirmation’s shared minimum width, padding, and subtle borders.
-  Phone layouts give both actions equal width and 48px minimum height.
-  The PWA delete confirmation uses a single-line centered header title, a close
-  control to cancel, and a danger-colored **Delete** text action on the right.
-  Its body contains only the confirmation message; both header controls disable
-  while deletion is pending and retain at least 44px touch targets.
-  PWA **Save a link** uses the shared reminder editor header instead: close on
-  the left, title centered, and **Save** on the right, disabled until the web link
-  is valid. Its header submit action targets the form; there are no footer actions.
-  Link capture in both hosts asks only for the URL; article extraction supplies the
-  title, with the hostname as the fallback while extraction is pending.
-  Headers with `preventFocusOnPress` also preserve field focus and selection on
-  title and empty-header taps, using the reminder editor's shared
-  `usePreserveFieldFocus` hook. These taps keep the keyboard open; header drags
-  and explicit actions retain their normal behavior.
-- `src/pwa/styles/foundation.scss` installs the shared tokens, controls, modal
-  primitives, and PWA header defaults for every feature. The PWA stylesheet
-  entry point loads it independently of the reminder layout stylesheet.
-  The browser setup screen uses `_browser-setup.scss` to keep its brand, heading,
-  and install/browser choices together. Choice rows reuse shared buttons and
-  theme icons; inline installation steps leave the actions in place. This layout
-  is scoped to setup so connection recovery screens retain their own geometry.
-  `_sheet-headers.scss` owns the rounded, tinted 44px close/back controls for
-  all PWA sheets, including Settings, Reading dialogs, reminder editors, and
-  pickers. Keep this treatment here rather than adding feature-specific overrides.
+- `ReminderEditorFields` and `ReminderActionChips` are shared editor content.
+  Their styles live in `src/reminders/ui/shared/styles/_editor-*.scss`; header
+  and control styles live in `src/ui/shared/styles/`. The plugin field adapter
+  supplies the theme's project icon mask.
 - `src/ui/shared/styles/_view-header.scss` owns common header presentation. Its
   `primary-screen` mixin supplies shared responsive padding, title rows, and count
   rows to reminder screens and Reading in both hosts. Count text has an explicit
@@ -236,237 +146,24 @@ and a count can only go down: after moving literals onto roles, run
   shared header inset on desktop. Plugin and PWA headers reserve the count row
   while loading; PWA loading screens also reserve the floating dock's space
   throughout startup. Feature adapters retain their safe-area ownership.
-- `src/pwa/settings/SettingsSection.tsx` and `SettingsRow.tsx` own settings
-  grouping and row structure. Settings reuses the shared list-item surface and title
-  mixins, with semantic filled controls and shared button press feedback for its
-  theme selector. Native selects and number fields retain 16px text for iPhone focus.
-  Sections generate unique heading associations;
-  rows can wrap a native control with a label. Feature settings keep their own
-  validation, async actions, and persistence.
-  Primary settings labels use the same 16px regular typography as the main lists,
-  with readable 14px descriptions. **Open app to** belongs to **Tabs** and retains
-  the saved opening preference; visible instructions explain replacing and reordering tabs.
-  **Sync**, **Device storage**, and **About** are always-visible sections. Shortcut setup
-  uses these same section surfaces, typography and shared action controls. Encryption
-  uses compact per-feature status rows and one shared setup note; locked and setting-up
-  guidance stays visible, while unlocked folder and notification details expand in place.
-  **Web app → Add to home screen** pushes a dedicated instructions page with retained
-  settings scroll/focus and browser Back/Forward. Installed apps hide this entry.
-- `PwaPushStack` owns retained sheet pages, push/pop motion and focus return.
-  Each opaque page includes its fixed header and scrolling body. It slides over
-  the stationary root with the Projects navigation spring; its resting offscreen
-  position stays at 100% even for immediate history changes or reduced motion.
-  This keeps subsequent pushes spatial and avoids fading or swapping the header.
-  `createPushedScreenHistory` owns their browser history. Keep its controller
-  mounted in the app shell so Back/Forward cannot reach the feature router below
-  an open sheet. Capture the root before showing its detail, and finish app Back
-  motion before traversing history. Native Back renders the root immediately.
-  All pushed screens declare `data-pwa-back` and a history `pwaBackDestination`;
-  `usePwaBackGesture` applies one native edge-swipe policy to settings pages,
-  Reading articles and projects. Root screens and covering modal editors block
-  that gesture. Do not add feature-specific gesture selectors or a second touch
-  recognizer on top of native history navigation.
-- `src/pwa/components/PwaToast.tsx` renders feedback from `useToast` in either
-  feature. Errors use assertive alerts; other feedback uses polite status messages.
-  Both features share bottom-center positioning above the dock and safe area.
-  Toasts use the chrome surface raised by the `--pwa-toast-*` tokens (a lighter dark fill, stronger border and shadow) so they stand out from cards.
-  Toasts fade in and out with the shared fade without moving; reduced motion skips the fade.
-  Replacing feedback updates the current toast instead of stacking another one.
-  Reading confirms explicit link, tag, and highlight-note saves after local
-  persistence; offline confirmations say they are saved on this device. Favorite
-  and passage-highlight changes use their immediate visual state: an unsent
-  highlight paints lighter with a dashed underline until its change leaves the
-  outbox, and only an offline highlight gets a toast. Archive confirms with
-  **Undo**. A toast action (`Undo`, `Retry`, `Review`) sits inline after the
-  message and extends the toast to six seconds. The open article's header shows
-  its own pending changes with the shared sync dot, and falls back to its
-  availability label once they sync. A failure for the open article replaces the
-  app-wide notice with one naming the change: **Retry** resends it, and **Review**
-  opens settings for a rejected change, which is no longer shown as applied.
-  Input validation stays beside the field. Failed local writes also show an error
-  toast. Both features announce rejected changes or exhausted automatic retries
-  once per operation, when the feature is visible; routine retries and refreshes
-  stay quiet. Persistent sync notices and settings retain the recovery details.
-- `src/pwa/components/PwaNotice.tsx` owns notice title/body/action layout, with
-  styles in `src/pwa/styles/_notice.scss` loaded by the common foundation.
-  Recovery features retain their announcements, retry/discard decisions, and
-  review-before-removal safeguards. Standard actions use `Button`/`PwaButton`;
-  PWA feature code cannot import Base UI Button directly.
-- The plugin's `PluginReminderSourceNotice` shows local scan failures in a subtle
-  tinted surface using compact shared typography, icons, and action buttons. Lead
-  with a plain-language problem, then the filename and available line number;
-  include the full path when affected filenames would be ambiguous. Known scanner
-  messages get readable descriptions while original diagnostics remain intact.
-  Keep **Editing is paused** secondary, emphasize **Open note**, and keep **Retry**
-  quieter. All details stay visible without a disclosure; long lists scroll.
-  Successful recovery removes the notice and any old action error.
+
+## Shared components
+
+- `src/ui/shared/` owns buttons, icon buttons, text fields, and headers.
+  Obsidian modal shells, native modal controls and stylesheet/React mounting
+  helpers live in `src/ui/plugin/`. Shared controls remain independent of these
+  host APIs; ESLint enforces the import boundary for shared UI and the PWA.
+  Icons use the existing `ThemeIcon` provider; the plugin adapters supply
+  Obsidian icons.
+- Shared text fields use one rounded style in both hosts: 16px corners, 48px
+  minimum height, and 16px horizontal padding. Their filled surfaces, borders,
+  and focus cues retain shared theme colors. Flat Reading rows use the same 8px
+  hover/press corners as reminder rows.
 - `src/ui/shared/CopyableText.tsx` owns clipboard feedback and the selectable
   readonly fallback. It uses the control's owner window, ignores stale copy
   completions, and runs an optional synchronous feature guard before copying.
   Shortcut setup retains pairing expiry and session validation; diagnostics
   retains its payload. Copy failure never changes or regenerates the value.
-- `src/pwa/storage/download.ts` owns the JSON download and Blob URL lifecycle shared by
-  Reading and reminder recovery. Each caller retains its filename, payload
-  format, and export snapshot. Starting a download does not prove it was saved.
-- `ReminderEditorFields` and `ReminderActionChips` are shared editor content.
-  Their styles live in `src/reminders/ui/shared/styles/_editor-*.scss`; header
-  and control styles live in `src/ui/shared/styles/`. The plugin field adapter
-  supplies the theme's project icon mask.
-- Each host retains its own sheet, keyboard, navigation, and persistence
-  behavior. The PWA editor layout sets browser sheet height, safe areas, and
-  touch target sizes. Its focus/keyboard-save hook remains in the PWA adapter.
-  Date, project, and repeat picker content and styles are shared too. Host adapters
-  keep apply/cancel semantics, keyboard geometry, and date-input commit timing.
-- `src/pwa/components/PwaModalSheet.tsx` wraps Base UI Drawer for focus containment,
-  dismissal, and downward swipe gestures. `drawer.scss` owns its transitions,
-  including reduced motion. The PWA retains its document scroll lock and editor
-  keyboard geometry. As in UIKit, content scrolled to its top hands a downward
-  drag to the sheet, including from a focused field; Base UI ignores swipes over
-  an expanded selection so its handles stay native.
-  Swiping the editor retains its draft, while swiping a picker or
-  delete confirmation returns to the editor. Explicit editor close still discards
-  the draft. Busy operations and screen transitions block dismissal.
-  Forms opt into opening focus with `data-initial-focus`. The shared sheet focuses
-  that field without scrolling during mount and applies the same no-scroll focus
-  to touch activation of editable fields. Open capture synchronously within its
-  initiating tap so iOS can show the keyboard. Outer sheet wrappers use clipped
-  overflow; the form's content panel retains native scrolling and selection.
-  `tests/browser/pwa/pwa-sheet-field-test.mjs` checks capture focus and simulated keyboard
-  geometry in Chromium/WebKit; installed iPhone keyboard behavior needs a device check.
-
-  PWA surface motion lives in `src/ui/shared/navigation/motion.ts` and
-  `src/pwa/styles/motion.scss`. Project details and picker entrances use a
-  critically damped Motion spring; CSS-owned drawers and Reading navigation
-  use a sampled spring curve with a cubic fallback. Direct drawer dragging
-  remains unanimated, and CSS transitions resume from the current position.
-  All modal sheets and backdrops use the shared 420ms spring curve on entry
-  and a coordinated 320ms exit. On phones (up to 640px) `PwaModalSheet`
-  presents a `card` or a `page`. A card (reminders, short Reading dialogs,
-  draft recovery) fits its content and floats 8px from the screen edges and the
-  keyboard, and above the home indicator when the keyboard is closed
-  (`--pwa-sheet-card-gap`, with no safe-area padding inside), over a lighter 20% dim; its surface keeps the full-width layout box
-  and keyboard padding while `::before` paints the card. A page (settings, the
-  shortcut setup, full-height Reading dialogs) keeps its full height and spans
-  the width without a border. Both share `--pwa-sheet-card-radius` (30px) and
-  shadow tokens; only the card draws the border. Sheet swipes shorten that exit to 240–320ms
-  using the drawer's release strength and the shared spring curve. A 240ms floor
-  keeps a fast flick's remaining travel visible instead of compressing it into
-  the first few frames;
-  the backdrop and canvas follow the sheet's painted position instead of animating
-  separately. Gesture progress resets cannot change background depth, including
-  when a settling sheet is grabbed again. On phones, sheets that opt into
-  background depth scale and round the underlying feature canvas. Modals portal outside that canvas
-  so their geometry and direct touch tracking remain independent. The canvas,
-  sheet and backdrop remain proportional during dragging, interruption, and cancellation.
-  Reading dialogs over a document-scrolled article retain their viewport portal
-  and stationary frozen article, preserving scroll position and native Back.
-  Reduced motion removes the depth effect and sets CSS motion durations to zero.
-  Initialize unvisited features and picker modules after the entrance completes.
-  Picker screen handoffs retain their existing focus/keyboard timing; these are
-  replacements inside one drawer, not additional stacked dialogs.
-  Every stationary fade uses one shared fade: 270ms `cubic-bezier(0.22, 1, 0.36, 1)`,
-  fitted to Linear's screen switches. The departing screen is half gone within
-  about 45ms, so two screens never sit muddled at half strength, then leaves a
-  faint trace for the rest of the fade that reads as motion. It is defined once as
-  `--pwa-motion-fade-duration` and `--pwa-motion-fade-ease` in
-  `src/ui/shared/styles/_navigation-motion.scss` and mirrored by `PWA_FADE` and
-  `PWA_FADE_TIMING` in `src/ui/shared/navigation/motion.ts` (a unit test keeps them equal).
-  Never hard-code a fade duration; first visits and returns must look the same.
-  Tab dissolves use it while the dock's collapse carries the motion. Switching to
-  or from Reading uses that same dissolve in both hosts. A Reading tag change
-  dissolves a copy of the departing rows over the new list with the same fade, so
-  rows both tags list stay steady. Content that replaces a loading state fades in
-  with it through `useContentReveal`, as do list rows, empty states and toasts, so a
-  Reading section that has to load never pops in; a screen read before draws at
-  once without fading, and Reading sections keep their pages through a sync while
-  they reload. Switching sections on a visible Reading screen to one the PWA has not read
-  yet keeps the current screen, with the dock already on the new tab, until its
-  first page answers, then dissolves once. A section, tag or search the PWA has not
-  read dims the current list to 45% at once, with the 120ms feedback curve, so the
-  tap reads as taken; only a request slower than 250ms (counted after a search's
-  typing delay) replaces it with a loading state, whose spinner shows at once
-  rather than after the usual 250ms spinner delay. A spinner that became visible
-  stays at least 300ms so a quick answer never flickers it; a load that answers
-  before its spinner appears shows its content at once. Arriving from Reminders never shows a stale section, and
-  nothing loads before the user switches. Press feedback uses
-  120ms ease-out (`--pwa-motion-feedback-ease`), and control movement uses the shared control spring or 180ms CSS curve.
-  The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
-  changes retain visible travel instead of spending almost all their time settling.
-  Dock expansion uses a spring with a soft overshoot of a few pixels and closes
-  on a quicker critically damped spring; its choices' icons and labels rise 8px
-  into stationary hit targets. While the surface changes shape, the choices and
-  tab icons crossfade where they overlap, so a chosen view visibly collapses back
-  into the bar; neither carries a filter, since WebKit paints blurred layers inside
-  the clipped menu with stray edge artifacts. A held switcher swells until the menu opens, the expanded surface
-  gains a shadow with its progress, and one highlight slides between choices
-  under a held finger. Native dragging remains immediate.
-  Shared control tokens inherit these PWA defaults without changing Obsidian.
-  Shared navigation indicators use a critically damped spring. Centered Obsidian
-  dialogs use a stationary fade; bottom sheets retain their source direction and
-  swipe tracking. Completion checkmarks settle without overshooting, and progress
-  meters scale their fill without relaying out neighboring content. Checkmark and
-  pull-to-refresh animations stop under reduced motion.
-  Empty/list replacements dissolve concurrently. Departing content leaves normal
-  flow in its current position, keeping the incoming scroller’s parent and geometry
-  intact. Incoming reminders accept input immediately; departing content is inert.
-  Empty-state copy and icons fade as one unit without a separate icon delay.
-  Reading library, filter results, and setup guidance reuse the shared
-  `EmptyState` component and `empty-state` Sass from `src/ui/shared/`. Center these messages in
-  the space below the search and filters, clear of navigation; short screens
-  scroll from the top so their text and actions remain reachable.
-  `PwaSheetSurface` owns keyboard padding and motion for reminder stages,
-  Reading dialogs, and Settings. `PwaModalSheet` measures the keyboard by default;
-  reminder navigation can override the inset while handing off to a picker.
-  Keep the surface anchored at the viewport bottom and paint behind the keyboard:
-  compact forms grow by the inset, while full-height forms retain their height
-  and shrink their scrollable content. Do not lift new dialogs with `bottom` or
-  subtract the keyboard from both the surface height and its content area.
-  New and edit reminders use compact content-sized sheets. Their action chips
-  sit outside the scrolling fields so they remain visible above the keyboard
-  when long content fills the available height. Reminder sheets keep the app
-  canvas stationary during dragging and dismissal; only the sheet and dimming
-  follow the gesture, avoiding horizontal movement from background scaling.
-  Shared keyboard updates commit height/padding once, then
-  `useSheetKeyboardMotion` animates the resulting displacement with independent
-  `translate` keyframes. Do not interpolate the inset used by height and padding:
-  that lays out the editor on every animation frame. Keyboard closing keeps a
-  temporary scaled background beneath the moving surface; interruption and
-  unmount remove it. Picker transitions retain their own transform, and live
-  reduced-motion preferences skip keyboard movement.
-  Keep input focus synchronous with the opening tap. During drawer transitions,
-  dragging, and keyboard displacement, hide only the caret with `caret-color`;
-  restore it when all movement ends. Do not blur/refocus or reset selection to
-  work around a caret lagging its transformed surface.
-  Keep native history gestures immediate and tab changes as stationary outgoing-screen dissolves over opaque incoming screens,
-  and reduced-motion paths free of spatial transitions. Reader content stays
-  mounted until its exit completes; timeout cleanup is only a recovery path. Phone-sized
-  PWA readers use document scrolling so iOS can own the status-bar scroll-to-top
-  gesture. The PWA adapter restores the embedded scroll position for the closing
-  animation; desktop and plugin readers retain their own scroll container. The
-  sticky action header hides on downward scroll and returns on upward scroll or
-  keyboard focus. Verify the status-bar gesture in an installed app on an iPhone;
-  desktop browser automation cannot establish that OS behavior. Sheets over the
-  document reader hold its offset with `html.pwa-sheet-scroll-held` instead of
-  fixing the body: re-layering a long article made iOS paint it a frame late,
-  flashing the library and its dock through the article.
-
-- On phone-sized iOS layouts, the settled reminders lists, Projects, a pushed
-  project and the Reading library also scroll the document
-  (`src/pwa/navigation/document-scroll.ts`, `useDocumentScrollScreens`). Their
-  ancestors grow to the list, and sibling header, notice and dock chrome is
-  pinned where it is drawn with inline fixed offsets, so iOS bounces never move
-  it. Screens covered by a pushed layer are hidden, a fixed cover hides rows under
-  the header area, and any chrome resize hands the scroll back for a fresh
-  measurement. Installed iOS apps are taller than the layout viewport the
-  document scrolls against (see `ios27.scss`), so the handoff fits the screen to
-  `innerHeight`; otherwise a short list scrolls by the status bar inset and stays
-  under its header. The handoff waits until no touch, scroll, screen
-  transition or focused field is active. Tab, feature and project transitions,
-  sheets and the reader return the offset to the embedded scroller first, so
-  they animate exactly as before. Scroll consumers read the active owner
-  through `scrollPort`. `pwa-document-scroll-test.mjs` checks that both modes
-  draw identical pixels.
-
 - `src/ui/shared/BaseModal.tsx` uses Base UI Dialog on desktop and
   Drawer for mobile sheets. Portals remain inside the same themed mount and
   owner document, including Obsidian Shadow DOM and popout windows. Nested
@@ -481,29 +178,59 @@ and a count can only go down: after moving literals onto roles, run
   completion controls use Checkbox; priority/date/day controls use Toggle;
   completed lists and project branches use Collapsible; progress uses Progress.
   The project list composes Toolbar's roving focus with its existing listbox
-  semantics and explicit Enter/click selection. The old click bridge and Motion
-  sheet gesture/backdrop components are removed. Motion remains for list,
+  semantics and explicit Enter/click selection. Motion handles list,
   reorder, and content animations.
 - Obsidian Settings, Notice, Menu, and its other native modal screens stay on
   Obsidian's APIs. Plain native select/number/date/time inputs and review
   checkboxes remain browser controls. The rich-text editor's caret-based project
   completion remains editor logic; it is not a plain combobox input.
+- The plugin's `PluginReminderSourceNotice` shows local scan failures in a subtle
+  tinted surface using compact shared typography, icons, and action buttons. Lead
+  with a plain-language problem, then the filename and available line number;
+  include the full path when affected filenames would be ambiguous. Known scanner
+  messages get readable descriptions while original diagnostics remain intact.
+  Keep **Editing is paused** secondary, emphasize **Open note**, and keep **Retry**
+  quieter. All details stay visible without a disclosure; long lists scroll.
+  Successful recovery removes the notice and any old action error.
+- Each host retains its own sheet, keyboard, navigation, and persistence
+  behavior. The PWA editor layout sets browser sheet height, safe areas, and
+  touch target sizes. Its focus/keyboard-save hook remains in the PWA adapter.
+  Date, project, and repeat picker content and styles are shared too. Host adapters
+  keep apply/cancel semantics, keyboard geometry, and date-input commit timing.
+  PWA sheets and keyboard handling are in [PWA UI](pwa-ui.md#sheets-and-keyboard).
 
-## Making a visual change
+### List style
 
-PWA **Settings → Tabs** lets people choose exactly four bottom destinations from
-Inbox, Reminders, Today, Upcoming, Projects, Reading, Favorites, Archive, and Highlights.
-Each row has a replacement picker and a drag handle (also movable with arrow
-keys). There are no add or remove actions. Older saved layouts with fewer than four
-tabs retain their selections and fill the remaining slots from the defaults.
-Preferences persist on the device and update across browser tabs.
-**Reset tabs** restores Inbox, Reminders, Projects, and Reading. **Open app to** and
-explicit links remain independent of visibility. Pinned Reading destinations open
-directly. The last dock slot always opens the Reading view picker on hold or upward
-slide, regardless of its destination; a normal tap still opens that slot’s view.
-A small, muted up/down chevron pair marks this control, vertically centered beside
-the destination icon without shifting it or adding a badge background. The cached
-launch shell uses the same order, visibility, and selection before React starts.
+**Appearance → List style** in Obsidian and **General → List style** in the PWA
+select **Flat** (the default) or **Cards** for reminders, projects, and Reading locally in each
+host. Existing saved choices are retained. The plugin setting applies immediately to open views,
+project lists, embedded notes, and Reading; the PWA stores its own preference and updates
+open tabs. Flat rows retain completion targets, priority, keyboard focus,
+press/drag feedback, and theme colors while removing card surfaces and metadata
+pill outlines. Flat reminder and project rows have no dividers, including expanded
+subproject groups; the main header separator remains. Inbox hides its redundant project
+label while retaining dates and recurrence; mixed-project views keep project labels.
+Reading rows follow the same preference; see [Reading UI](reading-ui.md#library-rows-dialogs-and-capture).
+
+Project cards and subproject groups share this setting, retaining their colored
+accents, progress, disclosures, and focus/press feedback in either presentation.
+Project counts use smaller, regular-weight text with a dot separator. Flat project
+rows share the reminders’ rounded hover/press fills; expanded parent rows have
+no persistent background. Subproject rows use tighter vertical padding, with
+extra space after an expanded top-level group to distinguish the next project.
+Flat reminder rows share the common row padding and text spacing, with
+slightly smaller metadata icons and slightly larger checkbox
+circles. They retain 44px completion targets and softly rounded hover/press fills;
+row motion reads `--crate-reminder-row-gap` so it preserves the selected style.
+
+Today shows overdue reminders and those due today in one continuous list,
+ordered by due date without section headings. Flat Upcoming and Completed sections
+hide their decorative separators while preserving group spacing, date headings,
+and the Completed toggle. Header, settings, picker, toolbar, and article-content
+separators retain their existing treatment. Metadata and overdue dates use the host's
+original text and error colors; only hover/press fills add surface blending.
+
+### Schedule switcher and navigation
 
 Both hosts’ **Reminders** screens contain a compact **Today / Upcoming** segmented
 control with a flat, opaque track and sliding selection. The PWA track uses the
@@ -512,38 +239,105 @@ flat chrome surface; Obsidian uses the theme's raised background. It uses 13px l
 `ScheduleSwitcher` in `src/ui/shared/navigation/` keeps the controls mounted while the shared reminder panels
 change. Their content reuses the shared `TabTransition` for the same stationary dissolve
 as dock navigation, while the heading and segmented control stay mounted.
-Upcoming retains its configured range, date groups, and launch links;
-Both views select Reminders in the default dock; a pinned Upcoming tab has its own selection. The opening shell reserves the chips' final space
+Upcoming retains its configured range, date groups, and launch links.
+Today and Upcoming are not dock destinations: both select the Reminders slot
+(`dockDestinationIndex` in `src/ui/shared/navigation/dock-destinations.ts`). The opening shell reserves the chips' final space
 before JavaScript loads. Once the initial reminder snapshot is ready, the counts,
 chips, and list reveal together with the shared fade. The title, actions,
 and dock stay painted; reduced motion reveals content immediately, and background
 refreshes do not replay the entrance. `tests/browser/pwa/pwa-schedule-test.mjs` checks cold
 and cached launches with overdue reminders, coordinated reveal, selection,
 keyboard focus, launch geometry, rapid reversals, stable card geometry and scroll,
-empty states, and light/dark responsive layouts in Chromium and WebKit. The plugin uses the same dock, date switcher and project transition components. `PluginWorkspaceNavigation` retains both features inside one pane, while `PluginRemindersAppShell` manages local project navigation without browser history. Compact project sheets keep their own header and omit the main dock. Plugin pane geometry and Obsidian bottom obstructions live in `src/ui/plugin/plugin-navigation.scss`; dock, schedule and navigation presentation lives in the shared Sass modules. Dock destinations persist through Obsidian device-local storage.
+empty states, and light/dark responsive layouts in Chromium and WebKit.
+
+The plugin uses the same dock, date switcher and project transition components. `PluginWorkspaceNavigation` retains both features inside one pane, while `PluginRemindersAppShell` manages local project navigation without browser history. Compact project sheets keep their own header and omit the main dock. Plugin pane geometry and Obsidian bottom obstructions live in `src/ui/plugin/plugin-navigation.scss`; dock, schedule and navigation presentation lives in the shared Sass modules. Dock destinations persist through Obsidian device-local storage. The PWA's dock settings are in [PWA UI](pwa-ui.md#bottom-tabs).
+
+## Interaction rules
+
+`usePressFeedback` owns momentary interaction state for buttons, reminder cards,
+and native picker rows. Style it with `data-press-active`; never use CSS
+`:active` or Base UI's persistent toggle `data-pressed` for that feedback.
+Release, cancellation, scrolling, pointer exit, blur, activation, and app
+backgrounding clear the press. Scope hover effects to `(hover: hover) and
+(pointer: fine)`. Keep actual selection, checked states, keyboard focus, and
+native field editing independent of press feedback.
+
+Compound fields use `focus.within` from `src/ui/shared/styles/_focus.scss`
+for one focus cue around the whole control. Text inputs, textareas and compound
+text fields change their existing border color on focus without an outer ring.
+Buttons, links, tabs and non-text selectors retain visible keyboard-focus rings.
+Settings selectors, number fields, and search boxes share the focus mixin. The PWA enables that outline only after keyboard
+navigation through `--crate-compound-focus-style`; touch and mouse focus stay
+undecorated without blurring controls. Obsidian retains its normal focus cue.
+
+Headers with `preventFocusOnPress` also preserve field focus and selection on
+title and empty-header taps, using the reminder editor's shared
+`usePreserveFieldFocus` hook. These taps keep the keyboard open; header drags
+and explicit actions retain their normal behavior.
+
+## Motion rules
+
+PWA surface motion lives in `src/ui/shared/navigation/motion.ts` and
+`src/pwa/styles/motion.scss`. Project details and picker entrances use a
+critically damped Motion spring; CSS-owned drawers and Reading navigation
+use a sampled spring curve with a cubic fallback. Direct drawer dragging
+remains unanimated, and CSS transitions resume from the current position.
+Sheet presentation and keyboard motion in the PWA are in [PWA UI](pwa-ui.md#sheets-and-keyboard).
+
+Every stationary fade uses one shared fade: 270ms `cubic-bezier(0.22, 1, 0.36, 1)`,
+fitted to Linear's screen switches. The departing screen is half gone within
+about 45ms, so two screens never sit muddled at half strength, then leaves a
+faint trace for the rest of the fade that reads as motion. It is defined once as
+`--pwa-motion-fade-duration` and `--pwa-motion-fade-ease` in
+`src/ui/shared/styles/_navigation-motion.scss` and mirrored by `PWA_FADE` and
+`PWA_FADE_TIMING` in `src/ui/shared/navigation/motion.ts` (a unit test keeps them equal).
+Never hard-code a fade duration; first visits and returns must look the same.
+Tab dissolves use it while the dock's collapse carries the motion. Switching to
+or from Reading uses that same dissolve in both hosts. A Reading tag change
+dissolves a copy of the departing rows over the new list with the same fade, so
+rows both tags list stay steady. Content that replaces a loading state fades in
+with it through `useContentReveal`, as do list rows, empty states and toasts, so a
+Reading section that has to load never pops in; a screen read before draws at
+once without fading. Reading section loading is described in [Reading UI](reading-ui.md#library-rows-dialogs-and-capture).
+
+Press feedback uses
+120ms ease-out (`--pwa-motion-feedback-ease`), and control movement uses the shared control spring or 180ms CSS curve.
+The dock selection highlight uses a 300ms spring-like curve so adjacent-tab
+changes retain visible travel instead of spending almost all their time settling.
+Dock expansion uses a spring with a soft overshoot of a few pixels and closes
+on a quicker critically damped spring; its choices' icons and labels rise 8px
+into stationary hit targets. While the surface changes shape, the choices and
+tab icons crossfade where they overlap, so a chosen view visibly collapses back
+into the bar; neither carries a filter, since WebKit paints blurred layers inside
+the clipped menu with stray edge artifacts. A held switcher swells until the menu opens, the expanded surface
+gains a shadow with its progress, and one highlight slides between choices
+under a held finger. Native dragging remains immediate.
+
+Shared control tokens inherit these PWA defaults without changing Obsidian.
+Shared navigation indicators use a critically damped spring. Centered Obsidian
+dialogs use a stationary fade; bottom sheets retain their source direction and
+swipe tracking. Completion checkmarks settle without overshooting, and progress
+meters scale their fill without relaying out neighboring content. Checkmark and
+pull-to-refresh animations stop under reduced motion.
+
+Empty/list replacements dissolve concurrently. Departing content leaves normal
+flow in its current position, keeping the incoming scroller’s parent and geometry
+intact. Incoming reminders accept input immediately; departing content is inert.
+Empty-state copy and icons fade as one unit without a separate icon delay.
+Reading library, filter results, and setup guidance reuse the shared
+`EmptyState` component and `empty-state` Sass from `src/ui/shared/`. Center these messages in
+the space below the search and filters, clear of navigation; short screens
+scroll from the top so their text and actions remain reachable.
+
+Keep native history gestures immediate and tab changes as stationary outgoing-screen dissolves over opaque incoming screens,
+and reduced-motion paths free of spatial transitions.
+
+## Making a visual change
 
 The shared components and semantic tokens are Crate's design system. Extend
 them for common controls and states; keep feature layouts and article typography
-in their feature styles. PWA-wide behavior belongs in the host layer:
-
-- `src/pwa/styles/host/interactions.scss` owns native control taps,
-  selection, callouts, and the reusable `.pwa-screen` gesture policy. Use this
-  class on a feature's PWA screen, including its loading state. Screens allow
-  horizontal/vertical scrolling while suppressing touch page zoom. Do not put
-  the policy on `#app` or the portal mount: sheets retain native editing gestures.
-- App chrome is not selectable. Inputs and editable text retain selection and
-  callouts; article pages explicitly enable both for reading and copying.
-  Reader font-size controls remain available. Browser/OS accessibility zoom is
-  outside this touch policy; the viewport has no scaling restriction.
-- `button-feedback.scss`, `host/focus.scss`, and `motion.scss` own PWA press feedback,
-  input-modality focus, and motion respectively. New features reuse them rather
-  than adding a second interaction policy.
-
-Built-app checks in `tests/browser/reading/reading-browser-test.mjs` and
-`tests/browser/pwa/pwa-focus-test.mjs` cover the shared screen policy, native Chromium
-pinching, text selection, font sizing, and sheet editing boundaries. Desktop
-WebKit checks the CSS policy and editing behavior; installed iPhone gestures
-still need physical-device verification.
+in their feature styles. PWA-wide behavior belongs in the PWA host layer; see
+[PWA interaction policy](pwa-ui.md#interaction-policy).
 
 Modal surfaces inherit the shared theme border, including editors, exclusions,
 and mobile sheets. Do not remove it in a screen-specific rule. Standard text
@@ -620,23 +414,39 @@ Run `npm run build`, `npm run lint`, `npm run check:css-scope`,
 for a local preview with disposable reminder fixtures. Test saving, completion,
 project navigation, and light/dark switching when changing shared styles.
 
+`scripts/bundle-budgets.mjs` is the source of truth for the stylesheet's size:
+it records measured baselines and explicit raw/gzip limits for `dist/styles.css`,
+the plugin, embedded Worker, PWA entry and all PWA assets.
+
 `scripts/pwa-asset-version.mjs` hashes the compiled PWA Sass in addition to client
 assets and Worker PWA sources. Changes to transitive shared imports therefore
 invalidate the installed PWA shell cache. Plugin-only styles do not change the
 PWA version. `src/pwa/pwa-asset-version.test.ts` protects that boundary.
 
+Knip ignores the `tailwindcss` dependency because its direct import is the Sass
+`@use "tailwindcss/theme.css"` in `src/styles/main.scss`, which Knip does not scan.
+Keep that dependency while the stylesheet imports its theme.
+
 ## Visual regression coverage
 
 `npm run build && npm run preview:ui` serves the isolated gallery on port 8790.
-It renders production cards, editor fields, and all three picker contents with
+It renders production cards, editor fields, pickers, Reading and other fixtures with
 plugin or PWA styles. Query parameters select `host=plugin|pwa`,
-`theme=light|dark`, and `scene=cards|editor|date|project|weekly|monthly`.
+`theme=light|dark`, and `scene`. The screenshot scenes are
+`cards`, `flat`, `editor`, `date` (the default), `project`, `weekly` and `monthly`;
+`tests/visual/gallery/main.tsx` also defines `reading`, `controls`, `motion`,
+`list-style`, `navigation`, `tabs`, `draft`, `lexical`, `source`, `metadata`,
+`delete`, `progress`, `status`, `project-interactions`, `loading` and
+`loading-block` for the other specs.
 The plugin fixture supplies deterministic Obsidian-style variables; it does not
 replace testing actual community themes or native modal/keyboard integration.
 
 `npm run test:visual` builds a private gallery snapshot on its own port before
-comparing 48 screenshots at 390px and 1280px widths and
-checks project/repeat keyboard navigation. The canonical snapshot platform is
+comparing screenshots and checking project/repeat keyboard navigation.
+`tests/visual/baselines` holds 74 images: `shared-ui.spec.ts` compares the seven
+screenshot scenes for both hosts and themes at 390px and 1280px widths (56), and
+`reading.spec.ts` compares the Reading library, reader and appearance screens (18).
+The canonical snapshot platform is
 macOS 26 on Apple silicon, matching the `macos-26` CI runner. Use that platform
 when comparing or updating these images: system fonts and native controls can
 render differently on Linux or Windows. Chromium comes from the lockfile; CI
@@ -646,19 +456,13 @@ new baselines, dispatch **Shared UI visual checks** with **Generate candidate
 baselines for review**, inspect its artifact, and commit only approved images
 from `tests/visual/baselines`. Normal CI never updates baselines automatically.
 
-The stylesheet is approximately 170 KB raw / 24 KB gzip after the shared Base UI
-migration. `scripts/bundle-budgets.mjs` records measured baselines and explicit
-limits for the plugin, embedded Worker, PWA entry and all PWA assets.
-
 `tests/browser/plugin/base-ui-plugin-test.mjs` checks Dialog/Drawer nesting, keyboard navigation,
 focus return, pending mutations, native Obsidian overlay handoff, touch gestures,
 and portal content initialization in Chromium and WebKit. The smaller
 `tests/browser/plugin/react-shadow-dom-test.mjs` covers editing and single button activation
 across mount/unmount cycles.
 
-Knip ignores the `tailwindcss` dependency because its direct import is the Sass
-`@use "tailwindcss/theme.css"` in `src/styles/main.scss`, which Knip does not scan.
-Keep that dependency while the stylesheet imports its theme.
+## Sync indicator appearance
 
 The Obsidian status bar and Sync activity share the sync indicator. A configured
 vault starts yellow while saved sync state loads and local startup checks run,
@@ -667,8 +471,6 @@ activity until those checks finish; do not display **All synced** from an older
 saved timestamp during startup. Actual sync progress, errors, and offline warnings
 retain their own labels. This startup readiness flag belongs to the plugin runtime;
 the PWA continues to supply its own session and refresh state.
-
-## Sync indicator appearance
 
 The shared indicator uses fixed green (`#22c55e`) and orange (`#f59e0b`)
 for success and syncing across themes. Every state retains a solid circular dot, with
@@ -706,15 +508,12 @@ disabled submission, inline marker geometry, property colors, and the delete
 action's hover and keyboard states using the production reminder header. Chip
 selection and pressing must change color without scaling the surface. Picker
 checks cover native date/time inputs, selected rows and keyboard focus at narrow
-and desktop widths.
-These replace the corresponding SCSS text checks; token and scoping conventions
-remain covered by source assertions.
+and desktop widths. Token and scoping conventions are covered by source assertions.
 
 `node scripts/visual-test-run.mjs tests/visual/reminder-list-style.spec.ts tests/visual/reminder-list-style-webkit.spec.ts --workers=2`
 checks the shared list presentation and animated mouse reordering in both hosts.
 The drag surface lifts while row geometry stays unchanged, releasing commits the
-order without opening a reminder, and the next click still opens it. This replaces
-source checks for Motion props and drag wrappers.
+order without opening a reminder, and the next click still opens it.
 
 `node tests/browser/plugin/activity-empty-layout-test.mjs` mounts the production activity and
 conflict modals against synthetic Obsidian host CSS. Chromium and WebKit check

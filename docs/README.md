@@ -26,7 +26,7 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 
 - [Embedded reminders](embedded-reminders.md) - fenced code blocks that show reminder lists inside notes.
 - [Reminder clock](reminder-clock.md) - the shared clock that keeps Today, Upcoming and overdue views current.
-- [Reminder retention](reminder-retention.md) - the retry window and retention policy for web reminder commands.
+- [Reminder retention](reminder-retention.md) - retry windows and receipt retention for web reminder commands, Reading commands and upload receipts.
 - [Reminder source recovery](reminder-source-recovery.md) - recovering reminder notes that cannot be read safely.
 - [Reminder archive](reminder-archive.md) - moving completed reminders out of project notes, and how the archive stays unindexed.
 - [Notification processing](notification-processing.md) - how committed changes become scheduled notifications, and the database reads involved.
@@ -53,9 +53,9 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 ## Server and deployment
 
 - [Deploying and operating the server](deployment.md) - Cloudflare OAuth setup, deployment, updates, recovery and deletion.
-- [Self-hosting](self-hosting.md) - running the server locally or in Docker, remote access, backups and updates.
+- [Self-hosting](self-hosting.md) - running the server locally or in Docker, remote access, starting automatically, crash recovery, backups and updates.
 - [Server upgrades](server-upgrades.md) - server revision, schema versioning, migration and release contracts.
-- [Backup and recovery](recovery.md) - paired D1 and R2 archives, restoring automatic upgrade backups and investigating missing notes.
+- [Cloudflare backup and recovery](recovery.md) - paired D1 and R2 archives, restoring automatic upgrade backups and investigating missing notes. Self-hosted backups are in [self-hosting](self-hosting.md#verified-backups-restore-and-updates).
 
 ## Testing and release
 

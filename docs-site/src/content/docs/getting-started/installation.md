@@ -24,7 +24,7 @@ Crate is now installed. Open **Settings → Crate** to finish setup. If BRAT giv
 ## What next?
 
 - **Sync your vault or use the web app:** [choose where your server runs](/docs/getting-started/hosting/), either your Cloudflare account or your own computer with Docker. After connecting, Crate asks which features to manage in this vault.
-- **Just try it on this device:** turn on **Reading** or **Reminders** in **Settings → Crate**, then run **Crate: Add link to reading list** or **Crate: Create reminder** from Obsidian's command palette. Both work without a server. Crate shows the folder each feature will use before it changes any notes.
+- **Just try it on this device:** in **Settings → Crate → Features**, turn on **Reading → Enable reading** or **Reminders → Enable reminders**, then run **Crate: Add link to reading list** or **Crate: Create reminder** from Obsidian's command palette. Both work without a server. Crate shows the folder each feature will use before it changes any notes.
 
 Vault sync, the web app, and notifications need a server.
 

@@ -41,7 +41,7 @@ to a registry yet, so this command builds from the checkout.
 
 Logs show **Server address to paste into Obsidian** and a **Pairing code**. Enter
 those in **Settings → Crate → Connect to your server**, select **Sync now**, then
-use **Copy app link** or **Show QR code** to enroll the PWA. Codes expire after
+use **Crate web app → Set up on phone** (or **Open app** on the same device) to enroll the PWA. Codes expire after
 ten minutes and can be redeemed once. The long-lived device token is returned
 directly to Obsidian, not printed in the container's startup logs. Ctrl+C exits
 the log viewer while Crate continues running.
@@ -59,7 +59,7 @@ ports. Docker must remain running and the computer must stay awake and online.
 On a Mac, enable Docker Desktop's start-at-login setting if desired.
 
 **Quick Tunnel addresses still change when Crate restarts**, including automatic
-restarts. Update the address on each Obsidian device under **Server details →
+restarts. Update the address on each Obsidian device under **Server →
 Update server address**, sync, and enroll the PWA again. Existing tokens and
 server data remain valid. Sync pending PWA edits before stopping or updating.
 Docker does not turn a Quick Tunnel into a permanent public hostname.
@@ -81,8 +81,8 @@ Use the public **Server address to paste into Obsidian:** URL even when Obsidian
 Entering `127.0.0.1:8787` without a protocol is not a complete server URL.
 
 On a phone, `127.0.0.1` and `localhost` mean the phone itself. Use the server's
-HTTPS URL to connect from another device. Enroll the PWA using **Copy app link**
-or **Show QR code** after connecting Obsidian.
+HTTPS URL to connect from another device. Enroll the PWA with **Crate web app → Set up on phone**
+after connecting Obsidian.
 
 ### Choosing a port or public address
 
@@ -101,7 +101,7 @@ npm run server -- start --local --port 9000
 
 Enter `http://127.0.0.1:9000` in Obsidian on that computer. **--local** skips any
 saved tunnel setup. If you change an existing connection's address, use **Server
-details → Update server address**. The server's **--origin** option declares the
+→ Update server address**. The server's **--origin** option declares the
 HTTPS URL supplied by a separate proxy; it does not create a hostname or tunnel.
 
 ### Storage and lifecycle
@@ -146,64 +146,10 @@ local server owner can generate codes: administration uses a private local socke
 and secret; the public endpoint can only redeem an issued code. Codes are held in
 memory and invalidated by a restart. Existing device tokens remain valid.
 
-### Verified backups, restore, and updates
+### Backups and updates
 
-Back up while Crate runs. The backup copies stored files first, then pauses sync
-for a moment while it copies the database; devices wait and continue. It creates
-a directory with a manifest and SHA-256 checksum for every database, file, and
-remote configuration file, then verifies the copied bytes. Copy the completed
-backup outside Docker's volume so losing the volume does not also lose the backup:
-
-```sh
-docker compose exec crate crate backup --output /data/backups/before-update
-docker compose run --rm -T --entrypoint tar crate -C /data/backups -czf - before-update > crate-backup.tgz
-```
-
-For daily backups without these steps, see [automatic backups](#automatic-backups).
-
-Choose a new backup directory name each time; existing backups are not replaced.
-Keep backups private. To restore into a fresh, separately named Docker project,
-stop the original server and use an image compatible with the backup:
-
-```sh
-docker compose stop
-docker compose -p crate-restored run --rm -T --entrypoint tar crate -C /data -xzf - < crate-backup.tgz
-docker compose -p crate-restored run --rm crate restore --backup /data/before-update
-docker compose -p crate-restored up -d
-```
-
-Restore refuses non-empty destinations, modified backup files, unsupported
-schemas/runtimes, and downgrades. It validates the restored database with reminder
-alarms disabled before completing. It preserves device credentials, files, and
-Durable Object alarms, and gives the restored server a new storage identity, so
-devices merge with it even after it catches up with them. Keep the old server stopped; connect to the restored
-server's new public address. Each device notices that the restored server is
-behind it and merges: edits made after the backup are kept, as conflict copies
-where both sides differ, and files created after it upload again. Use
-`-p crate-restored` for subsequent commands on that installation.
-
-Before an upgrade, create the verified backup above, stop the server, retain the
-current image, build the update, and run a read-only compatibility check:
-
-```sh
-docker compose stop
-docker image tag crate-server:local crate-server:before-update
-docker compose build
-docker compose run --rm crate check-upgrade
-docker compose up -d
-```
-
-Only start the new image if the check succeeds. If it rejects the upgrade,
-retag `crate-server:before-update` as `crate-server:local` and resume the previous
-image. The check has not changed the data. Updates with the same storage runtime
-and schema can advance the server revision. If the check reports that the
-database needs a migration, run
-`docker compose run --rm crate upgrade --output /data/backups/before-migration`
-before starting. It creates a verified backup, then applies the registered
-migrations. A changed runtime, or a schema change without a registered migration
-from the data's schema version, is rejected. After a successful
-upgrade has written newer data, rollback requires the previous image and its
-pre-upgrade backup; do not bypass version checks.
+Back up, restore, and update a Docker server with the commands in
+[verified backups, restore, and updates](#verified-backups-restore-and-updates).
 
 ## Start directly on your Mac
 
@@ -239,8 +185,8 @@ Cloudflare resources and local files. It does not migrate remote history,
 browser sessions, or unsynced changes from other devices.
 
 The plugin verifies compatibility and vault access before saving the token in
-Obsidian secret storage. Open the reminders web app link from Crate's reminder
-settings after connecting. Visiting `/notifications` alone does not grant access;
+Obsidian secret storage. Open the web app from **Settings → Crate → Crate web app**
+after connecting. Visiting `/notifications` alone does not grant access;
 the existing folder-bound browser enrollment flow remains in use.
 
 ## Data and additional devices
@@ -261,7 +207,7 @@ reminder alarms. An exclusive directory lock prevents multiple server or
 administration processes from opening the same data simultaneously.
 
 Connected devices can revoke other devices through **Account and devices →
-Devices and sessions**. **Disconnect this device** attempts revocation and removes
+Connected devices and sessions**. **Disconnect this device** attempts revocation and removes
 the local credential. If the server was unreachable, revoke that credential from
 another connected device later. Generate a new token to reconnect.
 
@@ -282,7 +228,7 @@ revoking from another device.
 
 When this plugin bundles a newer server than the one you run, Crate settings show
 **Server update available**. Update the server on its computer as described in
-[Backups, restore, and updates](#backups-restore-and-updates).
+[Verified backups, restore, and updates](#verified-backups-restore-and-updates).
 
 ## Access from another device
 
@@ -344,13 +290,13 @@ Keep the terminal open and the computer awake. **Ctrl+C** stops the tunnel and
 server. Run `npm run server -- start` to resume. Configuration beside the data
 directory remembers Quick Tunnel mode; data and device credentials persist.
 **Every new tunnel has a new public address.** On connected Obsidian devices,
-use **Server details → Update server address**, then sync again. This verifies
+use **Server → Update server address**, then sync again. This verifies
 the existing token, backs up and resets checkpoints scoped to the old address,
 and performs normal reconciliation on the next sync.
 
 The installed PWA cannot automatically follow a new origin. Sync pending browser
-changes before stopping the tunnel, then use a fresh **Copy app link** or
-**Show QR code** to enroll the PWA again after restarting. Unsynced browser data
+changes before stopping the tunnel, then use a fresh **Crate web app → Set up on phone** link
+to enroll the PWA again after restarting. Unsynced browser data
 does not move to the new origin. For ongoing daily use with an installed PWA,
 use a stable HTTPS endpoint. Cloudflare describes
 [Quick Tunnels](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)
@@ -525,8 +471,8 @@ Crate clients to authenticate using their own tokens. The setup command does
 not change your domain's existing security or caching rules.
 
 Use `https://crate.example.com` as **Server address** when connecting Obsidian,
-including on the host Mac. Then select **Copy app link** or **Show QR code** in
-**Reminders web app** to enroll the phone. Those links use the configured server
+including on the host Mac. Then select **Set up on phone** in
+**Crate web app** to enroll the phone. Those links use the configured server
 address and open `/notifications` with a short-lived enrollment grant. People
 with only the public hostname do not gain access to reminders or vault files.
 
@@ -683,61 +629,42 @@ Tailscale is not ready at boot, Crate exits and systemd retries it 30 seconds la
   data directory.
 - **Damaged database:** startup checks the database first and refuses to open a
   damaged one. Keep that directory unchanged, then
-  [restore a backup](#backups-restore-and-updates) into a new directory or
+  [restore a backup](#restore) into a new directory or
   [rebuild from your devices](#if-the-server-is-lost).
 
 Check a server with `npm run server -- status` (or `crate-server status`,
 `docker compose exec crate crate status`). It reports whether Crate is running,
 how many runtime crashes it recovered from, the last verified backup, and the automatic backup setting.
 
-## Backups, restore, and updates
+## Verified backups, restore, and updates
 
-For a source installation, use the verified backup commands. Backup works while
-the server runs and pauses sync briefly; restore needs an empty directory:
+Back up while Crate runs. A backup copies stored files first, then pauses sync
+for a moment while it copies the database; devices wait and continue. It writes
+a new directory with a manifest and a SHA-256 checksum for every database, file,
+and remote settings file (the whole `.remote` directory next to the data
+directory, with Quick Tunnel, Tailscale, and named-tunnel settings), then
+verifies the copied bytes. Each verified backup is recorded in the data
+directory; `status` and the startup log show the last one.
+
+Choose a new destination each time, outside the data and `.remote` directories;
+an existing backup is never replaced. Backups contain vault contents and
+credentials, so keep them private.
+
+### Back up now
+
+With Docker, copy the completed backup out of the volume, so losing the volume
+does not also lose the backup:
+
+```sh
+docker compose exec crate crate backup --output /data/backups/before-update
+docker compose run --rm -T --entrypoint tar crate -C /data/backups -czf - before-update > crate-backup.tgz
+```
+
+For a source installation (use `crate-server backup` for the npx package):
 
 ```sh
 npm run server -- backup --data-dir /path/to/crate-data --output /path/to/crate-backup
-npm run server -- restore --backup /path/to/crate-backup --data-dir /path/to/empty-restored-data
 ```
-
-The backup includes the local database, objects, alarms, and any adjacent named-tunnel configuration. Restore checks file hashes and compatibility before publishing the restored data. Use a new backup destination each time.
-
-Each verified backup is recorded in the data directory; `status` and the startup
-log show the last one.
-
-You can also stop the server cleanly and copy the **entire data directory** and its adjacent `.remote` directory to make a cold backup.
-Keep its matching repository commit, lockfile and Node version. Backups contain
-vault contents and credentials. D1, R2 and Durable Object state belong together;
-do not copy just one of them or edit live SQLite files.
-
-To restore, stop clients, preserve the current directory, and copy the complete
-backup into a separate directory. Start the matching installation with that
-**--data-dir**. Review local edits and pending browser writes before reconnecting.
-Each Obsidian device then merges with the restored server: edits made after the
-backup are kept, as conflict copies where both sides differ, and files created
-after it upload again.
-Never run independent restored copies behind the same address. Cloudflare
-recovery scripts manage Cloudflare resources; use a cold directory backup here.
-
-To update, stop the server, make a complete backup, update the source, run
-`npm ci` and `npm run build:worker`, then run `npm run server -- check-upgrade --data-dir /path/to/crate-data`. Start with the same directory and origin only if that check succeeds.
-If the check reports that the database needs a migration, first run
-`npm run server -- upgrade --data-dir /path/to/crate-data --output /path/to/new-backup`.
-It creates a verified backup, then applies the registered migrations in order.
-The launcher rejects older server revisions and different Miniflare versions.
-Normal startup rejects a different schema hash; only **upgrade** accepts one, and
-only with a registered migration from the data's recorded schema version. Do not edit `server.json` to bypass
-checks. Restore the matching installation when an upgrade is rejected. Stale
-generated Worker bundles are also rejected; rebuilding does not reset data.
-Missing database files or missing/corrupt `server.json` stop startup instead of
-silently creating a replacement server. Restore a complete backup. If the very
-first initialization failed before any device connected, use a new empty
-directory and retain the incomplete one for diagnosis.
-
-After a crash, `server.lock` may remain. Verify that no Crate or workerd process
-uses the directory before removing only that lock file and restarting. The
-launcher does not guess whether another process is safe to interrupt.
-
 
 ### Automatic backups
 
@@ -748,11 +675,12 @@ folder; it must be outside the data directory:
 npm run server -- auto-backup --output /path/to/backups --keep 7
 ```
 
-Use `crate-server auto-backup` for the npx package. While Crate runs, it makes a
-verified backup every day, in a folder named `crate-` and the time, and deletes
-the oldest beyond `--keep` (7 by default, at most 30). If the server was off or
-asleep, it catches up within an hour of starting. Each backup pauses sync for a
-moment while the database is copied.
+Use `crate-server auto-backup` for the npx package. While Crate runs, it checks
+every hour and makes a verified backup when the newest one is a day old, in a
+folder named `crate-` and the time. It then deletes the oldest beyond `--keep`
+(7 by default, at most 30). The first check runs about five minutes after Crate
+starts, so a server that was off or asleep catches up soon after it is back. Each
+backup pauses sync for a moment while the database is copied.
 
 Backups share unchanged files through hard links, so seven daily backups take
 about as much space as one plus each day's changes. Each one still restores on
@@ -761,7 +689,7 @@ less than 1 GB free is refused. Crate never deletes anything else in the folder,
 including backups you made yourself with **backup**.
 
 `status` shows the setting and the last failure, if any; a failed backup is retried
-every hour. Turn it off with `npm run server -- auto-backup --off`. The setting
+within the hour. Turn it off with `npm run server -- auto-backup --off`. The setting
 stays with the data directory and is not part of backups, so a restored copy does
 not touch the original server's backups.
 
@@ -776,6 +704,98 @@ docker compose exec crate crate auto-backup --output /backups --keep 7
 
 Copying backups to another computer is still up to you; test a restore into an
 empty directory now and then.
+
+### Restore
+
+Restore into a new, empty directory and keep the original server stopped. Restore
+refuses non-empty destinations, modified backup files, unsupported
+schemas/runtimes, and downgrades. It validates the restored database with reminder
+alarms disabled before completing. It preserves device credentials, files, and
+Durable Object alarms, and gives the restored server a new storage identity, so
+devices merge with it even after it catches up with them. Each device notices the
+change and merges: edits made after the backup are kept, as conflict copies where
+both sides differ, and files created after it upload again. Review local edits
+and pending browser writes before reconnecting.
+
+With Docker, restore into a fresh, separately named project using an image
+compatible with the backup:
+
+```sh
+docker compose stop
+docker compose -p crate-restored run --rm -T --entrypoint tar crate -C /data -xzf - < crate-backup.tgz
+docker compose -p crate-restored run --rm crate restore --backup /data/before-update
+docker compose -p crate-restored up -d
+```
+
+Connect to the restored server's new public address, and use `-p crate-restored`
+for later commands on that installation.
+
+For a source installation, start the matching installation with the restored
+**--data-dir** afterwards:
+
+```sh
+npm run server -- restore --backup /path/to/crate-backup --data-dir /path/to/empty-restored-data
+```
+
+Never run independent restored copies behind the same address. The Cloudflare
+recovery scripts in `scripts/recovery/` manage Cloudflare resources, not local
+servers.
+
+### Update and migrate
+
+Make a verified backup, stop the server, keep the current installation, build the
+update, then run the read-only compatibility check. Start the new version only if
+the check succeeds.
+
+With Docker:
+
+```sh
+docker compose stop
+docker image tag crate-server:local crate-server:before-update
+docker compose build
+docker compose run --rm crate check-upgrade
+docker compose up -d
+```
+
+If the check rejects the upgrade, retag `crate-server:before-update` as
+`crate-server:local` and resume the previous image. If it reports that the
+database needs a migration, run
+`docker compose run --rm crate upgrade --output /data/backups/before-migration`
+before starting.
+
+For a source installation: update the source, run `npm ci` and
+`npm run build:worker`, then run
+`npm run server -- check-upgrade --data-dir /path/to/crate-data`. If it reports
+that the database needs a migration, run
+`npm run server -- upgrade --data-dir /path/to/crate-data --output /path/to/new-backup`
+before starting with the same directory and origin.
+
+The check does not change data. **upgrade** creates a verified backup, then
+applies the registered migrations in order. Updates with the same storage runtime
+and schema can advance the server revision. The launcher rejects older server
+revisions and different Miniflare versions. Normal startup rejects a different
+schema hash; only **upgrade** accepts one, and only with a registered migration
+from the data's recorded schema version. Stale generated Worker bundles are also
+rejected; rebuilding does not reset data. Do not edit `server.json` to bypass
+checks. After an upgrade has written newer data, rollback needs the previous
+installation and its pre-upgrade backup.
+
+Missing database files or a missing or corrupt `server.json` stop startup instead
+of silently creating a replacement server. Restore a complete backup. If the very
+first initialization failed before any device connected, use a new empty directory
+and keep the incomplete one for diagnosis.
+
+### Cold copies
+
+You can also stop the server cleanly and copy the **entire data directory** and its
+adjacent `.remote` directory. Keep the matching repository commit, lockfile and
+Node version. D1, R2 and Durable Object state belong together; do not copy just
+one of them or edit live SQLite files.
+
+Prefer **restore** from a verified backup. A cold copy keeps the original storage
+identity, so a device treats it as a restored server only while the copy's change
+log is behind that device's cursor. Once another device syncs to the copy first,
+later devices can plan against stale baselines.
 
 ## If the server is lost
 

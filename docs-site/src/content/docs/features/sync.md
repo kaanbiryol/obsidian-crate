@@ -27,12 +27,12 @@ Phones pause apps in the background, and sync pauses with them. Before switching
 <details>
 <summary>Fine-tune timing</summary>
 
-Under **Sync → Sync options**:
+Under **Sync → Sync options**, while **Automatic sync** is on:
 
 | Setting | What it does |
 | --- | --- |
 | **Sync delay after editing (seconds)** | How long Crate waits after you stop typing. The default is 5 seconds; 0 syncs right away. |
-| **Check for remote changes** | How often this device looks for edits from your other devices. The default is every 5 minutes. **Off** stops these checks, but edits, startup, and resume still sync. |
+| **Check for remote changes** | How often your Obsidian devices look for edits from each other. It applies to all devices. The default is every 5 minutes. **Off** stops these checks, but edits, startup, and resume still sync. |
 
 </details>
 
@@ -51,11 +51,9 @@ A plugin's code files (`main.js`, `manifest.json` and `styles.css`) show as one 
 
 ![Sync activity with one pending note, showing the line that changed since the last sync](../../../assets/screenshots/crate-sync-pending.png)
 
-- Select the sync button below the list. It sends the checked files and gets changes from your other devices. Its label says what it sends, such as **Sync 3 files**.
-- Uncheck the files you want to hold back. They stay on this device, untouched by changes from other devices, until you sync them. With every file unchecked, the button reads **Get remote changes**.
-- With nothing pending, the button reads **Sync** and gets changes from your other devices. While a sync runs, it reads **Stop sync**.
+The button below the list sends the checked files and gets changes from your other devices. Its label tells you what it will do, such as **Sync 3 files**, and it reads **Stop sync** while a sync runs.
 
-Holding files back applies to that one sync. **Crate: Sync now**, the **Sync now** button in settings and automatic sync always send everything. With automatic sync on, the list has no checkboxes and the button reads **Sync now**, so turn off automatic sync first if you want to decide exactly when files go.
+To hold a file back, uncheck it. It stays on this device, untouched by changes from other devices, until a later sync. This applies only to that one sync: **Crate: Sync now** and automatic sync always send everything. With automatic sync on, the list has no checkboxes, so turn it off first if you want to choose exactly what goes.
 
 <details>
 <summary>Good to know</summary>
@@ -69,7 +67,7 @@ Holding files back applies to that one sync. **Crate: Sync now**, the **Sync now
 
 ### Throw away local changes
 
-If you want to give up edits on this device, right-click the file and choose the discard action. Your device goes back to the server's version, and files you added on this device move to the trash. The server copy never changes.
+If you want to give up edits on this device, right-click the file and choose **Discard 1 item…** (or select several files first). Your device goes back to the server's version, and files you added on this device move to the trash. The server copy never changes.
 
 Check the file names in the confirmation before you continue. If you change your mind, Crate keeps a copy of what it replaced in `<vault config>/plugins/crate/discard-recovery/`.
 
@@ -87,9 +85,9 @@ Your other plugins and their settings sync too. After they download, restart Obs
 
 Update Crate on one device and your other devices get the same version on their next sync. Restart Obsidian on each device to load it.
 
-Until you sync, the device you updated lists the update as **Crate <version> update** in sync activity, with the files it carries: `main.js`, `styles.css` and `manifest.json`.
+Until you sync, the device you updated lists the update in sync activity as a **Crate** row marked **Plugin updated**.
 
-- In an encrypted vault, the update installs on its own. Only your paired devices can create it.
+- In an encrypted vault, the update installs on its own, because only your own unlocked devices can create it.
 - Without encryption, Crate shows a notice first. Select **Install update** to accept it.
 - A device never installs an older version than the one it has, and never touches Crate's settings or sync state.
 
@@ -113,12 +111,12 @@ Private/
 
 This keeps the `Private` folder, all Photoshop files, and one plugin's files local. Use the real plugin folder name, and your own configuration folder if it isn't `.obsidian`.
 
-Exclusions apply to all your Obsidian devices. Adding a rule stops future syncing but leaves existing copies on the server. To remove those too, select **Review and remove** under **Remove excluded server files**. Your local files are kept, and the server copies stay recoverable for 30 days.
+Exclusions apply to all your Obsidian devices. Adding a rule stops future syncing but leaves existing copies on the server. To remove those too, select **Review and remove** under **Remove excluded server files**. Your local files are kept, and the server copies stay recoverable for your history period.
 
 ## When something goes wrong
 
 - **Two devices changed the same note:** Crate keeps both versions for you to compare. See [Resolve conflicts](/docs/troubleshooting/conflicts/).
-- **You need an earlier version:** the server keeps replaced and deleted files for 30 days by default (you can choose 7, 14, 60 or 90), about one version every 10 minutes while you edit, and you can restore your whole vault to an earlier synced state. See [History and recovery](/docs/troubleshooting/recovery/) before you restore.
+- **You need an earlier version:** the server keeps replaced and deleted files for 30 days by default (change it in **Sync options → Keep history for**), about one version every 10 minutes while you edit, and you can restore your whole vault to an earlier synced state. See [History and recovery](/docs/troubleshooting/recovery/) before you restore.
 
 :::caution[Sync is not a backup]
 Deleting a file on one device deletes it everywhere. Keep a separate backup of notes you can't afford to lose.

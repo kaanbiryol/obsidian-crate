@@ -36,11 +36,11 @@ The save form tells you which device does the downloading:
 
 ### Article images
 
-By default, Crate saves an article's images in your vault when it downloads the article. They go in **attachments** inside the Reading folder, one folder per article, and sync like any other file. Images work offline in Obsidian, and in the web app in articles you save for offline. Deleting an article deletes its images too: the web app deletes them on the server, and Obsidian moves them to the trash you chose in **Settings** → **Files and links** → **Deleted files**.
+By default, Crate saves an article's images in your vault when it downloads the article. They go in an `attachments` folder inside the Reading folder, one folder per article, and sync like any other file. Images work offline in Obsidian, and in the web app in articles you save for offline. Deleting an article deletes its images too: the web app deletes them on the server, and Obsidian moves them to the trash you chose in **Settings** → **Files and links** → **Deleted files**.
 
 To keep only the images' links, go to **Settings** → **Crate** → **Reading** and set **Article images** to **Load from the website**. The choice applies to every device and to articles saved from then on. The websites hosting the images then see your IP address each time you open the article, and the images need a connection.
 
-Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. Obsidian saves every image in an article, up to 10 MB each and 40 MB in all. Your server saves the first 10 (5 MB each), or 10 of up to 2 MB each in an encrypted vault, which keeps each save within the Cloudflare free plan's limits. An image that is too large or fails to download keeps its link.
+Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. Obsidian saves every image in an article, up to 10 MB each and 40 MB in all. When your server downloads the article, it saves the first 10 images, up to 5 MB each and 20 MB in all, or up to 2 MB each and 8 MB in all in an encrypted vault. An image that is too large or fails to download keeps its link.
 
 ### When a page won't download
 
@@ -111,9 +111,9 @@ Highlights are saved in the note, so they sync with it. Most use Obsidian's own 
 
 ### Save from the share sheet on iPhone
 
-With iOS 27 or later, open **Reading settings → Set up iPhone shortcut** and follow the steps to install and pair **Save to Crate**. After that, select **Share → Save to Crate** from any app. The shortcut needs a connection.
+With iOS 27 or later, open **Settings → Install → Save from iPhone** in the web app and follow the steps to install and pair **Save to Crate**. After that, select **Share → Save to Crate** from any app. The shortcut needs a connection.
 
-Pairing codes work once and expire after ten minutes. You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to Reading settings to create a pairing code. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is. Logging out of the web app you paired from, or removing that session from connected devices in Obsidian, also disconnects the shortcut.
+Pairing codes work once and expire after ten minutes. You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to **Save from iPhone** in the web app to create a pairing code. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is. Logging out of the web app you paired from, or removing that session from connected devices in Obsidian, also disconnects the shortcut.
 
 The shortcut doesn't work with [encryption](/docs/features/encryption/). It can't encrypt a note or make it searchable, so encrypted vaults don't offer it. Save links in the web app or in Obsidian instead.
 

@@ -46,7 +46,7 @@ To test delivery, select **Settings → Crate → Notifications → Test notific
 
 ## Still not working
 
-Check Crate's sync diagnostics for notification failures and follow the repair steps it suggests.
+Run **Settings → Crate → Troubleshooting → Run diagnostics** and check the results. [Get help](/docs/troubleshooting/get-help/) explains how to report the problem safely.
 
 If you report the problem, include:
 

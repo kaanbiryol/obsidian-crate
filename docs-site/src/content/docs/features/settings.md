@@ -5,7 +5,7 @@ description: Turn Crate features on or off, understand which devices a setting a
 
 Crate does several things: vault sync, Reading, and Reminders. Use one, two, or all three. Notifications and encryption are optional extras you can add whenever you like.
 
-Everything lives under **Settings → Crate** in Obsidian. Expand **Reading** or **Reminders** to see their controls, with or without a server. The **Sync** controls appear once a server is connected, and **Notifications** once Reminders is on too.
+Everything lives under **Settings → Crate** in Obsidian. Expand **Reading** or **Reminders** under **Features** to see their controls, with or without a server. **Sync**, **Crate web app** and **Appearance** appear once a server is connected, and **Notifications** once Reminders is on too.
 
 ## What starts on?
 
@@ -38,13 +38,13 @@ Turn off **Enable reading** or **Enable reminders** in its section. Turn it back
 :::note[These switches affect every device]
 They apply to **all devices connected to this server**, so changing them needs a connection. Other devices pick up the change when they next check the server. An offline device keeps its last known setting until it reconnects.
 
-A vault that has never used a feature doesn't start it from the server's setting. When you connect the first device, the last setup step, **Choose what Crate manages in this vault**, lists each feature with its folder; both start off, so turn on the ones you want and select **Finish**. Crate saves that choice, and devices you connect later turn on the same features without asking. If you close that step, Crate shows a notice instead, and you turn the feature on in that vault's settings after checking its folder.
+When you connect the first device, you choose these in the last setup step, **Choose what Crate manages in this vault**. [After you connect](/docs/getting-started/hosting/#after-you-connect) explains that step.
 :::
 
 ## Pause sync on one device
 
 - **Sync only when you ask:** turn off **Sync → Automatic sync**. You can still run **Crate: Sync now**, and a sync already running can finish.
-- **Stop right now:** select **Pause sync** in Sync activity, or run **Crate: Stop sync**. This also turns off automatic sync until you turn it back on.
+- **Stop right now:** select **Stop sync** in Sync activity, or run **Crate: Stop sync**. This also turns off automatic sync until you turn it back on.
 
 This only affects this Obsidian device. Other devices, the web app, and notifications carry on. To stop alerts everywhere, turn off **Notifications → Push notifications**.
 
@@ -54,11 +54,11 @@ Crate labels settings **This device** or **All devices** where it matters.
 
 | Setting | Applies to |
 | --- | --- |
-| Automatic sync and delay after editing | This Obsidian device |
+| Automatic sync, delay after editing, and **Sync Crate updates** | This Obsidian device |
 | Remote check interval and excluded files | Your connected Obsidian devices, through shared settings |
-| Reading and Reminders on/off switches | All devices on the server |
+| Reading and Reminders on/off switches, **Article images**, and **Keep history for** | All devices on the server |
 | Push notifications, notification folder, timezone, and all-day alert time | The server's alert schedule for all subscribed devices |
-| List style, default reminders tab, default due date, startup view, and upcoming range | This Obsidian device |
+| List style, default reminders tab, default due date, startup view, upcoming range, and **Desktop notifications** | This Obsidian device |
 | Web app theme, tabs, and list style | That browser or installed web app |
 
 Shared changes reach other devices the next time they contact or sync with the server. On a phone, the browser and the Home Screen app can have their own preferences and connections.
@@ -85,6 +85,6 @@ Crate just starts looking somewhere else. If you want existing notes in the new 
 
 Under **Reminders**, choose **Default due date**, **Open reminders on startup**, **Default reminders tab**, and **Upcoming range (days)**. These change what you see and the starting values for new reminders; they never reschedule existing tasks.
 
-**Appearance → List style** switches between **Flat** rows and **Cards** for reminders, projects, and Reading. The web app has its own [appearance and tab settings](/docs/features/web-app/#make-it-yours).
+With a server connected, **Appearance → List style** switches between **Flat** rows and **Cards** for reminders, projects, and Reading. The web app has its own [appearance and tab settings](/docs/features/web-app/#make-it-yours).
 
 Looking for something else? To disconnect a device, see the [device guide](/docs/getting-started/devices/#disconnect-a-device). Turning [encryption off](/docs/features/encryption/#turn-encryption-off) resets your server data, so read that guide first.

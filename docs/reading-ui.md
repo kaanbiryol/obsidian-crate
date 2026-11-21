@@ -382,6 +382,50 @@ Disabled server Reading keeps the library header, search, sidebar, and tab bar.
 Show setup guidance inline in the list area with the shared empty-state styles,
 without an error alert. Keep navigation mounted while **Check again** is pending.
 
+## Library rows, dialogs and capture
+
+Reading uses the shared list presentation in `_list-item.scss` on desktop and phones,
+retaining its source icon and one stacked library/reader flow at every width in both
+hosts. Favorite actions are available only inside the article reader. Reading uses
+bottom navigation, floating Highlights, and sheets; do not introduce desktop
+sidebars, split panes, or centered dialogs. Desktop support is separate future
+work. Covered library cards keep their resting surface on return.
+
+Reading articles follow the same divider-free [list style](ui-styling.md#list-style)
+preference as reminders. Highlight passages always use compact rows separated by
+inset hairlines, in both styles. The Highlights library groups passages by article,
+ordered by the newest highlight. Article disclosure headers use flat rows at rest
+with rounded hover/press feedback, or card surfaces when Cards is selected. The
+newest group starts expanded; older groups expand on selection. Article reader
+highlights use the same rows.
+
+Reading dialogs opened inside the Obsidian workspace portal into a pane-local
+overlay outside clipped tab and feature layers. Sheets and their backdrops stay
+inside the pane, above its dock, without covering the rest of Obsidian.
+Reading form actions use `crate-dialog-actions` for the plugin confirmation’s
+shared minimum width, padding, and subtle borders. Phone layouts give both actions
+equal width and 48px minimum height.
+
+Link capture in both hosts asks only for the URL; article extraction supplies the
+title, with the hostname as the fallback while extraction is pending. Plugin
+**Save a link** uses the reminder header Save action, with no footer actions. PWA
+**Save a link** uses the shared reminder editor header instead: close on the left,
+title centered, and **Save** on the right, disabled until the web link is valid.
+Its header submit action targets the form; there are no footer actions.
+
+Reading sections keep their pages through a sync while they reload. Switching
+sections on a visible Reading screen to one the PWA has not read yet keeps the
+current screen, with the dock already on the new tab, until its first page
+answers, then dissolves once. A section, tag or search the PWA has not read dims
+the current list to 45% at once, with the 120ms feedback curve, so the tap reads
+as taken; only a request slower than 250ms (counted after a search's typing
+delay) replaces it with a loading state, whose spinner shows at once rather than
+after the usual 250ms spinner delay. A spinner that became visible stays at least
+300ms so a quick answer never flickers it; a load that answers before its spinner
+appears shows its content at once. Arriving from Reminders never shows a stale
+section, and nothing loads before the user switches. The shared fade these
+transitions use is described in [UI styling](ui-styling.md#motion-rules).
+
 ## Testing notes
 
 Choosing and running suites is covered in [testing](testing.md).

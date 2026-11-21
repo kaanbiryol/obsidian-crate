@@ -1,10 +1,35 @@
 # Testing
 
-How to run each suite, where it runs in CI and the release gate come first. Notes for individual features start at [Feature-specific notes](#feature-specific-notes).
+Start with [Choosing tests](#choosing-tests) to pick the checks for a change. The suites, where they run in CI and the release gate follow; harnesses come after the manual checks, and notes for individual features start at [Feature-specific notes](#feature-specific-notes).
+
+## Choosing tests
+
+Match verification to the change. Scripts in `package.json` are the source of truth; each row lists the checks to run before review, beyond `npm run lint` and the relevant type-check.
+
+| Changed area | Run |
+| --- | --- |
+| Any TypeScript module | `npx vitest run <file>` for the tests beside it, then `npm test` |
+| `src/sync`, `src/encryption`, `src/protocol`, `src/reminders/core` | `npm run test:coverage` (coverage floors). Frozen-format and property tests run in the unit suite; see [Guardrail tests in AGENTS.md](../AGENTS.md#guardrail-tests) |
+| Wire formats, release manifest, shortcut protocol, transfer limits | `node scripts/check-contract-docs.mjs --write`, then `npm run check:contracts` |
+| Worker handlers, D1, R2 or Durable Objects (`src/cloudflare/worker/`) | `npm run typecheck:worker` and `npm run test:worker-runtime`; one file: `npx vitest run --config vitest.cloudflare.config.ts <file>` |
+| Server-side behavior that needs a new server revision | `npm run check:server-revision`; see [server upgrades](server-upgrades.md) |
+| `packages/server/` | `npm run typecheck:server`, `npm run test:local-server`, `npm run test:server-package`; `npm run test:docker` for the image |
+| PWA (`src/pwa/`) | `npm run test:pwa-preview`, then the affected `node tests/browser/pwa/<name>-test.mjs` scripts or `npm run test:pwa-browser`. Service worker: `npm run typecheck:service-worker` |
+| Reading | `npm run test:reading`, or `npm run test:reading-server` / `npm run test:reading-browser` |
+| Shared UI, components or Sass (`src/ui/`, `*.scss`) | `npm run check:style-tokens`, `npm run check:css-scope`, `npm run size-check`, then `npm run test:visual` or `node scripts/visual-test-run.mjs <spec>`; see [UI styling](ui-styling.md#making-a-visual-change) |
+| Reminder editor | `npm run test:editor-contract`; `npm run test:lexical` for rich-text work |
+| Plugin activity, file history or dialogs | `npm run build`, then `npm run test:activity-browser`, `npm run test:file-history-browser` or `npm run test:plugin-dialogs` |
+| Build, release or check scripts in `scripts/` | `npm run test:ci` |
+| `scripts/recovery/` | `npm run test:recovery` |
+| Dependencies | `npm run notices:generate`, `npm run deadcode`, `npm run security:check`, `npm run size-check` |
+| Documentation only | Link and diff review; `npm run build:site:docs` builds the docs site and checks its links |
+| A release | A successful **Release plugin** run for the exact commit, or `npm run release:check`; see [Release verification](#release-verification) |
+
+`npm run check` covers everything except the browser suites. Changes that reach the Obsidian UI also need the [manual smoke test](#manual-obsidian-smoke-test).
 
 ## Suites and commands
 
-Scripts in `package.json` are the source of truth. [Framework and Config](#framework-and-config) describes the unit, Worker runtime, local server and Docker suites in more detail.
+[Framework and config](#framework-and-config) describes the unit, Worker runtime, local server and Docker suites in more detail.
 
 | Suite | Command | Notes |
 | --- | --- | --- |
@@ -21,11 +46,11 @@ Scripts in `package.json` are the source of truth. [Framework and Config](#frame
 | Server revision | `npm run test:server-revision` and `npm run check:server-revision` | The second checks the server revision and schema against the published release baseline; it needs Git history and `gh`, so it runs beside `check:source` in CI and `release:check` rather than inside it. |
 | Recovery tooling | `npm run test:recovery` | Python `unittest`. |
 | Contract docs | `npm run check:contracts` | Rejects stale values in `current-contract.md`; `node scripts/check-contract-docs.mjs --write` refreshes them. |
-| Static checks | `npm run lint`, `typecheck`, `typecheck:worker`, `typecheck:service-worker`, `typecheck:server`, `typecheck:visual`, `deadcode`, `notices:check` | Run each as `npm run <name>`. The type-checks keep incremental state in the ignored `.generated/tsc/`. |
-| Source checks | `npm run check:source` | Builds the Worker, then runs lint, the plugin, Worker and service-worker type-checks, `deadcode`, `notices:check`, `check:contracts`, `test:ci`, `test:server-revision`, `test:recovery` and `test:coverage`. |
+| Static checks | `npm run lint`, `typecheck`, `typecheck:worker`, `typecheck:service-worker`, `typecheck:server`, `typecheck:visual`, `deadcode`, `notices:check`, `check:style-tokens`, `check:css-scope` | Run each as `npm run <name>`. The type-checks keep incremental state in the ignored `.generated/tsc/`. |
+| Source checks | `npm run check:source` | Builds the Worker, then runs lint, the plugin, Worker, service-worker and server type-checks, `deadcode`, `notices:check`, `check:contracts`, `check:style-tokens`, `test:ci`, `test:server-revision`, `test:recovery` and `test:coverage`. |
 | Everything except browsers | `npm run check` | `check:source`, then `test:worker-runtime` and `test:local-server`. |
 | PWA preview smoke test | `npm run test:pwa-preview` | Smoke test of the built PWA preview and its asset budgets. |
-| PWA browser | `npm run test:pwa-browser` | Chromium and WebKit, registered in `scripts/browser-tests.mjs`. `-- --platform=linux --shard=1/4 --list` selects and lists a CI group. One script: `node tests/browser/pwa/<name>-test.mjs`. |
+| PWA browser | `npm run test:pwa-browser` | Chromium and WebKit, registered in `scripts/browser-tests.mjs`. `-- --platform=linux --shard=1/4 --list` selects and lists a CI group. One script: `node tests/browser/pwa/<name>-test.mjs`. See [Browser tests](#browser-tests). |
 | Reading | `npm run test:reading` | `test:reading-server` (extraction, server and shortcut contracts), then `test:reading-browser`. |
 | Shared UI | `npm run test:visual` | Screenshot comparisons on the reviewed macOS baselines, then the editor contract. A subset: `node scripts/visual-test-run.mjs <spec>`. Local runs record no traces; add `--trace=on` when debugging a failure. |
 | Editor contract | `npm run test:editor-contract` | Playwright editor contract, then the PWA editor contract script. Uses half the local cores (4 workers on CI); `--project=chromium-pwa` runs one of its four projects. |
@@ -50,9 +75,39 @@ Pull requests and pushes to `master` and `release/**` run `lint.yml` ("Node.js b
 | `reading` (2 groups) | Linux, Playwright container | `test:reading-browser:library` or `test:reading-browser:annotations`. |
 | `reproducible` | Linux | Only when a release tag is supplied: a clean-install Worker and plugin build (`build:worker` and `build:plugin`, without the repeated type check) compared with the checked artifacts. |
 
-`release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. `test:ci` fails when a `release:check` command has no matching CI step; `scripts/release-verification.test.mjs` maps sharded commands and allowlists local-only steps, such as exporting `CRATE_WORKER_PREBUILT`. A release run that reuses a successful push build of the tag commit, or of its version-only parent, skips the test jobs; see [Release verification](#release-verification).
+CI runs each `check:source` command as a separate step so one failure does not hide the others. Linux browser jobs use a pinned Playwright image with preinstalled browsers and OS dependencies; update its version and digest alongside the Playwright lockfile version. The native PWA shards stay on macOS for native menus, font geometry and WebKit rendering/focus checks. The visual job keeps the reviewed macOS snapshot platform. These four macOS jobs stay under the hosted macOS concurrency limit, leaving a slot for overlapping runs. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation.
+
+`release:check` covers the same suites except `test:docker` and the `reproducible` rebuild, which run only in CI. `test:ci` fails when a `release:check` command has no matching CI step; `scripts/release-verification.test.mjs` maps sharded commands and allowlists local-only steps, such as exporting `CRATE_WORKER_PREBUILT`. A release run that reuses a successful push build of the tag commit, or of its version-only parent, skips the test jobs; see [verification reuse](releases.md#prepare-a-draft-with-one-command).
 
 Other workflows: `pages.yml` runs `check:docs`, the shortcut and site-deployment tests and the site build for documentation, site and shortcut changes; it deploys only for a published release or a manual run. `visual.yml` is manual, for baseline review and generation.
+
+## Browser tests
+
+To inspect or reproduce a PWA browser shard:
+
+```bash
+npm run test:pwa-browser -- --platform=linux --shard=1/4 --list
+npm run test:pwa-browser -- --platform=linux --shard=1/4
+npm run test:pwa-browser -- --platform=macos --shard=1/3
+```
+
+Omitting both `--platform` and `--shard` runs the complete browser suite. The Linux and native macOS groups cover every script exactly once; `test:ci` checks their combined coverage and balance. Groups are balanced by the measured script durations in `scripts/browser-durations.json`, which records the CI run they came from (`source`) and any local measurements (`additionalSources`); refresh it from CI logs whenever workloads change. The runner reports each script's duration and collects ordinary test failures so one run exposes all failures in that group. Each CI shard has its own checkout; do not run shards concurrently in the same working directory.
+
+The runner builds the Worker/PWA once, then sets `CRATE_WORKER_PREBUILT=1` for its child scripts, which verify and reuse those fresh assets. Standalone scripts build by default; tests requesting explicit asset versions (including service-worker updates) always build those versions separately. Missing prebuilt assets fail the test. `npm run test:ci` checks shard coverage and balance, runner failure handling, and metadata-independent asset versions.
+
+Reading checks use the same named groups locally and in CI: `test:reading-server`
+covers extraction, server behavior, and shortcut contracts; `test:reading-browser`
+covers the library, consent, optimistic changes, highlights, and shortcut browser
+flows in two groups (`library` and `annotations`, one CI job each), one browser script at a time to avoid competing selection and focus tests.
+Both groups require Chromium/WebKit and a built Worker. `test:reading` builds the
+Worker and runs both groups.
+File/vault history and plugin dialog browser checks also run in `release:check`.
+
+Browser files follow one naming rule, which `test:ci` enforces: entrypoints end in `-test.mjs` and imported helper modules in `-checks.mjs`; shared fixtures live in `tests/browser/support/` (the PWA preview server and assets in `support/preview/`). Every entrypoint must be in the registry, a registry group, or a package script.
+
+PWA asset hashing and raw server-input tracking exclude Finder/Explorer metadata (`.DS_Store`, AppleDouble `._*` files, `Thumbs.db`, and `desktop.ini`). Actual source files, including other dotfiles, still affect the version.
+
+Touch-swipe tests park the desktop cursor outside the viewport before each gesture. This prevents WebKit's layout-driven mouse-hover events from interrupting the simulated finger. The drawer test deliberately starts with a stale hover position as regression coverage. Failures save touch/pointer events, drawer state and a screenshot to `.generated/browser-failures/`; CI uploads these as `pwa-failures-<shard>`.
 
 ## Release verification
 
@@ -67,73 +122,17 @@ gate locally:
 npm run release:check
 ```
 
-It first runs the npm advisory audit (including development dependencies, failing at low severity) and a checksum-pinned Gitleaks scan of complete fetched Git history and current source. Network failures and shallow clones fail this gate. It builds and checks the plugin, Worker and service-worker TypeScript targets, runs lint, dead-code analysis of both the full project and production dependency graph, the complete unit and Worker-runtime suites, the packed standalone server test, and the PWA preview smoke test. It then creates production plugin and Worker artifacts, enforces raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks for the OAuth deployment entry point. Chromium/WebKit tests cover PWA storage, recovery, authentication, updates, concurrency, clock boundaries and capacity.
-
-Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. Use the [local release preparation command](releases.md) to sign and upload the public shortcut, then dispatch verification. Verified plugin assets are attached to the same draft GitHub release. Publish the draft only after completing the physical-device and hosted acceptance record below.
-
-GitHub Actions runs the same gates through `.github/workflows/verify.yml`, shared by branch/PR builds and releases. Source/security/artifact checks, Worker integration tests, Docker hosting on AMD64/ARM64, four editor shards (activity on the first, file/vault history on the second, plugin dialogs on the third), four PWA browser shards and two Reading browser groups run on Linux. Linux browser jobs use a pinned Playwright image with preinstalled browsers and OS dependencies; update its version and digest alongside the Playwright lockfile version. Three balanced native PWA shards retain macOS for native menus, font geometry and WebKit rendering/focus checks; they were the longest jobs at two shards. One visual job retains the reviewed macOS snapshot platform and also checks the native shortcut parser. These four macOS jobs stay under the hosted macOS concurrency limit, leaving a slot for overlapping runs. Capacity benchmarks remain in the gate. Automatic visual comparisons run here once; the separate visual workflow is for manual comparisons and baseline generation. New commits cancel obsolete branch verification runs.
-
-Successful push builds upload candidate records and release assets for seven days.
-Release preparation can reuse only a successful repository push run for the exact
-tag commit. It rechecks that run, rejects missing or expired artifacts, refreshes
-security and the published server-revision baseline, and verifies the candidate's
-workflow identity, Node.js toolchain, version and artifact hashes. PR and fork runs
-are excluded.
-
-Without an exact-commit run, a release commit whose only change from its single
-parent is the version can reuse that parent's successful push run for the browser,
-Worker and Docker jobs. The four version files may change only their version fields
-and add the new `versions.json` entry; dependencies, `minAppVersion` and every other
-file must match. The source checks, plugin build, candidate record and clean-install
-reproducible rebuild still run on the tag commit, and the parent run and diff are
-rechecked before assets are attached. If neither run exists, the complete matrix
-runs normally.
-
-Reading checks use the same named groups locally and in CI: `test:reading-server`
-covers extraction, server behavior, and shortcut contracts; `test:reading-browser`
-covers the library, consent, optimistic changes, highlights, and shortcut browser
-flows in two groups (`library` and `annotations`, one CI job each), one browser script at a time to avoid competing selection and focus tests.
-Both groups require Chromium/WebKit and a built Worker. `test:reading` builds the
-Worker and runs both groups.
-File/vault history and plugin dialog browser checks also run in `release:check`.
-
-`useReminderSync.test.ts` and `useReminderEditor.test.ts` render real React hooks
-with LinkeDOM to check rerenders, effect cleanup, stale reads, and editor lifetime.
-Browser focus and persistent storage behavior remain covered by Chromium/WebKit
-checks against the built PWA.
-`useReminderEditorActions.test.ts` covers delayed saves, duplicate submissions,
-failed persistence and logout; `useReminderMutations.test.ts` exercises those actions
-with the command hook. `runtime/encryption-setup.test.ts` verifies shutdown before
-queued setup, during draining and while setup work is pending. Server-status tests exercise
-cache identity, expiry, throttling and cancellation through the public runtime API.
-
-Release runs resolve the tag to one commit before starting verification. Every job checks out that commit. A separate clean-install rebuild starts after the source artifacts are ready and must reproduce their plugin, CSS, Worker/PWA and source metadata hashes. Draft asset attachment waits for all required verification jobs and that rebuild. Source artifacts alone cannot authorize a release, and the original push run is rechecked before reused assets are attached.
-
-`npm run check:source` runs everything in `npm run check` except the Worker runtime tests (`test:worker-runtime`) and the local server tests (`test:local-server`). CI runs each of its commands as a separate step so one failure does not hide the others. To inspect or reproduce a PWA browser shard:
-
-```bash
-npm run test:pwa-browser -- --platform=linux --shard=1/4 --list
-npm run test:pwa-browser -- --platform=linux --shard=1/4
-npm run test:pwa-browser -- --platform=macos --shard=1/2
-```
-
-Omitting both `--platform` and `--shard` runs the complete browser suite. The Linux and native macOS groups cover every script exactly once; `test:ci` checks their combined coverage and balance. Groups are balanced by the measured script durations in `scripts/browser-durations.json`, which records the source run. The current estimates use the September 30 macOS release run; refresh them from Linux CI logs after the runner change, and whenever workloads change. The runner reports each script's duration and collects ordinary test failures so one run exposes all failures in that group. Each CI shard has its own checkout; do not run shards concurrently in the same working directory.
-
-The runner builds the Worker/PWA once, then sets `CRATE_WORKER_PREBUILT=1` for its child scripts, which verify and reuse those fresh assets. Standalone scripts build by default; tests requesting explicit asset versions (including service-worker updates) always build those versions separately. Missing prebuilt assets fail the test. `npm run test:ci` checks shard coverage and balance, runner failure handling, and metadata-independent asset versions.
+It first runs the npm advisory audit (including development dependencies, failing at low severity) and a checksum-pinned Gitleaks scan of complete fetched Git history and current source. Network failures and shallow clones fail this gate. It builds and checks the plugin, Worker and service-worker TypeScript targets, runs lint, dead-code analysis of both the full project and production dependency graph, the complete unit and Worker-runtime suites, the packed standalone server test, and the PWA preview smoke test. It then creates production plugin and Worker artifacts, enforces raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks for the OAuth deployment entry point. Chromium/WebKit tests cover PWA storage, recovery, authentication, updates, concurrency, clock boundaries and capacity. Capacity benchmarks remain in the gate.
 
 `release:check` builds the Worker once, then exports `CRATE_WORKER_PREBUILT=1` so the nested `build:worker` calls (in `check:source`, the server revision, Worker runtime, local server, server package and Reading suites, and the browser runner) reuse that output. In that mode `scripts/build-worker.mjs` fails instead of reusing output that is missing, a development build, or older than any recorded Worker input in `.generated/cloudflare/server-inputs.json`. Do not export the variable in an interactive shell.
 
-Browser files follow one naming rule, which `test:ci` enforces: entrypoints end in `-test.mjs` and imported helper modules in `-checks.mjs`; shared fixtures live in `tests/browser/support/` (the PWA preview server and assets in `support/preview/`). Every entrypoint must be in the registry, a registry group, or a package script.
-
-PWA asset hashing and raw server-input tracking exclude Finder/Explorer metadata (`.DS_Store`, AppleDouble `._*` files, `Thumbs.db`, and `desktop.ini`). Actual source files, including other dotfiles, still affect the version.
-
-Touch-swipe tests park the desktop cursor outside the viewport before each gesture. This prevents WebKit's layout-driven mouse-hover events from interrupting the simulated finger. The drawer test deliberately starts with a stale hover position as regression coverage. Failures save touch/pointer events, drawer state and a screenshot to `.generated/browser-failures/`; CI uploads these as `pwa-failures-<shard>`.
-
-The individual size gates are also available as `npm run size-check:plugin` and `npm run size-check:worker`. A Cloudflare configuration change should additionally pass:
+Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. The individual size gates are also available as `npm run size-check:plugin` and `npm run size-check:worker`. A Cloudflare configuration change should additionally pass:
 
 ```bash
 npx --yes wrangler@4.123.0 deploy --dry-run
 ```
+
+[Preparing a plugin release](releases.md) covers signing and uploading the public shortcut, dispatching verification, reusing a push run or its version-only parent, the reproducible rebuild and attaching verified assets to the draft. Publish the draft only after completing the physical-device and hosted acceptance record below.
 
 ## Public-release acceptance
 
@@ -150,12 +149,12 @@ Record the Obsidian version, operating-system version, and result for each devic
 - On both mobile platforms, exercise the settings tab: sync controls and exclusions, reminder and notification options, web app **Open app**, Reading **Open web reading**, connected devices, Cloudflare usage and dashboard, and recovery dialogs. Check link and clipboard fallbacks from the same phone. If Reading is enabled, test its library and a new browser setup link. Record any settings that cannot be reached or changed.
 - Confirm **Disconnect this device** removes only the local credential, while explicit Cloudflare resource deletion removes the remote copy as documented.
 
-## Framework and Config
+## Framework and config
 
 - **Framework:** vitest
 - **Config:** `vitest.config.ts`
 - **Test pattern:** `src/**/*.test.ts` (co-located next to source)
-- **Path aliases:** `src` -> `src/`, `obsidian` -> `src/test/mocks/obsidian.ts`
+- **Path aliases:** `@` and `src` -> `src/`, `obsidian` -> `src/test/mocks/obsidian.ts`
 
 ```bash
 npm test                                  # run all tests
@@ -236,7 +235,7 @@ dates are anchored to October 4, 2026; refresh them before taking screenshots
 on another day. Nested projects, recurrence, descriptions, priorities, and
 completed reminders provide the other demo scenarios.
 
-## Manual Obsidian Smoke Test
+## Manual Obsidian smoke test
 
 Run this before merging changes that touch sync orchestration, reminder parsing, markdown scanning, shadow DOM rendering, or reminder view styles:
 
@@ -298,7 +297,7 @@ retries, after its first passing run. Run browser suites sequentially in each
 checkout so builds, focus, and output artifacts cannot interfere. A passing
 repeat establishes evidence for the fix, not a guarantee that every flake is gone.
 
-## Obsidian Mock
+## Obsidian mock
 
 Unit tests use two kinds of Obsidian stand-ins.
 
@@ -320,143 +319,148 @@ Browser tests that bundle plugin UI with esbuild use `tests/browser/support/obsi
 - `obsidianDialogModule` - a synthetic `obsidian` module with `setIcon`, `Setting`, `Notice` (messages in `window.notices`) and `Modal` (the open modal in `window.currentModal`); serve it from an esbuild plugin and append test-specific exports such as `Platform`
 - `hostStyles` - minimal native host CSS variables and dialog, setting and button rules, with a `.theme-dark` variant
 
-## Testing Patterns
+## Harnesses and patterns
 
-### Persistent Engine Harness
+Shared harnesses end in `-test-harness.ts` and are excluded from coverage.
 
-`sync/engine/engine-persistence-test-harness.ts` initializes a real `SyncEngine`,
-`LocalManifest`, upload/restore journals and file operations against
-`test/factories/sync-vault.ts`. Inject responses through `ApiHttpTransport` for
-network-dependent cases. The shared vault fixture is also used by Worker runtime
-integration tests; plugin and sync tests do not import fixtures from Worker code.
+| Harness | File | Use for |
+| --- | --- | --- |
+| Persistent engine | `src/sync/engine/engine-persistence-test-harness.ts` | Checkpoint persistence, discard/recovery, file transfer and shutdown ordering |
+| Lightweight engine | `src/sync/engine/engine-test-harness.ts` | Sync mode selection, state transitions and isolated error handling |
+| Transfer | `src/sync/transfer/transfer-test-harness.ts` | Transfer modules and other code that takes a `TransferContext` |
+| Planner | `src/sync/planner/planner-test-harness.ts` | Incremental planning (`createIncrementalHarness`, `createSettings`) |
+| Runtime | `src/sync/runtime/runtime-test-harness.ts` | `SyncRuntime` lifecycle (`createRuntimeHarness`, `createDeferred`, `flushMicrotasks`) |
+| Worker sync devices | `src/cloudflare/worker/test-support/sync-engine-test-harness.ts` | `SyncTestDevice`, a separate device per instance against the real Worker |
+| D1 query counter | `src/cloudflare/worker/test-support/d1-query-test-harness.ts` | Query budgets (`countD1Queries`, `installD1QueryCounter`) |
+| Storage cost meter | `src/cloudflare/worker/test-support/storage-cost-test-harness.ts` | D1, R2 and Durable Object use per request, including alarms |
 
-Use this harness for checkpoint persistence, discard/recovery and shutdown ordering.
+### Persistent engine harness
+
+`createPersistentEngineHarness(transport)` in `sync/engine/engine-persistence-test-harness.ts`
+initializes a real `SyncEngine`, `LocalManifest`, upload/restore journals and file
+operations against the `PersistentTestVault` in `test/factories/sync-vault.ts`. Inject
+responses through `ApiHttpTransport` for network-dependent cases. The shared vault
+fixture is also used by Worker runtime integration tests; plugin and sync tests do not
+import fixtures from Worker code.
+
 Assert stored bytes and public engine results. Do not replace private engine fields:
 file operations retain their original manifest and journal bindings. The harness
 destroys engines and drains active work after each test.
 
-### Lightweight Engine Harness
+### Lightweight engine harness
 
-`sync/engine/engine-test-harness.ts` bundles mock dependencies for isolated planning and
-orchestration tests. It does not establish persistence behavior:
+`createHarness()` in `sync/engine/engine-test-harness.ts` is for orchestration tests
+only; it does not establish persistence behavior. It builds a real `SyncEngine` over an
+in-memory vault adapter, mocked API methods pre-configured for the happy path, and a
+real `LocalManifest` whose methods are wrapped in spies:
 
 ```ts
-type Harness = {
-  engine: SyncEngine;
-  settings: CrateSettings;
-  api: { isConfigured: Mock; getChanges: Mock; uploadFile: Mock; ... };
-  vault: { adapter: MockAdapter; getAbstractFileByPath: Mock; ... };
-  localManifest: { load: Mock; save: Mock; hashMatches: Mock; ... };
-};
+type Harness = ReturnType<typeof createHarness>;
+// {
+//   engine, hooks, settings, fileManager, workspace, conflictStore,
+//   api: { isConfigured, getChanges, uploadFile, batchUpload, ... },   // vi.fn() mocks
+//   vault: { adapter, getAbstractFileByPath, getFiles, ... },
+//   localManifest: LocalManifest & { load, save, hashMatches, setEntry, ... }, // vi.spyOn
+// }
 ```
 
-A `createHarness()` function wires up the engine with all mocks pre-configured for the happy path. Tests override specific mocks as needed.
+Tests override specific mocks as needed. Helpers such as `runPeriodicCheck`,
+`spyOnIncrementalSync`, `spyOnConflictRecovery` and `createNamedAbortError` live in the
+same file. Sync orchestration tests observe the engine's constructor-owned manifest
+through these spies.
 
-### Module-Level Harness (`transfer/download.test.ts`)
+### Transfer harness
 
-For testing extracted modules (planner, transfer, queue), a lighter harness creates just the context interface:
+`createTransferHarness()` in `sync/transfer/transfer-test-harness.ts` is shared by the
+transfer tests (`download`, `upload`, `prepare`, `applied-content`,
+`hidden-file-download`), `planner/incremental-cancellation.test.ts` and
+`local/local-delete.test.ts`. It returns the mocks (`adapter`, `vault`, `fileManager`,
+`api`, `localManifest`, `retryWithBackoff`, `getModifiedIso`) and a `context` that
+satisfies `TransferContext`: `api` is passed as `files`, `runConcurrent` is a plain
+`Promise.all`, `retryWithBackoff` calls the function once, and `encrypted()` returns
+false.
 
-```ts
-function createTransferHarness() {
-  const adapter = { readBinary: vi.fn(), stat: vi.fn(), ... };
-  const vault = { adapter, getAbstractFileByPath: vi.fn(), ... };
-  const api = { uploadFile: vi.fn(), downloadFile: vi.fn(), ... };
-  const localManifest = { hashMatches: vi.fn(), setEntry: vi.fn(), ... };
-  return {
-    adapter, vault, api, localManifest,
-    context: { vault, api, localManifest, runConcurrent, retryWithBackoff, ... },
-  };
-}
-```
+### Module mocking with `vi.hoisted()`
 
-### Module Mocking with `vi.hoisted()` (`planner/incremental-reconciliation.test.ts`, `transfer/download.test.ts`)
-
-When a module under test imports other modules that need mocking:
+When a module under test imports other modules that need mocking
+(`planner/incremental-reconciliation.test.ts`, `transfer/download.test.ts`):
 
 ```ts
-// 1. Define mocks in hoisted scope (runs before imports)
+import { runIncrementalSync } from './incremental';
+
+// Runs before any import, so the factories below can use these references.
 const fileDiscoveryMocks = vi.hoisted(() => ({
   getAllVaultFiles: vi.fn(),
   isHiddenPath: vi.fn((path: string) => path.split('/').some(s => s.startsWith('.'))),
 }));
 
-// 2. Replace the module
 vi.mock('../local/file-discovery', () => ({
   getAllVaultFiles: fileDiscoveryMocks.getAllVaultFiles,
   isHiddenPath: fileDiscoveryMocks.isHiddenPath,
 }));
-
-// 3. Import the module under test AFTER vi.mock()
-import { runIncrementalSync } from './incremental';
 ```
 
-Key: `vi.hoisted()` ensures mock references are available before module evaluation. The import of the module under test must come after `vi.mock()` calls.
+Vitest hoists `vi.mock()` calls above the imports, so the module under test sees the
+mocks wherever its import appears in the file. A mock factory runs before the file's
+own variables exist, so any value it references must come from `vi.hoisted()`. Use
+`vi.doMock()` when a mock must apply only to modules imported after it, for example
+through a dynamic `import()` inside one test.
 
-### Context Interface Pattern
+### Context interfaces
 
-Sync modules define narrow context interfaces (e.g., `TransferContext` and `QueueFlushContext`) rather than depending on concrete classes. This makes tests easy to write with partial mocks:
+Sync modules define narrow context interfaces (for example `TransferContext` in
+`sync/transfer/types.ts` and `QueueFlushContext`) rather than depending on concrete
+classes, so tests can supply partial mocks:
 
 ```ts
-// Module defines what it needs
 export interface TransferContext {
+  plannedContent?: PlannedContent;
   vault: Vault;
-  api: TransferApi;
+  fileManager: { trashFile(file: TAbstractFile): Promise<void> };
+  /** The engine's journaled file operations. */
+  files: TransferApi;
   localManifest: TransferManifest;
+  markdownBaseCache: TransferMarkdownBaseCache;
+  conflictStore: TransferConflictStore;
   runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
   retryWithBackoff<T>(fn: () => Promise<T>): Promise<T>;
   getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
+  /** Whether uploads are encrypted, which limits how deep a synced file can be. */
+  encrypted(): boolean;
 }
-
-// Test provides minimal implementation
-const context = {
-  vault: vault as never,
-  api,
-  localManifest,
-  runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(t => t())),
-  retryWithBackoff: async (fn) => fn(),
-  getModifiedIso: async () => '2026-01-01T00:00:00.000Z',
-};
 ```
 
-## Writing Tests by Module Type
+### By module type
 
-### Sync modules (planner, transfer, queue)
-
-- Use the context interface pattern - create a harness matching the context type
-- Mock `runConcurrent` as simple `Promise.all` (no concurrency limit needed in tests)
-- Mock `retryWithBackoff` as direct invocation
-- Use `vi.hoisted()` + `vi.mock()` for cross-module dependencies
-
-### Pure functions (conflict, encoding, hasher, file-discovery)
-
-- Test directly with real inputs, no mocking needed
-- Example: `conflict.test.ts` tests `getConflictFileName()` and `detectConflicts()` with plain objects
-
-### Engine (integration)
-
-- Use the persistent harness for manifest, journal, recovery and shutdown behavior.
-- Use the lightweight mock harness for sync mode selection, state transitions and
-  isolated error handling.
-- Trigger fallback through an expired changelog response and cancellation through
-  pending adapter/API work, rather than replacing private engine contexts.
-- Test pagination directly with `incremental-changelog.test.ts`; incremental
+- **Sync modules (planner, transfer, queue):** create a harness matching the context
+  type, or use the shared one. Mock `runConcurrent` as a simple `Promise.all` (no
+  concurrency limit needed in tests) and `retryWithBackoff` as direct invocation. Use
+  `vi.hoisted()` + `vi.mock()` for cross-module dependencies.
+- **Pure functions (conflict naming, ignore rules, file discovery helpers):** test
+  directly with real inputs, no mocking needed. For example, `conflict/conflict.test.ts`
+  tests `getConflictFileName()` and the three-way `classifyPaths()` with plain objects.
+- **Engine:** use the persistent harness for manifest, journal, recovery and shutdown
+  behavior, and the lightweight harness for sync mode selection, state transitions and
+  isolated error handling. Trigger fallback through an expired changelog response and
+  cancellation through pending adapter/API work, rather than replacing private engine
+  contexts. Test pagination directly with `incremental-changelog.test.ts`; incremental
   reconciliation tests cover late local edits, guarded deletes and cursor retention.
-- `engine/transfer-parity.test.ts` runs a mixed upload/delete workload through
+  `engine/transfer-parity.test.ts` runs a mixed upload/delete workload through
   selected, full, incremental, automatic and forced sync using real journals and
   file operations. `transfer/delete.test.ts` checks bounded concurrency, progress,
   upload failure gates, local absence and accepted sibling cancellation.
-
-### Worker query budgets
-
-- Cloudflare limits live in `src/cloudflare/worker/d1/platform-limits.ts`, with the docs
-  they were checked against. Assert budgets against `D1_QUERIES_PER_INVOCATION`, not a literal.
-- Count queries as D1 does: one per `first`/`run`/`all` and one per `db.batch()`, whatever
+- **Worker query budgets:** Cloudflare limits live in
+  `src/cloudflare/worker/d1/platform-limits.ts`, with the docs they were checked
+  against. Assert budgets against `D1_QUERIES_PER_INVOCATION`, not a literal. Count
+  queries as D1 does: one per `first`/`run`/`all` and one per `db.batch()`, whatever
   its size. Pass `countD1Queries(env.DB).db` to the one invocation under test, or use
-  `installD1QueryCounter(env.DB)` from `test-support/d1-query-test-harness.ts` when the code reads the binding itself.
-- Measure the worst case (stale writes, conflicts, encryption, a Reading index page in the
-  same pass) and size each feature batch to leave headroom below the limit.
+  `installD1QueryCounter(env.DB)` when the code reads the binding itself. Measure the
+  worst case (stale writes, conflicts, encryption, a Reading index page in the same
+  pass) and size each feature batch to leave headroom below the limit.
 
 ## Feature-specific notes
+
+Jump to: [cleanup and route execution](#cleanup-reviews-storage-opening-and-route-execution) · [Reading pagination and checkpoints](#reading-pagination-and-checkpoint-boundaries) · [sync outcomes and reader actions](#sync-outcomes-and-reader-action-lifetimes) · [PWA hooks and runtime setup](#pwa-hooks-and-runtime-setup) · [settings identity and pending keys](#settings-identity-and-pending-change-keys) · [sync shutdown](#sync-shutdown) · [structured merge and Reading recovery](#structured-merge-and-reading-recovery).
 
 Coverage notes, commands and manual checks for individual features live in each feature's doc under **Testing notes**:
 
@@ -513,11 +517,14 @@ pages and searches 10,000- and 50,000-note libraries and bounds the rows each re
 `tests/browser/reading/reading-cache-recovery-test.mjs` verifies that a rejected list page
 preserves offline articles, pending commands and drafts in Chromium and WebKit.
 
-`encryption/file-inventory.test.ts`, `pwa/reading/encrypted-api.test.ts` and
-`pwa/reminders/encrypted-reminder-api.test.ts` cover encrypted page and delta validation, advancing
-empty-page limits, duplicate paths, cursor and snapshot changes, 304 polls, deltas, batch downloads
-of notes that change or disappear after listing, and retention of the previous decrypted cache
-after rejected loads. `encryption/encrypted-folder-lists.integration.ts` meters the rows of an
+`encryption/file-inventory.test.ts` and `pwa/reminders/encrypted-reminder-api.test.ts`
+cover encrypted page and delta validation, advancing empty-page limits, duplicate paths,
+cursor and snapshot changes, 304 polls, deltas, batch downloads of notes that change or
+disappear after listing, and retention of the previous decrypted cache after rejected
+loads. `pwa/reading/encrypted-routing.test.ts` checks that the Reading app sends
+encrypted capture, update, retry and delete requests only as ciphertext, and
+`tests/browser/pwa/pwa-reading-encryption-test.mjs` covers the encrypted Reading app end
+to end in Chromium and WebKit. `encryption/encrypted-folder-lists.integration.ts` meters the rows of an
 unchanged poll at 100 and 1,000 notes, deltas, and the requests and queries of a cold list.
 
 `manifest.test.ts`, `manifest-checkpoint.test.ts` and `checkpoint-validation.test.ts`
@@ -595,6 +602,18 @@ same bundler as production and browser previews. `npm run typecheck:service-work
 checks that source with WebWorker globals. Asset-version tests cover runtime-only
 changes so a changed handler cannot retain the previous offline shell version.
 
+### PWA hooks and runtime setup
+
+`useReminderSync.test.ts` and `useReminderEditor.test.ts` render real React hooks
+with LinkeDOM to check rerenders, effect cleanup, stale reads, and editor lifetime.
+Browser focus and persistent storage behavior remain covered by Chromium/WebKit
+checks against the built PWA.
+`useReminderEditorActions.test.ts` covers delayed saves, duplicate submissions,
+failed persistence and logout; `useReminderMutations.test.ts` exercises those actions
+with the command hook. `runtime/encryption-setup.test.ts` verifies shutdown before
+queued setup, during draining and while setup work is pending. Server-status tests exercise
+cache identity, expiry, throttling and cancellation through the public runtime API.
+
 ### Settings identity and pending-change keys
 
 `plugin/CratePlugin.test.ts` hydrates a device ID before successful and rejected
@@ -651,12 +670,11 @@ covers completion progress after engine idle, stopping, conflicts and status lab
 
 ### Structured merge and Reading recovery
 
-Sync orchestration tests observe the engine's constructor-owned manifest through
-`engine-test-harness.ts`. File transfer and recovery tests use
-`engine-persistence-test-harness.ts`, with real file operations, journals and a
-persistent vault; only HTTP responses and deliberate I/O failures are substituted.
-`engine/selected.test.ts` and `deletion-safety.test.ts` reload saved checkpoints to
-verify selected uploads/deletions, interrupted journals and incomplete discovery.
+File transfer and recovery tests use the [persistent engine harness](#persistent-engine-harness),
+with real file operations, journals and a persistent vault; only HTTP responses and
+deliberate I/O failures are substituted. `engine/selected.test.ts` and
+`deletion-safety.test.ts` reload saved checkpoints to verify selected uploads/deletions,
+interrupted journals and incomplete discovery.
 
 `reading/data/obsidian-vault.test.ts` exercises file replacement, rename, exclusion and
 shutdown while reads or atomic updates are pending. Reading Worker integration

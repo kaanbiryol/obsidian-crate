@@ -20,7 +20,7 @@ These settings apply to every subscribed device. The saved timezone stays put wh
 
 1. [Open the Crate web app](/docs/getting-started/devices/#open-the-web-app) on the device.
 2. On iPhone or iPad, [add it to your Home Screen](/docs/features/web-app/#install-on-your-phone) and open the installed app.
-3. In the app, open **Settings → Reminders** and select **Enable** beside **Push notifications**.
+3. In the app, open **Settings → Notifications** and select **Enable** beside **Push notifications**. In Safari on iPhone or iPad it shows **Install first** until you open the Home Screen app.
 4. Allow notifications when asked, and wait until Crate shows **On**.
 
 Repeat this on each device where you want alerts.
@@ -42,7 +42,7 @@ On desktop, Obsidian can show reminder alerts itself, so reminders work even whe
 
 1. Open **Settings → Crate → Reminders** and check that **Enable reminders** is on.
 2. Check that **Desktop notifications** is on.
-3. For reminders with a date but no time, set **All-day notification time**. It's under **Reminders** without a server, and under **Notifications** with one, where it applies to every device even with **Push notifications** off.
+3. For reminders with a date but no time, set **All-day notification time**. Without a server it's under **Reminders**. With a server it's under **Notifications** and applies to every device, even with **Push notifications** off.
 
 When Obsidian opens, reminders that fell due while it was closed alert once, up to a day late. With sync on, this waits for the first sync, so a reminder completed on another device doesn't alert. If more than three fall due together, you get one summary instead. Reminders that were already past due when the device first saw them don't alert.
 

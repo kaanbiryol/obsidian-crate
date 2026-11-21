@@ -76,6 +76,48 @@ If you have a domain on Cloudflare, you can use a [custom-domain tunnel](/docs/r
 
 ## Look after your data
 
-Your server's data lives in a Docker volume, so it survives when the container is replaced. Don't remove that volume, and keep separate backups. Before updating, follow the [backup and upgrade instructions](/docs/reference/self-hosting/#verified-backups-restore-and-updates).
+Your server's data lives in a Docker volume, so it survives when the container is replaced. Don't remove that volume, and keep backups outside it.
+
+### Turn on daily backups
+
+1. Create a folder named `backups` next to `compose.yaml`. On Linux, make it writable by user ID 1000.
+2. In `compose.yaml`, uncomment the `./backups:/backups` line, then run `docker compose up -d`.
+3. Turn on daily backups, keeping the latest seven:
+
+   ```sh
+   docker compose exec crate crate auto-backup --output /backups --keep 7
+   ```
+
+Crate makes the first backup right away, then a verified backup each day while it runs, without stopping sync for more than a moment, and deletes the oldest beyond seven. Copy the `backups` folder to another disk or computer now and then. The [server command reference](/docs/reference/self-hosting/#verified-backups-restore-and-updates) covers restoring one.
+
+### Update the server
+
+When Obsidian shows **Server update available**, update the server to the same version as your plugin:
+
+1. Let sync finish on your devices, and make a backup:
+
+   ```sh
+   docker compose exec crate crate backup --output /backups/before-update
+   ```
+
+   This needs the `backups` folder from [daily backups](#turn-on-daily-backups). Use a new name each time.
+2. From the repository folder, switch to the release that matches your plugin version, for example `0.14.3`:
+
+   ```sh
+   git fetch --tags
+   git checkout 0.14.3
+   ```
+
+3. Stop the server, keep a copy of the current image, build the new one, and check it before you start it:
+
+   ```sh
+   docker compose stop
+   docker image tag crate-server:local crate-server:before-update
+   docker compose build
+   docker compose run --rm crate check-upgrade
+   docker compose up -d
+   ```
+
+Start the server only if `check-upgrade` succeeds. If it reports that the database needs a migration, or rejects the update, follow the [update and migrate steps](/docs/reference/self-hosting/#update-and-migrate) instead of starting it.
 
 [Connect your other devices →](/docs/getting-started/devices/)

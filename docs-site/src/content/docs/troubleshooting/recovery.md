@@ -60,7 +60,7 @@ If your session needs renewing:
 2. Review your saved work.
 3. Select **Resume saved changes** when it's offered.
 
-Export pending work before you clear browser data.
+Before you clear browser data, open **Settings** in the web app and select **Export Reading data** or **Export unsynced reminders** when they're offered.
 
 :::caution[Don't sign out to fix a stuck save]
 **Signing out clears cached data, pending changes, and drafts.** Try the steps above first.
@@ -86,5 +86,5 @@ Your notes aren't changed. Neither file holds sign-in credentials; those stay in
 
 Crate's history only goes back so far, and deletions sync like any other change. Keep a separate backup of vaults that matter to you.
 
-- **Self-hosted:** use the [verified backup and restore commands](/docs/reference/self-hosting/#verified-backups-restore-and-updates).
-- **Cloudflare:** restoring the server's storage means restoring its database and file storage together. See the [operator recovery runbook](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/recovery.md).
+- **Self-hosted:** [turn on daily backups](/docs/getting-started/self-hosting/#turn-on-daily-backups). The [server command reference](/docs/reference/self-hosting/#restore) explains restoring one.
+- **Cloudflare:** Crate backs up your server before a server update that changes its database. To restore one of these backups, open **Settings → Crate → Server** on a desktop and select **Restore backup…** under **Server backup recovery**. Crate creates a separate server marked **(restored)** and keeps your current one, so you can connect your devices to it when you're ready. For other recovery, see the [operator recovery runbook](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/recovery.md).

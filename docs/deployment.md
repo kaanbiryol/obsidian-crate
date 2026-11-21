@@ -250,7 +250,7 @@ File-upload recovery checkpoints confirmed receipts every 16 uploads and saves a
 
 ### Recover an interrupted update in Crate
 
-Select **Check and recover update** beside the update notice, or under **Server and usage → Interrupted server update**. Crate uses the saved Cloudflare login to inspect the live Worker, its storage bindings, and the operation record.
+Select **Check and recover update** beside the update notice, or under **Server → Interrupted server update**. Crate uses the saved Cloudflare login to inspect the live Worker, its storage bindings, and the operation record.
 
 A confirmed, definitively rejected, or operator-settled update can resume with the exact artifact using an exact-value ownership replacement. Writes stay fenced throughout resumption and verification. The previous updater cannot send its next mutation after recovery wins that comparison. A checkpoint from before database/code changes can be safely released instead, after which the result dialog offers **Update server**.
 
@@ -267,6 +267,18 @@ network request. Startup, reconnect, foreground sync and periodic checks retry i
 Only an explicit pending edit updates an existing server folder; ordinary policy
 initialization cannot overwrite it. Acknowledging an older update cannot clear a
 newer local edit.
+
+## Deployment code
+
+Paths are relative to `src/`. Worker bindings and the upload payload are listed under [Worker bindings](architecture.md#worker-bindings).
+
+- `cloudflare/deployment/types.ts` defines authorization-independent deployment requests (reconnect, connect, switch, create, update and delete) and distinguishes a deleted server from a deployed server with a URL. OAuth sessions contain a request; saved authorization runs that request directly.
+- `cloudflare/deployment/target.ts` owns account selection, discovery and server reuse policy. `CloudflareDeploymentService` (`cloudflare/deployment/service.ts`) owns authorization, operation exclusion, cancellation, lifetime guards, target verification, guarded settings and transport access, and the ordered provisioning workflow. `cloudflare/deployment/preconditions.ts` holds the saved-server checks an operation runs before and during authorization. `cloudflare/deployment/state.ts` validates persisted deployment and deletion state; plugin settings compose that normalizer.
+- `plugin/cloudflare/operations.ts` coordinates each operation in prepare-device, run-deployment and connect-device steps; `ui/cloudflare/operation-presentation.ts` owns modal copy and the recovery actions the coordinator supplies.
+- `cloudflare/restore/workflow.ts` keeps restore checkpoint selection, destination creation and persist-before-remote ordering together.
+- OAuth: the plugin creates a random `state` and a fresh PKCE S256 verifier and challenge in memory (`cloudflare/oauth/`). Creating a deployment initializes the current schema, explicit updates require its schema marker before uploading code, and Worker cold starts never change the schema. `CloudflareSavedLogin` (`cloudflare/oauth/saved-login.ts`) keeps the access and refresh tokens in Obsidian secret storage under `crate-usage-oauth-<account>`, scoped to the Cloudflare account, renews them early and revokes them best effort when it clears them. Plugin settings contain only non-secret deployment metadata and the cached usage snapshot (`cloudflare/usage/`). Authorization can also be revoked in Cloudflare.
+- Device pairing shares its format in `protocol/device-pairing.ts`. `cloudflare/deployment/device-pairing.ts` writes the hashed one-use code through the saved Cloudflare login, replacing any earlier unredeemed one; `ui/settings/add-device-modal.ts` shows the QR code and waits for the new token; `cloudflare/worker/auth/device-pairing.ts` redeems the code. On the new device, `plugin/device-pairing.ts` handles `obsidian://crate-pair` and pasted links.
+- Terminal deletion is `cloudflare/server-reset/delete.ts`, with resource identity checks in `delete-ownership.ts` and settled-operation takeover in `delete-fence.ts`. The helper Worker (`server-delete-worker.js`) uses a hashed capability and binds only the selected bucket; it does not depend on application protocols, releases, schemas or reset and rebuild rules. Non-secret deletion progress survives plugin reload.
 
 ## Testing notes
 

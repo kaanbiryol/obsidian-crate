@@ -8,11 +8,11 @@ Crate is an Obsidian plugin for people who want to own the infrastructure behind
 
 ## Status
 
-Crate is early self-hosted software. Review the code, understand the Cloudflare resources it creates, and test with a non-critical vault before using it for important notes. It is not yet in the Obsidian community plugin catalog; install it from source or from release artifacts.
+Crate is early self-hosted software. Review the code, understand the Cloudflare resources it creates, and test with a non-critical vault before using it for important notes. It is not yet in the Obsidian community plugin catalog; install it with [BRAT](https://crate.kaanbiryol.com/docs/getting-started/installation/), from release artifacts, or from source.
 
 ## Features
 
-- **Vault sync** across desktop and mobile, with attachments, deletes and renames, 30-day file history, and conflict copies instead of silent overwrites
+- **Vault sync** across desktop and mobile, with attachments, deletes and renames, file history (30 days by default, 7 to 90 available), and conflict copies instead of silent overwrites
 - **Your infrastructure:** file contents in your R2 bucket, metadata in your D1 database, deployed through Cloudflare sign-in without giving the plugin an account API token
 - **Local hosting:** run the same server on your own computer or in Docker, with no Cloudflare account required
 - **Reminders** stored as Markdown in your vault, with `reminders`, `reminders-today` and `reminders-upcoming` query blocks, push notifications through your own Worker, and desktop notifications from Obsidian without a server
@@ -22,7 +22,7 @@ Crate is early self-hosted software. Review the code, understand the Cloudflare 
 
 ## Documentation
 
-Start with the [documentation site](https://crate.kaanbiryol.com/docs/): [install the plugin](https://crate.kaanbiryol.com/docs/getting-started/installation/), [choose your hosting](https://crate.kaanbiryol.com/docs/getting-started/hosting/), then [connect your devices](https://crate.kaanbiryol.com/docs/getting-started/devices/). Feature guides cover [vault sync](https://crate.kaanbiryol.com/docs/features/sync/), [reminders](https://crate.kaanbiryol.com/docs/features/reminders/), [Reading](https://crate.kaanbiryol.com/docs/features/reading/), the [web app](https://crate.kaanbiryol.com/docs/features/web-app/), [encryption](https://crate.kaanbiryol.com/docs/features/encryption/) and [practical limits](https://crate.kaanbiryol.com/docs/getting-started/limits/).
+Start with the [documentation site](https://crate.kaanbiryol.com/docs/) and its [common questions](https://crate.kaanbiryol.com/docs/getting-started/faq/): [install the plugin](https://crate.kaanbiryol.com/docs/getting-started/installation/), [choose your hosting](https://crate.kaanbiryol.com/docs/getting-started/hosting/), then [connect your devices](https://crate.kaanbiryol.com/docs/getting-started/devices/). Feature guides cover [vault sync](https://crate.kaanbiryol.com/docs/features/sync/), [reminders](https://crate.kaanbiryol.com/docs/features/reminders/), [Reading](https://crate.kaanbiryol.com/docs/features/reading/), the [web app](https://crate.kaanbiryol.com/docs/features/web-app/), [encryption](https://crate.kaanbiryol.com/docs/features/encryption/) and [practical limits](https://crate.kaanbiryol.com/docs/getting-started/limits/).
 
 For operators and contributors:
 
@@ -58,6 +58,7 @@ Automatic sync is off by default on each device. After connecting, run **Crate: 
 ## Privacy and security
 
 - Vault files go to your own server and storage. Crate has no hidden telemetry, fetches no remote code at runtime, and needs no Crate account.
+- Like your other plugins, Crate's own release files (`main.js`, `manifest.json`, `styles.css`) sync between your devices through your server, so updating Crate on one device offers the same version on the others. Without encryption, each device asks before installing it; in an encrypted vault it installs on its own, because only your unlocked devices can create it. Turn this off per device with **Settings → Crate → Sync → Sync options → Sync Crate updates**.
 - Secrets and Cloudflare credentials are kept in Obsidian's secret storage.
 - Reading downloads saved links and their images from the original site. Obsidian downloads on your device; the web app asks your server, which doesn't store the link or the images when encryption is on. For X, Reddit, Bilibili and C2 wiki links it may also call a fixed list of public APIs, including the third-party FxTwitter API, with the saved link only.
 - Push notifications are optional. Payloads are encrypted, and the push provider sees only delivery metadata.

@@ -52,9 +52,16 @@ Each note in your reminders folder is a project. `Reminders/Travel.md`, for exam
 - [x] Choose travel dates
 ```
 
-Crate adds small hidden comments to each checkbox line so it can recognize the same reminder after edits and sync. Leave those comments in place when you edit existing tasks.
+Crate adds a small hidden comment to each checkbox line so it can recognize the same reminder after edits and sync, and writes dates in a fixed form. Saved reminders look like this:
 
-When the note is open, Crate adds these comments and turns words like "tomorrow" into a date through the editor, so your cursor and unsaved typing stay put. It leaves the line you're typing until you move off it.
+```markdown
+- [ ] Book train tickets Nov 28, 2026 <!-- crate-id:k3j9x2 -->
+- [ ] Send the proposal 2026-11-22T11:00:00.000Z ! <!-- crate-id:p7q2m4 -->
+```
+
+A date without a time reads like `Nov 28, 2026`. A reminder with a time stores it as a UTC timestamp, which the editor shows as a readable date. A `!` on its own marks a high-priority reminder. Leave the comments in place when you edit existing tasks.
+
+You can type dates in your own words, such as "tomorrow at 9". Crate turns them into a fixed date once you move off the line, without moving your cursor.
 
 Crate picks up every checkbox in the reminders folder except its **Archive** subfolder. Use a dedicated folder so checkboxes in your other notes don't become reminders.
 

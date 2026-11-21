@@ -59,6 +59,13 @@ rebuild still run on the release commit, and preparation dispatches **Release
 plugin** without waiting for the release branch's own push build. Without either
 run it runs the complete verification suite.
 
+Successful push builds keep their candidate records and release assets for seven
+days. For a version-only reuse, the four version files (`manifest.json`,
+`package.json`, `package-lock.json` and `versions.json`) may change only their
+version fields and add the new `versions.json` entry; dependencies, `minAppVersion`
+and every other file must match the parent. The parent run and that diff are
+rechecked before assets are attached.
+
 For the fastest release, prepare it from a commit whose push build already passed.
 Push builds run only for `master` and `release/**`, so that is usually a green `master`
 commit; other branches are verified through their pull requests.
@@ -69,6 +76,12 @@ Worker/PWA and source metadata must match, and a separate clean-install build mu
 reproduce the plugin, CSS and server artifacts. That rebuild starts as soon as
 source artifacts are ready, alongside remaining tests. Plugin provenance covers
 the distributable assets. CI does not claim to have signed the local shortcut.
+
+**Release plugin** resolves the tag to one commit before verification starts, and
+every job checks out that commit. Attaching assets to the draft waits for every
+required verification job and the reproducible rebuild; source artifacts alone
+cannot authorize a release, and the original push run is rechecked before reused
+assets are attached.
 
 A successful **Release plugin** run for the exact commit satisfies the automated
 release gate. Use focused checks during development; a second local

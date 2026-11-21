@@ -1,6 +1,6 @@
 # Reminder retry and retention policy
 
-The current protocol gives new web commands a finite retry window without making an old request executable again after its receipt disappears. This policy covers web reminder mutations and Reading commands. [Upload receipts](upload-recovery.md) follow the same rules under their own monotonic floor (`upload_operation_floor`) and a 30-date window. Generic file deletion audit receipts and retained file versions still use their separate 30-day policy.
+The current protocol gives new web commands a finite retry window without making an old request executable again after its receipt disappears. This policy covers web reminder mutations and Reading commands. [Upload receipts](upload-recovery.md) follow the same rules under their own monotonic floor (`upload_operation_floor`) and a 30-date window. Generic file deletion audit receipts and retained file versions follow the server's separate history period (30 days by default).
 
 ## Commands and identities
 

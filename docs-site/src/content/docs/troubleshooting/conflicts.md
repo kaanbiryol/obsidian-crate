@@ -5,17 +5,17 @@ description: Review competing file versions, compare changes, and choose what to
 
 A conflict doesn't lose anything. Crate keeps both versions and waits for you to choose.
 
-Conflicts happen when the same file changed in two places before they could sync. You compare the versions and decide what belongs in your vault.
+When two devices edit different parts of the same note before they sync, Crate combines the edits on its own. A conflict happens when they changed the same lines, when the note is very large (over 1 MB or 20,000 lines), when Crate has no earlier synced copy to compare against, or when a non-text file such as an image or PDF changed in both places. Crate keeps the other version next to yours as a conflict copy, named like `Note (conflict 2026-11-21 14-05-09 a1b2).md`.
 
 ## Resolve a conflict in a note
 
 ![Review conflict window comparing the current file with the saved copy, with options to keep either version, both, or a custom result](../../../assets/screenshots/crate-conflict-review.png)
 
-1. Open **Sync activity → Conflicts**.
+1. Run **Crate: Show sync activity** and open **Conflicts**.
 2. Select **Review** next to the file.
 3. Compare your current file with the saved copy. Red is removed text; green is added text.
-4. Choose the current version, the saved version, both versions, or your own combined version.
-5. Check the result, then confirm.
+4. Choose **Keep current**, **Use saved copy**, **Keep both**, or **Custom result** to combine them yourself.
+5. Check the result, then select **Resolve conflict**.
 6. Open the note to make sure it looks right, then sync again.
 
 If you build your own combined version, read the whole thing through before you confirm.

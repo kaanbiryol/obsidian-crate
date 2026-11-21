@@ -53,7 +53,7 @@ A pairing code is for Obsidian only. To connect the web app, connect Obsidian fi
 
 ## The web app asks me to reconnect
 
-1. On a connected Obsidian device, open **Settings → Crate → Crate web app** and create a new link.
+1. On a connected Obsidian device, open **Settings → Crate → Crate web app** and select **Set up on phone** or **Copy link**. Links expire after ten minutes.
 2. Open the link in the browser or installed app you want to use.
 3. Reconnect to the same server and folder, then follow the review and resume prompts.
 
