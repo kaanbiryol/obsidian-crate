@@ -1,5 +1,58 @@
 import { getEditorSelectionRange } from '../../ui/shared/editor-selection';
-import { matchingHighlights, type ReadingHighlight } from '../core/highlights';
+import { matchingHighlights, sameHighlight, type ReadingHighlight } from '../core/highlights';
+import { READING_IMAGE_SOURCE_ATTRIBUTE } from './reading-content';
+
+const IMAGE_HIGHLIGHT_CLASS = 'crate-reading-reader__image-highlight';
+
+/** Each image the reader shows, at the text offset where it appears. */
+function readerImages(body: HTMLElement): { element: HTMLImageElement; offset: number; source: string }[] {
+	const walker = body.ownerDocument.createTreeWalker(body, 1 /* SHOW_ELEMENT */ | 4 /* SHOW_TEXT */);
+	const images: { element: HTMLImageElement; offset: number; source: string }[] = [];
+	let offset = 0;
+	while (walker.nextNode()) {
+		const node = walker.currentNode;
+		if (node.nodeType === 3) offset += (node as Text).length;
+		else if ((node as Element).localName === 'img') {
+			const source = (node as Element).getAttribute(READING_IMAGE_SOURCE_ATTRIBUTE);
+			if (source) images.push({ element: node as HTMLImageElement, offset, source });
+		}
+	}
+	return images;
+}
+
+/** The highlight a tap on `image` makes. */
+export function imageHighlightOf(body: HTMLElement, image: HTMLImageElement): ReadingHighlight | null {
+	const entry = readerImages(body).find(candidate => candidate.element === image);
+	return entry ? { start: entry.offset, end: entry.offset, text: image.alt.slice(0, 1000), image: entry.source } : null;
+}
+
+/** The reader's image an image highlight names. */
+export function highlightImage(body: HTMLElement, highlight: ReadingHighlight): HTMLImageElement | null {
+	if (highlight.image === undefined) return null;
+	return readerImages(body).find(entry => entry.offset === highlight.start && entry.source === highlight.image)?.element ?? null;
+}
+
+/** Removes the marks `paintHighlights` put on images. */
+export function clearImageHighlights(body: HTMLElement): void {
+	for (const image of Array.from(body.querySelectorAll<HTMLElement>(`.${IMAGE_HIGHLIGHT_CLASS}`))) {
+		image.classList.remove(IMAGE_HIGHLIGHT_CLASS);
+		for (const name of ['role', 'aria-label', 'tabindex', 'data-highlight-start', 'data-highlight-end', 'data-sync']) image.removeAttribute(name);
+	}
+}
+
+function paintImageHighlights(body: HTMLElement, highlights: ReadingHighlight[], pending: ReadingHighlight[]): void {
+	const images = highlights.filter(highlight => highlight.image !== undefined);
+	if (!images.length) return;
+	for (const { element, offset, source } of readerImages(body)) {
+		const highlight = images.find(entry => entry.start === offset && entry.image === source);
+		if (!highlight) continue;
+		element.classList.add(IMAGE_HIGHLIGHT_CLASS);
+		element.dataset.highlightStart = String(offset); element.dataset.highlightEnd = String(offset);
+		if (pending.some(entry => sameHighlight(entry, highlight))) element.dataset.sync = 'pending';
+		element.setAttribute('role', 'button'); element.setAttribute('aria-label', 'Image highlight options');
+		element.tabIndex = 0;
+	}
+}
 
 export function selectedHighlight(body: HTMLElement): ReadingHighlight | null {
 	const range = getEditorSelectionRange(body);
@@ -15,6 +68,7 @@ export function selectedHighlight(body: HTMLElement): ReadingHighlight | null {
  * A painted passage is pending while any highlight it covers is still unsynced. */
 export function paintHighlights(body: HTMLElement, highlights: ReadingHighlight[], pending: ReadingHighlight[] = []): void {
 	if (!highlights.length) return;
+	paintImageHighlights(body, highlights, pending);
 	const ranges = matchingHighlights(body.textContent ?? '', highlights).sort((a, b) => a.start - b.start);
 	const isPending = (range: ReadingHighlight) => pending.some(entry => entry.start === range.start && entry.end === range.end);
 	const merged: Array<{ start: number; end: number; pending: boolean }> = [];
@@ -52,6 +106,13 @@ export function paintHighlights(body: HTMLElement, highlights: ReadingHighlight[
 
 /** Resolve portable text offsets after markup is repainted or split into marks. */
 export function highlightRange(body: HTMLElement, highlight: ReadingHighlight): Range | null {
+	if (highlight.image !== undefined) {
+		const image = highlightImage(body, highlight);
+		if (!image) return null;
+		const range = body.ownerDocument.createRange();
+		range.selectNode(image);
+		return range;
+	}
 	if ((body.textContent ?? '').slice(highlight.start, highlight.end) !== highlight.text) return null;
 	const walker = body.ownerDocument.createTreeWalker(body, 4);
 	const range = body.ownerDocument.createRange();
@@ -89,6 +150,10 @@ export function resizeHighlight(text: string, highlight: ReadingHighlight, edge:
 
 /** Text-only rectangles avoid painting the empty width of fully selected blocks. */
 export function highlightTextRects(body: HTMLElement, highlight: ReadingHighlight): DOMRect[] {
+	if (highlight.image !== undefined) {
+		const rect = highlightImage(body, highlight)?.getBoundingClientRect();
+		return rect && rect.width > 0 && rect.height > 0 ? [rect] : [];
+	}
 	const walker = body.ownerDocument.createTreeWalker(body, 4), rects: DOMRect[] = [];
 	let offset = 0;
 	while (walker.nextNode()) {

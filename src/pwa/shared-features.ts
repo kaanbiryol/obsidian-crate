@@ -1,7 +1,15 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { AUTH_TOKEN_KEY } from './config';
 import { readingSession } from './reading/session/session';
-import { parseSharedFeatures, type SharedFeatures } from '@/protocol/feature-policy';
+import { parseFeaturePolicy, type ReadingImageMode, type SharedFeatures as ServerFeatures } from '@/protocol/feature-policy';
+
+/** The shared switches, and how Reading shows images; a missing `readingImages` means `save`. */
+type SharedFeatures = ServerFeatures & { readingImages?: ReadingImageMode };
+function parseSharedFeatures(value: unknown): SharedFeatures | null {
+	// The cached copy has no revision; only the server's answer carries one.
+	const policy = parseFeaturePolicy(value && typeof value === 'object' ? { revision: null, ...value } : value);
+	return policy && { reading: policy.reading, reminders: policy.reminders, ...(policy.readingImages ? { readingImages: policy.readingImages } : {}) };
+}
 import { FOREGROUND_REFRESH_GAP_MS } from './shell/app-resume';
 
 const CACHE_KEY = 'crate-shared-features';
@@ -40,7 +48,7 @@ export function useServerFeatures(): SharedFeatures {
 				if (alive && currentToken === token && value) {
 					const serialized = JSON.stringify(value);
 					if (localStorage.getItem(CACHE_KEY) !== serialized) localStorage.setItem(CACHE_KEY, serialized);
-					setFeatures(current => current.reading === value.reading && current.reminders === value.reminders ? current : value);
+					setFeatures(current => current.reading === value.reading && current.reminders === value.reminders && current.readingImages === value.readingImages ? current : value);
 				}
 			} catch { /* Keep confirmed state while offline. */ }
 			finally { busy = false; }

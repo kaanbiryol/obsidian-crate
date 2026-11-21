@@ -129,6 +129,8 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	// rebuild, which writes, runs under the coordinator lock (see `reading/library-read.ts`); it
 	// wakes notification processing only when a rebuild ran.
 	'GET /reading/item': { scopes: LIBRARY, plaintextOnly: true },
+	// Images in the Reading folder, for the web app reader.
+	'GET /reading/file': { scopes: LIBRARY, plaintextOnly: true },
 	[`POST ${shortcut.preparePath}`]: { scopes: ['reading_capture'], execution: COORDINATOR, rateLimit: 30 },
 	[`POST ${shortcut.exchangePath}`]: { scopes: VAULT, execution: READING_GRANT, rateLimit: 10 },
 };

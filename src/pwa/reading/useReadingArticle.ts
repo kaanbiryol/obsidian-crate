@@ -3,8 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readingUrlIdentity, type ReadingItem } from '@/reading/core/model';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
-import { loadReadingArticle, queryReadingItems } from './api';
-import { readReadingArticle, cacheReadingArticle, removeReadingArticle, type ReadingCache } from './storage/storage';
+import { loadReadingArticle, loadReadingImage, queryReadingItems } from './api';
+import { readReadingArticle, cacheReadingArticle, removeReadingArticle, offlineReadingImagePaths, type OfflineReadingImages, type ReadingCache } from './storage/storage';
+import { linkedVaultImages, readingImageType } from '@/reading/core/article-images';
+import { arrayBufferToBase64 } from '@/platform/base64';
+import { mapBounded } from '@/platform/map-bounded';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { presentReadingItems } from './pending-view';
 import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './storage/article-history';
@@ -18,6 +21,19 @@ interface ReadingArticleOptions {
 	isCurrentSession: (session: ReadingSession) => boolean;
 	reportSessionError: (session: ReadingSession, error: string | null) => void;
 	run: (action: () => Promise<void>) => Promise<void>;
+}
+
+/** The vault images an offline copy of `markdown` shows: stored ones are kept and the rest
+ * downloaded. One that cannot be downloaded is left out and loads from the server when online. */
+async function offlineImages(session: ReadingSession, item: ReadingItem, markdown: string): Promise<OfflineReadingImages> {
+	const linked = item.path ? linkedVaultImages(markdown, item.path) : [];
+	const stored = linked.length ? await offlineReadingImagePaths(session, item.crate_reading_id) : new Set<string>();
+	const save = new Map<string, { type: string; data: string }>();
+	await mapBounded(linked.filter(path => !stored.has(path)), 4, async path => {
+		try { save.set(path, { type: readingImageType(path)!, data: arrayBufferToBase64(await (await loadReadingImage(session, path)).arrayBuffer()) }); }
+		catch { /* Shown from the server when online. */ }
+	});
+	return { save, keep: new Set(linked) };
 }
 
 /** Article navigation and stale-request guards share one lifetime. */
@@ -92,7 +108,7 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 				setReader({ item: article.item, markdown: article.markdown, availableOffline: cached, etag: article.etag, ...bodySource(article.item) });
 				// Only a copy the user saved is kept, and only when the article changed.
 				if (cached && article !== saved) {
-					try { await cacheReadingArticle(session, article.item, article.markdown, { etag: article.etag, refresh: true }); }
+					try { await cacheReadingArticle(session, article.item, article.markdown, { etag: article.etag, refresh: true, images: await offlineImages(session, article.item, article.markdown) }); }
 					catch { if (current()) reportSessionError(session, 'Offline copy could not be updated.'); }
 				}
 			} catch (cause) {
@@ -126,7 +142,7 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 				if (!active || request !== navigation.current) return;
 				let cached = false, failed = false;
 				if (saved) {
-					try { cached = await cacheReadingArticle(session, article.item, article.markdown, { etag: article.etag, refresh: true }); } catch { failed = true; }
+					try { cached = await cacheReadingArticle(session, article.item, article.markdown, { etag: article.etag, refresh: true, images: await offlineImages(session, article.item, article.markdown) }); } catch { failed = true; }
 				}
 				assertReadingSession(session);
 				if (!active || request !== navigation.current) return;
@@ -195,7 +211,7 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 		const { item, markdown, etag } = reader;
 		if (keep) {
 			// Only the browser's storage quota limits saved copies.
-			try { await cacheReadingArticle(session, item, markdown, { etag }); }
+			try { await cacheReadingArticle(session, item, markdown, { etag, images: await offlineImages(session, item, markdown) }); }
 			catch (error) {
 				if (error instanceof DOMException && error.name === 'QuotaExceededError') throw new Error('This device is out of storage. Remove an offline copy to save this one.');
 				throw error;

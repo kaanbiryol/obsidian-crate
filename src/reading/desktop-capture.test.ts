@@ -36,7 +36,8 @@ describe('desktop article capture', () => {
 		const article = await captureDesktopArticle('https://example.com/article', new AbortController().signal);
 		expect(article.title).toBe('Local article');
 		expect(article.markdown).toContain('[the next article](https://example.com/next)');
-		expect(article.markdown).not.toContain('tracking.example.org');
+		// Image links stay in the Markdown; capture itself downloads none of them.
+		expect(article.markdown).toContain('![](https://tracking.example.org/pixel)');
 		expect(article.markdown).not.toContain('window.bad');
 		expect(fetch).not.toHaveBeenCalled();
 		expect(requestUrl).toHaveBeenCalledTimes(2);

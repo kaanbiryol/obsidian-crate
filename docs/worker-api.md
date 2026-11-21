@@ -162,8 +162,24 @@ last saw, and `markdownHash` is the lowercase SHA-256 of the article body (the `
 returns 409 `reading_conflict` and leaves the note untouched. The web app offers delete only
 once the article has loaded. The encrypted web app checks the same values before it commits. The
 note is deleted as an ordinary sync deletion of that exact revision, keeping a `deleted`
-file version, and the receipt commits in the same batch. Synced Obsidian devices move the
+file version, and the receipt commits in the same batch. Then the files in its image folder
+(`<Reading folder>/attachments/<Reading ID>/`) are deleted at the revisions listed, in one more
+batch; a failure there leaves them in place. Synced Obsidian devices move the
 note to their trash. A note still in the capture queue has no file and returns 409.
+
+### Reading images
+
+While `readingImages` is `save`, server captures and article jobs download up to 10 `https`
+images per article (PNG, JPEG, GIF, WebP or AVIF by their bytes, 5 MiB each, 20 MiB in all, one
+redirect each) in the Reading alarm, and put them in R2 under one upload lease. The publication
+sent to the coordinator carries only their object keys. Under the lock, each image still inside
+the current folder's `attachments/<Reading ID>/` commits as a new file (or is kept when that exact
+content is already live) before the note, which links only the committed ones; every other
+image keeps its web link and its object is queued for cleanup.
+
+`GET /reading/file?path=…` (library credential, plaintext vaults) returns one image file inside
+the Reading folder, typed by its name with `X-Content-Type-Options: nosniff` and a sandboxing
+CSP. Other paths return 400.
 
 A new Reading folder or generation, an index format change, a restore or an index
 whose bytes were unavailable at commit time rebuilds the index from R2, 25 files
@@ -608,9 +624,11 @@ field applies the shared permission.
 ### Shared feature policy
 
 The server advertises `shared-features-v1`. `GET /features` returns
-`{ reading: boolean, reminders: boolean, revision: string | null }`. Vault,
+`{ reading: boolean, reminders: boolean, revision: string | null, readingImages?: "remote" }`. Vault,
 Reading-library and reminders credentials can read; only vault credentials can
-POST `{ feature: "reading" | "reminders", enabled: boolean, revision }`. Capture-only
+POST `{ feature: "reading" | "reminders", enabled: boolean, revision }` or
+`{ readingImages: "save" | "remote", revision }`. A missing `readingImages` means `save`, which is
+never stored, so older servers and clients agree on the default. Capture-only
 credentials cannot access this policy. Stale writes return 409. Writes are
 serialized through the projection coordinator, and a successful write wakes
 background work; reads return the last committed policy without entering the
@@ -729,7 +747,7 @@ Using the replacement token, `GET /encryption/reset?id=…` reads the receipt an
 
 Authenticated `GET /reading/encryption` returns the public configuration and, in an encrypted vault, the Reading folder's `folderLabel`. It and the public feature/session control-plane reads can bootstrap without encryption headers; content operations still require the current vault and generation.
 
-`GET /reading/encrypted-files?folderPath=…&after=…&since=…`, `GET /reading/encrypted-file?folderPath=…&path=…&revision=…`, `POST /reading/encrypted-files/download` and `POST /reading/encrypted-commit` reuse the conditional encrypted-file protocol above. Inventory entries of both features also carry `modified`, the server's time of the file's last write, which the server already knows; the Reading app uses it to open the most recently changed notes of a library over its device limit. Reading authority additionally fixes the folder to the current Reading policy and rejects capture-only credentials. A Reading commit with `remove` renames a note, for example when **Try again** finds the title of a note that still has its link-based name. A commit with an empty `files` list and one `remove` deletes that exact note revision. `POST /reading/encrypted-extract` accepts `{ url }` from a library credential while encryption is active, downloads the page through the same public-only transport as server captures, and returns `{ article }` without storing the link or article. It runs outside the coordinator, returns 422 when the download fails, 403 `reading_fetching_off` while article fetching is off, and 409 without encryption. It has its own limit of 30 requests per minute per credential and counts toward the Reading daily budget. In an active encrypted vault, the shortcut preparation route downloads the shared page outside the coordinator (with article fetching off, it keeps only the link), then the coordinator seals the note to the vault seal key and commits it as a new `.md` file directly inside the tagged Reading folder. Without the path key, the server names it with a random 26-character tag and seals the titled name inside. It responds with `launchUrl` `…/notifications/save-reading#saved` and stores nothing readable. Only that path may commit a sealed descriptor, and only as a create. Reading plaintext list/item/capture/update/retry/delete, handoff and background extraction paths fail closed while any encryption state exists.
+`GET /reading/encrypted-files?folderPath=…&after=…&since=…`, `GET /reading/encrypted-file?folderPath=…&path=…&revision=…`, `POST /reading/encrypted-files/download` and `POST /reading/encrypted-commit` reuse the conditional encrypted-file protocol above. Inventory entries of both features also carry `modified`, the server's time of the file's last write, which the server already knows; the Reading app uses it to open the most recently changed notes of a library over its device limit. Reading authority additionally fixes the folder to the current Reading policy and rejects capture-only credentials. A Reading commit with `remove` renames a note, for example when **Try again** finds the title of a note that still has its link-based name. A commit with an empty `files` list and one `remove` deletes that exact note revision. `POST /reading/encrypted-extract` accepts `{ url }` from a library credential while encryption is active, downloads the page through the same public-only transport as server captures, and returns `{ article }` without storing the link or article. While `readingImages` is `save`, it also returns `images: [{ url, type, data }]`, base64 bytes of up to 10 images (2 MiB each, 8 MiB in all), stored nowhere. A Reading commit may then carry `attachments: [{ path, content }]`, up to 10 sealed non-note files beside exactly one new note: each commits as a new file before the note, an existing one is kept, and non-note files must have no public data. A delete commit (empty `files`, one `remove`) may carry `removeAttachments: [path]`, the tags of up to 30 non-note files the deleted note linked to; after the note's deletion commits they are deleted at their current revisions, and a failure leaves them in place. `GET /reading/encrypted-file` also returns non-note files in the Reading folder, up to the encrypted file limit. It runs outside the coordinator, returns 422 when the download fails, 403 `reading_fetching_off` while article fetching is off, and 409 without encryption. It has its own limit of 30 requests per minute per credential and counts toward the Reading daily budget. In an active encrypted vault, the shortcut preparation route downloads the shared page outside the coordinator (with article fetching off, it keeps only the link), then the coordinator seals the note to the vault seal key and commits it as a new `.md` file directly inside the tagged Reading folder. Without the path key, the server names it with a random 26-character tag and seals the titled name inside. It responds with `launchUrl` `…/notifications/save-reading#saved` and stores nothing readable. Only that path may commit a sealed descriptor, and only as a create. Reading plaintext list/item/capture/update/retry/delete, handoff and background extraction paths fail closed while any encryption state exists.
 
 Reset clears Reading policy, sources, jobs, receipts, captures, enrollments and handoffs at both boundaries.
 

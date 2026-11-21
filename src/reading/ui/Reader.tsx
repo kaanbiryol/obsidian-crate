@@ -15,7 +15,8 @@ import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { SyncIndicator, type SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 import { readingDocument } from '../core/markdown';
 import { renderReadingContent } from './reading-content';
-import type { ReadingHighlight } from '../core/highlights';
+import { useReadingImages, type ReadingImageHost } from './useReadingImages';
+import { highlightExcerpt, type ReadingHighlight } from '../core/highlights';
 import { HighlightList } from './HighlightList';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
@@ -36,8 +37,10 @@ export function ReadingReader({
 	item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onDelete,
 	onSaveComplete, onCopyComplete, onFeedback, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.',
 	mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false,
-	floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange, syncStatus, pendingHighlights, savedOffline, onOfflineChange,
+	floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange, syncStatus, pendingHighlights, savedOffline, onOfflineChange, images,
 }: {
+	/** Shows the article's images; without it the reader shows none and loads nothing. */
+	images?: ReadingImageHost;
 	appearance?: ReadingAppearance; onAppearanceChange?: (appearance: ReadingAppearance) => void;
 	item: ReadingMetadata; markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
 	/** Deletes the note; the caller closes the reader. */
@@ -95,12 +98,14 @@ export function ReadingReader({
 		// Transfer opening focus without taking it from a control used while loading.
 		if (showHeader && article.current?.ownerDocument.activeElement === article.current) heading.current?.focus({ preventScroll: true });
 	}, [showHeader]);
-	const content = useMemo(() => {
+	const notePath = images?.notePath, remoteImages = images?.remote;
+	const rendered = useMemo(() => {
 		if (markdown === null) return null;
-		const result = renderReadingContent(markdown, item.source_url, highlightCode);
+		const result = renderReadingContent(markdown, item.source_url, highlightCode, notePath === undefined ? undefined : { notePath, remote: Boolean(remoteImages) });
 		if (videoId) decorateTranscript(result, markdown, segments);
 		return result;
-	}, [markdown, item.source_url, highlightCode, videoId, segments]);
+	}, [markdown, item.source_url, highlightCode, videoId, segments, notePath, remoteImages]);
+	const content = useReadingImages(rendered, images);
 	const {
 		highlightsOpen, openHighlights, closeHighlights, annotation, note, setNote, noteOverHighlights, openNote, closeNote, canSaveNote,
 		pendingDelete, requestDelete, cancelDelete, saveHighlights, saveNote, deleteHighlight, perform, view,
@@ -110,7 +115,7 @@ export function ReadingReader({
 	};
 	const noteDialog = annotation && <ReadingDialog title="Highlight note"
 		action={{ label: 'Save', ariaLabel: 'Save note', type: 'submit', form: noteFormId, disabled: !canSaveNote, busy }} busy={busy} onClose={closeNote}>
-		{close => <ReadingHighlightNoteForm id={noteFormId} excerpt={annotation.text} note={note} busy={busy} canSave={canSaveNote} error={error}
+		{close => <ReadingHighlightNoteForm id={noteFormId} excerpt={highlightExcerpt(annotation)} note={note} busy={busy} canSave={canSaveNote} error={error}
 			onChange={setNote} onSave={() => saveNoteAndClose(close)} />}
 	</ReadingDialog>;
 	const renderHighlights = (close?: () => void) => <>
@@ -120,11 +125,11 @@ export function ReadingReader({
 			onPlay={seconds => perform(() => { setMode('article'); setVideoSeek({ seconds }); }, close)}
 			entries={(item.highlights ?? []).map(highlight => ({ item, highlight }))} disabled={busy || highlightsPending}
 			onView={(_item, highlight) => view(highlight, close)} onAnnotate={onUpdate ? (_item, highlight) => openNote(highlight, Boolean(close)) : undefined}
-			onDelete={onUpdate ? (_item, highlight) => requestDelete(highlight) : undefined} onCopy={onCopyComplete} />
+			onDelete={onUpdate ? (_item, highlight) => requestDelete(highlight) : undefined} onCopy={onCopyComplete} images={images} />
 		{!!item.highlight_recovery?.length && <details className="crate-reading__notice">
 			<summary>{item.highlight_recovery.length} saved highlights need reselecting</summary>
 			<p>The original excerpts are preserved here. Select their current passages in the article to highlight them again.</p>
-			<HighlightList entries={item.highlight_recovery.map(highlight => ({ item, highlight }))} />
+			<HighlightList entries={item.highlight_recovery.map(highlight => ({ item, highlight }))} images={images} />
 		</details>}
 		{close && noteOverHighlights && noteDialog}
 		{pendingDelete && <ReadingDialog title="Delete highlight" role="alertdialog"
@@ -133,7 +138,7 @@ export function ReadingReader({
 				event.preventDefault();
 				void run(async isCurrent => { await deleteHighlight(pendingDelete); if (isCurrent()) closeDelete(); });
 			}}>
-			<blockquote className="crate-reading-note__excerpt">{pendingDelete.text}</blockquote>
+			<blockquote className="crate-reading-note__excerpt">{highlightExcerpt(pendingDelete)}</blockquote>
 			<p className="crate-reading-note__message">{pendingDelete.note ? 'This removes the highlight and its note.' : 'This removes the highlight from the article.'}</p>
 			{error && <span className="crate-field__error" role="alert">{error}</span>}
 		</form>}</ReadingDialog>}

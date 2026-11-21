@@ -16,6 +16,7 @@ import { groupReadingItems, readingSections, readingSource, readingTitle, type R
 import { LoadingIndicator } from '@/ui/shared/LoadingIndicator';
 import { useContentReveal } from '@/ui/shared/useContentReveal';
 import { HighlightList } from './HighlightList';
+import type { ReadingImageLoader } from './useReadingImages';
 import type { ReadingHighlight } from '../core/highlights';
 import { ReadingItemContent } from './ReadingItemContent';
 import type { ReadingLibrarySource } from './useLibraryPages';
@@ -52,6 +53,8 @@ export interface ReadingLibraryProps {
 	beforeListContent?: React.ReactNode;
 	/** Host-owned unavailable state, keeping library navigation mounted. */
 	listContent?: React.ReactNode;
+	/** Shows highlighted images in the Highlights view. */
+	images?: ReadingImageLoader;
 }
 
 const sectionIcons = { inbox: 'inbox', favorites: 'star', archived: 'archive', highlights: 'highlighter' };
@@ -65,7 +68,7 @@ const NEAR_END_PX = 800;
 export function ReadingLibraryPanel({
 	listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, source, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich,
 	onSettings, settingsLabel = 'Reading settings', headerActions, headerStatus, activeId, reader, readerMotion, onReaderClosed, readerClosing = false,
-	notice, beforeListContent, listContent,
+	notice, beforeListContent, listContent, images,
 }: ReadingLibraryProps) {
 	const [section, setSection] = useState<ReadingSection>(initialSection);
 	// Whether the last section switch was made on a screen already showing, so it can stay until the next answers.
@@ -198,7 +201,7 @@ export function ReadingLibraryPanel({
 					{snapshot.issues.length > 0 && <ReadingIssues issues={snapshot.issues} />}
 					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" immediate={immediateLoading} /> : <>
 						{shownSection === 'highlights' && (count > 0
-							? <HighlightList entries={excerpts.slice(0, visible)} disabled={busy.has('open')}
+							? <HighlightList entries={excerpts.slice(0, visible)} disabled={busy.has('open')} images={images}
 								onView={(item, highlight) => run('open', () => onOpen(item, highlight, shownSection))} onOpenItem={item => run('open', () => onOpen(item, undefined, shownSection))} />
 							: !more && <EmptyState className="crate-reading__empty" icon="highlighter" title={highlightsCopy.title} description={highlightsCopy.description} />)}
 						{shownSection !== 'highlights' && rows.length === 0 && <EmptyState className="crate-reading__empty" icon="book-open" title={linksCopy.title} description={linksCopy.description}>

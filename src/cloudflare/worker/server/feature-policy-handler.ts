@@ -16,10 +16,14 @@ export async function handleFeaturePolicy(request: Request, env: Env, loaded?: s
 	const current = await featurePolicy(db);
 	const parsed = await parseJsonObject(request);
 	if (!parsed.ok) return parsed.response;
-	const { feature, enabled, revision } = parsed.value;
-	if (!['reading', 'reminders'].includes(String(feature)) || typeof enabled !== 'boolean') return corsResponse({ error: 'Choose a feature and enabled state.' }, 400);
+	const { feature, enabled, readingImages, revision } = parsed.value;
+	const images = readingImages === 'save' || readingImages === 'remote';
+	if (images ? feature !== undefined || enabled !== undefined : !['reading', 'reminders'].includes(String(feature)) || typeof enabled !== 'boolean') return corsResponse({ error: 'Choose a feature and enabled state.' }, 400);
 	if (revision !== current.revision) return corsResponse({ error: 'Feature settings changed on another device. Check again before saving.' }, 409);
-	const next = { ...current, [String(feature)]: enabled, revision: crypto.randomUUID() };
+	const { readingImages: _previous, ...rest } = current; void _previous;
+	// Image saving is the default, so only the other choice is stored.
+	const next = images ? { ...rest, ...(readingImages === 'remote' ? { readingImages } : {}), revision: crypto.randomUUID() }
+		: { ...current, [String(feature)]: enabled, revision: crypto.randomUUID() };
 	await saveServerState(db, 'features', JSON.stringify(next)).run();
 	// A paused dispatcher keeps its schedules, attempts and recipient progress but no alarm.
 	// Resuming arms it for the earliest one; retry-age limits still apply. Saving Reminders

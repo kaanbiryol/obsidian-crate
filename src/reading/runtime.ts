@@ -6,9 +6,11 @@ import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { shouldIgnoreSyncPath, createIgnoreMatcherContext } from '../sync/local/ignore';
 import { ReadingLibrary } from './data/library';
 import { ReadingMaintenance } from './data/maintenance';
+import { ReadingImageCleanup } from './data/image-cleanup';
 import { createReadingRefresh } from './data/refresh-batch';
 import { createObsidianReadingVault } from './data/obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
+import { readingImageMode } from './core/article-images';
 
 export const READING_VIEW_TYPE = 'crate-reading';
 /** Vault changes check the server's Reading folder at most this often; Complete server setup checks at once. */
@@ -140,9 +142,12 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	const maintenance = new ReadingMaintenance({ ...readingVault, editing }, folder, controller.signal, canAdopt, startAfter);
 	// The card list is built only while a Reading view or an action uses it.
 	const library = new ReadingLibrary({ ...readingVault, editing,
-		...{ captureArticle: async (url: string, signal: AbortSignal) => {
+		...{ captureArticle: async (url: string, signal: AbortSignal, id: string) => {
 			const { captureDesktopArticle } = await import('./desktop-capture');
-			return captureDesktopArticle(url, signal);
+			const article = await captureDesktopArticle(url, signal);
+			if (readingImageMode(plugin.settings.reading.images) !== 'save' || article.transcript) return article;
+			const { saveDesktopArticleImages } = await import('./desktop-images');
+			return saveDesktopArticleImages(article, { vault, folder, id, signal, allowed: path => allowedReadingPath(plugin, path) });
 		} },
 	}, folder, controller.signal, maintenance, startAfter);
 	let lastErrorAt = 0;
@@ -211,6 +216,20 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		if (!inFolder(file.path)) return;
 		refresh.reindexed(file.path);
 	});
+	// A deleted note's saved images go to the trash with it, also when sync deletes the note.
+	const imageCleanup = new ReadingImageCleanup({
+		folder, signal: controller.signal,
+		busy: () => plugin.syncRuntime.isWritingVault(),
+		noteIds: () => readingVault.files().map(file => {
+			const properties = readingVault.cachedProperties(file);
+			return properties ? typeof properties.crate_reading_id === 'string' ? properties.crate_reading_id : null : undefined;
+		}),
+		folderExists: path => vault.getAbstractFileByPath(path) instanceof TFolder,
+		trash: async path => { const entry = vault.getAbstractFileByPath(path); if (entry instanceof TFolder) await plugin.app.fileManager.trashFile(entry); },
+	});
+	const deletedRef = plugin.app.metadataCache.on('deleted', (file, previous) => {
+		if (file.path.startsWith(`${folder}/`)) imageCleanup.deleted(previous?.frontmatter?.crate_reading_id);
+	});
 	// Closing an editor lets waiting imports and highlight records proceed; other layout changes need no work.
 	const layoutRef = plugin.app.workspace.on('layout-change', () => { if (maintenance.waitingForEditor) refresh.retry(); });
 	plugin.syncRuntime.addStateChangeListener(onSyncStateChange);
@@ -219,6 +238,7 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		for (const ref of refs) vault.offref(ref);
 		plugin.app.workspace.offref(layoutRef);
 		plugin.app.metadataCache.offref(metadataRef);
+		plugin.app.metadataCache.offref(deletedRef);
 		plugin.syncRuntime.removeStateChangeListener(onSyncStateChange);
 		lifetime.removeEventListener('abort', onAbort);
 		return Promise.allSettled([library.close(), maintenance.close(), refresh.stop()]).then(() => {});
@@ -227,7 +247,7 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	lifetime.addEventListener('abort', onAbort, { once: true });
 	readingState(plugin).runtime = { library, stop, checkSetup, setupError: () => setupError };
 	notifyRuntime(plugin);
-	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) refresh.schedule(); });
+	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) { refresh.schedule(); } });
 }
 
 /** Applies changed Reading settings; open views close because they hold the previous library. */

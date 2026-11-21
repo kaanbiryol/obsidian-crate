@@ -34,6 +34,14 @@ The save form tells you which device does the downloading:
 | Web app without encryption | Your Crate server downloads it, so Obsidian can stay closed. |
 | Web app with encryption | Your Crate server downloads it without keeping the link, and the web app encrypts it. If the website blocks the server, the link is saved with **Try again**. |
 
+### Article images
+
+By default, Crate saves an article's images in your vault when it downloads the article. They go in **attachments** inside the Reading folder, one folder per article, and sync like any other file. Images work offline in Obsidian, and in the web app in articles you save for offline. Deleting an article deletes its images too: the web app deletes them on the server, and Obsidian moves them to the trash you chose in **Settings** → **Files and links** → **Deleted files**.
+
+To keep only the images' links, go to **Settings** → **Crate** → **Reading** and set **Article images** to **Load from the website**. The choice applies to every device and to articles saved from then on. The websites hosting the images then see your IP address each time you open the article, and the images need a connection.
+
+Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. Obsidian saves every image in an article, up to 10 MB each and 40 MB in all. Your server saves the first 10 (5 MB each), or 10 of up to 2 MB each in an encrypted vault, which keeps each save within the Cloudflare free plan's limits. An image that is too large or fails to download keeps its link.
+
 ### When a page won't download
 
 Pages behind a login, pages that block downloads, and pages that rely on scripts may stay as saved links. Server downloads don't use your browser cookies or Crate sign-in. Select **Try again**, open the original page, or use [Web Clipper](#use-obsidian-web-clipper) to save what you can see in your browser.
@@ -89,13 +97,13 @@ Web Clipper can save a transcript into your Reading folder too. Check its previe
 
 ## Highlight and revisit passages
 
-Select text while reading to highlight it. Tap or select a highlight to copy, share, delete, or resize it. Each article's **Highlights** view shows your notes alongside a **View in article** action.
+Select text while reading to highlight it. Tap or select a highlight to copy, share, delete, or resize it. To highlight an image, tap it and select **Highlight**; tap it again to add a note or delete the highlight. Each article's **Highlights** view shows your notes alongside a **View in article** action, with highlighted images as thumbnails.
 
 The library's **Highlights** view collects highlights from your inbox, favorites, and archive in one place. Search them, or filter by tag.
 
 ![The Highlights view in the web app on iPhone, grouping highlights by article](../../../assets/screenshots/phone-reading-highlights.png)
 
-Highlights are saved in the note, so they sync with it. Most use Obsidian's own `==highlight==` syntax. Selections that can't safely use those markers are stored as annotations that Crate's reader displays. See the [highlight format reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/reading-highlights.md) for details.
+Highlights are saved in the note, so they sync with it. Most use Obsidian's own `==highlight==` syntax. Selections that can't safely use those markers, and image highlights, are stored as annotations that Crate's reader displays; Obsidian's own note view doesn't show them. See the [highlight format reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/reading-highlights.md) for details.
 
 ## Read on your phone
 
@@ -115,15 +123,15 @@ In browsers that support sharing to web apps, install the web app, then select *
 
 ## Read offline
 
-In Obsidian, article text lives in your vault, so it's always available offline.
+In Obsidian, article text and saved images live in your vault, so they're always available offline.
 
-The web app keeps an article on your device only when you ask: open it and select **More** → **Save for offline**. Select it again (**More** → **Remove offline copy**) to delete the copy. Your browser's storage is the only limit; if it runs out, remove a copy to save another. A saved article is checked for changes when you open it, never in the background.
+The web app keeps an article on your device only when you ask: open it and select **More** → **Save for offline**. Select it again (**More** → **Remove offline copy**) to delete the copy. Your browser's storage is the only limit; if it runs out, remove a copy to save another. A saved article is checked for changes when you open it, never in the background. Offline copies keep the article's saved images too; images loaded from the website need a connection.
 
 Saves and edits you make offline stay pending until your server confirms them. Export pending work before clearing browser data or signing out. If something gets stuck, see [Recovery](/docs/troubleshooting/recovery/#pending-work-in-the-web-app).
 
 ## Privacy and availability
 
-Crate's reader blocks remote images and active content inside articles, so the article text itself doesn't load anything from the web. A few things do reach out:
+Crate's reader blocks active content inside articles. It shows images saved in your vault, and loads images from the web only when **Article images** is set to **Load from the website**. A few things do reach out:
 
 - **Favicons and thumbnails:** library icons can contact the saved site or its icon host, and YouTube thumbnails contact YouTube's image host. Those hosts see the request and may receive their own cookies. Crate doesn't send your Crate sign-in or the page you came from.
 - **The YouTube player:** it loads only when you select the play icon or a timed transcript passage. It contacts YouTube, may use YouTube's cookies, and may see the web app's address as the referring page. It never receives your Crate sign-in or note contents.

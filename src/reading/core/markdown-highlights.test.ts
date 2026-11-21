@@ -220,3 +220,42 @@ describe('source-preserving Markdown highlights', () => {
 		expect(() => writeMarkdownHighlights('&NotEqualTilde;', [{ start: 0, end: 1, text: text[0]! }])).toThrow('whole character');
 	});
 });
+
+describe('image highlights', () => {
+	const id = '0cf86c65-51e2-4e2b-8987-0a4732473588';
+	const markdown = `Intro text.\n\n![A chart](attachments/${id}/1.png)\n\nMiddle text.\n\n![](https://cdn.example/b.png)\n\nEnd.\n`;
+	const document = readingDocument(markdown);
+
+	it('finds each rendered image at the text offset where it appears', () => {
+		expect(document.images).toEqual([
+			// Each paragraph's line break follows its image.
+			{ offset: document.text.indexOf('Middle') - 1, src: `attachments/${id}/1.png` },
+			{ offset: document.text.indexOf('End') - 1, src: 'https://cdn.example/b.png' },
+		]);
+	});
+
+	it('saves an image highlight beside text highlights without changing the article', () => {
+		const offset = document.images[0]!.offset, text = 'Middle text';
+		const start = document.text.indexOf(text);
+		const saved = writeMarkdownHighlights(markdown, [
+			{ start: offset, end: offset, text: 'A chart', image: `attachments/${id}/1.png`, note: 'Key figure' },
+			{ start, end: start + text.length, text },
+		]);
+		expect(saved.markdown).toBe(markdown.replace('Middle text', '==Middle text=='));
+		expect(saved.highlights.map(entry => entry.image ?? entry.text)).toEqual([`attachments/${id}/1.png`, 'Middle text']);
+		expect(saved.highlights[0]).toMatchObject({ start: offset, end: offset, note: 'Key figure' });
+		expect(saved.highlights[0]!.id).toBeTruthy();
+		expect(readMarkdownHighlights(saved.markdown, saved.highlights).highlights).toEqual(saved.highlights);
+		expect(() => writeMarkdownHighlights(markdown, [{ start: 0, end: 0, text: '', image: `attachments/${id}/1.png` }])).toThrow('Article changed');
+	});
+
+	it('follows its image when text before it changes, and keeps a note when the image is gone', () => {
+		const image = { start: document.images[1]!.offset, end: document.images[1]!.offset, text: '', image: 'https://cdn.example/b.png', id: 'a', note: 'Remember' };
+		const edited = markdown.replace('Intro text.', 'A longer introduction.');
+		const moved = readMarkdownHighlights(edited, [image]);
+		expect(moved.highlights).toEqual([{ ...image, start: readingDocument(edited).images[1]!.offset, end: readingDocument(edited).images[1]!.offset }]);
+		const removed = readMarkdownHighlights(markdown.replace('![](https://cdn.example/b.png)', ''), [image, { ...image, id: 'b', note: undefined }]);
+		expect(removed.highlights).toEqual([]);
+		expect(removed.recovery).toEqual([image]);
+	});
+});

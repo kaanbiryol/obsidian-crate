@@ -19,6 +19,8 @@ import { extractForEncryptedReading } from '../reading/encrypted-extract';
 import { isLibraryRead, loadLibraryRead, readLibrary } from '../reading/library-read';
 import { PLAINTEXT_ONLY_PATHS } from './policy';
 import { takenReadingPaths } from '../reading/taken-names';
+import { readReadingImage } from '../reading/image-file';
+import { featurePolicy, parseStoredFeaturePolicy } from '../server/feature-policy';
 
 export interface ReadingRouteOptions {
 	/** The coordinator's state, when the request runs under its lock. */
@@ -76,7 +78,8 @@ async function handleEncryptedLibraryRoute(request: Request, env: Env, path: str
 		if (!encryption) throw new ReadingError('Article downloads here are only for encrypted Reading folders.', 409);
 		// As in unencrypted vaults, the web app then saves the link as a bookmark.
 		if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before downloading articles.', 403, 'reading_fetching_off');
-		return await extractForEncryptedReading(request, env);
+		const images = (featurePolicyValue === undefined ? await featurePolicy(env.DB) : parseStoredFeaturePolicy(featurePolicyValue)).readingImages !== 'remote';
+		return await extractForEncryptedReading(request, env, images);
 	}
 	return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
 }
@@ -101,6 +104,7 @@ async function handleBearerReadingRoute(request: Request, env: Env, url: URL, pr
 	if (path === '/reading/capture' && request.method === 'POST') return await mutateReading(env, principal, current, body, 'capture', mutation?.mutation);
 	if (principal.scope === 'reading_capture') throw new ReadingError('This credential can only save links.', 403);
 	if (path === '/reading/session' && request.method === 'GET') return readingResponse({ id: principal.tokenId, folderPath: current.folder_path, generation: current.generation, expiresAt: principal.expiresAt ?? null, day: Math.floor(Date.now() / 86400_000) });
+	if (path === '/reading/file' && request.method === 'GET') return await readReadingImage(env, current, url);
 	if (action) return await mutateReading(env, principal, current, body, action, mutation?.mutation);
 	if (loaded) return await readLibrary(request, env, current, loaded, state, forward, !!encryption);
 	if (path === '/reading/taken' && request.method === 'GET') {

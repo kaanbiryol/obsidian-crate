@@ -108,6 +108,11 @@ The library list stays on the server and in memory; only articles saved for
 offline are stored. A list response never removes an offline copy: a source issue
 remains visible while the saved copy is retained, and a page without the article
 does not prove it was deleted. Unknown article records remain available for export.
+An offline copy also stores the vault images its note links to, one record per image
+(`article-image:<session>:<reading id>:<path>`), sealed like the copy. Refreshing the copy
+downloads only images it does not hold and drops ones it no longer links to; removing the
+copy, or the retirement pass removing it, removes its images. Images are left out of the
+recovery export, since the vault keeps them.
 HTTP failures and rejected pages leave stored copies, pending changes and drafts
 unchanged. A confirmed load deletes the library caches earlier versions stored, and
 unlocking an encrypted session deletes them in the same transaction that seals this

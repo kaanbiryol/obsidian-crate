@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
-import { cacheReadingArticle, readOfflineReadingItems, readReadingArticle, removeRetiredReadingRecords, removeReadingArticle } from './cache';
+import { cacheReadingArticle, offlineReadingImagePaths, readOfflineReadingImage, readOfflineReadingItems, readReadingArticle, removeRetiredReadingRecords, removeReadingArticle } from './cache';
 import { decodeReadingValue } from './private-storage';
 import { READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { AUTH_TOKEN_KEY } from '../../config';
@@ -12,6 +12,7 @@ vi.mock('./private-storage', async importOriginal => {
 });
 vi.mock('../../storage/single-store-database', () => ({ openSingleStoreDatabase: async () => ({
 	get: async (_store: string, key: string) => values.get(key),
+	getAllKeys: async () => [...values.keys()],
 	transaction: () => ({
 		store: {
 			getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key),
@@ -86,4 +87,24 @@ it('removes a saved copy', async () => {
 	await cacheReadingArticle(session, item(2), 'Two');
 	await removeReadingArticle(session, item(1).crate_reading_id);
 	expect(articleKeys()).toEqual([articleKey(2)]);
+});
+
+it('keeps an offline copy\'s images with it and removes them with it', async () => {
+	const id = item(1).crate_reading_id, path = (n: number) => `Reading/attachments/${id}/${n}.png`;
+	const image = { type: 'image/png', data: 'iVBORwE=' };
+	await cacheReadingArticle(session, item(1), 'One', { images: { save: new Map([[path(1), image], [path(2), image]]), keep: new Set([path(1), path(2)]) } });
+	expect(await offlineReadingImagePaths(session, id)).toEqual(new Set([path(1), path(2)]));
+	const blob = await readOfflineReadingImage(session, id, path(1));
+	expect(blob?.type).toBe('image/png');
+	expect([...new Uint8Array(await blob!.arrayBuffer())]).toEqual([0x89, 0x50, 0x4e, 0x47, 1]);
+	// A refreshed copy keeps the images it still links to and drops the rest.
+	await cacheReadingArticle(session, item(1), 'One again', { refresh: true, images: { save: new Map(), keep: new Set([path(2)]) } });
+	expect(await offlineReadingImagePaths(session, id)).toEqual(new Set([path(2)]));
+	// Another session's image, and one whose copy is gone, are removed with the retired records.
+	values.set(`article-image:other:${id}:${path(1)}`, image);
+	values.set(`article-image:${session.id}:${item(2).crate_reading_id}:Reading/x.png`, image);
+	await removeRetiredReadingRecords(session);
+	expect([...values.keys()].filter(key => key.startsWith('article-image:'))).toEqual([`article-image:${session.id}:${id}:${path(2)}`]);
+	await removeReadingArticle(session, id);
+	expect([...values.keys()]).toEqual([]);
 });

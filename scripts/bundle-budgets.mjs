@@ -4,17 +4,17 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Server-side extraction for encrypted Reading drops Defuddle from the embedded PWA:
-		// 4.922 MB raw / 2.292 MB gzip.
-		maxBytes: 4972000,
+		// Reading article images, offline copies and image highlights measure
+		// 4.975 MB raw / 2.302 MB gzip.
+		maxBytes: 4975500,
 		maxGzipBytes: 2316000,
 	},
 	{
 		path: 'dist/styles.css',
-		// The Recently deleted list and its History action measure
-		// 393.7 KB raw / 48.8 KB gzip across the plugin and shared PWA surfaces.
-		maxBytes: 394000,
-		maxGzipBytes: 48900,
+		// The Recently deleted list with Reading image highlights and their Highlights rows
+		// measure 395.5 KB raw / 49.0 KB gzip across the plugin and shared PWA surfaces.
+		maxBytes: 396000,
+		maxGzipBytes: 49100,
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
@@ -27,15 +27,15 @@ export const bundleBudgets = {
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// Every feature loads at startup. Floating card sheets, reader menu motion and
-		// held Reading section switches measure 1.191 MB raw / 390.9 KB gzip.
-		maxBytes: 1192000,
-		maxGzipBytes: 391500,
+		// Every feature loads at startup. Reading article images (vault image loading,
+		// encrypted image saves, offline copies, image highlights) measure 1.205 MB raw / 395.2 KB gzip.
+		maxBytes: 1205500,
+		maxGzipBytes: 395500,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
-		// Importing Web Clipper highlight dates and notes measures 1.888 MB raw / 622.8 KB gzip.
-		maxBytes: 1920000,
-		maxGzipBytes: 634000,
+		// Reading article images, offline copies and image highlights measure 1.925 MB raw / 636.0 KB gzip.
+		maxBytes: 1926000,
+		maxGzipBytes: 636500,
 	}],
 };

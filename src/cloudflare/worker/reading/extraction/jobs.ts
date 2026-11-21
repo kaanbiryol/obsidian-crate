@@ -1,6 +1,7 @@
 import { readEncryptionState } from '../../encryption/state';
-import { capturePath, MAX_FETCH_ATTEMPTS, publishCapture, runCapture, type CapturePublication } from '../captures';
-import { featureEnabled } from '../../server/feature-policy';
+import { capturePath, MAX_FETCH_ATTEMPTS, publishCapture, runCapture, stageImages, type CapturePublication } from '../captures';
+import { featureEnabled, featurePolicy } from '../../server/feature-policy';
+import type { StagedReadingImage } from './images';
 import type { FeaturePolicy } from '../../../../protocol/feature-policy';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { Env } from '../../types';
@@ -27,16 +28,17 @@ export const READING_COORDINATOR_KEY = 'readingCoordinator';
 const EXHAUSTED_JOB_RETRY_MS = 60 * 60_000;
 
 interface Job { path: string; item_id: string; generation: string; source_revision: string; block_hash: string; url: string; attempts: number }
-export interface Publication { job: Job; result: Awaited<ReturnType<typeof extractDocument>> | null; resolvedUrl?: string }
+export interface Publication { job: Job; result: Awaited<ReturnType<typeof extractDocument>> | null; resolvedUrl?: string; images?: StagedReadingImage[] }
 
 /** Called under the file coordinator's lock. Never recreate a missing or changed source. */
 export async function publishExtraction(env: Env, publication: Publication | CapturePublication): Promise<void> {
 	if (await readEncryptionState(env.DB)) return ;
 	if ('captureId' in publication) {
-		if (await featureEnabled(env.DB, 'reading')) await publishCapture(env, publication.captureId, publication.generation, publication.result, publication.resolvedUrl);
+		if (await featureEnabled(env.DB, 'reading')) await publishCapture(env, publication.captureId, publication.generation, publication.result, publication.resolvedUrl, publication.images);
 		return;
 	}
-	const { job, result } = publication;
+	const { job } = publication;
+	let { result } = publication;
 	if (!await featureEnabled(env.DB, 'reading')) return;
 	const current = await policy(env.DB);
 	if (!current?.enabled || current.generation !== job.generation) return;
@@ -47,6 +49,10 @@ export async function publishExtraction(env: Env, publication: Publication | Cap
 		const source = await readSource(env, job.path), item = parseReadingNote(source.content), block = managedArticle(source.content);
 		if (source.file.storageKey !== job.source_revision || item?.crate_reading_id !== job.item_id || item.capture_method !== 'url'
 			|| item.extraction_status !== 'pending' || item.source_url !== job.url || !block || await sha256Hex(block.text) !== job.block_hash) return;
+		if (result && publication.images?.length) {
+			const { publishArticleImages } = await import('./images');
+			result = await publishArticleImages(env, result, publication.images, current, item.crate_reading_id);
+		}
 		const { content, title } = assembleReadingArticle(source.content, item, { kind: 'extraction', article: result, block, resolvedUrl: publication.resolvedUrl });
 		// A note still named after its link takes the extracted title; a user rename is kept.
 		if (title !== item.title && isGeneratedCapturePath(job.path, current.folder_path, { title: item.title, url: item.source_url }, item.crate_reading_id)) {
@@ -76,14 +82,20 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 	if (await readEncryptionState(env.DB)) return ;
 	// A persisted maintenance fence stops new network work during backup/upgrade.
 	if (await deploymentFenceHeld(env.DB)) { await state.storage.setAlarm(Date.now() + 60_000); return; }
-	if (!await featureEnabled(env.DB, 'reading')) return;
+	const features = await featurePolicy(env.DB);
+	if (!features.reading) return;
 	const current = await policy(env.DB);
 	if (!current) return;
-	try { await runCapture(env, state, Boolean(current.enabled)); } catch { /* The durable lease retries an uncertain publication. */ }
+	const saveImages = features.readingImages !== 'remote';
+	let captured = true;
+	try { captured = await runCapture(env, state, Boolean(current.enabled), saveImages); } catch { /* The durable lease retries an uncertain publication. */ }
+	// Saving images uses most of a run's subrequests (50 on the Workers Free plan), so a run
+	// that handled a capture leaves the next job for an alarm a second later.
+	const deferred = saveImages && captured;
 	// File removals delete their jobs in the commit batch, and a new generation deletes the old one's.
-	const job = await env.DB.prepare('SELECT path, item_id, generation, source_revision, block_hash, url, attempts FROM reading_jobs WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
+	const job = deferred ? null : await env.DB.prepare('SELECT path, item_id, generation, source_revision, block_hash, url, attempts FROM reading_jobs WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Job>();
 	// A job that found its source changed leaves its capture for the queue below.
-	let requeue = !job;
+	let requeue = !job && !deferred;
 	if (job && current.enabled) {
 		// Lease before network access: a crash or restart repeats safely after one minute.
 		// Exhausted jobs keep their row, so the article queue cannot restart their fetches,
@@ -91,7 +103,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 		await env.DB.prepare(`UPDATE reading_jobs SET available_at=CASE WHEN attempts+1>=${MAX_JOB_ATTEMPTS} THEN ? ELSE ? END, attempts=attempts+1 WHERE path=?`)
 			.bind(Date.now() + EXHAUSTED_JOB_RETRY_MS, Date.now() + 60_000, job.path).run();
 		await state.storage.setAlarm(Date.now() + 60_000);
-		let result: Awaited<ReturnType<typeof extractDocument>> | null = null, resolvedUrl: string | undefined;
+		let result: Awaited<ReturnType<typeof extractDocument>> | null = null, resolvedUrl: string | undefined, images: StagedReadingImage[] | undefined;
 		try {
 			// The revision check needs only the file row; publication reads the note itself.
 			const file = await getStoredFileRow(env.DB, job.path);
@@ -103,10 +115,12 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 				// Three attempts fetch the page. Later ones publish the bookmark without an
 				// article, so a note that cannot take its article stops refetching it.
 				if (job.attempts < MAX_FETCH_ATTEMPTS) {
-					try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, env.READING_FETCH ? request => env.READING_FETCH!.fetch(request) : fetch, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
+					const fetchPublic = env.READING_FETCH ? (request: Request) => env.READING_FETCH!.fetch(request) : fetch;
+					try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, fetchPublic, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
 					catch { if (job.attempts < MAX_FETCH_ATTEMPTS - 1) return; }
+					images = result && saveImages ? await stageImages(env, result, job.item_id, fetchPublic) : undefined;
 				}
-				if (!await publishReading(env, { job, result, resolvedUrl } satisfies Publication)) throw new Error('Reading publication unavailable');
+				if (!await publishReading(env, { job, result, resolvedUrl, ...(images?.length ? { images } : {}) } satisfies Publication)) throw new Error('Reading publication unavailable');
 			}
 		} catch { /* Keep the bounded lease and exact source for recovery. No article or URL logging. */ }
 	}

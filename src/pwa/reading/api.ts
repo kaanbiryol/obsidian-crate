@@ -9,6 +9,7 @@ import type { ReadingItem } from '@/reading/core/model';
 import type { ReadingSection, ReadingTag } from '@/reading/core/reading-presentation';
 import { ENCRYPTED_READING_ACTIONS, EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
+import { readingImageType } from '@/reading/core/article-images';
 export { ReadingApiError } from './session/api-error';
 import { isReadingArticle, isReadingItem, parseReadingListPage, type ReadingArticle } from './storage/record-validation';
 import { mapBounded } from '@/platform/map-bounded';
@@ -148,6 +149,22 @@ export async function reloadReadingAfterWrites(session: ReadingSession, writes: 
 		if (article?.etag && article.markdownHash) await refreshSavedArticle(session, article.item, article.etag, article.markdownHash);
 	});
 	return loadReading(session);
+}
+
+/** An image in the Reading folder, as a blob typed by its file name. An encrypted vault's
+ * copy is decrypted and checked against its own metadata. */
+export async function loadReadingImage(session: ReadingSession, path: string): Promise<Blob> {
+	const type = readingImageType(path);
+	if (!type) throw new Error('This is not an image.');
+	const bytes = await retryAfterEncryptionChange(async refresh => {
+		const keys = await prepareReadingEncryption(session, refresh);
+		if (keys) return encryptedReadingApi(session, keys).image(path);
+		const response = await rawReadingRequest(`/reading/file?${new URLSearchParams({ path })}`, session);
+		if (!response.ok) { const failure = await responseError(response, 'Image is unavailable.'); throw new ReadingApiError(failure.message, response.status, failure.code); }
+		return new Uint8Array(await response.arrayBuffer());
+	});
+	assertReadingSession(session);
+	return new Blob([bytes], { type });
 }
 
 /** `etag` names the server revision of the article; an encrypted vault derives it from the note's file. */

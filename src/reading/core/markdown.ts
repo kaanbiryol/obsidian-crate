@@ -29,6 +29,8 @@ export interface MarkdownDocument {
 	/** Whole inline tokens can be wrapped; partial selections and blocks stay literal. */
 	codes: { start: number; end: number; source?: { start: number; end: number } }[];
 	autolinks: { start: number; end: number; source?: { start: number; end: number } }[];
+	/** Each rendered image, at the text offset where it appears, with its `src` as rendered. */
+	images: { offset: number; src: string }[];
 }
 
 /** Match parser-owned text within its parent, allowing removed list/quote prefixes. */
@@ -142,7 +144,7 @@ export function readingDocument(markdown: string): MarkdownDocument {
 			return `<mark${source ? ` ${markAttribute}="${id}"` : ''}>${this.parser.parseInline((token as HighlightToken).tokens)}</mark>`;
 		},
 	}] });
-	const result: MarkdownDocument = { text: '', html: unmarkedMarkdown.parser(tokens), characters: [], marks: [], codes: [], autolinks: [] };
+	const result: MarkdownDocument = { text: '', html: unmarkedMarkdown.parser(tokens), characters: [], marks: [], codes: [], autolinks: [], images: [] };
 	// A leaf collects its own text: slicing the growing document text per tag is quadratic.
 	const stack: { start: number; leaf?: number; text?: string; mark?: number; code: boolean; inlineCode?: number; autolink?: number; hidden: boolean; raw: boolean }[] = [];
 	let hidden = 0;
@@ -150,6 +152,7 @@ export function readingDocument(markdown: string): MarkdownDocument {
 		onopentag(name, attributes) {
 			const drop = READING_DROP_CONTENTS.includes(name) && !READING_HTML_TAGS.includes(name);
 			if (drop) hidden++;
+			if (name === 'img' && !hidden && attributes.src) result.images.push({ offset: result.text.length, src: attributes.src });
 			stack.push({ start: result.text.length, hidden: drop, code: name === 'code', raw: attributes[rawAttribute] !== undefined,
 				...(attributes[sourceAttribute] === undefined ? {} : { leaf: Number(attributes[sourceAttribute]), text: '' }),
 				...(attributes[markAttribute] === undefined ? {} : { mark: Number(attributes[markAttribute]) }),

@@ -43,6 +43,18 @@
 	&__item[data-openable] > .crate-reading-highlights__excerpt {
 		display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden;
 	}
+	// A highlighted image shows as a thumbnail beside the same accent dot, with its alt text below.
+	&__figure {
+		position: relative; display: grid; gap: var(--crate-space-4); margin: 0; padding: 0 0 0 var(--crate-space-12);
+		&::before { content: ''; position: absolute; top: calc(.775em - 3px); left: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--crate-highlight-accent); }
+	}
+	&__image { display: block; max-width: min(100%, 320px); max-height: 180px; width: auto; height: auto; border-radius: 8px; object-fit: contain; }
+	&__image-placeholder {
+		display: inline-flex; align-items: center; gap: var(--crate-space-8); min-height: 44px; padding: 0 var(--crate-space-12);
+		border-radius: 8px; background: var(--crate-control-hover-bg); font-size: var(--crate-font-sm); color: var(--text-muted);
+		> span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	}
+	&__caption { font-size: var(--crate-font-xs); line-height: 1.5; color: var(--text-muted); }
 	// The note reads as a quoted reply: a thin rule beside muted text.
 	&__note {
 		position: relative; margin: 2px 0 0 var(--crate-space-12); padding-left: var(--crate-space-12);

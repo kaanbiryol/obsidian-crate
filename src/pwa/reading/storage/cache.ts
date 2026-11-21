@@ -1,16 +1,39 @@
 import type { ReadingItem } from '@/reading/core/model';
 import { isRecord } from '@/platform/validation';
+import { base64ToArrayBuffer } from '@/platform/base64';
+import { readingImageType } from '@/reading/core/article-images';
 import { decodeReadingValue, encodeReadingValue } from './private-storage';
 import { readingDatabase, readReadingValue } from './database';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
 import { isReadingArticleCache, type ReadingArticleCache } from './storage-validation';
-import { isArticleReadingKey, isRetiredReadingCacheKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
+import { isArticleImageReadingKey, isArticleReadingKey, isRetiredReadingCacheKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { readingNoteFolder } from '../session/encryption-session';
 
 /** The library's first inbox page and its issues, kept in memory only. The library stays on
  * the server; this device stores only articles saved for offline. */
 export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; cursor?: string | null }
+
+/** An image an offline copy shows: its type and base64 bytes. */
+interface OfflineReadingImage { type: string; data: string }
+/** The images to store with an offline copy. Stored images outside `keep` are deleted. */
+export interface OfflineReadingImages { save: ReadonlyMap<string, OfflineReadingImage>; keep: ReadonlySet<string> }
+const imagePrefix = (session: ReadingSession, id: string) => `${readingKeys.articleImagePrefix(session.id)}${id}:`;
+
+/** Vault paths of the images stored with an article's offline copy. */
+export async function offlineReadingImagePaths(session: ReadingSession, id: string): Promise<Set<string>> {
+	const db = await readingDatabase(); assertReadingSession(session);
+	const prefix = imagePrefix(session, id);
+	return new Set((await db.getAllKeys('values')).filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length)));
+}
+
+/** An image stored with an article's offline copy, or undefined when there is none. */
+export async function readOfflineReadingImage(session: ReadingSession, id: string, path: string): Promise<Blob | undefined> {
+	const value = await readReadingValue(`${imagePrefix(session, id)}${path}`);
+	const type = readingImageType(path);
+	if (!type || !isRecord(value) || typeof value.data !== 'string' || value.type !== type) return undefined;
+	return new Blob([base64ToArrayBuffer(value.data)], { type });
+}
 
 export async function readReadingArticle(session: ReadingSession, id: string) {
 	const value = await readReadingValue(`${readingKeys.articlePrefix(session.id)}${id}`);
@@ -39,12 +62,17 @@ export async function removeRetiredReadingRecords(session: ReadingSession): Prom
 	const db = await readingDatabase(); assertReadingSession(session);
 	const tx = db.transaction('values', 'readwrite'), mine = readingKeys.articlePrefix(session.id);
 	try {
+		// `<session>:<id>` of each copy kept, and image keys, which go with their copy.
+		const copies: string[] = [], images: string[] = [];
 		for (const key of await tx.store.getAllKeys()) {
 			if (isRetiredReadingCacheKey(key)) { await tx.store.delete(key); continue; }
+			if (isArticleImageReadingKey(key)) { images.push(key.slice('article-image:'.length)); continue; }
 			if (!isArticleReadingKey(key)) continue;
 			const copy = readableCopy(key, await tx.store.get(key));
 			if (copy && (!key.startsWith(mine) || copy.offline !== true)) await tx.store.delete(key);
+			else copies.push(key.slice('article:'.length));
 		}
+		for (const image of images) if (!copies.some(copy => image.startsWith(`${copy}:`))) await tx.store.delete(`article-image:${image}`);
 		assertReadingSession(session);
 		await tx.done;
 	} catch (error) {
@@ -74,7 +102,7 @@ export async function readOfflineReadingItems(session: ReadingSession): Promise<
  * is saved.
  */
 export async function cacheReadingArticle(session: ReadingSession, item: ReadingItem, markdown: string,
-	{ etag, refresh = false }: { etag?: string; refresh?: boolean } = {}): Promise<boolean> {
+	{ etag, refresh = false, images }: { etag?: string; refresh?: boolean; images?: OfflineReadingImages } = {}): Promise<boolean> {
 	const db = await readingDatabase(); assertReadingSession(session);
 	const tx = db.transaction('values', 'readwrite');
 	const key = `${readingKeys.articlePrefix(session.id)}${item.crate_reading_id}`;
@@ -89,18 +117,25 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
 		if (refresh && !replaced) { await tx.done; return false; }
 		const usedAt = replaced?.usedAt ?? Date.now();
 		await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt, offline: true, ...etag ? { etag } : {} }), key);
+		if (images) {
+			const prefix = imagePrefix(session, item.crate_reading_id);
+			for (const stored of await tx.store.getAllKeys()) if (stored.startsWith(prefix) && !images.keep.has(stored.slice(prefix.length))) await tx.store.delete(stored);
+			for (const [path, image] of images.save) await tx.store.put(encodeReadingValue(`${prefix}${path}`, image), `${prefix}${path}`);
+		}
 		assertReadingSession(session);
 		await tx.done;
 	} catch (error) { await abortTransaction(tx); throw error; }
 	return true;
 }
 
-/** Deletes a saved offline copy. */
+/** Deletes a saved offline copy and its images. */
 export async function removeReadingArticle(session: ReadingSession, id: string): Promise<void> {
 	const db = await readingDatabase(); assertReadingSession(session);
 	const tx = db.transaction('values', 'readwrite');
 	try {
 		await tx.store.delete(`${readingKeys.articlePrefix(session.id)}${id}`);
+		const images = imagePrefix(session, id);
+		for (const key of await tx.store.getAllKeys()) if (key.startsWith(images)) await tx.store.delete(key);
 		assertReadingSession(session);
 		await tx.done;
 	} catch (error) { await abortTransaction(tx); throw error; }

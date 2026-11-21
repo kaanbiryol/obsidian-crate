@@ -6,7 +6,9 @@ import { planReadingFileCommand, readingFileCommandRefusal } from '@/reading/cor
 import { patchReadingFrontmatter, readReadingFrontmatter } from '@/reading/core/frontmatter';
 import { sha256Hex } from '@/platform/sha256';
 import { stageMarkdownFile } from '../sync/markdown-file-staging';
-import { commitFileDelete, commitStagedFile } from '../sync/mutations';
+import { commitFileDelete, commitFileDeletes, commitStagedFile } from '../sync/mutations';
+import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
+import { isReadingImagePath, readingImageFolder } from '@/reading/core/article-images';
 import type { Env } from '../types';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { beginOperation, operationEffects, operationReceiptStatement, operationStatement, type ReadingReceiptRow } from './operations';
@@ -108,6 +110,9 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 		const result = await commitFileDelete(env.DB, { path: source.path, expectedHash: source.file.hash, expectedRevision: source.file.storageKey, previousFile: source.file,
 			readingPolicy: current, effects: operationEffects(env.DB, op, response) });
 		if (!result.committed) throw new ReadingError('This note changed. Refresh before deleting it.', 409);
+		// Then the article's saved images, each only at the revision listed here. A failure
+		// leaves them in place; the deleted note is already committed.
+		await deleteArticleImages(env.DB, current, source.item.crate_reading_id).catch(() => {});
 		return readingResponse(response);
 	}
 	const content = plan.content;
@@ -121,4 +126,12 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	const article = { item: { ...saved, path: source.path }, etag: await readingItemEtag(current, saved.crate_reading_id, { path: source.path, storage_key: staged.objectKey, hash: staged.hash }),
 		markdownHash: await sha256Hex(readReadingFrontmatter(content)?.body ?? '') };
 	return readingResponse({ ...response, article });
+}
+
+async function deleteArticleImages(db: D1Database, current: ReadingPolicy, id: string): Promise<void> {
+	const images = await db.prepare(`SELECT path, hash, size, storage_key FROM files WHERE ${FILE_FOLDER_MATCH} LIMIT 100`)
+		.bind(...fileFolderArgs(readingImageFolder(current.folder_path, id))).all<{ path: string; hash: string; size: number; storage_key: string }>();
+	await commitFileDeletes(db, images.results.filter(image => isReadingImagePath(current.folder_path, image.path)).map(image => ({
+		path: image.path, expectedHash: image.hash, expectedRevision: image.storage_key,
+		previousFile: { hash: image.hash, size: image.size, storageKey: image.storage_key }, readingPolicy: current })));
 }

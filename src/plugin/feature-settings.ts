@@ -5,7 +5,8 @@ import { captureServerConnection, serverRequest } from './server-request';
 import { republishReadingNotes, restartReading } from '../reading/runtime';
 import { readReadingPolicy } from '../reading/server';
 import { getPluginLifecycleSignal } from './lifecycle-state';
-import { parseFeaturePolicy, type FeaturePolicy, type SharedFeatures } from '../protocol/feature-policy';
+import { parseFeaturePolicy, type FeaturePolicy, type ReadingImageMode, type SharedFeatures } from '../protocol/feature-policy';
+import { readingImageMode } from '../reading/core/article-images';
 import { sharedSettingsSync } from './shared-settings-sync';
 import { openConfirmationModal } from '../ui/plugin/confirmation-modal';
 import { openFeatureChoiceModal, type FeatureChoice } from '../ui/settings/feature-choice-modal';
@@ -143,8 +144,16 @@ async function apply(plugin: CratePlugin, policy: FeaturePolicy, activate: boole
 	const reading = policy.reading && plugin.settings.reading.confirmed;
 	const reminders = policy.reminders && plugin.remindersSettings.confirmed;
 	const changed = plugin.settings.reading.enabled !== reading || plugin.remindersSettings.enabled !== reminders;
+	// The image choice applies to captures and the reader; neither needs a restart.
+	const images = policy.readingImages ?? 'save';
+	if (plugin.settings.reading.enabled === reading && readingImageMode(plugin.settings.reading.images) !== images) {
+		const { images: _previous, ...rest } = plugin.settings.reading; void _previous;
+		await plugin.writeSettings({ reading: images === 'save' ? rest : { ...rest, images } }, assertCurrent);
+		assertCurrent();
+	}
 	if (plugin.settings.reading.enabled !== reading) {
-		await plugin.writeSettings({ reading: { ...plugin.settings.reading, enabled: reading } }, assertCurrent);
+		const { images: _previous, ...rest } = plugin.settings.reading; void _previous;
+		await plugin.writeSettings({ reading: { ...rest, enabled: reading, ...(images === 'save' ? {} : { images }) } }, assertCurrent);
 		assertCurrent();
 		restartReading(plugin, activate && reading);
 		if (reading) republishReadingNotes(plugin, plugin.settings.reading.folderPath);
@@ -196,6 +205,16 @@ export function setSharedFeature(plugin: CratePlugin, feature: Feature, enabled:
 		assertCurrent();
 		const policy = await requestFeatures(plugin, { feature, enabled, revision: current.revision });
 		await apply(plugin, policy, true, assertCurrent);
+	});
+}
+/** Saves how articles keep their images for every device; without a server, for this vault only. */
+export function setSharedReadingImages(plugin: CratePlugin, images: ReadingImageMode): Promise<void> {
+	return serialize(plugin, async assertCurrent => {
+		const local: FeaturePolicy = { reading: plugin.settings.reading.enabled, reminders: plugin.remindersSettings.enabled, revision: null, readingImages: images };
+		if (!plugin.settings.workerUrl) { await apply(plugin, local, true, assertCurrent); return; }
+		const current = await requestFeatures(plugin);
+		assertCurrent();
+		await apply(plugin, await requestFeatures(plugin, { readingImages: images, revision: current.revision }), true, assertCurrent);
 	});
 }
 /** Automatic syncs can run every few seconds; the policy rarely changes. */

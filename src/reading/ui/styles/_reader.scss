@@ -89,6 +89,13 @@
 	&__body h1, &__body h2 { font-size: 1.35em; }
 	&__body h3 { font-size: 1.15em; }
 	&__body a { color: inherit; text-decoration: underline; text-decoration-color: var(--text-faint, var(--text-muted)); text-underline-offset: 4px; }
+	// Images keep their aspect ratio within the column; one without a source shows nothing.
+	&__body img { display: block; max-width: 100%; height: auto; margin: .35em 0; border-radius: 8px; }
+	&__body img:not([src]) { display: none; }
+	// A highlighted image wears the highlight colour as a frame; an unsynced one is dashed.
+	&__body img.crate-reading-reader__image-highlight { cursor: pointer; outline: 4px solid var(--text-highlight-bg, rgba(255, 208, 64, .6)); outline-offset: 2px; }
+	&__body img.crate-reading-reader__image-highlight[data-sync="pending"] { outline-style: dashed; }
+	&__body img.crate-reading-reader__image-highlight:focus-visible { outline-color: var(--interactive-accent); }
 	&__body pre { max-width: 100%; overflow-x: auto; padding: 18px; background: var(--crate-panel-bg); border: 1px solid var(--crate-divider); border-radius: 10px; line-height: 1.65; }
 	&__body code { font-family: var(--font-monospace, monospace); font-size: .8em; }
 	&__body :not(pre) > code { padding: 2px 5px; border-radius: 4px; background: var(--crate-panel-bg); }

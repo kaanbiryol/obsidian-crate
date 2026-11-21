@@ -52,6 +52,7 @@ import {
 	Smartphone,
 	StickyNote,
 	ExternalLink,
+	Image,
 	type LucideIcon,
 } from 'lucide-react';
 
@@ -104,6 +105,7 @@ const ICONS: Record<string, LucideIcon> = {
 	'grip-vertical': GripVertical,
 	hash: Hash,
 	highlighter: Highlighter,
+	image: Image,
 	inbox: Inbox,
 	plus: Plus,
 	repeat: Repeat,

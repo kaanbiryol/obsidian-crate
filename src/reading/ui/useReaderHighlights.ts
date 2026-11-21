@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { readingDocument } from '../core/markdown';
 import { anchorHighlight, writeMarkdownHighlights } from '../core/markdown-highlights';
-import type { ReadingHighlight } from '../core/highlights';
+import { sameHighlight, type ReadingHighlight } from '../core/highlights';
+import { highlightImage } from './reader-highlights';
 import type { ReadingChanges, ReadingMetadata } from '../core/model';
 
 type ReaderMode = 'article' | 'highlights';
@@ -23,7 +24,7 @@ interface ReaderHighlightsOptions {
 }
 
 function findCurrent(item: ReadingMetadata, target: ReadingHighlight): ReadingHighlight | undefined {
-	return item.highlights?.find(highlight => target.id ? highlight.id === target.id : highlight.start === target.start && highlight.end === target.end);
+	return item.highlights?.find(highlight => target.id ? highlight.id === target.id : sameHighlight(highlight, target));
 }
 
 /** Highlight sheets, the note and delete dialogs, and passage focus for one open reading item. */
@@ -46,7 +47,8 @@ export function useReaderHighlights({ item, markdown, content, body, article, mo
 		const ownerWindow = article.current?.ownerDocument.defaultView;
 		if (!ownerWindow) return;
 		const focusPassage = () => {
-			const passage = body.current?.querySelector<HTMLElement>(`[data-highlight-start="${target.start}"]`);
+			const passage = body.current && (target.image !== undefined ? highlightImage(body.current, target)
+				: body.current.querySelector<HTMLElement>(`mark[data-highlight-start="${target.start}"]`));
 			if (passage) {
 				passage.focus({ preventScroll: true });
 				passage.scrollIntoView({ block: 'center', behavior: floatingHighlights && !ownerWindow.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant' });

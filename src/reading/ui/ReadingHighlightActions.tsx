@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { PWA_CONTROL_SPRING, PWA_FADE, PWA_SURFACE_SPRING } from '../../ui/shared/navigation/motion';
-import { readingHighlights, type ReadingHighlight } from '../core/highlights';
+import { readingHighlights, sameHighlight, type ReadingHighlight } from '../core/highlights';
 import { highlightRange, highlightTextRects } from './reader-highlights';
 import { readingHighlightGeometry, type HighlightGeometry } from './reading-highlight-geometry';
 import { registerReadingHighlightInteraction, type HighlightEdit } from './reading-highlight-interaction';
@@ -26,7 +26,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 	const [busy, setBusy] = useState(false);
 	// A save or delete that failed offers Retry in place of Note until it succeeds or the edit changes.
 	const [failed, setFailed] = useState(false);
-	const commands = useRef({ copy: () => {}, share: () => {}, annotate: () => {}, remove: () => {}, retry: () => {} });
+	const commands = useRef({ copy: () => {}, share: () => {}, highlight: () => {}, annotate: () => {}, remove: () => {}, retry: () => {} });
 	const [transferBusy, setTransferBusy] = useState(false);
 	const [layout, setLayout] = useState(0);
 
@@ -65,10 +65,12 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			saving.current = true; setBusy(true); clearFailure();
 			try {
 				if (!highlightRange(text, value.highlight)) throw new Error('Article text changed. Select the passage again.');
-				const next = latest.current.highlights.filter(entry => value.original
-					? entry.end <= value.original.start || entry.start >= value.original.end
-					: entry.start !== value.highlight.start || entry.end !== value.highlight.end);
-				const previous = value.original && latest.current.highlights.find(entry => entry.start === value.original!.start && entry.end === value.original!.end);
+				const { original, highlight } = value;
+				// An image highlight replaces only itself; a passage replaces the text highlights it overlapped.
+				const next = latest.current.highlights.filter(entry => highlight.image !== undefined || entry.image !== undefined
+					? !sameHighlight(entry, original ?? highlight)
+					: original ? entry.end <= original.start || entry.start >= original.end : !sameHighlight(entry, highlight));
+				const previous = original && latest.current.highlights.find(entry => sameHighlight(entry, original));
 				if (!remove) next.push({ ...previous, ...value.highlight });
 				await latest.current.onSave(readingHighlights(next));
 				if (!alive) return;
@@ -104,6 +106,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		commands.current = {
 			copy: () => { void transfer(false); },
 			share: () => { void transfer(true); },
+			highlight: () => { if (editing.current) void persist(editing.current); },
 			annotate: () => {
 				const value = editing.current;
 				if (!value || saving.current) return;
@@ -129,7 +132,8 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		return () => { alive = false; interaction.dispose(); };
 	}, [article, body]);
 
-	const note = draft && savedHighlight(highlights, draft.highlight)?.note;
+	const saved = draft && savedHighlight(highlights, draft.highlight), note = saved?.note;
+	const image = draft?.highlight.image !== undefined;
 	// Obsidian desktop has no native share sheet, so offer Copy only.
 	const canShare = typeof article.current?.ownerDocument.defaultView?.navigator.share === 'function';
 	const reduceMotion = useReducedMotion();
@@ -142,25 +146,27 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 	return <AnimatePresence>{draft && geometry && <PresenceSurface key="editor" ref={controls} className="crate-reading-reader__highlight-editor"
 		variants={{ hidden: { opacity: 0, transition: PWA_FADE }, shown: { opacity: 1, transition: PWA_FADE } }} initial="hidden" animate="shown" exit="hidden">
 		<div aria-hidden="true">{geometry.boxes.map((box, index) => <span key={index} className="crate-reading-reader__highlight-preview" style={box} />)}</div>
-		{(['start', 'end'] as const).map(edge => {
+		{!image && (['start', 'end'] as const).map(edge => {
 			const box = geometry[edge];
 			return <button key={edge} type="button" className="crate-reading-reader__highlight-handle" data-highlight-edge={edge} aria-label={`Adjust highlight ${edge}`} disabled={busy || disabled}
 				style={{ left: box.left + (edge === 'end' ? box.width : 0), top: box.top, '--highlight-line-height': `${box.height}px` } as React.CSSProperties} />;
 		})}
 		<motion.div className="crate-reading-reader__selection" role="group" aria-label="Highlight actions" variants={toolbarMotion}
 			style={{ ...geometry.menu, transformOrigin: geometry.menu.top < geometry.start.top ? 'center bottom' : 'center top' }}>
-			<Button variant="ghost" aria-label="Copy text" disabled={transferBusy} onClick={() => commands.current.copy()}>Copy</Button>
-			{canShare && <Button variant="ghost" aria-label="Share text" disabled={transferBusy} onClick={() => commands.current.share()}>Share</Button>}
-			{failed
+			{!image && <Button variant="ghost" aria-label="Copy text" disabled={transferBusy} onClick={() => commands.current.copy()}>Copy</Button>}
+			{!image && canShare && <Button variant="ghost" aria-label="Share text" disabled={transferBusy} onClick={() => commands.current.share()}>Share</Button>}
+			{image && !saved && !failed
+				? <Button variant="ghost" aria-label="Highlight image" disabled={busy || disabled} onClick={() => commands.current.highlight()}>Highlight</Button>
+				: failed
 				? <Button variant="ghost" aria-label="Retry highlight" disabled={busy || disabled} onClick={() => commands.current.retry()}>Retry</Button>
 				: <Button variant="ghost" aria-label={note ? 'Edit highlight note' : 'Add highlight note'} disabled={busy || disabled} onClick={() => commands.current.annotate()}>Note</Button>}
-			<span className="crate-reading-reader__selection-divider" aria-hidden="true" />
-			<IconButton className="crate-reading-reader__delete-highlight" icon="trash-2" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />
+			{(!image || saved) && <span className="crate-reading-reader__selection-divider" aria-hidden="true" />}
+			{(!image || saved) && <IconButton className="crate-reading-reader__delete-highlight" icon="trash-2" size="large" variant="surface" tone="danger" label="Delete highlight" disabled={busy || disabled} onClick={() => commands.current.remove()} />}
 			{busy && <span className="crate-reading__sr-only" role="status">Saving highlight</span>}
 		</motion.div>
 	</PresenceSurface>}</AnimatePresence>;
 }
 
 function savedHighlight(highlights: ReadingHighlight[], highlight: ReadingHighlight): ReadingHighlight | undefined {
-	return highlights.find(entry => entry.start === highlight.start && entry.end === highlight.end);
+	return highlights.find(entry => sameHighlight(entry, highlight));
 }

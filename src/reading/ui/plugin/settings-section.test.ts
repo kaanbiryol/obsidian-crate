@@ -50,7 +50,7 @@ async function setup(connected = true, enabled = true, confirmed = true) {
 
 it('shows Reading controls after expanding without fetching remote settings', async () => {
  const { toggle } = await setup();
- expect(MockSetting.instances.map(row => row.nameEl.textContent)).toEqual(['Enable reading', 'Reading folder']);
+ expect(MockSetting.instances.map(row => row.nameEl.textContent)).toEqual(['Enable reading', 'Reading folder', 'Article images']);
  expect(toggle.value).toBe(true);
  expect(request).not.toHaveBeenCalled();
 });
@@ -68,7 +68,7 @@ it.each([true, false])('sets local Reading to %s without changing another device
 
 it('shows the folder while Reading is off, so it can be chosen before turning it on', async () => {
  await setup(false, false, false);
- expect(MockSetting.instances.map(row => row.nameEl.textContent)).toEqual(['Enable reading', 'Reading folder']);
+ expect(MockSetting.instances.map(row => row.nameEl.textContent)).toEqual(['Enable reading', 'Reading folder', 'Article images']);
 });
 
 it('changes no notes until this vault confirms turning Reading on with its folder', async () => {

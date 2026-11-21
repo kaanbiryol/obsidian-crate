@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { renderHook } from '../../test/react-hooks';
 import { loadReadingArticle } from './api';
-import { cacheReadingArticle, readReadingArticle, removeReadingArticle, type ReadingCache } from './storage/storage';
+import { cacheReadingArticle, offlineReadingImagePaths, readReadingArticle, removeReadingArticle, type ReadingCache } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { AUTH_TOKEN_KEY } from '../config';
 import { useReadingArticle } from './useReadingArticle';
@@ -11,7 +11,7 @@ import { useReadingArticle } from './useReadingArticle';
 vi.mock('./session/encryption-session', () => ({ prepareReadingEncryption: vi.fn(async () => null), readingEncryptionKeys: () => null, readingNoteFolder: ({ folderPath }: { folderPath: string }) => folderPath, readingEncryptionHeaders: () => ({}) }));
 vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),
-	readReadingArticle: vi.fn(), cacheReadingArticle: vi.fn(async () => true), removeReadingArticle: vi.fn(async () => {}),
+	readReadingArticle: vi.fn(), cacheReadingArticle: vi.fn(async () => true), removeReadingArticle: vi.fn(async () => {}), offlineReadingImagePaths: vi.fn(async () => new Set<string>()),
 }));
 vi.mock('./storage/article-history', () => ({
 	openReadingArticleHistory: async (id: string) => {
@@ -132,11 +132,27 @@ it('keeps an opened article only in memory until it is saved for offline, with i
 	expect(hook.current.reader).toMatchObject({ markdown: 'Online text.', availableOffline: false });
 	vi.mocked(cacheReadingArticle).mockResolvedValue(true);
 	await act(async () => { await hook.current.setOffline(true); });
-	expect(cacheReadingArticle).toHaveBeenCalledWith(session, item, 'Online text.', { etag: '"revision"' });
+	expect(cacheReadingArticle).toHaveBeenCalledWith(session, item, 'Online text.', { etag: '"revision"', images: { save: new Map(), keep: new Set() } });
 	expect(hook.current.reader).toMatchObject({ availableOffline: true });
 	await act(async () => { await hook.current.setOffline(false); });
 	expect(removeReadingArticle).toHaveBeenCalledWith(session, item.crate_reading_id);
 	expect(hook.current.reader).toMatchObject({ availableOffline: false });
+});
+
+it('saves the vault images an offline copy shows, downloading only those not stored yet', async () => {
+	const folder = `Reading/attachments/${item.crate_reading_id}`;
+	const markdown = `Text\n\n![One](attachments/${item.crate_reading_id}/1.png)\n\n![Two](attachments/${item.crate_reading_id}/2.png)\n\n![Web](https://cdn.example/3.png)\n`;
+	vi.mocked(readReadingArticle).mockResolvedValue(undefined);
+	vi.mocked(offlineReadingImagePaths).mockResolvedValue(new Set([`${folder}/2.png`]));
+	network.mockImplementation(async input => (input as string).startsWith('/reading/file')
+		? new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]))
+		: Response.json({ item, markdown }));
+	const { hook } = harness();
+	await act(async () => { await hook.current.open(item); });
+	await act(async () => { await hook.current.setOffline(true); });
+	expect(network.mock.calls.map(call => call[0] as string).filter(url => url.startsWith('/reading/file'))).toEqual([`/reading/file?${new URLSearchParams({ path: `${folder}/1.png` })}`]);
+	expect(cacheReadingArticle).toHaveBeenCalledWith(session, item, markdown, { images: {
+		save: new Map([[`${folder}/1.png`, { type: 'image/png', data: 'iVBORwE=' }]]), keep: new Set([`${folder}/1.png`, `${folder}/2.png`]) } });
 });
 
 it('reports a device out of storage instead of removing another saved copy', async () => {

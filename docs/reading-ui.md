@@ -41,7 +41,17 @@ Obsidian keeps separate library and reader scroll containers. The PWA reader use
 document scrolling while preserving the covered library’s filters and list position.
 Browser history remains in the PWA adapter.
 
-Article HTML still passes through the existing sanitizer. Source badges begin as
+Article HTML still passes through the existing sanitizer. It keeps `img` with `src` and `alt`
+only: a relative source resolves against the note to a vault image (PNG, JPEG, GIF, WebP or AVIF),
+which the host loads (`ReadingImageHost`: a resource URL in Obsidian, a blob URL in the web app),
+and an `https` source loads with `referrerpolicy="no-referrer"` only while **Article images** is
+**Load from the website**. Without a host the reader shows no images. The web app shows an image
+from the article's offline copy when it holds one. When a note in the Reading folder is deleted,
+including by sync, Obsidian moves `attachments/<reading id>` to the user's trash once sync is not
+writing the vault and no indexed note still has that Reading ID (`src/reading/data/image-cleanup.ts`).
+A note deleted elsewhere while Obsidian was closed is covered when sync deletes it here. One
+removed outside Obsidian, for example in a file manager, leaves its folder for the user to delete.
+Source badges begin as
 letter marks and load HTTPS favicons when available; an unavailable or offline icon
 leaves the letter in place. Each host uses its own browser image cache. Appearance,
 tags, and capture use the existing Base UI modal primitive with portals in the

@@ -12,6 +12,7 @@ function anchored(text: string, highlight: ReadingHighlight): ReadingHighlight |
 }
 
 export function anchorHighlight(text: string, highlight: ReadingHighlight): ReadingHighlight {
+	if (highlight.image !== undefined) return highlight;
 	return { ...highlight, prefix: text.slice(Math.max(0, highlight.start - 32), highlight.start), suffix: text.slice(highlight.end, highlight.end + 32) };
 }
 
@@ -31,10 +32,31 @@ function samePassage(document: MarkdownDocument, highlight: ReadingHighlight): b
 		|| !document.text.slice(mark.start, highlight.start).trim() && !document.text.slice(highlight.end, mark.end).trim());
 }
 
+/** The image an image highlight names: the only one with its source, or the one at its offset. */
+function anchoredImage(document: MarkdownDocument, highlight: ReadingHighlight): ReadingHighlight | null {
+	const matches = document.images.filter(image => image.src === highlight.image);
+	const match = matches.length === 1 ? matches[0] : matches.find(image => image.offset === highlight.start);
+	return match ? { ...highlight, start: match.offset, end: match.offset } : null;
+}
+
+/** Image highlights still in the article, each once; one whose image is gone keeps its note in recovery. */
+function readImageHighlights(document: MarkdownDocument, stored: ReadingHighlight[], recovery: ReadingHighlight[]): ReadingHighlight[] {
+	const images: ReadingHighlight[] = [];
+	for (const entry of stored) {
+		if (entry.image === undefined) continue;
+		const match = anchoredImage(document, entry);
+		if (match && !images.some(other => other.image === match.image && other.start === match.start)) images.push(match);
+		else if (!match && entry.note) recovery.push(entry);
+	}
+	return images;
+}
+
 /** Inline markers own prose; explicit anchors preserve source-sensitive excerpts. */
 export function readMarkdownHighlights(markdown: string, stored: ReadingHighlight[] = []) {
 	const document = readingDocument(markdown), highlights: ReadingHighlight[] = [], recovery: ReadingHighlight[] = [];
+	const images = readImageHighlights(document, stored, recovery);
 	for (const entry of stored) {
+		if (entry.image !== undefined) continue;
 		const match = anchored(document.text, entry);
 		if (match && samePassage(document, match)) highlights.push(anchorHighlight(document.text, match));
 		else if (entry.note || entry.codeAnchor || entry.textAnchor) recovery.push(entry);
@@ -60,7 +82,7 @@ export function readMarkdownHighlights(markdown: string, stored: ReadingHighligh
 		if (current.note || current.codeAnchor || current.textAnchor) recovery.push(current);
 		highlights.splice(i, 1);
 	}
-	return { highlights: readingHighlights(highlights), recovery };
+	return { highlights: readingHighlights([...highlights, ...images].sort((a, b) => a.start - b.start)), recovery };
 }
 
 interface HighlightPlan {
@@ -114,9 +136,15 @@ export function writeMarkdownHighlights(markdown: string, value: ReadingHighligh
 	for (const offset of delimiters) plain = plain.slice(0, offset) + plain.slice(offset + 2);
 	const document = readingDocument(plain);
 	if (document.text !== original.text || document.html !== original.html) throw new Error('This Markdown cannot be highlighted safely. Edit its highlights in Obsidian.');
-	const plans: HighlightPlan[] = [];
+	const plans: HighlightPlan[] = [], images: ReadingHighlight[] = [];
 	let previousEnd = -1;
-	for (const entry of [...desired].sort((a, b) => a.start - b.start)) {
+	for (const entry of desired) {
+		if (entry.image === undefined) continue;
+		if (!document.images.some(image => image.src === entry.image && image.offset === entry.start)) throw new Error('Article changed. Reopen it before highlighting.');
+		if (images.some(other => other.image === entry.image && other.start === entry.start)) throw new Error('This image is already highlighted.');
+		images.push({ ...entry, id: entry.id ?? crypto.randomUUID(), createdAt: entry.createdAt ?? new Date().toISOString() });
+	}
+	for (const entry of desired.filter(entry => entry.image === undefined).sort((a, b) => a.start - b.start)) {
 		if (document.text.slice(entry.start, entry.end) !== entry.text) throw new Error('Article text changed. Reopen it before highlighting.');
 		if (/[\uDC00-\uDFFF]/.test(entry.text[0]!) || /[\uD800-\uDBFF]/.test(entry.text.at(-1)!)) throw new Error('Select the whole character to highlight.');
 		for (const boundary of [entry.start, entry.end]) {
@@ -165,5 +193,6 @@ export function writeMarkdownHighlights(markdown: string, value: ReadingHighligh
 		const plan = { highlight, spans };
 		plans.push(textAnchor ? textAnchored(plan) : plan);
 	}
-	return resolvePlans(plain, document, plans);
+	const written = resolvePlans(plain, document, plans);
+	return images.length ? { markdown: written.markdown, highlights: readingHighlights([...written.highlights, ...images].sort((a, b) => a.start - b.start)) } : written;
 }

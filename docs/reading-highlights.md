@@ -13,6 +13,16 @@ code characters. These annotations sync in the note's frontmatter and appear in
 Crate's PWA and Obsidian reader and Highlights views. Obsidian's ordinary Markdown
 view does not paint metadata-only annotations.
 
+Image highlights are metadata only and leave the body unchanged. An entry with `image`
+names the image's source as the note links it (a vault path relative to the note or an
+`https` link) and sits at the reader-text offset where the image appears, so `start`
+equals `end`; `text` keeps the image's alt text. When the note changes, the highlight
+follows the only image with that source, or the one at its offset when the source repeats.
+An image highlight whose image is gone goes to `highlight_recovery` when it has a note.
+In the reader, tapping an image offers **Highlight**; a highlighted image has a frame in
+the highlight colour and offers **Note** and **Delete highlight**. Highlights lists show
+the image as a thumbnail, loaded like the article's images, with its alt text below.
+
 Other selections that cannot safely take markers use `textAnchor: true`. This
 includes partial autolinks, escaped table cells, HTML, literal `==`, and selections
 inside Obsidian constructs. Their article body stays unchanged. Wikilinks, embeds,

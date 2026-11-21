@@ -19,7 +19,7 @@ export function readingItemSyncStatus(pending: PendingReading[], id: string, isO
 	return readingSyncStatus({ pending: own, isOffline, loading: false, refreshing: false, confirmed: true, error: null, recovery: false });
 }
 
-const sameRange = (a: ReadingHighlight, b: ReadingHighlight) => a.start === b.start && a.end === b.end && a.text === b.text;
+const sameRange = (a: ReadingHighlight, b: ReadingHighlight) => a.start === b.start && a.end === b.end && a.text === b.text && a.image === b.image;
 
 /** Passages shown from local intent that the confirmed article does not have yet. */
 export function pendingReadingHighlights(confirmed: ReadingItem, pending: PendingReading[]): ReadingHighlight[] {

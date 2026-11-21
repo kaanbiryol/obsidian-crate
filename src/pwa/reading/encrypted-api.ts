@@ -1,6 +1,8 @@
-import { applyLocalArticle, type CapturedArticle } from '../../reading/core/article';
+import { applyLocalArticle } from '../../reading/core/article';
+import { downloadArticleImages, linkedVaultImages, linkSavedImages, readingImageFolder, type ReadingImageFile } from '../../reading/core/article-images';
+import type { ServerCapturedArticle } from './capture-article';
 import { planReadingFileCommand, readingFileCommandRefusal } from '../../reading/core/reading-file-command';
-import { sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
+import { openFile, sealFile, type FileEncryptionAuthority } from '@/encryption/file-codec';
 import { decryptJson, encryptJson } from '@/encryption/envelope';
 import { createReadingNote, parseReadingNote, readingImportId } from '../../reading/core/notes';
 import { readReadingFrontmatter, patchReadingFrontmatter } from '../../reading/core/frontmatter';
@@ -28,14 +30,14 @@ interface Attempt { requestHash: string; body: string; generation: number; rejec
  * note write. A capture has no path until its note is named. */
 type PreparedPlan =
 	| { response: unknown }
-	| { kind: 'remove'; itemId: string; file: WireFile }
+	| { kind: 'remove'; itemId: string; file: WireFile; images: string[] }
 	| { kind: 'write'; itemId: string; content: string; path: string; wire: string; previous?: WireFile; before?: ReadingItem };
 interface EncryptedReadingOptions {
 	/** The plaintext Reading folder; requests name `wireFolder`, its server form. */
 	folderPath: string; wireFolder: string; paths: PathTags; generation: number; authority: FileEncryptionAuthority;
 	/** Hashes search terms (`src/encryption/reading-search.ts`). */
 	searchKey: CryptoKey;
-	captureArticle?(url: string): Promise<CapturedArticle>;
+	captureArticle?(url: string): Promise<ServerCapturedArticle>;
 	request(path: string, body?: string, headers?: Record<string, string>): Promise<Response>;
 	readAttempt(id: string): Promise<unknown>;
 	writeAttempt(id: string, attempt: Attempt): Promise<void>;
@@ -86,6 +88,17 @@ export class EncryptedReadingApi {
 		this.sources.set(file.path, source);
 		trimContentCache(this.sources, 100);
 		return source;
+	}
+
+	/** An image file in the Reading folder, decrypted. Its metadata must name `path`. */
+	async image(path: string): Promise<Uint8Array<ArrayBuffer>> {
+		const wire = await this.options.paths.wire(path);
+		const response = await this.options.request(`/reading/encrypted-file?${new URLSearchParams({ folderPath: this.options.wireFolder, path: wire })}`);
+		if (!response.ok) {
+			const { message, code } = await responseError(response, 'Image is unavailable.');
+			throw this.options.error(message, response.status, code);
+		}
+		return (await openFile(new Uint8Array(await response.arrayBuffer()), path, this.options.authority)).content;
 	}
 
 	private async existing(wires: string[]): Promise<Set<string>> {
@@ -203,14 +216,21 @@ export class EncryptedReadingApi {
 		const plan = action === 'capture' ? await this.planCapture(body, id, rawBody) : await this.planEdit(action, body);
 		if ('response' in plan) return plan;
 		const { itemId } = plan;
-		if (plan.kind === 'remove') return { attempt: await this.persistAttempt(id, requestHash, { deleted: true, id: itemId }, [], [plan.file]) };
+		if (plan.kind === 'remove') return { attempt: await this.persistAttempt(id, requestHash, { deleted: true, id: itemId }, [], [plan.file], [], plan.images) };
 		let { content, path, wire, previous } = plan;
+		let images: ReadingImageFile[] = [];
 		if ((action === 'capture' && body.fetchArticle !== false || action === 'retry') && this.options.captureArticle) {
 			const item = parseReadingNote(content)!;
 			try {
-				const article = await this.options.captureArticle(item.source_url);
+				const { images: downloaded, ...article } = await this.options.captureArticle(item.source_url);
+				// Images the server downloaded are saved beside a new note; the server stored none of them.
+				if (downloaded?.length && action === 'capture') {
+					images = await downloadArticleImages(article.markdown, { folder: this.options.folderPath, id: itemId, signal: new AbortController().signal,
+						fetchImage: async url => downloaded.find(image => image.url === url)?.bytes ?? null });
+					article.markdown = linkSavedImages(article.markdown, this.options.folderPath, images);
+				}
 				content = applyLocalArticle(patchReadingFrontmatter(content, { extraction_status: 'unavailable' }), { ...item, path }, article);
-			} catch { content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' }); }
+			} catch { content = patchReadingFrontmatter(content, { extraction_status: 'unavailable' }); images = []; }
 		}
 		// Notes are named after the article once its title is known; a name the user chose is kept.
 		const saved = parseReadingNote(content)!, source = { title: saved.title, url: saved.source_url };
@@ -232,7 +252,10 @@ export class EncryptedReadingApi {
 		const publicData = await readingUploadCard(this.options.folderPath, path, wire, bytes, this.cardKeys);
 		const sealed = await sealFile({ path, content: bytes, publicData }, this.options.authority);
 		const file = { path: wire, content: new TextDecoder().decode(sealed.bytes), expectedHash: previous?.hash ?? null, ...(previous ? { expectedRevision: previous.revision } : {}) };
-		return { attempt: await this.persistAttempt(id, requestHash, { saved: true, id: itemId }, [file], removed ? [removed] : []) };
+		// Images carry no public data: the server learns only that the note has some files beside it.
+		const attachments = await Promise.all(images.map(async image => ({ path: await this.options.paths.wire(image.path),
+			content: new TextDecoder().decode((await sealFile({ path: image.path, content: image.bytes.slice(), publicData: null }, this.options.authority)).bytes) })));
+		return { attempt: await this.persistAttempt(id, requestHash, { saved: true, id: itemId }, [file], removed ? [removed] : [], attachments) };
 	}
 	/** A new note for a captured link, or the answer when a note already saves it. */
 	private async planCapture(body: Record<string, unknown>, id: string, rawBody: string): Promise<PreparedPlan> {
@@ -262,7 +285,14 @@ export class EncryptedReadingApi {
 			const refusal = readingFileCommandRefusal(plan, command);
 			throw this.options.error(refusal.message, refusal.status, refusal.code);
 		}
-		if (plan.kind === 'remove') return { kind: 'remove', itemId: item.crate_reading_id, file: source.file };
+		if (plan.kind === 'remove') {
+			// The images Crate saved for this article go with it. The server knows them only by
+			// their tags, so the note's links name them.
+			const folder = `${readingImageFolder(this.options.folderPath, item.crate_reading_id)}/`;
+			const saved = linkedVaultImages(readReadingFrontmatter(source.content)!.body, item.path).filter(path => path.startsWith(folder) && !path.slice(folder.length).includes('/'));
+			const images = await Promise.all(saved.slice(0, 30).map(path => this.options.paths.wire(path)));
+			return { kind: 'remove', itemId: item.crate_reading_id, file: source.file, images };
+		}
 		return { kind: 'write', itemId: item.crate_reading_id, content: plan.content, path: item.path, wire: listed.file.path, previous: source.file, before: item };
 	}
 	/** An unreadable note may be a failed download, so a change it blocks stays queued
@@ -271,10 +301,11 @@ export class EncryptedReadingApi {
 		return this.options.error(message, 503, 'reading_unavailable');
 	}
 	/** Stores the exact commit body, with the encrypted receipt `response` answers with. */
-	private async persistAttempt(id: string, requestHash: string, response: unknown, files: unknown[], remove: WireFile[]): Promise<Attempt> {
+	private async persistAttempt(id: string, requestHash: string, response: unknown, files: unknown[], remove: WireFile[], attachments: { path: string; content: string }[] = [], removeAttachments: string[] = []): Promise<Attempt> {
 		const acknowledgment = await encryptJson({ requestHash, response }, this.options.authority.key, this.context(id));
 		const attempt: Attempt = { requestHash, generation: this.options.generation, body: JSON.stringify({ folderPath: this.options.wireFolder, operationId: id, files,
-			...(remove.length ? { remove: remove.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) } : {}), acknowledgment }) };
+			...(remove.length ? { remove: remove.map(file => ({ path: file.path, expectedHash: file.hash, expectedRevision: file.revision })) } : {}),
+			...(attachments.length ? { attachments } : {}), ...(removeAttachments.length ? { removeAttachments } : {}), acknowledgment }) };
 		await this.options.writeAttempt(id, attempt);
 		return attempt;
 	}

@@ -12,7 +12,8 @@ import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontma
 
 export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
 export interface ReadingVault {
-	captureArticle?: (url: string, signal: AbortSignal) => Promise<CapturedArticle>;
+	/** Downloads the article for the note with Reading ID `id`, including any images it saves alongside. */
+	captureArticle?: (url: string, signal: AbortSignal, id: string) => Promise<CapturedArticle>;
 	occupied?(path: string): boolean;
 	/** True while an editor has the note open; background writes wait until it closes. */
 	editing?(path: string): boolean;
@@ -378,7 +379,7 @@ export class ReadingLibrary {
 				return file;
 			});
 			this.assertActive();
-			const article = await capture(item.source_url, this.signal);
+			const article = await capture(item.source_url, this.signal, item.crate_reading_id);
 			return this.enqueue(async () => {
 				await this.reload([item.path]);
 				this.assertListed(item);

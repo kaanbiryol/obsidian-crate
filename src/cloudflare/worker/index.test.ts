@@ -316,7 +316,7 @@ describe('worker entrypoint', () => {
 		const nonce = /<script nonce="([^"]+)"/.exec(pageHtml)?.[1];
 		expect(nonce).toBeTruthy();
 		expect(pageResponse.headers.get('Content-Security-Policy')).toContain(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic';`);
-		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("img-src 'self' data: https:");
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("img-src 'self' data: blob: https:");
 		// The app only talks to this Worker; articles are downloaded by the server.
 		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("connect-src 'self';");
 		expect(pageResponse.headers.get('Content-Security-Policy')).not.toContain("script-src 'self' 'unsafe-inline'");

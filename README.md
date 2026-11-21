@@ -51,7 +51,7 @@ Automatic sync is off by default on each device. After connecting, run **Crate: 
 - **Accounts and payment:** Crate has no account or payment of its own. Hosting on Cloudflare needs a Cloudflare account with R2 activated; Cloudflare asks for a payment method during R2 checkout even if you stay within the free allowance, and bills any usage beyond it to you. Local hosting on your own computer needs neither.
 - **Your Crate server:** sync, reminders and the web app connect to the server you deploy or run (your Cloudflare Worker or your local server).
 - **Cloudflare:** connecting, updating, deleting a server and showing its usage call Cloudflare's API after you sign in. The sign-in returns through `https://crate.kaanbiryol.com/oauth/callback/`, a static page that hands the authorization code back to Obsidian and stores nothing.
-- **Websites you save or paste:** Reading downloads each saved link from its original site, directly from Obsidian or through your server for the web app and iPhone shortcut. For X, Reddit, Bilibili and C2 wiki links it may also call a fixed list of public APIs. Pasting a link into a reminder fetches its page title through your server.
+- **Websites you save or paste:** Reading downloads each saved link from its original site, directly from Obsidian or through your server for the web app and iPhone shortcut. It also downloads the article's images once, at save time, into the Reading folder. With **Article images** set to **Load from the website**, it keeps their links instead, and the image hosts see each request when you open the article. For X, Reddit, Bilibili and C2 wiki links it may also call a fixed list of public APIs. Pasting a link into a reminder fetches its page title through your server.
 - **YouTube:** saved YouTube links show thumbnails from `i.ytimg.com` and play in YouTube's privacy-enhanced `youtube-nocookie.com` player.
 - **Push service:** only when you turn on notifications, your server sends encrypted payloads through your browser's or device's push service.
 
@@ -59,7 +59,7 @@ Automatic sync is off by default on each device. After connecting, run **Crate: 
 
 - Vault files go to your own server and storage. Crate has no hidden telemetry, fetches no remote code at runtime, and needs no Crate account.
 - Secrets and Cloudflare credentials are kept in Obsidian's secret storage.
-- Reading downloads saved links from the original site. Obsidian downloads on your device; the web app asks your server, which doesn't store the link when encryption is on. For X, Reddit, Bilibili and C2 wiki links it may also call a fixed list of public APIs, including the third-party FxTwitter API, with the saved link only.
+- Reading downloads saved links and their images from the original site. Obsidian downloads on your device; the web app asks your server, which doesn't store the link or the images when encryption is on. For X, Reddit, Bilibili and C2 wiki links it may also call a fixed list of public APIs, including the third-party FxTwitter API, with the saved link only.
 - Push notifications are optional. Payloads are encrypted, and the push provider sees only delivery metadata.
 - Optional [end-to-end encryption](docs/e2ee-implementation.md) hides note content from the server operator. Without it, the operator can read synced content.
 - Sync is not a backup. Keep an independent backup of any vault you use with Crate.

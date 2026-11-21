@@ -28,6 +28,8 @@ import { blockedReadingItemIds, presentReadingItems } from './pending-view';
 import { exportReadingData } from './storage/storage';
 import { useDocumentReaderScroll } from './useDocumentReaderScroll';
 import { useReadingArticle } from './useReadingArticle';
+import { usePwaReadingImages } from './usePwaReadingImages';
+import { useSharedFeatures } from '../shared-features';
 import { pendingReadingHighlights, readerStatus, readingItemSyncStatus } from './reader-feedback';
 import { useReaderSyncFeedback } from './useReaderSyncFeedback';
 import type { PendingReading } from './outbox';
@@ -55,6 +57,7 @@ function ReadingAppContent() {
 	const [focusHighlight, setFocusHighlight] = useState<ReadingHighlight>();
 	const [settingsOpen, setSettingsOpen] = useSettingsOpen();
 	useDocumentReaderScroll(ready && !!session && active && !!reader, reader?.item.crate_reading_id);
+	const { host: images, loader: imageLoader } = usePwaReadingImages(session, reader?.item.path ? { id: reader.item.crate_reading_id, notePath: reader.item.path } : undefined, useSharedFeatures().readingImages === 'remote');
 	const canSaveLink = (() => {
 		try { readingUrl(url); return !saving; } catch { return false; }
 	})();
@@ -115,7 +118,7 @@ function ReadingAppContent() {
 		onRetry={() => { if (session) void run(refreshManually); else void connect(); }} onReview={() => setSettingsOpen(true)} />;
 	return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
 		{!session && !readingDisabled ? <ReadingWelcome share={share} notices={notices} /> : <>
-			<ReadingLibraryPanel listStyle={preferences.reminderListStyle} initialSection={featureNavigation?.readingTab}
+			<ReadingLibraryPanel images={imageLoader} listStyle={preferences.reminderListStyle} initialSection={featureNavigation?.readingTab}
 				renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
 				renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} addBlocked={readOnly} onAdd={openCapture} />}
 				source={source} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length,
@@ -135,7 +138,7 @@ function ReadingAppContent() {
 				</EmptyState> : undefined}
 				beforeListContent={<PwaPullRefreshIndicator enabled={!!cache && !reader && !adding && !settingsOpen} scrollSelector=".crate-reading-web .crate-reading__list-scroll" onRefresh={() => run(refreshManually)} />}
 				headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
-				reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance}
+				reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} images={images}
 					revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight}
 					item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }}
 					status={readerStatus(reader, cache)} notice={notices}

@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import type { ReadingHighlight } from '../core/highlights';
-import { highlightOffsetAtPoint, highlightTextRects, resizeHighlight, selectedHighlight } from './reader-highlights';
+import { sameHighlight } from '../core/highlights';
+import { highlightOffsetAtPoint, highlightTextRects, imageHighlightOf, resizeHighlight, selectedHighlight } from './reader-highlights';
 import { readerScrollElement } from './reader-scroll';
 
 export type HighlightEdit = { original: ReadingHighlight | null; highlight: ReadingHighlight };
@@ -47,6 +48,18 @@ export function registerReadingHighlightInteraction(options: {
 	};
 	const activate = (event: MouseEvent | KeyboardEvent) => {
 		if ('key' in event && !['Enter', ' '].includes(event.key)) return;
+		// Tapping an image offers to highlight it, or opens its highlight.
+		const image = eventTarget(event).closest('img');
+		if (image && text.contains(image)) {
+			if ((!('key' in event) && Date.now() < suppressClickUntil) || selectedHighlight(text)) return;
+			const highlight = imageHighlightOf(text, image);
+			if (!highlight) return;
+			event.preventDefault(); nativeIntent = false;
+			const original = options.getState().highlights.find(entry => sameHighlight(entry, highlight)) ?? null;
+			onSelect(highlight);
+			options.select({ original, highlight });
+			return;
+		}
 		const mark = eventTarget(event).closest<HTMLElement>('.crate-reading-reader__highlight');
 		if (!mark || !text.contains(mark)) return;
 		if ((!('key' in event) && Date.now() < suppressClickUntil) || selectedHighlight(text)) return;

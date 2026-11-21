@@ -22,3 +22,16 @@ it('rejects failed downloads and malformed articles', async () => {
 		await expect(captureServerArticle('https://example.com/a', request)).rejects.toThrow('Article download unavailable.');
 	}
 });
+
+it('keeps only well-formed raster images the server downloaded', async () => {
+	const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9]);
+	const encode = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+	const request = vi.fn(async () => Response.json({ article: { markdown: 'Body' }, images: [
+		{ url: 'https://cdn.example/a.png', data: encode(png) },
+		{ url: 'https://cdn.example/page.svg', data: encode(new TextEncoder().encode('<svg/>')) },
+		{ url: 'http://cdn.example/insecure.png', data: encode(png) },
+		{ url: 'https://cdn.example/broken.png', data: '%%%' },
+		{ url: 'https://cdn.example/huge.png', data: 'A'.repeat(3 * 1024 * 1024) },
+	] }));
+	expect(await captureServerArticle('https://example.com/a', request)).toEqual({ markdown: 'Body', images: [{ url: 'https://cdn.example/a.png', bytes: png }] });
+});

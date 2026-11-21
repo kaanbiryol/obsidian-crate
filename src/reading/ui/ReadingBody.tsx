@@ -1,7 +1,7 @@
 import { readerScrollElement } from './reader-scroll';
 import React, { useLayoutEffect, useRef } from 'react';
 import type { ReadingHighlight } from '../core/highlights';
-import { paintHighlights } from './reader-highlights';
+import { clearImageHighlights, paintHighlights } from './reader-highlights';
 
 /** Annotation changes must not replace the article's paragraphs or its scroll anchor. */
 export function ReadingBody({ body, article, content, highlights, pendingHighlights }: {
@@ -23,6 +23,7 @@ export function ReadingBody({ body, article, content, highlights, pendingHighlig
 		if (!sameContent) text.replaceChildren(...(content ? [content.cloneNode(true)] : []));
 		// Only unwrap our annotations. Captured article <mark> elements remain untouched.
 		for (const mark of Array.from(text.querySelectorAll('.crate-reading-reader__highlight'))) mark.replaceWith(...Array.from(mark.childNodes));
+		clearImageHighlights(text);
 		text.normalize();
 		paintHighlights(text, highlights, pendingHighlights);
 		painted.current = { content, highlights: signature };

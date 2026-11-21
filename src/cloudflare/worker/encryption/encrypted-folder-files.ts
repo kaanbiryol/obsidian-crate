@@ -1,7 +1,7 @@
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES, isReceiptEnvelope } from '../../../encryption/receipt-format';
 
 import { ENCRYPTED_INVENTORY_PAGE, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '../../../encryption/file-inventory';
-import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
+import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES } from '../../../encryption/file-format';
 import { fileFolderArgs } from '../sync/file-identity';
 import { corsHeaders, corsResponse } from '../http/cors';
 import { parseJsonObject, sanitizePath } from '../http/request-validation';
@@ -12,24 +12,25 @@ import { changedPathsSince, deltaBase, parseDeltaBase, readVaultChangeState, vau
 import { portablePathKey } from '../../../protocol/portable-path';
 import { mapBounded } from '../../../platform/map-bounded';
 import { SIMULTANEOUS_OPEN_CONNECTIONS } from '../d1/platform-limits';
-import { stageMarkdownFile } from '../sync/markdown-file-staging';
+import { stageMarkdownFile, stageMarkdownFiles } from '../sync/markdown-file-staging';
 import { writeCommittedMarkdownFilePair } from '../sync/atomic-markdown-write';
 import { writeCommittedMarkdownMove } from '../sync/atomic-markdown-move';
-import { commitFileDelete, commitStagedFile } from '../sync/mutations';
+import { commitFileDelete, commitFileDeletes, commitStagedFile } from '../sync/mutations';
 import { FileVersionConflictError } from '../sync/markdown-files';
 import { beginReminderOperation, reminderOperationEffects } from '../reminders/operations';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { FILE_HASH_HEADER, REVISION_HEADER } from '../../../protocol/http-headers';
 import type { Env } from '../types';
 import { isSha256Hex } from '../../../platform/validation';
-import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
+import { isMarkdownNoteInFolder, isMarkdownPath, isPathInFolder } from '../../../protocol/note-paths';
 
 interface EncryptedWebFile { path: string; content: string; expectedHash: string | null; expectedRevision?: string }
 
-function scopedPath(value: unknown, folder: string): string | null {
+/** `anyFile` also accepts files that are not notes, such as an article's saved images. */
+function scopedPath(value: unknown, folder: string, anyFile = false): string | null {
 	if (typeof value !== 'string') return null;
 	const path = sanitizePath(value);
-	return path && path === value && isMarkdownNoteInFolder(path, folder) ? path : null;
+	return path && path === value && (anyFile ? isPathInFolder(path, folder) : isMarkdownNoteInFolder(path, folder)) ? path : null;
 }
 
 const isFolder = (value: unknown): value is string => typeof value === 'string' && !!value && sanitizePath(value) === value;
@@ -44,19 +45,21 @@ export async function handleEncryptedFolderFiles(request: Request, env: Env, pat
 	if (![`${prefix}/encrypted-files`, `${prefix}/encrypted-files/download`, `${prefix}/encrypted-file`, `${prefix}/encrypted-commit`].includes(path)) return null;
 	const state = authenticated !== undefined ? authenticated : await readEncryptionState(env.DB);
 	if (!state || state.mode !== 'active') throw new EncryptionStateError(`Finish setting up encryption before using encrypted ${label}`);
-	if (path === `${prefix}/encrypted-commit` && request.method === 'POST') return commitEncryptedFiles(request, env, state, expectedFolder);
+	if (path === `${prefix}/encrypted-commit` && request.method === 'POST') return commitEncryptedFiles(request, env, state, expectedFolder, feature === 'reading');
 	if (path === `${prefix}/encrypted-files/download` && request.method === 'POST') return downloadEncryptedFiles(request, env, label, expectedFolder);
 	if (request.method !== 'GET') return null;
 	const params = new URL(request.url).searchParams;
 	const folder = params.get('folderPath');
 	if (!isFolder(folder) || (expectedFolder && folder !== expectedFolder)) return corsResponse({ error: `Unknown encrypted ${label} folder` }, 403);
 	if (path === `${prefix}/encrypted-files`) return listEncryptedFiles(request, env, state, folder, params);
-	const filePath = scopedPath(params.get('path'), folder);
+	// The Reading app also shows the images saved beside its notes. Their names are tags, so
+	// the server sees only that a file in the folder is not a note.
+	const filePath = scopedPath(params.get('path'), folder, feature === 'reading');
 	if (!filePath) return corsResponse({ error: 'File is outside this enrollment' }, 403);
 	const file = await getStoredFileRow(env.DB, filePath);
 	if (!file) return corsResponse({ error: 'Note not found' }, 404);
 	if (params.get('revision') && params.get('revision') !== file.storageKey) return corsResponse({ error: 'Note changed', code: 'version_conflict' }, 409);
-	if (file.size > MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES) return corsResponse({ error: `This note is too large for the ${label} app` }, 413);
+	if (file.size > (isMarkdownPath(filePath) ? MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES : MAX_ENCRYPTED_FILE_BYTES)) return corsResponse({ error: `This note is too large for the ${label} app` }, 413);
 	const object = await env.BUCKET.get(file.storageKey);
 	if (!object || !storedObjectMatchesMetadata(object, file)) return corsResponse({ error: 'Note is unavailable' }, 503);
 	return new Response(object.body, { headers: { ...corsHeaders(), 'Content-Type': ENCRYPTED_FILE_CONTENT_TYPE,
@@ -168,11 +171,21 @@ async function downloadEncryptedFiles(request: Request, env: Env, label: string,
 	return corsResponse({ files: await mapBounded(requested, SIMULTANEOUS_OPEN_CONNECTIONS, download) }, 200, { 'Cache-Control': 'private, no-store' });
 }
 
-async function commitEncryptedFiles(request: Request, env: Env, state: EncryptionServerState, expectedFolder?: string): Promise<Response> {
+/** Images a new Reading note links to, committed with it. */
+const MAX_ENCRYPTED_ATTACHMENTS = 10;
+/** Images a deleted Reading note linked to, deleted after it: as many as Obsidian saves for one article. */
+const MAX_REMOVED_ATTACHMENTS = 30;
+
+async function deleteEncryptedAttachments(db: D1Database, paths: string[]): Promise<void> {
+	const stored = await loadStoredFileRows(db, paths);
+	await commitFileDeletes(db, [...stored].map(([path, row]) => ({ path, expectedHash: row.hash, expectedRevision: row.storageKey, previousFile: row })));
+}
+
+async function commitEncryptedFiles(request: Request, env: Env, state: EncryptionServerState, expectedFolder?: string, allowAttachments = false): Promise<Response> {
 	const parsed = await parseJsonObject(request, MAX_ENCRYPTED_REMINDER_REQUEST_BYTES);
 	if (!parsed.ok) return parsed.response;
 	const body = parsed.value;
-	if (Object.keys(body).some(key => !['folderPath', 'operationId', 'files', 'remove', 'acknowledgment', 'createdId'].includes(key))) return corsResponse({ error: 'Unexpected encrypted mutation field' }, 400);
+	if (Object.keys(body).some(key => !['folderPath', 'operationId', 'files', 'remove', 'acknowledgment', 'createdId', ...(allowAttachments ? ['attachments', 'removeAttachments'] : [])].includes(key))) return corsResponse({ error: 'Unexpected encrypted mutation field' }, 400);
 	if ((expectedFolder && body.folderPath !== expectedFolder) || !isFolder(body.folderPath)
 		|| !Array.isArray(body.files) || body.files.length > 2 || (body.files.length < 1 && body.remove === undefined)
 		|| !isReceiptEnvelope(body.acknowledgment)) return corsResponse({ error: 'Invalid encrypted mutation' }, 400);
@@ -204,12 +217,47 @@ async function commitEncryptedFiles(request: Request, env: Env, state: Encryptio
 			|| files.length > 1 || files.length === 1 && (files[0]!.expectedHash !== null || sourcePath === files[0]!.path)) return corsResponse({ error: 'Invalid encrypted rename' }, 400);
 		removed = { path: sourcePath, expectedHash: source.expectedHash, expectedRevision: source.expectedRevision };
 	}
+	// Files that are not notes, such as a saved article's images: new files only, beside one new note.
+	const attachments: Array<{ path: string; content: string }> = [];
+	if (body.attachments !== undefined) {
+		if (!Array.isArray(body.attachments) || body.attachments.length > MAX_ENCRYPTED_ATTACHMENTS || files.length !== 1 || files[0]!.expectedHash !== null || removed)
+			return corsResponse({ error: 'Invalid encrypted attachments' }, 400);
+		for (const raw of body.attachments as unknown[]) {
+			const attachment = raw && typeof raw === 'object' ? raw as Partial<EncryptedWebFile> : undefined;
+			const attachmentPath = scopedPath(attachment?.path, body.folderPath, true);
+			if (!attachment || !attachmentPath || isMarkdownPath(attachmentPath) || Object.keys(attachment).some(key => !['path', 'content'].includes(key))
+				|| typeof attachment.content !== 'string' || attachments.some(other => other.path === attachmentPath)) return corsResponse({ error: 'Invalid encrypted attachment' }, 400);
+			await prepareEncryptedFileCommit(env.DB, attachmentPath, attachment.content, state);
+			attachments.push({ path: attachmentPath, content: attachment.content });
+		}
+	}
+	// A deleted note's images, by tag: the server cannot tell which files belong to which note.
+	const removedAttachments: string[] = [];
+	if (body.removeAttachments !== undefined) {
+		if (!Array.isArray(body.removeAttachments) || body.removeAttachments.length > MAX_REMOVED_ATTACHMENTS || !removed || files.length)
+			return corsResponse({ error: 'Invalid encrypted attachment removal' }, 400);
+		for (const raw of body.removeAttachments as unknown[]) {
+			const attachmentPath = scopedPath(raw, body.folderPath, true);
+			if (!attachmentPath || isMarkdownPath(attachmentPath) || removedAttachments.includes(attachmentPath)) return corsResponse({ error: 'Invalid encrypted attachment removal' }, 400);
+			removedAttachments.push(attachmentPath);
+		}
+	}
 	const response = { encrypted: body.acknowledgment };
 	const effects = reminderOperationEffects(env.DB, operation, response, typeof body.createdId === 'string' ? body.createdId : undefined);
 	try {
+		// Attachments publish before the note that links to them. One that already exists is
+		// kept: a retry of this attempt finds its own copy, and nothing else is overwritten.
+		// One lookup and one lease keep this within the invocation's query limit.
+		const stored = await loadStoredFileRows(env.DB, attachments.map(attachment => attachment.path));
+		const added = attachments.filter(attachment => !stored.has(attachment.path));
+		const staged = added.length ? await stageMarkdownFiles(env.BUCKET, env.DB, added.map(attachment => ({ ...attachment, expectedHash: null })), true) : [];
+		for (const [index, file] of staged.entries()) await commitStagedFile(env.BUCKET, env.DB, { ...file, content: added[index]!.content, encryptionState: state });
 		if (removed && !files.length) {
 			const result = await commitFileDelete(env.DB, { ...removed, previousFile: await getStoredFileRow(env.DB, removed.path), effects });
 			if (!result.committed) throw new FileVersionConflictError(removed.path, result.currentHash);
+			// Then its images, each at its current revision. A failure leaves them for Obsidian's
+			// cleanup; the deleted note is already committed.
+			await deleteEncryptedAttachments(env.DB, removedAttachments).catch(() => {});
 		} else if (removed) {
 			await writeCommittedMarkdownMove(env.BUCKET, env.DB, { source: removed, destination: files[0]!, effects, context: { encryptionState: state } });
 		} else if (files.length === 2) {

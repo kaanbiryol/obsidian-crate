@@ -233,3 +233,48 @@ it('stores a web app save with its card in the same commit', async () => {
 	// The commit is the only write: no card is posted separately.
 	expect(h.requests.filter(body => !body.startsWith('{"folderPath"'))).toEqual([]);
 });
+
+it('saves the images an encrypted capture downloaded beside its note, and the web app opens them', async () => {
+	const h = await setup();
+	const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 7, 7]);
+	const api = h.api(async () => ({ title: 'Encrypted pictures', markdown: `${'Private article text. '.repeat(4)}\n\n![Diagram](https://cdn.example/diagram.png)\n\n![Other](https://cdn.example/other.png)\n`,
+		images: [{ url: 'https://cdn.example/diagram.png', bytes: png }] }) as never);
+	const body = JSON.stringify({ operationId: operation(), url: 'https://private.example/pictures' });
+	h.loseNextReply(); await expect(api.request('/reading/capture', body)).rejects.toThrow('Lost reply');
+	const receipt = await api.request('/reading/capture', body) as { id: string };
+	const image = `Reading/attachments/${receipt.id}/1.png`;
+	// One image file and one note, each stored once despite the lost reply.
+	const files = (await env.DB.prepare('SELECT path, storage_key FROM files ORDER BY path').all<{ path: string; storage_key: string }>()).results;
+	expect(files).toHaveLength(2);
+	expect(JSON.stringify(files)).not.toContain('attachments');
+	const { article } = (await api.item(receipt.id))!;
+	expect(article.markdown).toContain(`![Diagram](attachments/${receipt.id}/1.png)`);
+	expect(article.markdown).toContain('![Other](https://cdn.example/other.png)');
+	expect(await api.image(image)).toEqual(png);
+	// The ciphertext is bound to its path: another name cannot open it.
+	await expect(api.image(`Reading/attachments/${receipt.id}/2.png`)).rejects.toThrow();
+	// A note is still limited to its own folder, and attachments only accompany a new note.
+	const attempt = JSON.parse(h.requests.at(-1)!) as { attachments: unknown[] };
+	expect(attempt.attachments).toHaveLength(1);
+	const reminders = await h.request(`/reminders/encrypted-file?${new URLSearchParams({ folderPath: h.folder.wire, path: files.find(file => !file.path.endsWith('.md'))!.path })}`);
+	expect(reminders.status).not.toBe(200);
+});
+
+it('deletes the images of an encrypted article the web app deletes', async () => {
+	const h = await setup();
+	const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9]);
+	const api = h.api(async () => ({ title: 'Deleted pictures', markdown: `${'Private article text. '.repeat(4)}\n\n![Diagram](https://cdn.example/diagram.png)\n`,
+		images: [{ url: 'https://cdn.example/diagram.png', bytes: png }] }) as never);
+	const saved = await api.request('/reading/capture', JSON.stringify({ operationId: operation(), url: 'https://private.example/pictures' })) as { id: string };
+	expect((await env.DB.prepare('SELECT count(*) AS n FROM files').first<{ n: number }>())!.n).toBe(2);
+	const { items: [item] } = await api.request('/reading/items?section=inbox') as { items: ReadingItem[] };
+	const { markdown } = await api.request(`/reading/item?id=${saved.id}`) as { markdown: string };
+	const body = JSON.stringify({ operationId: operation(), id: saved.id, before: { reading_status: item!.reading_status, favorite: item!.favorite, tags: item!.tags }, markdownHash: await sha256Hex(markdown) });
+	h.loseNextReply(); await expect(api.request('/reading/delete', body)).rejects.toThrow('Lost reply');
+	expect(await api.request('/reading/delete', body)).toEqual({ deleted: true, id: saved.id });
+	// The image goes with the note; the server saw only its tag.
+	const sent = JSON.parse(h.requests.at(-1)!) as { removeAttachments: string[] };
+	expect(sent.removeAttachments).toHaveLength(1);
+	expect(sent.removeAttachments[0]).not.toContain('attachments');
+	expect(await env.DB.prepare('SELECT 1 FROM files').first()).toBeNull();
+});

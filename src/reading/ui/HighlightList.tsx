@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { youtubeVideoId, youtubeMomentUrl } from '../core/youtube';
 import { timestampLabel } from '../core/transcript';
 import type { ReadingHighlight } from '../core/highlights';
+import { readingImageSource } from '../core/article-images';
+import type { ReadingImageLoader } from './useReadingImages';
 import type { ReadingMetadata } from '../core/model';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
@@ -13,6 +15,24 @@ import { ReadingSourceIcon } from './ReadingSourceIcon';
 const SHORT_DATE = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 const LONG_DATE = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
+/** A highlighted image, loaded the way its article shows it; nothing loads without a loader. */
+function HighlightImage({ item, highlight, images }: { item: ReadingMetadata & { path?: string }; highlight: ReadingHighlight; images?: ReadingImageLoader }) {
+	const [url, setUrl] = useState<string | null>(null);
+	const source = highlight.image ?? '', path = item.path, id = item.crate_reading_id;
+	useEffect(() => {
+		setUrl(null);
+		const target = images && path ? readingImageSource(source, path) : null;
+		if (!images || !target || target.kind === 'remote' && !images.remote) return;
+		if (target.kind === 'remote') { setUrl(target.url); return; }
+		const controller = new AbortController();
+		images.load(target.path, controller.signal, id).then(value => { if (!controller.signal.aborted) setUrl(value); }, () => {});
+		return () => controller.abort();
+	}, [images, source, path, id]);
+	return url
+		? <img className="crate-reading-highlights__image" src={url} alt={highlight.text} referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+		: <span className="crate-reading-highlights__image-placeholder"><ThemeIcon id="image" size="m" aria-hidden="true" /><span>{highlight.text || 'Image'}</span></span>;
+}
+
 function highlightDate(value: string): string {
 	const date = new Date(value);
 	return (date.getFullYear() === new Date().getFullYear() ? SHORT_DATE : LONG_DATE).format(date);
@@ -23,7 +43,9 @@ function highlightDate(value: string): string {
  * date, then note, copy and delete controls as separate targets. With `onOpenItem`
  * each row names its article, which opens from that line.
  */
-export function HighlightList<T extends ReadingMetadata>({ entries, onView, onOpenItem, onAnnotate, onDelete, onCopy, disabled = false, moment, onPlay }: {
+export function HighlightList<T extends ReadingMetadata & { path?: string }>({ entries, onView, onOpenItem, onAnnotate, onDelete, onCopy, disabled = false, moment, onPlay, images }: {
+	/** Shows highlighted images; without it they show as placeholders. */
+	images?: ReadingImageLoader;
 	moment?: (highlight: ReadingHighlight) => number | undefined;
 	onPlay?: (seconds: number) => void;
 	entries: { item: T; highlight: ReadingHighlight }[];
@@ -61,13 +83,16 @@ export function HighlightList<T extends ReadingMetadata>({ entries, onView, onOp
 			{onView && <Button className="crate-reading-highlights__open" data-reading-id={item.crate_reading_id} disabled={disabled} onClick={() => onView(item, highlight)}>
 				<span className="crate-reading__sr-only">{viewLabel}</span>
 			</Button>}
-			<blockquote className="crate-reading-highlights__excerpt">{highlight.text}</blockquote>
+			{highlight.image !== undefined
+				? <figure className="crate-reading-highlights__figure"><HighlightImage item={item} highlight={highlight} images={images} />
+					{highlight.text && <figcaption className="crate-reading-highlights__caption">{highlight.text}</figcaption>}</figure>
+				: <blockquote className="crate-reading-highlights__excerpt">{highlight.text}</blockquote>}
 			{highlight.note && <p className="crate-reading-highlights__note">{highlight.note}</p>}
 			{withActions
 				? <div className="crate-reading-highlights__toolbar">
 					{highlight.createdAt ? <time className="crate-reading-highlights__date" dateTime={highlight.createdAt}>{highlightDate(highlight.createdAt)}</time> : <span className="crate-reading-highlights__date" />}
 					{onAnnotate && <IconButton icon="notepad-text" iconSize="s" label={highlight.note ? 'Edit note' : 'Add note'} disabled={disabled} onClick={() => onAnnotate(item, highlight)} />}
-					<IconButton icon={copied === key ? 'check' : 'copy'} iconSize="s" label={copied === key ? 'Text copied' : 'Copy text'} onClick={() => void copy(key, highlight.text)} />
+					{highlight.image === undefined && <IconButton icon={copied === key ? 'check' : 'copy'} iconSize="s" label={copied === key ? 'Text copied' : 'Copy text'} onClick={() => void copy(key, highlight.text)} />}
 					{momentControls}
 					{onDelete && <IconButton className="crate-reading-highlights__delete" icon="trash-2" iconSize="s" tone="danger" label="Delete highlight" disabled={disabled} onClick={() => onDelete(item, highlight)} />}
 				</div>
