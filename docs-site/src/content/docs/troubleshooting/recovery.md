@@ -15,7 +15,15 @@ Your server keeps replaced and deleted files for 30 days by default. To change t
 
 ![File history for a note, listing earlier versions with a comparison against the current file and a Restore this version button](../../../assets/screenshots/crate-file-history.png)
 
-**Looking for a deleted file?** Open **Sync activity → History → File history**. Also check your vault's `.trash` folder, where files removed by sync from another device end up.
+### Get back a deleted file
+
+Your server keeps deleted files for the same history period.
+
+1. Open **Sync activity → History** and select **Recently deleted**, or run **Crate: Recover deleted file**.
+2. Search for the file by name or folder, then select it. Files that exist again in your vault or on the server are not listed.
+3. In the file's history, pick a version, select **Restore this version**, then sync.
+
+Also check your vault's `.trash` folder, where files removed by sync from another device end up.
 
 Files that only ever lived on one device may have no server history.
 

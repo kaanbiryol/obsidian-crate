@@ -8,6 +8,7 @@ const { outputFiles } = await build({
  external: ['electron'],
  stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
  import { openFileHistoryModal } from './src/ui/activity/file-history-modal';
+ import { openRecentlyDeletedModal } from './src/ui/activity/recently-deleted-modal';
  import { HistoryRestoreModal } from './src/ui/activity/history-restore-modal';
  import { ActivityHistory } from './src/ui/activity/activity-history';
  import { mergeSharedHistory } from './src/ui/activity/shared-history';
@@ -35,6 +36,13 @@ const { outputFiles } = await build({
   restoreRecentFileVersion: async version => {window.restores.push(version.storage_key);return {success:true,errors:[]};}
  };
  const localFiles=Object.keys(currentFiles).map(path=>({path,extension:'md',stat:{size:100,mtime:Date.now()}}));
+ const deletedRows = [{...row,path:'Archive/Deleted.md',storage_key:'deleted-latest',reason:'deleted',created_at:'2026-09-19T14:05:00Z'}, {...row,path:'Root.md',storage_key:'recreated',reason:'deleted'},
+  {...row,path:'Projects/Old plan.md',storage_key:'old-plan',reason:'deleted',created_at:'2026-09-18T09:30:00Z'}, {...row,path:'Archive/Deleted.md',storage_key:'deleted-earlier',reason:'deleted',created_at:'2026-09-10T08:00:00Z'}, {...row,path:'Notes/Edited.md',storage_key:'edited'}];
+ const deletedRuntime = {...runtime,
+  listRecentFileVersions: async query => query.path ? ({versions:deletedRows.filter(row => row.path===query.path),hasMore:false}) : ({versions:deletedRows.filter(row => !query.search || row.path.toLowerCase().includes(query.search.toLowerCase())),hasMore:false}),
+  findRemoteFiles: async paths => new Set(paths.filter(path => currentFiles[path])),
+ };
+ const deletedApp = {vault:{adapter:{exists:async path => localFiles.some(file => file.path===path)},getFiles:()=>localFiles,getFileByPath:path=>localFiles.find(file=>file.path===path)??null,cachedRead:async()=> '# Local contents'}};
  window.stateRestores = 0;
  window.mountStateHistory = () => {
   window.activityHistory?.dispose();
@@ -79,7 +87,7 @@ const { outputFiles } = await build({
       return {current:'# Current vault '+path,saved:'# '+(earliest?'Earliest ':'Selected ')+path};
      }};
    }
-  });
+  }, () => {}, onClosed => openRecentlyDeletedModal(deletedApp, deletedRuntime, onClosed));
   window.showHistoryErrors = () => {
    const issues = Array.from({length:4}, (_,i) => ({path:'Notes/error-'+i+'.md', message:'EACCES'}));
    history[0]={...history[0],success:false,errorCount:4,issues,errors:issues.map(issue=>issue.path+': '+issue.message)};
@@ -116,6 +124,7 @@ const { outputFiles } = await build({
    export class Setting {
     constructor(el) {this.settingEl=el.createDiv({cls:'setting-item'});this.info=this.settingEl.createDiv({cls:'setting-item-info'});this.control=this.settingEl.createDiv({cls:'setting-item-control'});this.controlEl=this.control;}
     setClass(name){this.settingEl.classList.add(name);return this;}
+    setName(name){this.info.createDiv({cls:'setting-item-name',text:name});return this;}
     addText(build){const input=this.control.createEl('input');const api={inputEl:input,setValue:v=>{input.value=v;return api;},setPlaceholder:v=>{input.placeholder=v;return api;},onChange:fn=>{input.oninput=()=>fn(input.value);return api;}};build(api);return this;}
     addButton(build){const button=this.control.createEl('button');const api={buttonEl:button,setButtonText:v=>{button.textContent=v;return api;},setDisabled:v=>{button.disabled=v;return api;},onClick:fn=>{button.onclick=fn;return api;},setCta:()=>{button.classList.add('mod-cta');return api;},setDestructive:()=>api};build(api);return this;}
    }
@@ -134,7 +143,7 @@ for(const browserType of [chromium,webkit]) {
    button{justify-content:center}
    :root{--background-primary:#fff;--background-secondary:#f5f5f5;--background-modifier-border:#ddd;--background-modifier-hover:#eee;--text-normal:#242424;--text-muted:#666;--text-accent:#7057b8;--interactive-accent:#7057b8;--text-on-accent:white;--interactive-normal:#eee;--text-success:#26763d;--text-error:#c33636;--font-ui-small:14px;--font-ui-smaller:12px;--font-ui-medium:16px;--radius-m:8px;--radius-s:4px;--font-interface:system-ui;--font-monospace:monospace}
    ${theme==='dark'?':root{--background-primary:#161616;--background-secondary:#222;--background-modifier-border:#333;--background-modifier-hover:#303030;--text-normal:#ddd;--text-muted:#999;--interactive-normal:#292929;--text-success:#87c693;--text-error:#ed9696;}':''}
-   #history-fixture{display:flex;width:auto;max-width:100vw} #history-fixture .crate-activity-surface.is-bottom-sheet{width:100vw}*{box-sizing:border-box}body{margin:0;background:var(--background-secondary);color:var(--text-normal);font:14px system-ui;display:flex;align-items:center;justify-content:center;height:100vh}button,input{font:inherit;color:inherit;border:1px solid var(--background-modifier-border);background:var(--interactive-normal);padding:8px 12px;border-radius:6px}button{cursor:pointer}button.mod-cta{background:var(--interactive-accent);color:white}.modal{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:14px}.modal.crate-confirmation-modal,.modal.crate-history-restore-modal,.modal.crate-vault-history-modal{position:fixed;z-index:10;box-shadow:0 0 0 200vmax #0008}.setting-item{display:flex}.setting-item-control{display:flex;gap:8px}
+   #history-fixture{display:flex;width:auto;max-width:100vw} #history-fixture .crate-activity-surface.is-bottom-sheet{width:100vw}*{box-sizing:border-box}body{margin:0;background:var(--background-secondary);color:var(--text-normal);font:14px system-ui;display:flex;align-items:center;justify-content:center;height:100vh}button,input{font:inherit;color:inherit;border:1px solid var(--background-modifier-border);background:var(--interactive-normal);padding:8px 12px;border-radius:6px}button{cursor:pointer}button.mod-cta{background:var(--interactive-accent);color:white}.modal{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:14px}.modal.crate-confirmation-modal,.modal.crate-history-restore-modal,.modal.crate-vault-history-modal,.modal.crate-recently-deleted-modal{position:fixed;z-index:10;box-shadow:0 0 0 200vmax #0008}.modal.crate-recently-deleted-modal~.modal.crate-file-history-modal{position:fixed;z-index:11}.setting-item{display:flex}.setting-item-control{display:flex;gap:8px}
    </style><style>${css}</style>`);
    await page.addScriptTag({content:outputFiles[0].text});await page.evaluate(()=>window.mount());
    await expect(page.locator('.reminder-modal-header-title')).toBeFocused();
@@ -437,6 +446,36 @@ for(const browserType of [chromium,webkit]) {
    await expect(historyRoot).toHaveCount(0);
    await expect(activityRoot).toBeVisible();
    await expect(browseVault).toBeFocused();
+   const recentlyDeleted=activityRoot.getByRole('button',{name:'Recently deleted',exact:true});
+   const toolbarBounds=await activityRoot.locator('.crate-history-timeline-toolbar').boundingBox();
+   for(const action of [recentlyDeleted,browseVault]) {
+    const actionBounds=await action.boundingBox();
+    assert.ok(actionBounds.x>=toolbarBounds.x-1&&actionBounds.x+actionBounds.width<=toolbarBounds.x+toolbarBounds.width+1,'History actions stay inside the toolbar');
+   }
+   await recentlyDeleted.click();
+   const deletedRoot=page.locator('.crate-recently-deleted-modal');
+   await expect(deletedRoot.getByRole('heading',{name:'Recently deleted',exact:true})).toBeVisible();
+   const deletedFiles=deletedRoot.locator('.crate-history-version');
+   await expect(deletedFiles).toHaveCount(2);
+   await expect(deletedFiles.first()).toContainText('Deleted.md');
+   await expect(deletedFiles.first()).toContainText('Archive · Deleted');
+   await expect(deletedFiles.nth(1)).toContainText('Old plan.md');
+   await expect(deletedRoot).not.toContainText('Root.md');
+   await expect(deletedRoot).not.toContainText('Edited.md');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.screenshot({path:'.generated/file-history/'+browserType.name()+'-'+width+'-'+theme+'-recently-deleted.png'});
+   await deletedRoot.getByRole('searchbox',{name:'Search deleted files',exact:true}).fill('PLAN');
+   await expect(deletedFiles).toHaveCount(1);
+   await expect(deletedFiles.first()).toContainText('Old plan.md');
+   await deletedFiles.first().click();
+   const deletedHistory=page.locator('.crate-recently-deleted-modal ~ .crate-file-history-modal');
+   await expect(deletedHistory.getByRole('heading',{name:'Projects/Old plan.md',exact:true})).toBeVisible();
+   await expect(deletedHistory.locator('[data-version-key=old-plan]')).toHaveCount(1);
+   await deletedHistory.getByRole('button',{name:'Close dialog',exact:true}).click();
+   await expect(deletedHistory).toHaveCount(0);
+   await deletedRoot.getByRole('button',{name:'Close dialog',exact:true}).click();
+   await expect(deletedRoot).toHaveCount(0);
+   await expect(recentlyDeleted).toBeFocused();
    await page.evaluate(() => { window.mountStateHistory(); window.showHistoryErrors(); });
    const errorHistory = page.locator('#history-fixture details[data-history-key]').first();
    await errorHistory.locator(':scope > summary').click();
@@ -448,4 +487,4 @@ for(const browserType of [chromium,webkit]) {
   }
  } finally {await browser.close();}
 }
-console.log('File history: Chromium and WebKit, desktop/mobile, light/dark, history, current files, keyboard, previews, deleted files, retry and confirmed restore passed.');
+console.log('File history: Chromium and WebKit, desktop/mobile, light/dark, history, current files, keyboard, previews, deleted files, recently deleted, retry and confirmed restore passed.');

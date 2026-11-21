@@ -151,6 +151,11 @@ export class SyncRuntime {
 		return this.withCurrentApi(api => api.listFileVersions(query), FILE_HISTORY_CHANGED);
 	}
 
+	/** The paths among `paths` that the server holds now. */
+	findRemoteFiles(paths: string[]): Promise<Set<string>> {
+		return this.withCurrentApi(async api => new Set(Object.keys((await api.getFileMetadata(paths)).files)), FILE_HISTORY_CHANGED);
+	}
+
 	listSharedCheckpoints(): Promise<SharedCheckpoint[]> {
 		return this.withCurrentApi(api => api.sharedHistory.list(), HISTORY_CHANGED);
 	}

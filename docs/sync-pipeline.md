@@ -562,7 +562,12 @@ The History tab keeps expandable sync summaries with uploaded, downloaded, merge
 and deleted files. Each file offers **File history**. A single
 **Browse vault history** button opens a dedicated Vault history dialog above Sync
 activity. Closing it returns to the unchanged activity list and its previous scroll
-position. The wider
+position. **Recently deleted** (also the **Recover deleted file** command) lists
+files deleted within the history period from `GET /sync/versions`, newest first.
+It keeps `deleted` versions on the plugin side, shows each path once, and hides
+paths that exist again in the vault or on the server. Selecting one opens its
+file history. Search also filters on the device, because encrypted names cannot
+be searched on the server. The wider
 screen combines sync selection, files, and saved-state previews in three panes
 (History → Files → Diff on narrow screens). Saved contents load only when this
 screen opens. A selected checkpoint is compared with the current vault on this

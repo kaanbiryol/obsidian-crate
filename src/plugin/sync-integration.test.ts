@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { TFile, TFolder, type Command, type Menu, type MenuItem, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
+import { openRecentlyDeletedModal } from '../ui/activity/recently-deleted-modal';
 import { openSyncActivity, registerSyncCommands, startVaultReplacement } from './sync-integration';
 import type { ActivityModalActions } from '../ui/activity/activity-modal';
 import { setSyncReady } from './lifecycle-state';
@@ -9,6 +10,7 @@ import { Notice } from '../test/mocks/obsidian';
 
 const activity = vi.hoisted(() => ({ open: vi.fn(), actions: [] as ActivityModalActions[] }));
 vi.mock('../ui/activity/file-history-modal', () => ({ openFileHistoryModal: vi.fn() }));
+vi.mock('../ui/activity/recently-deleted-modal', () => ({ openRecentlyDeletedModal: vi.fn() }));
 vi.mock('../ui/activity/activity-modal', () => ({ ActivityModal: class {
 	constructor(_app: unknown, _settings: unknown, _deps: unknown, actions: ActivityModalActions) { activity.actions.push(actions); }
 	open() { activity.open(); }
@@ -45,6 +47,18 @@ it('opens the active file only when the history command is executed', async () =
  plugin.syncRuntime.isConfigured.mockReturnValue(false);
  expect(command.checkCallback!(false)).toBe(false);
  expect(openFileHistoryModal).toHaveBeenCalledTimes(1);
+});
+
+it('opens recently deleted files from the recover command when sync is configured', async () => {
+ const { plugin, commands } = setup();
+ const command = commands.find(command => command.id === 'recover-deleted-file')!;
+ expect(command.name).toBe('Recover deleted file');
+ expect(command.checkCallback!(true)).toBe(true);
+ expect(openRecentlyDeletedModal).not.toHaveBeenCalled();
+ command.checkCallback!(false);
+ await vi.waitFor(() => expect(openRecentlyDeletedModal).toHaveBeenCalledWith(plugin.app, plugin.syncRuntime));
+ plugin.syncRuntime.isConfigured.mockReturnValue(false);
+ expect(command.checkCallback!(true)).toBe(false);
 });
 
 it('registers a file-only context action that opens the clicked file', async () => {

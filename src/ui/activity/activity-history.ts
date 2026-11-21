@@ -21,10 +21,18 @@ export class ActivityHistory {
 	private readonly toolbar: HTMLElement;
 	private readonly timeline: HTMLElement;
 
-	constructor(private app: App, private panel: HTMLElement, private deps: HistoryBrowserDeps, private onFileOpened: () => void = () => {}) {
+	constructor(private app: App, private panel: HTMLElement, private deps: HistoryBrowserDeps, private onFileOpened: () => void = () => {},
+		openRecentlyDeleted?: (onClosed: () => void) => void) {
 		panel.addClass('crate-history-timeline');
 		this.toolbar = panel.createDiv({ cls: 'crate-history-timeline-toolbar' });
-		this.browse = this.toolbar.createEl('button', { text: 'Browse vault history', cls: 'crate-activity-action', attr: { type: 'button' } });
+		const actions = this.toolbar.createDiv({ cls: 'crate-history-timeline-actions' });
+		if (openRecentlyDeleted) {
+			const deleted = actions.createEl('button', { text: 'Recently deleted', cls: 'crate-activity-action', attr: { type: 'button' } });
+			deleted.addEventListener('click', () => openRecentlyDeleted(() => {
+				if (this.active && deleted.isConnected) deleted.focus({ preventScroll: true });
+			}));
+		}
+		this.browse = actions.createEl('button', { text: 'Browse vault history', cls: 'crate-activity-action', attr: { type: 'button' } });
 		this.browse.addEventListener('click', () => this.show());
 		this.timeline = panel.createDiv({ cls: 'crate-history-timeline-content' });
 	}

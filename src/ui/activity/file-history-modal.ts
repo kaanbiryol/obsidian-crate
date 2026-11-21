@@ -43,7 +43,7 @@ class FileHistoryModal extends SharedModal {
 	private previewEl!: HTMLElement;
 	private workspaceEl!: HTMLElement;
 
-	constructor(app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string) { super(app); }
+	constructor(app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string, private readonly onClosed?: () => void) { super(app); }
 
 	onOpen(): void {
 		this.closed = false;
@@ -75,7 +75,7 @@ class FileHistoryModal extends SharedModal {
 		}
 	}
 
-	onClose(): void { this.cancelInitialFocus?.(); this.cancelInitialFocus = undefined; this.closed = true; ++this.previewRevision; ++this.fileRequestRevision; super.onClose(); }
+	onClose(): void { this.cancelInitialFocus?.(); this.cancelInitialFocus = undefined; this.closed = true; ++this.previewRevision; ++this.fileRequestRevision; super.onClose(); this.onClosed?.(); }
 	private showPane(pane: 'list' | 'preview'): void { this.workspaceEl.setAttribute('data-pane', pane); }
 	private versionButton(container: HTMLElement, version: RemoteFileVersion, seconds: boolean): HTMLButtonElement {
 		const button = action(container, '', () => { void this.selectVersion(version); }, 'crate-history-version');
@@ -265,6 +265,6 @@ class FileHistoryModal extends SharedModal {
 	}
 }
 
-export function openFileHistoryModal(app: App, runtime: FileHistoryRuntime, path: string): void {
-	new FileHistoryModal(app, runtime, path).open();
+export function openFileHistoryModal(app: App, runtime: FileHistoryRuntime, path: string, onClosed?: () => void): void {
+	new FileHistoryModal(app, runtime, path, onClosed).open();
 }

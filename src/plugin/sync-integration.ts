@@ -1,6 +1,7 @@
 import { registerSyncStatus } from './sync-status';
 import { registerSyncResultNotices } from './sync-result-notices';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
+import { openRecentlyDeletedModal } from '../ui/activity/recently-deleted-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, Platform, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
@@ -62,6 +63,19 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 			const file = plugin.app.workspace.getActiveFile();
 			const available = plugin.syncRuntime.isConfigured() && file !== null;
 			if (!checking && available) openFileHistoryWhenReady(plugin, file.path);
+			return available;
+		},
+	});
+	plugin.addCommand({
+		id: 'recover-deleted-file', name: 'Recover deleted file',
+		checkCallback: checking => {
+			const available = plugin.syncRuntime.isConfigured();
+			if (!checking && available) {
+				const signal = getPluginLifecycleSignal(plugin);
+				void waitForSyncReady(plugin).then(() => {
+					if (!signal.aborted) openRecentlyDeletedModal(plugin.app, plugin.syncRuntime);
+				});
+			}
 			return available;
 		},
 	});

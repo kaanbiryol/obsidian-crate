@@ -23,7 +23,7 @@ function runtime(overrides: Partial<ActivityModalDeps>): ActivityModalDeps {
 		loadHistoryComparison: unused, listSharedCheckpoints: async () => [], createHistoryRestore: unused,
 		loadPendingDiff: unused, createPendingDiscard: unused, createConflictReview: unused,
 		listRecentFileVersions: unused, getPendingRestores: () => [], loadFileHistoryPreview: unused,
-		restoreRecentFileVersion: unused, loadCurrentSyncedPreview: unused,
+		restoreRecentFileVersion: unused, loadCurrentSyncedPreview: unused, findRemoteFiles: unused,
 		getPendingKeys: () => [], getPendingChangeCount: () => 0, hasPendingKey: () => false, getActiveConflicts: () => [],
 		getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 		getActivityProgress: () => null, addProgressListener: vi.fn(), removeProgressListener: vi.fn(),
