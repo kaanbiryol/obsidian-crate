@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
-import { mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, open, readdir, readFile, writeFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -9,7 +9,7 @@ import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
-import { openLocalRuntime, issueLocalDevice, isLockFromEarlierBoot, lockLocalData, normalizeLocalOrigin, revokeLocalDevice } from '../src/local-server-runtime.mjs';
+import { openLocalRuntime, issueLocalDevice, isAbandonedLock, isLockFromEarlierBoot, lockLocalData, normalizeLocalOrigin, revokeLocalDevice } from '../src/local-server-runtime.mjs';
 import { listenLocalServer } from '../src/local-server-http.mjs';
 import { createPairing } from '../src/local-server-pairing.mjs';
 
@@ -47,7 +47,23 @@ test('starting after a reboot replaces a lock left by the previous boot', async 
 	await assert.rejects(lockLocalData(dataDir), /locked/);
 	await unlock();
 	await writeFile(path, JSON.stringify({ pid: exited.pid, startedAt: new Date().toISOString() }));
-	await assert.rejects(lockLocalData(dataDir), /locked/);
+	// Without a reboot, a force-quit server may have left workerd running on the data.
+	await assert.rejects(lockLocalData(dataDir, { listWorkerd: async () => [4243] }), /force-quit.*kill 4243/);
+	await assert.rejects(lockLocalData(dataDir, { listWorkerd: async () => null }), /locked/);
+	const reclaimed = await lockLocalData(dataDir, { listWorkerd: async () => [] });
+	assert.equal(JSON.parse(await readFile(path, 'utf8')).pid, process.pid);
+	await reclaimed();
+});
+
+test('without a reboot, a lock is abandoned only when its process is gone and no workerd is left without a parent', async () => {
+	const lock = JSON.stringify({ pid: 4242, startedAt: new Date().toISOString() });
+	const options = (running, workerd) => ({ isRunning: () => running, listWorkerd: async () => workerd });
+	assert.equal(await isAbandonedLock(lock, options(false, [])), true);
+	assert.equal(await isAbandonedLock(lock, options(true, [])), false);
+	// Processes cannot be listed on this platform: keep the lock.
+	assert.equal(await isAbandonedLock(lock, options(false, null)), false);
+	await assert.rejects(isAbandonedLock(lock, options(false, [7, 8])), /PID 7, 8.*kill 7 8/);
+	for (const text of ['', 'null', '{"pid":"1"}']) assert.equal(await isAbandonedLock(text, options(false, [])), false);
 });
 
 test('damaged metadata and missing storage cannot silently create a fresh server', { timeout: 20_000 }, async () => {
@@ -360,6 +376,76 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		assert.equal(JSON.parse(await readFile(join(dataDir, 'server.json'), 'utf8')).format, 1);
 	} finally {
 		await stop();
+		await rm(dataDir, { recursive: true, force: true });
+	}
+});
+
+test('starting arms reminder delivery for a reminder that came due with no alarm', { timeout: 40_000 }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-rearm-'));
+	let runtime;
+	let server;
+	try {
+		runtime = await openLocalRuntime({ dataDir });
+		server = await listenLocalServer(runtime, { port: 0 });
+		const origin = `http://127.0.0.1:${server.address().port}`;
+		const device = await issueLocalDevice(runtime.db, 'Mac');
+		const info = await (await fetch(`${origin}/.well-known/crate`)).json();
+		await runtime.db.prepare("INSERT INTO server_state(id, import_token, import_state) VALUES (1, 'test', 'complete') ON CONFLICT(id) DO UPDATE SET import_token = excluded.import_token, import_state = excluded.import_state").run();
+		const response = await fetch(`${origin}/sync/upload?path=hello.txt`, { method: 'PUT', headers: {
+			Authorization: `Bearer ${device.token}`, 'X-Crate-Protocol': String(info.protocol.current), 'Content-Type': 'text/plain',
+			'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${randomUUID()}`,
+		}, body: 'reminder source' });
+		assert.equal(response.status, 200, await response.clone().text());
+		await response.text();
+		await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+		server = null;
+		await runtime.close();
+
+		// An administrative runtime registers no Durable Objects, so this schedule has no alarm,
+		// as if it were written by a server that stopped before arming delivery.
+		runtime = await openLocalRuntime({ dataDir, administrative: true });
+		const parserSource = await readFile(new URL('../../../src/cloudflare/worker/reminders/cache/types.ts', import.meta.url), 'utf8');
+		const parserVersion = Number(/REMINDER_CACHE_PARSER_VERSION = (\d+)/.exec(parserSource)[1]);
+		const file = await runtime.db.prepare("SELECT storage_key FROM files WHERE path = 'hello.txt'").first();
+		const due = new Date(Date.now() - 60_000).toISOString();
+		await runtime.db.prepare("INSERT INTO notification_policy (id, folder_path, timezone, revision, enabled) VALUES (1, 'Reminders', 'UTC', 'policy', 1)").run();
+		await runtime.db.prepare("INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified) VALUES ('hello.txt', ?, ?, 1)")
+			.bind(file.storage_key, parserVersion).run();
+		await runtime.db.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, notification_token, due_datetime, content, due_at)
+			VALUES ('missed-alarm', 'hello.txt', 'job', ?, 'Missed while stopped', ?)`).bind(due, Date.parse(due)).run();
+		await runtime.close();
+
+		runtime = await openLocalRuntime({ dataDir });
+		const deadline = Date.now() + 10_000;
+		while (!await runtime.db.prepare("SELECT reminder_id FROM reminder_projections WHERE reminder_id = 'missed-alarm' AND delivered_due IS NOT NULL").first()) {
+			assert.ok(Date.now() < deadline, 'Startup did not arm reminder delivery');
+			await delay(100);
+		}
+	} finally {
+		if (server) await new Promise(resolve => server.close(resolve));
+		await runtime?.close();
+		await rm(dataDir, { recursive: true, force: true });
+	}
+});
+
+test('a damaged database stops startup before anything changes it', { timeout: 30_000 }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-corrupt-'));
+	try {
+		let runtime = await openLocalRuntime({ dataDir, administrative: true });
+		try { for (let index = 0; index < 300; index++) await issueLocalDevice(runtime.db, `Device ${index}`); }
+		finally { await runtime.close(); }
+		const directory = join(dataDir, 'resources/d1/miniflare-D1DatabaseObject');
+		const [database] = (await readdir(directory)).filter(name => name.endsWith('.sqlite') && name !== 'metadata.sqlite');
+		const path = join(directory, database);
+		const file = await open(path, 'r+');
+		try { await file.write(Buffer.alloc(4096, 0xff), 0, 4096, Math.floor((await file.stat()).size / 2 / 4096) * 4096); }
+		finally { await file.close(); }
+		const metadata = await readFile(join(dataDir, 'server.json'), 'utf8');
+		await assert.rejects(openLocalRuntime({ dataDir }), /failed its integrity check.*If the server is lost/);
+		assert.equal(await readFile(join(dataDir, 'server.json'), 'utf8'), metadata);
+		// The refusal releases the lock, so restore or diagnosis can open the directory.
+		await (await lockLocalData(dataDir))();
+	} finally {
 		await rm(dataDir, { recursive: true, force: true });
 	}
 });

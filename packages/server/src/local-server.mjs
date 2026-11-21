@@ -9,6 +9,7 @@ import { validateCommandOptions } from './local-server-options.mjs';
 import { backup, checkUpgrade, restore, upgrade } from './commands/data.mjs';
 import { addDevice, listDevices, pair, revoke } from './commands/devices.mjs';
 import { start } from './commands/start.mjs';
+import { status } from './commands/status.mjs';
 
 const help = `Crate local server
 
@@ -21,6 +22,7 @@ npm run server -- add-device --name "My Mac" [--data-dir PATH]
 npm run server -- pair --name "My phone" [--data-dir PATH]
 npm run server -- devices [--data-dir PATH]
 npm run server -- revoke --id TOKEN_ID [--data-dir PATH]
+npm run server -- status [--data-dir PATH]
 npm run server -- backup --output PATH [--data-dir PATH]
 npm run server -- upgrade --output NEW_BACKUP_PATH [--data-dir PATH]
 npm run server -- restore --backup PATH --data-dir EMPTY_PATH
@@ -34,14 +36,14 @@ Quick Tunnel addresses change on restart; reconnect devices and re-enroll PWAs.
 Start reuses saved remote settings; --local skips the managed tunnel.
 Without remote setup, start uses localhost (build first: npm run build:worker).
 Use pair while the server is running to connect another device without downtime.
-devices and revoke work while the server runs or while it is stopped.
+devices, revoke and status work while the server runs or while it is stopped.
 Stop the server before offline add-device administration.
 Default data directory: ~/.crate/server (one vault per directory).
 See docs/self-hosting.md for backups, updates, and other HTTPS proxies.`;
 
 /** @type {Record<string, import('./local-server-options.mjs').Command>} */
 const commands = {
-	setup: start, start, 'add-device': addDevice, pair, devices: listDevices, revoke,
+	setup: start, start, 'add-device': addDevice, pair, devices: listDevices, revoke, status,
 	backup, upgrade, restore, 'check-upgrade': checkUpgrade,
 };
 

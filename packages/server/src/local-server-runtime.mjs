@@ -1,17 +1,20 @@
 import { assertLocalMigrationPath, migrateLocalDatabase } from './local-server-migrations.mjs';
+import { watchRuntime } from './local-server-watchdog.mjs';
 import { coordinatorPath, packaged, revocationPath, runtimeVersion, serverAssetPath, workerPath } from './assets.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { uptime as osUptime } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 /** @type {typeof import('miniflare')} */
 const { Miniflare, convertV4MiniflareOptions } = await import(packaged
 	? '../vendor/miniflare/dist/src/index.js' : 'miniflare');
 /** @type {typeof import('../../../src/cloudflare/worker/auth/revocation.ts')} */
 const { RESET_GENERATION_SQL, revokeCredential } = await import(pathToFileURL(revocationPath).href);
 /** @type {typeof import('../../../src/cloudflare/worker/coordinator/coordinator.ts')} */
-const { revokeCoordinatedCredential } = await import(pathToFileURL(coordinatorPath).href);
+const { armReminderDispatcher, revokeCoordinatedCredential } = await import(pathToFileURL(coordinatorPath).href);
 
 /**
  * The D1 subset the server uses. Miniflare types its bindings with workers types this
@@ -68,6 +71,8 @@ const { revokeCoordinatedCredential } = await import(pathToFileURL(coordinatorPa
  * @property {string} dataDir
  * @property {string} origin
  * @property {(id: string) => Promise<boolean>} revoke
+ * @property {Promise<never>} failed Rejects when a serving runtime stops responding; never settles for administrative runtimes.
+ * @property {number} crashes Unexpected workerd exits Miniflare recovered from.
  * @property {() => Promise<void>} close
  */
 
@@ -152,8 +157,56 @@ function pidIsRunning(pid) {
 	catch (error) { return error.code !== 'ESRCH'; }
 }
 
-/** @param {string} dataDir @returns {Promise<() => Promise<void>>} Releases the lock. */
-export async function lockLocalData(dataDir) {
+/** Running workerd processes that lost their parent, or null where processes cannot be
+ * listed. A force-quit server leaves its workerd running on the same files, adopted by
+ * init or a subreaper. Workerd whose parent is a live Node process belongs to another
+ * server or tool that still runs, never to the dead lock holder.
+ * @returns {Promise<number[] | null>} */
+async function otherWorkerdProcesses() {
+	/** @type {{ pid: number, ppid: number, name: string }[]} */
+	let processes;
+	try {
+		if (process.platform === 'linux') {
+			processes = [];
+			for (const entry of await readdir('/proc')) {
+				if (!/^\d+$/.test(entry)) continue;
+				// `pid (comm) state ppid ...`; comm may contain spaces and parentheses.
+				const stat = await readFile(`/proc/${entry}/stat`, 'utf8').catch(() => null);
+				const match = stat && /^(\d+) \((.*)\) \S+ (\d+)/s.exec(stat);
+				if (match) processes.push({ pid: Number(match[1]), name: match[2], ppid: Number(match[3]) });
+			}
+		} else if (process.platform === 'darwin') {
+			const { stdout } = await promisify(execFile)('ps', ['-A', '-o', 'pid=,ppid=,comm=']);
+			processes = stdout.split('\n').flatMap(line => {
+				const match = /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line);
+				return match ? [{ pid: Number(match[1]), ppid: Number(match[2]), name: basename(match[3].trim()) }] : [];
+			});
+		} else return null;
+	} catch { return null; }
+	const names = new Map(processes.map(entry => [entry.pid, entry.name]));
+	return processes.filter(entry => entry.name === 'workerd' && names.get(entry.ppid) !== 'node').map(entry => entry.pid);
+}
+
+/** Without a reboot, a lock is stale once its process is gone and no workerd it may
+ * have started is still running. Throws while one may still use the data.
+ * @param {string} text
+ * @param {{ isRunning?: (pid: number) => boolean, listWorkerd?: () => Promise<number[] | null> }} [options] */
+export async function isAbandonedLock(text, { isRunning = pidIsRunning, listWorkerd = otherWorkerdProcesses } = {}) {
+	/** @type {ServerLock} */
+	let lock;
+	try { lock = JSON.parse(text); } catch { return false; }
+	if (!Number.isSafeInteger(lock?.pid) || isRunning(lock.pid)) return false;
+	const workerd = await listWorkerd();
+	if (workerd === null) return false;
+	if (workerd.length) {
+		throw new Error(`Data directory is locked by a Crate server that was force-quit, and workerd it may have started is still running without it (PID ${workerd.join(', ')}). Stop it with: kill ${workerd.join(' ')}. Then start Crate again.`);
+	}
+	return true;
+}
+
+/** @param {string} dataDir @param {Parameters<typeof isAbandonedLock>[1]} [options]
+ * @returns {Promise<() => Promise<void>>} Releases the lock. */
+export async function lockLocalData(dataDir, options) {
 	await mkdir(dataDir, { recursive: true, mode: 0o700 });
 	const path = join(dataDir, 'server.lock');
 	/** @type {import('node:fs/promises').FileHandle | undefined} */
@@ -163,7 +216,7 @@ export async function lockLocalData(dataDir) {
 		catch (error) {
 			if (error.code !== 'EEXIST') throw error;
 			const previous = await readFile(path, 'utf8').catch(() => '');
-			if (attempt === 0 && isLockFromEarlierBoot(previous)) { await unlink(path).catch(() => {}); continue; }
+			if (attempt === 0 && (isLockFromEarlierBoot(previous) || await isAbandonedLock(previous, options))) { await unlink(path).catch(() => {}); continue; }
 			throw new Error(`Data directory is locked. Stop its Crate server first. After a crash, verify no Crate/workerd process uses this directory before removing ${path}.`);
 		}
 	}
@@ -260,6 +313,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		}
 		/** @type {LocalD1Database} */
 		let db = await mf.getD1Database(bindings.database);
+		await assertIntactDatabase(db);
 		const { results: tables } = await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").all();
 		if (tables.length === 0) {
 			if (previous) throw new Error('The existing server database is missing. Restore a complete backup; refusing to create an empty replacement.');
@@ -273,33 +327,74 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
  else if (marker?.version !== release.schemaVersion) throw new Error('Unsupported local database schema. Run the stopped-server upgrade command with a new backup directory.');
 		}
 		await writePrivateJson(metadataPath, metadata);
+		let crashes = 0;
+		/** @type {() => Promise<void>} */
+		let wakeReminders = async () => {};
 		if (!administrative) {
 			await mf.dispose();
 			mf = createRuntime({ ...options,
 				r2Buckets: { [bindings.bucket]: 'crate-local-files' },
 				durableObjects: { [bindings.reminderAlarms]: { className: durableObjectClass, useSQLite: true } },
 				ratelimits: { [bindings.notificationRateLimiter]: { namespace_id: '1001', simple: notificationRateLimit } },
+				// Miniflare restarted a crashed workerd; reminders may have come due meanwhile.
+				unsafeHandleRuntimeRestart: async () => { crashes++; await wakeReminders(); },
 			});
 			await mf.ready;
 			db = await mf.getD1Database(bindings.database);
 		}
+		const live = /** @type {import('miniflare').Miniflare} */ (mf);
+		// Miniflare types the namespace with workers types this repository does not install.
+		const alarms = async () => ({ REMINDER_ALARMS: /** @type {DurableObjectNamespace} */ (/** @type {unknown} */ (
+			await live.getDurableObjectNamespace(bindings.reminderAlarms))) });
 		let closed = false;
 		// Administrative runtimes register no Durable Objects, so they revoke directly.
 		/** @type {(id: string) => Promise<boolean>} */
-		const revoke = administrative ? id => revokeCredential(db, id)
-			// Miniflare types the namespace with workers types this repository does not install.
-			: async id => revokeCoordinatedCredential({ REMINDER_ALARMS: /** @type {DurableObjectNamespace} */ (/** @type {unknown} */ (
-				await /** @type {import('miniflare').Miniflare} */ (mf).getDurableObjectNamespace(bindings.reminderAlarms))) }, id);
-		return { mf, db, dataDir, origin, revoke, async close() {
-			if (closed) return;
-			closed = true;
-			await /** @type {import('miniflare').Miniflare} */ (mf).dispose();
-			await unlock();
-		} };
+		const revoke = administrative ? id => revokeCredential(db, id) : async id => revokeCoordinatedCredential(await alarms(), id);
+		/** @type {ReturnType<typeof watchRuntime> | undefined} */
+		let watchdog;
+		if (!administrative) {
+			// Otherwise only a commit or enabling Reminders arms delivery, so a reminder that
+			// came due while the server was down would wait for the next sync.
+			wakeReminders = async () => {
+				if (!await armReminderDispatcher(await alarms())) console.warn('Could not wake reminder delivery. It resumes with the next sync.');
+			};
+			await wakeReminders();
+			watchdog = watchRuntime({ async probe(signal) {
+				const response = await live.dispatchFetch(`${origin}/.well-known/crate`, { signal });
+				await response.arrayBuffer();
+				if (!response.ok) throw new Error(`health check returned ${response.status}`);
+			} });
+		}
+		return { mf: live, db, dataDir, origin, revoke,
+			failed: watchdog?.failed ?? new Promise(() => {}),
+			get crashes() { return crashes; },
+			async close() {
+				if (closed) return;
+				closed = true;
+				watchdog?.close();
+				await live.dispose();
+				await unlock();
+			} };
 	} catch (error) {
 		await mf?.dispose();
 		await unlock();
 		throw error;
+	}
+}
+
+/** Refuses to serve, migrate or administer a damaged database. Recovery is a complete
+ * backup or a rebuild from devices, never an automatic repair or reset.
+ * @param {LocalD1Database} db */
+async function assertIntactDatabase(db) {
+	/** @type {unknown} */
+	let problem;
+	try {
+		// D1 permits quick_check but not integrity_check.
+		const { results } = await db.prepare('PRAGMA quick_check').all();
+		if (results.length !== 1 || Object.values(results[0])[0] !== 'ok') problem = results.map(row => String(Object.values(row)[0]).replace(/\s+/g, ' ')).slice(0, 3).join('; ');
+	} catch (error) { problem = error instanceof Error ? error.message : String(error); }
+	if (problem !== undefined) {
+		throw new Error(`The server database failed its integrity check (${problem}). Keep this data directory unchanged, then restore a complete backup into a new directory or rebuild from your devices; see "If the server is lost" in the self-hosting guide.`);
 	}
 }
 

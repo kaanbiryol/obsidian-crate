@@ -12,10 +12,16 @@ a stable address using your own domain. Without a domain,
 stable address. Phones can use any of these without a VPN.
 
 This initial implementation uses the exact Miniflare version already used by
-Crate's integration tests, currently a pinned prerelease. Automated tests cover
-real HTTP, disk persistence, transactions, revocation, retry receipts and overdue
-alarms across restart. They do not establish production support on every
-operating system or verify delivery through real browser push providers.
+Crate's integration tests, currently a pinned prerelease: the stable Miniflare 4
+line cannot run the Worker's compatibility date, so Crate moves to Miniflare 5
+once it is stable. Automated tests cover real HTTP, disk persistence,
+transactions, revocation, retry receipts, overdue alarms across restart, and
+recovery after the runtime or the server process is killed mid-write. They do not
+establish production support on every operating system or verify delivery
+through real browser push providers. Every connected device keeps a full copy of
+your notes; the server adds history, pairing, push setup and reminder state. See
+[After a crash or power loss](#after-a-crash-or-power-loss) and
+[If the server is lost](#if-the-server-is-lost).
 
 ## Run with Docker
 
@@ -168,7 +174,8 @@ docker compose -p crate-restored up -d
 Restore refuses non-empty destinations, modified backup files, unsupported
 schemas/runtimes, and downgrades. It validates the restored database with reminder
 alarms disabled before completing. It preserves device credentials, files, and
-Durable Object alarms. Keep the old server stopped; connect to the restored
+Durable Object alarms, and gives the restored server a new storage identity, so
+devices merge with it even after it catches up with them. Keep the old server stopped; connect to the restored
 server's new public address. Each device notices that the restored server is
 behind it and merges: edits made after the backup are kept, as conflict copies
 where both sides differ, and files created after it upload again. Use
@@ -660,10 +667,27 @@ Tailscale is not ready at boot, Crate exits and systemd retries it 30 seconds la
 
 ### After a crash or power loss
 
-A lock file stops two servers from using the same data. After a reboot, Crate
-replaces a lock left by the previous boot on its own. If Crate was force-quit
-without a reboot, the lock stays: check that no Crate or workerd process is
-running, then remove `server.lock` from the data directory and start again.
+- **The runtime crashes:** Crate restarts workerd on its own and keeps serving.
+  If workerd cannot come back, Crate stops with an error after about 45 seconds,
+  so Docker, launchd or systemd starts it again.
+- **Reminders:** each start, and each runtime restart, arms reminder delivery.
+  A reminder that came due while Crate was down is delivered if it is less than
+  24 hours late; older ones are recorded as missed instead of arriving stale.
+- **Locks:** a lock file stops two servers from using the same data. After a
+  reboot, or once the process that held the lock is gone, Crate replaces the
+  lock on its own. A force-quit server can leave workerd running on the same
+  files; Crate then refuses to start and prints the workerd process ID to stop
+  with `kill`. On other platforms, or when processes cannot be listed, check that
+  no Crate or workerd process is running, then remove `server.lock` from the
+  data directory.
+- **Damaged database:** startup checks the database first and refuses to open a
+  damaged one. Keep that directory unchanged, then
+  [restore a backup](#backups-restore-and-updates) into a new directory or
+  [rebuild from your devices](#if-the-server-is-lost).
+
+Check a server with `npm run server -- status` (or `crate-server status`,
+`docker compose exec crate crate status`). It reports whether Crate is running,
+how many runtime crashes it recovered from, and the last verified backup.
 
 ## Backups, restore, and updates
 
@@ -675,6 +699,9 @@ npm run server -- restore --backup /path/to/crate-backup --data-dir /path/to/emp
 ```
 
 The backup includes the local database, objects, alarms, and any adjacent named-tunnel configuration. Restore checks file hashes and compatibility before publishing the restored data. Use a new backup destination each time.
+
+Each verified backup is recorded in the data directory; `status` and the startup
+log show the last one.
 
 You can also stop the server cleanly and copy the **entire data directory** and its adjacent `.remote` directory to make a cold backup.
 Keep its matching repository commit, lockfile and Node version. Backups contain
@@ -708,6 +735,82 @@ directory and retain the incomplete one for diagnosis.
 After a crash, `server.lock` may remain. Verify that no Crate or workerd process
 uses the directory before removing only that lock file and restarting. The
 launcher does not guess whether another process is safe to interrupt.
+
+
+### Nightly backups
+
+Backups need a stopped server, so a nightly job stops Crate for the few seconds a
+backup takes, then starts it again. Devices and the PWA retry through the pause.
+Save this as `~/crate-backup.sh`, set the paths, and choose a backup folder on
+another disk or in a synced cloud folder:
+
+```sh
+#!/bin/sh
+# Stop Crate, take a dated verified backup, start Crate, keep the newest 7.
+set -eu
+NODE=/path/to/node
+CRATE=/path/to/crate-server.mjs
+DATA="$HOME/.crate/server"
+BACKUPS=/path/to/backups/crate
+STOP="launchctl kill SIGTERM gui/$(id -u)/local.crate.server"   # systemd: systemctl --user stop crate
+START="launchctl kickstart gui/$(id -u)/local.crate.server"     # systemd: systemctl --user start crate
+
+trap '$START' EXIT
+$STOP
+while "$NODE" "$CRATE" status --data-dir "$DATA" | grep -q '^Status: running'; do sleep 1; done
+mkdir -p "$BACKUPS"
+"$NODE" "$CRATE" backup --data-dir "$DATA" --output "$BACKUPS/$(date +%Y-%m-%d-%H%M)"
+ls -1d "$BACKUPS"/????-??-??-???? | sort -r | tail -n +8 | while read -r old; do rm -rf "$old"; done
+```
+
+Crate starts again even when the backup fails. Run it daily at 03:30:
+
+- **macOS:** save `~/Library/LaunchAgents/local.crate.backup.plist` with the label
+  `local.crate.backup`, `ProgramArguments` `/bin/sh` and the script's absolute path,
+  and a `StartCalendarInterval` of `Hour` 3 and `Minute` 30. Load it with
+  `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.crate.backup.plist`.
+- **Linux:** create `~/.config/systemd/user/crate-backup.service` with
+  `Type=oneshot` and `ExecStart=/bin/sh /home/you/crate-backup.sh`, and
+  `crate-backup.timer` with `OnCalendar=*-*-* 03:30` and `Persistent=true`, then run
+  `systemctl --user enable --now crate-backup.timer`.
+- **Docker:** run the [Docker backup commands](#verified-backups-restore-and-updates)
+  from the host's scheduler with a dated name each time. Remove the copy inside
+  the volume after exporting it with
+  `docker compose run --rm --entrypoint rm crate -rf /data/backups/NAME`.
+
+Check the result with `status`, and test a restore into an empty directory now
+and then.
+
+## If the server is lost
+
+Without a backup, rebuild the server from your devices. Each device has the full
+vault, so your notes are safe. What a rebuild cannot bring back:
+
+- device pairing: every device and the PWA pairs again
+- version history kept on the server
+- push notification setup: enable notifications again on each phone
+- the record of which reminders were already delivered
+
+1. Start a new server, ideally at the same address (the same tunnel hostname or
+   Tailscale name). It prints a first pairing code.
+2. Start with the device whose vault is most complete. Crate reports that its
+   sync access is no longer valid. In Crate settings → **Account and devices**,
+   select **Reconnect** and enter the pairing code. Its next sync uploads the
+   whole vault; nothing on the device is deleted.
+3. If the vault was end-to-end encrypted, sync stops with **Encryption is off on
+   this server**. Open **Manage encryption** and select **Turn on encryption**.
+   This creates new keys and a new recovery key; save it. The old recovery key
+   only opens old backups.
+4. Pair each other device with a new code from `pair`, and reconnect it the same
+   way. Encrypted vaults unlock with the new recovery key or by approving the
+   device from an unlocked one.
+
+Each device recognizes the new server by its storage identity and merges with it:
+notes only that device has upload, and a note that differs keeps its local version
+as a conflict copy. A device can't tell if it had not synced with the old server
+since updating to a Crate version with storage identities. A
+verified backup is still the better path: restoring one keeps pairing and history,
+and every device merges with it.
 
 ## Verification
 

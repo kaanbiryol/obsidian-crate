@@ -36,7 +36,7 @@
  * @typedef {(context: CommandContext, resources: import('./local-server-lifecycle.mjs').CommandResources) => Promise<void>} Command
  */
 
-const COMMANDS = ['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'backup', 'restore', 'check-upgrade', 'upgrade'];
+const COMMANDS = ['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'status', 'backup', 'restore', 'check-upgrade', 'upgrade'];
 const LOOPBACK_HOSTS = ['127.0.0.1', '::1', 'localhost'];
 
 /** Rejects an unknown command or conflicting options. `dockerWithoutTailscale` reports a

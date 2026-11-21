@@ -7,10 +7,12 @@ import { resolveServerOrigin, resolveStartMode } from '../local-server-options.m
 import { createPairing, startLocalControl } from '../local-server-pairing.mjs';
 import { startQuickServer } from '../local-server-quick.mjs';
 import { monitorPublicReadiness } from '../local-server-readiness.mjs';
+import { readLastBackup } from '../local-server-backup.mjs';
 import { openLocalRuntime } from '../local-server-runtime.mjs';
 import { startTailscaleFunnel } from '../local-server-tailscale.mjs';
 import { readRemoteSettings, saveQuickSettings, startTunnel } from '../local-server-tunnel.mjs';
 import { printPairing } from './devices.mjs';
+import { describeLastBackup } from './status.mjs';
 import { buildIfSource, setupNamedTunnel, setupTailscale } from './setup.mjs';
 
 /** @typedef {import('../local-server-options.mjs').Command} Command */
@@ -54,10 +56,11 @@ async function serveQuickTunnel({ command, values, dataDir, docker, signal, stop
 	const quickServer = resources.quickServer = await startQuickServer({ dataDir, port, name: values.name, signal, onReadiness: readinessChanged });
 	await saveQuickSettings(dataDir, port);
 	console.log(`Server address to paste into Obsidian: ${quickServer.runtime.origin}\nInternal listener (diagnostics only): 127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (quickServer.server.address()).port}\nData: ${dataDir}`);
+	console.log(describeLastBackup(await readLastBackup(dataDir)));
 	if (quickServer.pairingCode) printPairing(quickServer.pairingCode);
 	else console.log('Existing device tokens remain valid. Update the server address in Crate to the URL above.');
 	console.log(`Connect in Obsidian → Settings → Crate → Connect to your server, then select Sync now.\nUse Copy setup link or Show QR code in Crate to enroll the PWA. A new tunnel address requires fresh PWA enrollment.\nAdd a device without restarting: ${pairCommand(docker)}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Keep this terminal open. Press Ctrl+C to stop safely.'}`);
-	const result = await Promise.race([stopped.then(() => null), quickServer.tunnel.exited]);
+	const result = await Promise.race([stopped.then(() => null), quickServer.tunnel.exited, quickServer.runtime.failed]);
 	if (result && !signal.aborted) throw new Error(`Cloudflare Quick Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Restart Crate to get a new address.`);
 }
 
@@ -82,9 +85,10 @@ async function serve({ values, dataDir, docker, signal, stopped }, { remote, tai
 	let tunnel;
 	if (remote) tunnel = resources.tunnel = tailscale ? await startTailscaleFunnel(remote, signal) : await startTunnel(dataDir, remote, signal);
 	console.log(`Server address to paste into Obsidian: ${runtime.origin}\nInternal listener (diagnostics only): ${host}:${port}\nData: ${runtime.dataDir}\nAdd a device without restarting: ${pairCommand(docker)}\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Press Ctrl+C to stop safely.'}`);
+	console.log(describeLastBackup(await readLastBackup(dataDir)));
 	if (origin.startsWith('https://')) resources.readiness = monitorPublicReadiness({ origin, instance, signal, onChange: readinessChanged });
 	if (remote) console.log(`${tailscale ? 'Tailscale Funnel is starting; the first time, approve Funnel at the link Tailscale prints. A new public name can take up to 10 minutes to resolve.' : 'Tunnel is starting; initial DNS/certificate propagation may take a few minutes.'}\nUse this HTTPS server address in Obsidian, then Copy setup link or Show QR code to enroll the PWA.`);
-	const result = await Promise.race([stopped.then(() => null), ...(tunnel ? [tunnel.exited] : [])]);
+	const result = await Promise.race([stopped.then(() => null), runtime.failed, ...(tunnel ? [tunnel.exited] : [])]);
 	if (result && !signal.aborted) throw new Error(tailscale
 		? `Tailscale Funnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check the Tailscale output above. On Linux, allow your user once with: sudo tailscale set --operator=$USER`
 		: `Cloudflare Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Crate is stopping too; check cloudflared output and restart.`);

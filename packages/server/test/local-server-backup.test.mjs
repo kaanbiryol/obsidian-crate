@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from '../src/local-server-backup.mjs';
+import { backupLocalServer, checkLocalUpgrade, readLastBackup, restoreLocalServer } from '../src/local-server-backup.mjs';
 import { issueLocalDevice, openLocalRuntime } from '../src/local-server-runtime.mjs';
 
 test('verified backup restores files, credentials and durable alarm storage into a fresh server', { timeout: 60_000 }, async () => {
@@ -15,6 +15,16 @@ test('verified backup restores files, credentials and durable alarm storage into
 	try {
 		runtime = await openLocalRuntime({ dataDir: source });
 		const credential = await issueLocalDevice(runtime.db, 'Test');
+		// Read before the synthetic reminder rows below: the first sync read initializes notification processing, which rebuilds projections from files.
+		const storageId = async () => {
+			const { protocol } = await (await runtime.mf.dispatchFetch('http://localhost:8787/.well-known/crate')).json();
+			const response = await runtime.mf.dispatchFetch('http://localhost:8787/sync/check?since=0', { headers: {
+				Authorization: `Bearer ${credential.token}`, 'X-Crate-Protocol': String(protocol.current) } });
+			assert.equal(response.status, 200, await response.clone().text());
+			return (await response.json()).storageId;
+		};
+		const sourceStorageId = await storageId();
+		assert.match(sourceStorageId, /^[a-f0-9]{32}$/);
 		await (await runtime.mf.getR2Bucket('BUCKET')).put('backup-test', 'persistent bytes');
 		const parser = await readFile(new URL('../../../src/cloudflare/worker/reminders/cache/types.ts', import.meta.url), 'utf8');
 		const parserVersion = Number(/REMINDER_CACHE_PARSER_VERSION = (\d+)/.exec(parser)[1]);
@@ -36,10 +46,16 @@ test('verified backup restores files, credentials and durable alarm storage into
 		// A crash can leave the control socket in the data directory; backups skip it.
 		const leftover = createServer();
 		await new Promise(resolve => leftover.listen(join(source, 'control.sock'), resolve));
-		try { await backupLocalServer(source, backup); }
+		let created;
+		try { created = await backupLocalServer(source, backup); }
 		finally { await new Promise(resolve => leftover.close(resolve)); }
 		await assert.rejects(backupLocalServer(source, backup), /already exists/);
+		// The source records its last backup for status reports; the backup itself does not carry it.
+		const recorded = await readLastBackup(source);
+		assert.equal(recorded?.output, created);
+		assert.equal(recorded?.createdAt, JSON.parse(await readFile(join(backup, 'backup.json'), 'utf8')).createdAt);
 		await restoreLocalServer(target, backup);
+		assert.equal(await readLastBackup(target), null);
 		runtime = await openLocalRuntime({ dataDir: target });
 		assert.equal(await (await (await runtime.mf.getR2Bucket('BUCKET')).get('backup-test')).text(), 'persistent bytes');
 		assert.equal((await runtime.mf.dispatchFetch('http://localhost:8787/health', { headers: { Authorization: `Bearer ${credential.token}` } })).status, 200);
@@ -48,6 +64,10 @@ test('verified backup restores files, credentials and durable alarm storage into
 			assert.ok(Date.now() < deadline, 'Restored dispatcher alarm must wake and finish its empty-recipient delivery');
 			await delay(100);
 		}
+		// Devices must see a restored server as another server, even once it catches up with them.
+		const restoredStorageId = await storageId();
+		assert.match(restoredStorageId, /^[a-f0-9]{32}$/);
+		assert.notEqual(restoredStorageId, sourceStorageId);
 		await runtime.close(); runtime = null;
 		await assert.rejects(restoreLocalServer(target, backup), /empty data directory/);
 		await writeFile(join(backup, 'data/server.json'), '{}');

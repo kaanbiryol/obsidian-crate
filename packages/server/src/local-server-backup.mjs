@@ -20,7 +20,8 @@ import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocal
  * @property {BackupFile[]} remote
  */
 
-const ephemeral = new Set(['server.lock', 'control.json', 'control.sock', 'status.json', '.DS_Store']);
+// A backup describes its own source, so the record of the last backup stays out of it.
+const ephemeral = new Set(['server.lock', 'control.json', 'control.sock', 'status.json', 'last-backup.json', '.DS_Store']);
 const inside = (/** @type {string} */ parent, /** @type {string} */ child) => { const path = relative(parent, child); return path === '' || (!path.startsWith('..') && !isAbsolute(path)); };
 /** @param {string} path */
 async function digest(path) {
@@ -84,10 +85,23 @@ export async function backupLocalServer(dataDir, output, alreadyLocked = false) 
 		// Re-read copied bytes before publishing a completed backup.
 		if (JSON.stringify(await inventory(join(staging, 'data'))) !== JSON.stringify(data)
 			|| JSON.stringify(await inventory(join(staging, 'remote'))) !== JSON.stringify(remote)) throw new Error('Backup verification failed. No completed backup was created.');
-		await writeFile(join(staging, 'backup.json'), JSON.stringify({ format: 1, createdAt: new Date().toISOString(), metadata, data, remote }), { mode: 0o600 });
+		const createdAt = new Date().toISOString();
+		await writeFile(join(staging, 'backup.json'), JSON.stringify({ format: 1, createdAt, metadata, data, remote }), { mode: 0o600 });
 		await rename(staging, output);
+		// Only a status report reads this; the completed backup stands even if recording it fails.
+		await writeFile(join(dataDir, 'last-backup.json'), `${JSON.stringify({ createdAt, output })}\n`, { mode: 0o600 })
+			.catch(error => console.warn(`Backup completed, but its time could not be recorded: ${error.message}`));
 		return output;
 	} finally { await rm(staging, { recursive: true, force: true }); await unlock(); }
+}
+
+/** The most recent verified backup of this data directory, or null if none was recorded.
+ * @param {string} dataDir @returns {Promise<{ createdAt: string, output: string } | null>} */
+export async function readLastBackup(dataDir) {
+	try {
+		const record = JSON.parse(await readFile(join(dataDir, 'last-backup.json'), 'utf8'));
+		return typeof record?.createdAt === 'string' && typeof record.output === 'string' ? { createdAt: record.createdAt, output: record.output } : null;
+	} catch { return null; }
 }
 
 /** @param {string} dataDir @param {string} backup */
@@ -117,7 +131,11 @@ export async function restoreLocalServer(dataDir, backup) {
 		await copyInventory(join(backup, 'data'), staging, manifest.data);
 		// Validate the restored database with alarms disabled before exposing it.
 		const verified = await openLocalRuntime({ dataDir: staging, administrative: true, handleSignals: false });
-		await verified.close();
+		// A restored server is another server to its devices, even once its changelog catches
+		// up with their cursors. The next sync read creates a new storage identity
+		// (STORAGE_ID_SQL in src/cloudflare/worker/sync/storage.ts).
+		try { await verified.db.prepare("DELETE FROM maintenance_state WHERE key = 'storage_id'").run(); }
+		finally { await verified.close(); }
 		const files = await inventory(staging);
 		await copyInventory(staging, dataDir, files.filter(file => file.path !== 'server.json'));
 		if (manifest.remote.length) {

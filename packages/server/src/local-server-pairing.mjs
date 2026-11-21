@@ -3,6 +3,7 @@ import { createServer, request as httpRequest } from 'node:http';
 import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readLastBackup } from './local-server-backup.mjs';
 import { issueLocalDevice, listLocalDevices, readResetGeneration, revokeLocalDevice } from './local-server-runtime.mjs';
 
 const hash = (/** @type {string} */ value) => createHash('sha256').update(value).digest('hex');
@@ -89,6 +90,10 @@ export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 		if (request.method === 'GET' && request.url === '/devices') {
 			try { sendJson(response, 200, { devices: await listLocalDevices(runtime.db) }); }
 			catch { sendJson(response, 500, { error: 'Could not list devices.' }); }
+			return;
+		}
+		if (request.method === 'GET' && request.url === '/status') {
+			sendJson(response, 200, { origin, uptimeSeconds: Math.round(process.uptime()), crashes: runtime.crashes, lastBackup: await readLastBackup(dataDir) });
 			return;
 		}
 		if (request.method === 'POST' && request.url === '/revoke') {
