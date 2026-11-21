@@ -30,7 +30,7 @@ function HighlightImage({ item, highlight, images }: { item: ReadingMetadata & {
 	}, [images, source, path, id]);
 	return url
 		? <img className="crate-reading-highlights__image" src={url} alt={highlight.text} referrerPolicy="no-referrer" loading="lazy" decoding="async" />
-		: <span className="crate-reading-highlights__image-placeholder"><ThemeIcon id="image" size="m" aria-hidden="true" /><span>{highlight.text || 'Image'}</span></span>;
+		: <span className="crate-reading-highlights__image-placeholder" role="img" aria-label={highlight.text || 'Image'}><ThemeIcon id="image" size="m" aria-hidden="true" /></span>;
 }
 
 function highlightDate(value: string): string {

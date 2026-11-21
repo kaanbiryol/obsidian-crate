@@ -21,7 +21,9 @@ follows the only image with that source, or the one at its offset when the sourc
 An image highlight whose image is gone goes to `highlight_recovery` when it has a note.
 In the reader, tapping an image offers **Highlight**; a highlighted image has a frame in
 the highlight colour and offers **Note** and **Delete highlight**. Highlights lists show
-the image as a thumbnail, loaded like the article's images, with its alt text below.
+the image as a square thumbnail, cropped from its top centre and loaded like the article's
+images, with its alt text below. An image that is loading or cannot load shows an image
+icon in the same square.
 
 Other selections that cannot safely take markers use `textAnchor: true`. This
 includes partial autolinks, escaped table cells, HTML, literal `==`, and selections
