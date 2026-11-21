@@ -121,3 +121,12 @@ it('bounds receipt cleanup, retains a monotonic floor and rolls back a failed pr
 	expect(await db.prepare("SELECT COUNT(*) AS count FROM operations WHERE kind = 'reminder'").first()).toEqual({ count: 0 });
 	expect((await beginReminderOperation(db, { operationId: createReminderOperationId(day) }, 'create') as Response).status).toBe(410);
 });
+
+it('publishes each retry floor once, not on every idle pass', async () => {
+	const { meterD1Usage } = await import('../d1/d1-usage');
+	await pruneOperationReceipts(db, false);
+	const meter = meterD1Usage(db);
+	await pruneOperationReceipts(meter.db, false);
+	expect(meter.usage.rowsWritten).toBe(0);
+	expect(await db.prepare("SELECT COUNT(*) AS n FROM maintenance_state WHERE key LIKE '%floor%'").first()).toMatchObject({ n: 2 });
+});

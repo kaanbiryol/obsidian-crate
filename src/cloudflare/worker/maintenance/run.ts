@@ -5,7 +5,7 @@ import { deploymentFenceHeld, pruneChangelog } from '../d1/db';
 import { drainObjectCleanupQueue, expireFileVersions } from './object-cleanup';
 import type { Env } from '../types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './database';
-import { pruneReminderOccurrences } from './reminder-history';
+import { pruneOrphanReminderCache, pruneReminderOccurrences } from './reminder-history';
 import { pruneOperationReceipts } from './operation-receipts';
 import { pruneFolderLabels } from '../encryption/folder-labels';
 import { wakeProjection } from '../coordinator/coordinator';
@@ -36,6 +36,7 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, db); }],
 		// Unbounded scans of retained history: once per episode, not on every follow-up pass.
 		['prune obsolete reminder occurrences', async () => { if (firstPass) await pruneReminderOccurrences(db); }],
+		['prune unused reminder cache', async () => { if (firstPass) await pruneOrphanReminderCache(db); }],
 		['prune expired operation receipts', bounded(() => pruneOperationReceipts(db, firstPass))],
 		['prune request limits', () => db.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(db)],

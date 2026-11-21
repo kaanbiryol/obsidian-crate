@@ -13,3 +13,18 @@ export async function pruneReminderOccurrences(db: D1Database): Promise<void> {
 		ORDER BY o.first_seen_at LIMIT 500
 	)`).run();
 }
+
+/** Rows a pass removes from the cache of folders nothing reads any more, about 4,000 row writes. */
+const ORPHAN_REMINDER_CACHE_BATCH = 2000;
+
+/** Parsed-note cache rows of a folder neither the reminder policy nor any credential
+ * names, such as the previous folder after the setting changes. The cache is rebuilt on
+ * demand, so removing a row only costs a re-parse. */
+export async function pruneOrphanReminderCache(db: D1Database): Promise<void> {
+	await db.prepare(`DELETE FROM reminder_file_cache WHERE rowid IN (
+		SELECT rowid FROM reminder_file_cache WHERE folder_path NOT IN (
+			SELECT folder_path FROM notification_policy
+			UNION SELECT folder_path FROM auth_tokens WHERE folder_path IS NOT NULL)
+		LIMIT ${ORPHAN_REMINDER_CACHE_BATCH}
+	)`).run();
+}

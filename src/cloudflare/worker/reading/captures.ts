@@ -14,6 +14,10 @@ import { publishReading } from '@/cloudflare/worker/coordinator/coordinator';
 
 /** Page fetches per job or capture; failed fetches and failed publications both count. */
 export const MAX_FETCH_ATTEMPTS = 3;
+/** After this many attempts, like an article job, a capture that still cannot publish
+ * retries hourly instead of every minute. */
+export const MAX_CAPTURE_ATTEMPTS = 8;
+const EXHAUSTED_CAPTURE_RETRY_MS = 60 * 60_000;
 
 export interface CapturePublication { captureId: string; generation: string; result: Publication['result']; resolvedUrl?: string }
 export interface PendingCapture { id: string; generation: string; url_identity: string; note: string; attempts: number; available_at: number }
@@ -52,7 +56,8 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
 	const capture = await env.DB.prepare('SELECT id, generation, note, attempts FROM reading_captures WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Pick<PendingCapture, 'id' | 'generation' | 'note' | 'attempts'>>();
 	if (!capture) return;
 	// Queued captures are listed in this order.
-	await env.DB.prepare('UPDATE reading_captures SET available_at=?, attempts=attempts+1 WHERE id=?').bind(Date.now() + 60_000, capture.id).run();
+	await env.DB.prepare(`UPDATE reading_captures SET available_at=CASE WHEN attempts+1>=${MAX_CAPTURE_ATTEMPTS} THEN ? ELSE ? END,
+		attempts=attempts+1 WHERE id=?`).bind(Date.now() + EXHAUSTED_CAPTURE_RETRY_MS, Date.now() + 60_000, capture.id).run();
 	await state.storage.setAlarm(Date.now() + 60_000);
 	let result: Publication['result'] = null, resolvedUrl: string | undefined;
 	// After its fetch attempts, a capture that still cannot publish retries as a bookmark only.

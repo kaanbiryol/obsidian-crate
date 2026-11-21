@@ -17,8 +17,9 @@ export async function pruneOperationReceipts(db: D1Database, identities = true):
 	const prefix = `${tag} || printf('%08d', ${OPERATION_FLOOR}) || '_'`;
 	const uploadPrefix = `${tag} || printf('%08d', ${UPLOAD_OPERATION_FLOOR}) || '_'`;
 	const expired = (kind: string, below: string) => `kind = '${kind}' AND operation_id >= ${tag} AND operation_id < ${below}`;
+	// A floor moves once a day; an unchanged one is not rewritten on every pass.
 	const publishFloor = (key: string, floor: string) => db.prepare(`INSERT INTO maintenance_state (key, value) VALUES ('${key}', ${floor})
-			ON CONFLICT(key) DO UPDATE SET value = excluded.value`);
+			ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE maintenance_state.value IS NOT excluded.value`);
 	const prune = (kind: string, below: string) => [
 		db.prepare(`DELETE FROM operations WHERE kind = '${kind}' AND operation_id IN (
 			SELECT operation_id FROM operations WHERE ${expired(kind, below)} ORDER BY operation_id LIMIT ${RECEIPT_BATCH})`),

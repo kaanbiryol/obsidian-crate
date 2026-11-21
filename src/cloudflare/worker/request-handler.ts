@@ -1,7 +1,7 @@
 import { handleReadingRoute } from './routes/reading';
 import { shortcutLaunchResponse, shortcutTransport } from './reading/shortcut-transport';
 import { ReadingError } from './reading/common';
-import { isD1DailyLimitError, withD1Usage } from './d1/d1-usage';
+import { bindingIdentity, isD1DailyLimitError, withD1Usage } from './d1/d1-usage';
 import { coordinatedNewFiles } from './sync/staging/bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
@@ -63,8 +63,8 @@ interface ResponseContext {
 }
 
 export async function fetchWorkerRequest(request: Request, env: Env, execution: WorkerExecution = { kind: 'public' }): Promise<Response> {
-	// Usage metering wraps the namespace per request; remember setup on the binding.
-	const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, execution, env.REMINDER_ALARMS));
+	// Usage metering wraps the namespace per request; remember setup on the binding it wraps.
+	const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, execution, bindingIdentity(env.REMINDER_ALARMS)));
 	return shortcutLaunchResponse(request, response, env.CRATE_DEPLOYMENT_FINGERPRINT);
 }
 

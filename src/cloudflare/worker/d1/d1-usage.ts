@@ -62,6 +62,15 @@ export function meterD1Usage(database: D1Database) {
 	return { db, usage, add };
 }
 
+/** The namespace each metered wrapper stands for. */
+const measuredNamespaces = new WeakMap<object, object>();
+
+/** The binding a metered wrapper stands for, so per-isolate caches keyed on a binding
+ * still hit when every request (and every Durable Object request) wraps it anew. */
+export function bindingIdentity<T extends object | undefined>(binding: T): T {
+	return (binding && measuredNamespaces.get(binding) as T | undefined) ?? binding;
+}
+
 /** Each invocation owns its meter; child request totals are included once. Alarms are separate. */
 export async function withD1Usage(env: Env, action: (env: Env) => Promise<Response>): Promise<Response> {
 	const meter = meterD1Usage(env.DB);
@@ -79,6 +88,7 @@ export async function withD1Usage(env: Env, action: (env: Env) => Promise<Respon
 			} };
 		},
 	} } : {}) };
+	if (namespace && measuredEnv.REMINDER_ALARMS) measuredNamespaces.set(measuredEnv.REMINDER_ALARMS, bindingIdentity(namespace));
 	const response = await action(measuredEnv);
 	const headers = new Headers(response.headers);
 	const { rowsRead, rowsWritten, complete, queries } = meter.usage;

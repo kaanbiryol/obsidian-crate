@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from '../test-support/reading-route-test-harness';
-import { publishCapture, runCapture, type PendingCapture } from './captures';
+import { MAX_CAPTURE_ATTEMPTS, publishCapture, runCapture, type PendingCapture } from './captures';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { parseReadingNote } from '@/reading/core/notes';
@@ -100,6 +100,19 @@ it('stops fetching a capture whose earlier attempts could not publish', async ()
 	expect(fetch).not.toHaveBeenCalled();
 	const file = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, `Reading/example.com - ${row.id.slice(0, 8)}.md`))!;
 	expect(parseReadingNote(file.content)?.extraction_status).toBe('unavailable');
+});
+
+it('retries a capture that cannot publish every minute, then hourly after its attempts', async () => {
+	const { row } = await capture();
+	const nextTry = async (attempts: number) => {
+		await env.DB.prepare('UPDATE reading_captures SET attempts=?, available_at=0 WHERE id=?').bind(attempts, row.id).run();
+		const put = vi.spyOn(env.BUCKET, 'put').mockImplementationOnce(() => Promise.reject(new Error('R2 unavailable')));
+		await expect(runCapture(env, { storage: { setAlarm: async () => {} } } as unknown as DurableObjectState, false)).rejects.toThrow();
+		put.mockRestore();
+		return (await env.DB.prepare('SELECT available_at FROM reading_captures WHERE id=?').bind(row.id).first<{ available_at: number }>())!.available_at - Date.now();
+	};
+	expect(await nextTry(MAX_CAPTURE_ATTEMPTS - 2)).toBeLessThanOrEqual(60_000);
+	expect(await nextTry(MAX_CAPTURE_ATTEMPTS - 1)).toBeGreaterThan(50 * 60_000);
 });
 
 it('publishes a video with metadata and its timestamp through the normal capture queue', async () => {

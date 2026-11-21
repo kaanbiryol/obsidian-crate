@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { pruneReminderOccurrences } from '../maintenance/reminder-history';
+import { pruneOrphanReminderCache, pruneReminderOccurrences } from '../maintenance/reminder-history';
 import { writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { handleNotificationPolicy } from '../notifications/policy';
 import { drainNotificationProjections } from '../notifications/projection';
@@ -60,4 +60,16 @@ it('does not rearm a forgotten occurrence when old Markdown is restored after cl
 	expect(await env.DB.prepare('SELECT 1 FROM reminder_projections WHERE due_at IS NOT NULL').first()).toBeNull();
 	const observed = await env.DB.prepare('SELECT first_seen_at FROM reminder_occurrences WHERE reminder_id = ?').bind(id).first<{ first_seen_at: number }>();
 	expect(observed!.first_seen_at).toBeGreaterThan(Date.parse(due));
+});
+
+it('removes cached notes of folders nothing reads any more', async () => {
+	await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
+	await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope, folder_path) VALUES ('web', 'hash', 'reminders', 'Shared')").run();
+	for (const folder of ['Reminders', 'Shared', 'Old']) {
+		await env.DB.prepare(`INSERT INTO reminder_file_cache (folder_path, file_path, file_hash, parser_version, reminders_json)
+			VALUES (?, ?, 'hash', 1, '[]')`).bind(folder, `${folder}/Inbox.md`).run();
+	}
+	await pruneOrphanReminderCache(env.DB);
+	const kept = await env.DB.prepare('SELECT folder_path FROM reminder_file_cache ORDER BY folder_path').all<{ folder_path: string }>();
+	expect(kept.results.map(row => row.folder_path)).toEqual(['Reminders', 'Shared']);
 });
