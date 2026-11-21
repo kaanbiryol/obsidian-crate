@@ -67,8 +67,9 @@ export async function startQuickTunnel({ command, port, signal, timeout = 60_000
  * @param {string} [options.name] Names the first device's pairing code.
  * @param {AbortSignal} [options.signal]
  * @param {(ready: boolean) => void} [options.onReadiness]
+ * @param {number} [options.maxFileBytes] Largest synced file; the default when unset.
  */
-export async function startQuickServer({ dataDir, port = 0, name = hostname().slice(0, 128), signal, onReadiness }) {
+export async function startQuickServer({ dataDir, port = 0, name = hostname().slice(0, 128), signal, onReadiness, maxFileBytes }) {
 	/** @type {import('./local-server-runtime.mjs').LocalRuntime | undefined} */
 	let runtime;
 	/** @type {import('./local-server-runtime.mjs').LocalRuntime | null | undefined} */
@@ -94,11 +95,11 @@ export async function startQuickServer({ dataDir, port = 0, name = hostname().sl
 		// Reject a bad or already-running data directory before any exposure.
 		runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
 		const command = await installCloudflared({ signal });
-		server = await listenLocalServer(() => active, { host: '127.0.0.1', port, instance, tunnel: 'cloudflare',
+		server = await listenLocalServer(() => active, { host: '127.0.0.1', port, instance, tunnel: 'cloudflare', maxFileBytes,
 			pairing: { exchange: code => pairing.exchange(code) } });
 		tunnel = await startQuickTunnel({ command, port: /** @type {import('node:net').AddressInfo} */ (server.address()).port, signal });
 		await runtime.close();
-		runtime = await openLocalRuntime({ dataDir, origin: tunnel.origin, handleSignals: false });
+		runtime = await openLocalRuntime({ dataDir, origin: tunnel.origin, handleSignals: false, maxFileBytes });
 		signal?.throwIfAborted();
 		/** @type {{ count: number }} */
 		const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();

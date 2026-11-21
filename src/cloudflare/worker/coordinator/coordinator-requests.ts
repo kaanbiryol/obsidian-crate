@@ -2,6 +2,7 @@ import { armNotificationCoordinator, PROJECTION_PARSER_VERSION_KEY } from '../no
 import { fetchWorkerRequest } from '../request-handler';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import type { Env } from '../types';
+import { maxFileBytes } from '../server/file-limit';
 
 import { armReadingCoordinator, publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
@@ -82,7 +83,7 @@ export async function handleCoordinatorRequest(
 		if (path === TRANSFER_PATHS.batchDownload && request.method === 'POST') return handleBatchDownload(request, env.BUCKET, env.DB);
 		if (path === TRANSFER_PATHS.importUpload && ['POST', 'PUT'].includes(request.method)) {
 			// One unpublished batch at a time bounds decoded attachment memory.
-			return uploadInitialFiles(request, env.BUCKET, env.DB);
+			return uploadInitialFiles(request, env.BUCKET, env.DB, maxFileBytes(env));
 		}
 		return await handleLockedCoordinatorRequest(request, state, env) ?? new Response('Not found', { status: 404 });
 	});

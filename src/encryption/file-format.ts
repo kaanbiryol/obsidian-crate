@@ -1,11 +1,19 @@
 import { isEncryptionId, validateBase64Url } from './encoding';
 import { MAX_FILE_METADATA_ENVELOPE_BYTES, MIN_FILE_METADATA_ENVELOPE_BYTES } from './file-metadata-envelope';
-import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
+import { MAX_CONFIGURABLE_FILE_BYTES, MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export const ENCRYPTED_FILE_CONTENT_TYPE = 'application/vnd.crate.encrypted-file';
 const ENCRYPTED_FILE_PREFIX = 'CRATE-E2EE/1\n';
 export const MAX_ENCRYPTED_FILE_BYTES = 38 * 1024 * 1024;
 export const MAX_ENCRYPTED_PUBLIC_DATA_BYTES = 2 * 1024 * 1024;
+
+/** The encrypted wire size of a plaintext limit: base64url ciphertext, scheduling data
+ * and framing. The default limit keeps its released 38 MiB. */
+export function encryptedFileLimit(maxFileBytes: number): number {
+	return Math.max(MAX_ENCRYPTED_FILE_BYTES, Math.ceil(maxFileBytes * 4 / 3) + MAX_ENCRYPTED_PUBLIC_DATA_BYTES + 64 * 1024);
+}
+/** The largest encrypted file any server may allow. */
+export const MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES = encryptedFileLimit(MAX_CONFIGURABLE_FILE_BYTES);
 
 /** This descriptor contains no plaintext content digest or decryption key. It seals
  * `metadata` as the compact envelope in `file-metadata-envelope.ts`. */
@@ -39,12 +47,12 @@ function isCompactMetadata(value: string): boolean {
 	try { return validateBase64Url(value, MAX_FILE_METADATA_ENVELOPE_BYTES) >= MIN_FILE_METADATA_ENVELOPE_BYTES; } catch { return false; }
 }
 
-export function encodeEncryptedFile(packet: EncryptedFilePacket): Uint8Array<ArrayBuffer> {
+export function encodeEncryptedFile(packet: EncryptedFilePacket, maxBytes = MAX_ENCRYPTED_FILE_BYTES): Uint8Array<ArrayBuffer> {
 	validateFileDescriptor(packet.descriptor);
 	validatePublicData(packet.publicData);
 	const bytes = new TextEncoder().encode(ENCRYPTED_FILE_PREFIX
 		+ JSON.stringify({ descriptor: packet.descriptor, publicData: packet.publicData }) + '\n' + packet.ciphertext);
-	if (bytes.length > MAX_ENCRYPTED_FILE_BYTES) throw new Error('Encrypted file exceeds its transport limit');
+	if (bytes.length > maxBytes) throw new Error('Encrypted file exceeds its transport limit');
 	return bytes;
 }
 
@@ -66,8 +74,8 @@ export function isEncryptedFile(bytes: Uint8Array | string): boolean {
 
 /** Server-side parsing validates framing only. It cannot establish that a
  * client's scheduling projection describes its encrypted Markdown correctly. */
-export function parseEncryptedFile(bytes: Uint8Array | string): EncryptedFilePacket {
-	if ((typeof bytes === 'string' ? bytes.length : bytes.byteLength) > MAX_ENCRYPTED_FILE_BYTES) throw new Error('Encrypted file exceeds its transport limit');
+export function parseEncryptedFile(bytes: Uint8Array | string, maxBytes = MAX_ENCRYPTED_FILE_BYTES): EncryptedFilePacket {
+	if ((typeof bytes === 'string' ? bytes.length : bytes.byteLength) > maxBytes) throw new Error('Encrypted file exceeds its transport limit');
 	const text = typeof bytes === 'string' ? bytes : new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 	if (!text.startsWith(ENCRYPTED_FILE_PREFIX)) throw new Error('Unsupported encrypted file format');
 	// Keep the large opaque ciphertext out of JSON.parse. The Worker can inspect
@@ -85,8 +93,8 @@ export function parseEncryptedFile(bytes: Uint8Array | string): EncryptedFilePac
 	return { descriptor: value.descriptor, ciphertext, publicData: value.publicData };
 }
 
-export function fileTransportLimit(contentType: string | undefined): number {
-	return contentType === ENCRYPTED_FILE_CONTENT_TYPE ? MAX_ENCRYPTED_FILE_BYTES : MAX_FILE_SIZE_BYTES;
+export function fileTransportLimit(contentType: string | undefined, maxFileBytes = MAX_FILE_SIZE_BYTES): number {
+	return contentType === ENCRYPTED_FILE_CONTENT_TYPE ? encryptedFileLimit(maxFileBytes) : maxFileBytes;
 }
 
 function validatePublicData(value: unknown): void {

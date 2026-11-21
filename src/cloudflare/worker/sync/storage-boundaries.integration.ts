@@ -1,12 +1,12 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
-import { MAX_FILE_SIZE_BYTES } from '../../../protocol/sync-limits';
+import { ADVERTISED_FILE_LIMIT_PROTOCOL, CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
+import { formatFileLimit, MAX_FILE_SIZE_BYTES } from '../../../protocol/sync-limits';
 import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => {
@@ -75,4 +75,51 @@ it('preserves the prior live object and checkpoint metadata when an R2 write fai
 	expect(await liveFile()).toEqual(before);
 	expect(await (await request('/sync/download?path=attachment.bin')).text()).toBe('preserved');
 	expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM changelog').first<{ n: number }>())!.n).toBe(1);
+});
+
+describe('a self-hosted server with a raised file limit', () => {
+	const limit = MAX_FILE_SIZE_BYTES + 5 * 1024 * 1024;
+	// Transfer objects read the binding from the shared environment, as a deployment does.
+	beforeEach(() => { (env as { CRATE_MAX_FILE_BYTES?: string }).CRATE_MAX_FILE_BYTES = String(limit); });
+	afterEach(() => { delete (env as { CRATE_MAX_FILE_BYTES?: string }).CRATE_MAX_FILE_BYTES; });
+	const raised = () => env;
+	const send = (route: string, init: RequestInit = {}, protocol = CRATE_PLUGIN_PROTOCOL.current) => worker.fetch(new Request(`https://boundaries.test${route}`, { ...init, headers: {
+		Authorization: 'Bearer boundary-token', 'X-Crate-Protocol': String(protocol), ...init.headers,
+	} }), raised());
+	const upload = (body: BodyInit, headers: Record<string, string>, protocol?: number) => send('/sync/upload?path=attachment.bin', { method: 'PUT', body,
+		headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', ...headers } }, protocol);
+
+	it('advertises its limit and refuses clients that predate it', async () => {
+		const info = await (await send('/.well-known/crate')).json() as { limits: unknown; protocol: unknown };
+		expect(info.limits).toEqual({ maxFileBytes: limit });
+		expect(info.protocol).toEqual({ current: CRATE_PLUGIN_PROTOCOL.current, oldestCompatible: ADVERTISED_FILE_LIMIT_PROTOCOL });
+		const old = await upload('old client', {}, 1);
+		expect(old.status).toBe(428);
+		expect(await liveFile()).toBeNull();
+	});
+
+	it('round-trips a file above the default limit and refuses one byte over its own', { timeout: 120_000 }, async () => {
+		const content = new Uint8Array(limit);
+		content[0] = 7; content[limit - 1] = 9;
+		const hash = await sha256Hex(content);
+		expect((await upload(content, { 'X-File-Size': String(limit), 'X-File-Hash': hash })).status).toBe(200);
+		expect(await liveFile()).toMatchObject({ hash, size: limit });
+		const downloaded = await send('/sync/download?path=attachment.bin');
+		expect(await sha256Hex(await downloaded.arrayBuffer())).toBe(hash);
+		const over = await send('/sync/upload?path=other.bin', { method: 'PUT', body: 'x',
+			headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', 'X-File-Size': String(limit + 1) } });
+		expect(over.status).toBe(413);
+		expect(await over.json()).toEqual({ error: `File exceeds ${formatFileLimit(limit)} limit` });
+	});
+});
+
+it('keeps the default limit and protocol range without the self-hosted binding', async () => {
+	const info = await (await request('/.well-known/crate')).json() as { limits: unknown; protocol: unknown };
+	expect(info.limits).toEqual({ maxFileBytes: MAX_FILE_SIZE_BYTES });
+	expect(info.protocol).toEqual(CRATE_PLUGIN_PROTOCOL);
+	const over = await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: 'x',
+		headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', 'X-File-Size': String(MAX_FILE_SIZE_BYTES + 1) } });
+	expect(over.status).toBe(413);
+	expect((await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: 'protocol 1',
+		headers: { 'X-Crate-Protocol': '1', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent' } })).status).toBe(200);
 });

@@ -49,9 +49,11 @@ export function createEngineHistory(context: EngineHistoryContext) {
 			// Read actual vault contents, including hidden configuration and unsynced
 			// edits. The sync manifest only describes the last acknowledged state.
 			const files: Record<string, FileEntry> = Object.create(null) as Record<string, FileEntry>;
+			await context.api.refreshFileLimit();
+			const limit = context.api.fileLimit();
 			for (const file of await getAllVaultFiles(context.vault, context.shouldIgnore, verify)) {
 				verify();
-				const entry = await readLocalFileEntry(context.vault, file.path);
+				const entry = await readLocalFileEntry(context.vault, file.path, limit);
 				verify();
 				if (!entry) throw new Error(`${file.path} changed while checking the vault. Refresh the comparison.`);
 				files[file.path] = entry;

@@ -41,7 +41,7 @@ async function harness(initial: Record<string, string>, historical: Record<strin
 		trash: (file: { path: string }) => trash(file.path),
 	};
 	const remote = await metadata(server), target = await metadata(historical);
-	const api = { getManifest: vi.fn(async () => ({ version: 1, files: remote })) };
+	const api = { getManifest: vi.fn(async () => ({ version: 1, files: remote })), refreshFileLimit: vi.fn(async () => {}), fileLimit: () => 25 * 1024 * 1024 };
 	const expired = new Set<string>();
 	const readTarget = vi.fn(async (path: string, _file: FileEntry) => {
 		if (expired.has(path)) throw new HistoryVersionUnavailableError(path);

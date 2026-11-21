@@ -43,6 +43,7 @@ function createContext(options: {
 		deleteRemoteFiles: vi.fn<SyncWorkflowContext['deleteRemoteFiles']>(async () => []),
 		processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 		prepareFullSyncUpload: vi.fn(options.prepareFullSyncUpload ?? (async () => ({ path: 'notes/a.md', content: new ArrayBuffer(5), hash: 'local-hash', size: 5 }))),
+		maxFileBytes: () => 25 * 1024 * 1024,
 		uploadPreparedFiles: vi.fn<SyncWorkflowContext['uploadPreparedFiles']>(async () => {}),
 		parallelDownloadAndSaveFiles: vi.fn(async () => {}),
 		getLocalManifestEntry: vi.fn((path: string) => localFiles[path]),
@@ -67,6 +68,7 @@ function createContext(options: {
 		deleteRemoteFiles: spies.deleteRemoteFiles,
 		parallelDownloadAndSaveFiles: spies.parallelDownloadAndSaveFiles,
 		prepareFullSyncUpload: spies.prepareFullSyncUpload,
+		maxFileBytes: () => 25 * 1024 * 1024,
 		uploadPreparedFiles: spies.uploadPreparedFiles,
 		localManifest: {
 			getEntry: spies.getLocalManifestEntry,

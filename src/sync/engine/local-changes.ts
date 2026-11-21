@@ -24,6 +24,10 @@ interface LocalChangeDependencies {
 	getState: () => SyncState;
 	updateState: (updates: Partial<SyncState>) => void;
 	apiConfigured: () => boolean;
+	/** The largest file this device syncs, as of the server's last reply. */
+	fileLimit: () => number;
+	/** Reads the server's limit when this connection has not yet. */
+	refreshFileLimit: () => Promise<void>;
 	hasPendingRestores: () => boolean;
 	restorePendingKeys: (keys: PendingKey[]) => void;
 	/** A check stays current until sync activity starts. */
@@ -57,13 +61,20 @@ export class LocalChangeDetection {
 	}
 
 	hasUnsyncedChanges(): Promise<boolean> {
-		return this.d.trackWork(() => hasLocalFileChanges(
+		return this.d.trackWork(async () => hasLocalFileChanges(
 			this.d.vault,
 			this.d.manifest,
 			this.d.shouldIgnore,
+			await this.knownFileLimit(),
 			files => this.verifyContent(files),
 			() => this.d.lifecycle.abortSignal.throwIfAborted(),
 		));
+	}
+
+	/** The server's limit, or the last one known while it cannot be reached, as when offline. */
+	private async knownFileLimit(): Promise<number> {
+		try { await this.d.refreshFileLimit(); } catch { /* The limit stays at its last value. */ }
+		return this.d.fileLimit();
 	}
 
 	/** While automatic sync is off, surface same-metadata edits as pending changes. */
@@ -108,6 +119,7 @@ export class LocalChangeDetection {
 					signal: this.d.lifecycle.abortSignal,
 					verifyContent: files => this.verifyContent(files),
 					runConcurrent: (tasks, concurrency) => this.d.lifecycle.runConcurrent(tasks, concurrency),
+					maxFileBytes: await this.knownFileLimit(),
 				}, PREPARE_CONCURRENCY);
 				if (activityCurrent() && !this.d.getSettings().automaticSync) {
 					this.d.restorePendingKeys(paths);

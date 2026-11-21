@@ -33,6 +33,7 @@ export interface QueueFlushBatch {
 export interface QueueFlushContext extends WorkflowCompletionContext {
 	finishInitialSetup(): Promise<void>;
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
+	maxFileBytes(): number;
 	deleteRemoteFiles: DeleteRemoteFiles;
 	recoverUploads(): Promise<void>;
 	getQueuedKeyCount(): number;

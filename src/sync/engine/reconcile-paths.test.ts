@@ -57,6 +57,7 @@ async function createHarness(options: {
 		save: vi.fn(async () => {}),
 	};
 	const context: TargetedReconcileContext = {
+		maxFileBytes: () => 25 * 1024 * 1024,
 		vault: vault as never,
 		deleteRemoteFiles: vi.fn(async () => []),
 		localManifest,

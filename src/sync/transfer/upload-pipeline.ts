@@ -1,11 +1,13 @@
 import type { SyncResult, SyncWork } from '../types';
 import type { PreparedUpload } from './types';
-import { getBatchUploadConcurrency, pipelineUploadChunks } from './budget';
+import { getBatchUploadConcurrency, getTransferBudgetBytes, pipelineUploadChunks } from './budget';
 import { BATCH_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import type { UploadPreparedFilesOptions } from './upload';
 
 interface UploadPipelineContext {
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
+	/** The largest file this device syncs, which sizes the preparation budget. */
+	maxFileBytes(): number;
 }
 
 export interface UploadPipelineOptions<T> extends Pick<UploadPreparedFilesOptions, 'retry' | 'onFailure' | 'onVersionConflicts'> {
@@ -32,9 +34,10 @@ export async function uploadPipelined<T>(
 	options: UploadPipelineOptions<T>,
 ): Promise<void> {
 	let processed = 0;
+	const maxFileBytes = context.maxFileBytes();
 	const report = () => options.reportWork?.({ phase: 'uploading', current: processed, total: items.length });
 	// One chunk fills every batch request slot; the byte budget still bounds memory.
-	for await (const chunk of pipelineUploadChunks(items, item => options.prepare(item), undefined, getBatchUploadConcurrency() * BATCH_UPLOAD_MAX_FILES)) {
+	for await (const chunk of pipelineUploadChunks(items, item => options.prepare(item), getTransferBudgetBytes(maxFileBytes), getBatchUploadConcurrency() * BATCH_UPLOAD_MAX_FILES, maxFileBytes)) {
 		options.beforeChunk?.(chunk);
 		report();
 		let reported = 0;

@@ -15,6 +15,7 @@ export async function findStartupPendingPaths(context: {
 	signal: AbortSignal;
 	verifyContent(files: VaultFile[]): Promise<unknown>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
+	maxFileBytes: number;
 }, concurrency: number): Promise<string[]> {
 	const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.signal.throwIfAborted());
 	// The rotating check marks same-metadata edits unverified, so the metadata
@@ -24,7 +25,7 @@ export async function findStartupPendingPaths(context: {
 	const changes = await context.runConcurrent(files.map(file => async () => {
 		context.signal.throwIfAborted();
 		const entry = getPathEntry(context.baseline, file.path);
-		if (isOversizedSyncFile(file)) return null;
+		if (isOversizedSyncFile(file, context.maxFileBytes)) return null;
 		if (!entry) return pendingChangeKey('upload', file.path);
 		if (!hasLocalMetadataChange(file, entry)) return null;
 		const hash = await sha256Hex(await context.vault.adapter.readBinary(file.path));

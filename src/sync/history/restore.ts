@@ -2,7 +2,6 @@ import type { Vault } from 'obsidian';
 import { HistoryVersionUnavailableError } from './source';
 import type { FileEntry } from '../../protocol/sync-types';
 import type { LocalManifestView } from '../manifest/manifest';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { assertPortablePaths } from '../../protocol/portable-path';
 import type { SyncApiClient } from '../worker-api/client';
 import { getAllVaultFiles } from '../local/file-discovery';
@@ -25,7 +24,7 @@ export interface HistoryRestoreReview {
 }
 interface Context {
 	vault: Vault;
-	api: Pick<SyncApiClient, 'getManifest'>;
+	api: Pick<SyncApiClient, 'getManifest' | 'refreshFileLimit' | 'fileLimit'>;
 	baseline: LocalManifestView['files'];
 	target: Files;
 	recoveryRoot: string;
@@ -45,9 +44,11 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 	assertPortablePaths(Object.keys(target));
 	for (const path of Object.keys(target)) assertLocalSyncPath(path);
 	context.verify();
+	await api.refreshFileLimit();
+	const limit = api.fileLimit();
 	const remote = filter((await api.getManifest()).files);
 	if (!sameFiles(remote, filter(context.baseline), true)) throw new Error('Run Sync now before returning to this state so all current server changes are included.');
-	const local = await scanLocal(context);
+	const local = await scanLocal(context, limit);
 	const paths = [...new Set([...Object.keys(target), ...Object.keys(local), ...Object.keys(remote)])].sort();
 	const items: HistoryRestoreItem[] = paths.filter(path => local[path]?.hash !== target[path]?.hash || remote[path]?.hash !== target[path]?.hash).map(path => ({
 		path, action: !target[path] ? 'remove' : local[path] ? 'revert' : 'restore',
@@ -59,7 +60,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 	for (const item of items) {
 		const wanted = target[item.path];
 		if (!wanted) continue;
-		if (wanted.size > MAX_FILE_SIZE_BYTES) throw new Error(`${item.path}: file is too large to restore.`);
+		if (wanted.size > limit) throw new Error(`${item.path}: file is too large to restore.`);
 		sources.set(item.path, local[item.path]?.hash === wanted.hash
 			? () => vault.adapter.readBinary(item.path)
 			: () => context.readTarget(item.path, wanted));
@@ -78,7 +79,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 	const verify = async () => {
 		context.verify();
 		if (!sameFiles(remote, filter((await api.getManifest()).files), true)
-			|| !sameFiles(local, await scanLocal(context))) throw new Error('Files changed after this preview. Review the restore again.');
+			|| !sameFiles(local, await scanLocal(context, limit))) throw new Error('Files changed after this preview. Review the restore again.');
 		context.verify();
 	};
 	return {
@@ -95,7 +96,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 		},
 		verifySynced: async () => {
 			context.verify();
-			if (!sameFiles(expectedFiles(), filter((await api.getManifest()).files)) || !sameFiles(expectedFiles(), await scanLocal(context))) {
+			if (!sameFiles(expectedFiles(), filter((await api.getManifest()).files)) || !sameFiles(expectedFiles(), await scanLocal(context, limit))) {
 				throw new Error('Files changed during the final sync. Automatic sync is off; review the remaining changes before continuing.');
 			}
 			context.verify();
@@ -126,11 +127,11 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 					const current = local[item.path];
 					if (current) {
 						entry.original = `${folder}/${index}.original`;
-						await stage(vault, entry.original, await vault.adapter.readBinary(item.path), current.hash);
+						await stage(vault, entry.original, await vault.adapter.readBinary(item.path), current.hash, limit);
 					}
 					if (wanted) {
 						entry.target = `${folder}/${index}.target`;
-						await stage(vault, entry.target, content!, wanted.hash);
+						await stage(vault, entry.target, content!, wanted.hash, limit);
 					}
 					staged.set(item.path, entry);
 				}
@@ -152,7 +153,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 				for (const item of [...restored].sort((a, b) => Number(b.action === 'remove') - Number(a.action === 'remove'))) {
 					context.verify();
 					const originalHash = local[item.path]?.hash ?? null;
-					if ((await readLocalFileEntry(vault, item.path))?.hash !== local[item.path]?.hash) throw new Error(`${item.path} changed. Its new contents were kept.`);
+					if ((await readLocalFileEntry(vault, item.path, limit))?.hash !== local[item.path]?.hash) throw new Error(`${item.path} changed. Its new contents were kept.`);
 					if (item.action === 'remove') {
 						const outcome = await deletePathLocallyIfUnchanged({ vault }, item.path, originalHash);
 						if (outcome.status === 'changed') throw new Error(`${item.path} changed. Its new contents were kept.`);
@@ -173,7 +174,7 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 					}
 					context.applied(item.path, item.action === 'remove');
 				}
-				if (!sameFiles(expectedFiles(), await scanLocal(context))) throw new Error('The vault changed during restore. Review the remaining changes.');
+				if (!sameFiles(expectedFiles(), await scanLocal(context, limit))) throw new Error('The vault changed during restore. Review the remaining changes.');
 			} catch (error) {
 				throw new Error(`${error instanceof Error ? error.message : 'Restore interrupted.'} Some files may already be restored. Automatic sync is off; review this checkpoint again to finish. Recovery copies: ${folder}`);
 			}
@@ -182,11 +183,11 @@ export async function createHistoryRestore(context: Context): Promise<HistoryRes
 	};
 }
 
-async function scanLocal(context: Context): Promise<Files> {
+async function scanLocal(context: Context, limit: number): Promise<Files> {
 	const files: Files = Object.create(null) as Files;
 	for (const file of await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.verify())) {
 		context.verify();
-		const entry = await readLocalFileEntry(context.vault, file.path);
+		const entry = await readLocalFileEntry(context.vault, file.path, limit);
 		if (!entry) throw new Error(`${file.path} changed while checking the vault. Review again.`);
 		files[file.path] = entry;
 	}
@@ -199,8 +200,8 @@ function sameFiles(left: Files, right: Files, revisions = false): boolean {
 }
 
 
-async function stage(vault: Vault, path: string, bytes: ArrayBuffer, hash: string): Promise<void> {
-	if (bytes.byteLength > MAX_FILE_SIZE_BYTES || await sha256Hex(bytes) !== hash) throw new Error('A file changed or its saved version is damaged. No files were changed.');
+async function stage(vault: Vault, path: string, bytes: ArrayBuffer, hash: string, limit: number): Promise<void> {
+	if (bytes.byteLength > limit || await sha256Hex(bytes) !== hash) throw new Error('A file changed or its saved version is damaged. No files were changed.');
 	await vault.adapter.writeBinary(path, bytes);
 	if (await sha256Hex(await vault.adapter.readBinary(path)) !== hash) throw new Error('Could not verify a recovery copy. No files were changed.');
 }

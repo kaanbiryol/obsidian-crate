@@ -13,7 +13,7 @@ it.each(['notes/file.', 'notes/file ', 'notes/file:stream', 'notes/CON.md'])('re
  const exists = vi.spyOn(disk.vault.adapter, 'exists');
  const read = vi.spyOn(disk.vault.adapter, 'readBinary');
  const trash = vi.spyOn(disk.vault.adapter, 'trashLocal');
- await expect(readLocalFileEntry(disk.vault, path)).rejects.toThrow('on this Windows device');
+ await expect(readLocalFileEntry(disk.vault, path, 25 * 1024 * 1024)).rejects.toThrow('on this Windows device');
  await expect(deletePathLocallyIfUnchanged({ vault: disk.vault }, path, 'hash')).rejects.toThrow('on this Windows device');
  expect(exists).not.toHaveBeenCalled();
  expect(read).not.toHaveBeenCalled();

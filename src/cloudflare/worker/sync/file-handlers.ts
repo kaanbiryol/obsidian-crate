@@ -1,6 +1,7 @@
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { trackUploadLease } from './staging/upload-leases';
-import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit, MAX_ENCRYPTED_FILE_BYTES } from '../../../encryption/file-format';
+import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES } from '../../../encryption/file-format';
+import { formatFileLimit, MAX_CONFIGURABLE_FILE_BYTES, MAX_FILE_SIZE_BYTES } from '../../../protocol/sync-limits';
 import { EncryptionStateError, validateUploadEncryption } from '../encryption/state';
 import { beginUploadOperation } from './upload-operations';
 import { exactArrayBuffer, readLimitedRequestBody } from '../http/body-reader';
@@ -22,8 +23,8 @@ import { createManagedObjectKey } from '../../../protocol/storage-keys';
 import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERATION_HEADER, REVISION_HEADER } from '../../../protocol/http-headers';
 import { sha256Hex } from '../../../platform/sha256';
 
-export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, committers: UploadCommitters, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null): Promise<Response> {
-	const limit = fileTransportLimit(request.headers.get('Content-Type') ?? undefined);
+export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, committers: UploadCommitters, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null, maxFileBytes = MAX_FILE_SIZE_BYTES): Promise<Response> {
+	const limit = fileTransportLimit(request.headers.get('Content-Type') ?? undefined, maxFileBytes);
 	const url = new URL(request.url);
 	const rawPath = url.searchParams.get('path');
 	if (!rawPath) return corsResponse({ error: 'Path query parameter required' }, 400);
@@ -45,7 +46,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		return corsResponse({ error: 'Invalid Content-Length header' }, 400);
 	}
 	if ((declaredSize ?? 0) > limit || (contentLength ?? 0) > limit) {
-		return corsResponse({ error: 'File exceeds 25MB limit' }, 413);
+		return corsResponse({ error: `File exceeds ${formatFileLimit(maxFileBytes)} limit` }, 413);
 	}
 
 	const expectedHash = parseExpectedFileHash(request.headers.get(EXPECTED_HASH_HEADER));
@@ -145,8 +146,8 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 
 	const objectKey = storedFile?.storageKey ?? null;
 	if (!objectKey) return corsResponse({ error: 'File not found' }, 404);
-	if (storedFile && storedFile.size > MAX_ENCRYPTED_FILE_BYTES) {
-		return corsResponse({ error: 'File exceeds 25MB download limit' }, 413);
+	if (storedFile && storedFile.size > MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES) {
+		return corsResponse({ error: 'File exceeds the download limit' }, 413);
 	}
 
 	const obj = await bucket.get(objectKey);
@@ -156,8 +157,8 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 	if (storedFile && !storedObjectMatchesMetadata(obj, storedFile)) {
 		return corsResponse({ error: 'File content failed integrity validation' }, 503);
 	}
-	if (obj.size > fileTransportLimit(obj.httpMetadata?.contentType)) {
-		return corsResponse({ error: 'File exceeds 25MB download limit' }, 413);
+	if (obj.size > fileTransportLimit(obj.httpMetadata?.contentType, MAX_CONFIGURABLE_FILE_BYTES)) {
+		return corsResponse({ error: 'File exceeds the download limit' }, 413);
 	}
 
 	return new Response(obj.body, {

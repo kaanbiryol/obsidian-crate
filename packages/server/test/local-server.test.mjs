@@ -478,3 +478,20 @@ test('a damaged database stops startup before anything changes it', { timeout: 3
 		await rm(dataDir, { recursive: true, force: true });
 	}
 });
+
+test('a raised file limit reaches the Worker and its upload timeout', { timeout: 20_000 }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-test-'));
+	const maxFileBytes = 100 * 1024 * 1024;
+	const runtime = await openLocalRuntime({ dataDir, maxFileBytes });
+	const server = await listenLocalServer(runtime, { port: 0, maxFileBytes });
+	try {
+		const info = await (await runtime.mf.dispatchFetch('http://localhost:8787/.well-known/crate')).json();
+		assert.deepEqual(info.limits, { maxFileBytes });
+		assert.equal(info.protocol.oldestCompatible, 2);
+		assert.equal(server.requestTimeout, 400_000);
+	} finally {
+		await new Promise(resolve => server.close(resolve));
+		await runtime.close();
+		await rm(dataDir, { recursive: true, force: true });
+	}
+});

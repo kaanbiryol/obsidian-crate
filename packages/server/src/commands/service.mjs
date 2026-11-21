@@ -14,6 +14,6 @@ export async function service({ dataDir, values }) {
 	}
 	await access(join(dataDir, 'server.json')).catch(() => { throw new Error(`No Crate server data in ${dataDir}. Run setup first, then service.`); });
 	if (installKind() === 'npx') throw new Error('A service needs a lasting install. Run npm install -g @kaanbiryol/crate-server, then crate-server service.');
-	const { log } = await installService({ dataDir, keepAwake: Boolean(values['keep-awake']) });
+	const { log } = await installService({ dataDir, keepAwake: Boolean(values['keep-awake']), maxFileSize: values['max-file-size'] });
 	console.log(`Crate now starts when you log in and restarts after a failure.\nLog: ${log}\nStop it with the service --off command.${process.platform === 'linux' ? '\nTo keep it running after you log out, run once: sudo loginctl enable-linger "$USER"' : ''}`);
 }

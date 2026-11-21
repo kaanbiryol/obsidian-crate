@@ -22,6 +22,8 @@ import type { SharedSettings } from '../../protocol/shared-settings';
 import type { CrateServerInfo } from '../../protocol/server-info';
 import type { HostStatus } from '../../protocol/host-status';
 import { WorkerApiHttpClient } from './http';
+import { Platform } from 'obsidian';
+import { deviceFileLimit } from '../../protocol/sync-limits';
 import type { ApiHttpTransport } from './http';
 import type {
 	PushSubscriptionsResponse,
@@ -112,6 +114,17 @@ export class SyncApiClient {
 
 	setAbortSignal(signal: AbortSignal): void {
 		this.http.setAbortSignal(signal);
+	}
+
+	/** Reads the server's file limit once per connection, before a sync plans anything.
+	 * Later compatibility checks before changes keep it current. */
+	async refreshFileLimit(): Promise<void> {
+		if (!this.http.knowsServerFileLimit()) await this.http.getServerInfo();
+	}
+
+	/** The largest file this device syncs with this server. */
+	fileLimit(): number {
+		return deviceFileLimit(this.http.serverFileLimit(), Platform.isMobile);
 	}
 
 	isConfigured(): boolean {

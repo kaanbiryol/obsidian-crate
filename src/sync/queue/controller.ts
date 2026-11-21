@@ -10,7 +10,7 @@ import {
 /** The engine supplies the flush members; the controller adds its batch and scheduling ones. */
 export interface SyncQueueControllerContext extends Pick<QueueFlushContext,
 	| 'finishInitialSetup' | 'uploadPreparedFiles' | 'deleteRemoteFiles' | 'recoverUploads' | 'apiConfigured' | 'localManifest'
-	| 'updateState' | 'setLastSync' | 'reconnectNotice' | 'signal' | 'getStatus' | 'prepareUploadFromPath'> {
+	| 'updateState' | 'setLastSync' | 'reconnectNotice' | 'signal' | 'getStatus' | 'prepareUploadFromPath' | 'maxFileBytes'> {
 	automaticSyncEnabled?(): boolean;
 	shouldIgnore(path: string): boolean;
 	verifyPendingPaths(keys: string[], isCurrent: (key: string) => boolean, replayed?: ReadonlySet<string>): Promise<string[]>;

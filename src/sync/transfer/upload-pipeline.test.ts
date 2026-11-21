@@ -16,7 +16,7 @@ describe('upload pipeline', () => {
 			options.onProcessed?.(1);
 			events.push(`upload:${files.length}`);
 		});
-		await uploadPipelined({ uploadPreparedFiles }, ['a.md', 'b.md', 'c.md', 'skipped.md'], createEmptySyncResult(), {
+		await uploadPipelined({ uploadPreparedFiles, maxFileBytes: () => 25 * 1024 * 1024 }, ['a.md', 'b.md', 'c.md', 'skipped.md'], createEmptySyncResult(), {
 			prepare: async path => path === 'skipped.md' ? null : prepared(path),
 			retry: true,
 			beforeChunk: chunk => events.push(`before:${chunk.length}`),
@@ -31,7 +31,7 @@ describe('upload pipeline', () => {
 		const perChunk = getBatchUploadConcurrency() * BATCH_UPLOAD_MAX_FILES;
 		const uploadPreparedFiles = vi.fn(async (_files: PreparedUpload[], _result: unknown, _options: UploadPreparedFilesOptions) => {});
 		const paths = Array.from({ length: perChunk + 1 }, (_, index) => `${index}.md`);
-		await uploadPipelined({ uploadPreparedFiles }, paths, createEmptySyncResult(), { prepare: async path => prepared(path), retry: false });
+		await uploadPipelined({ uploadPreparedFiles, maxFileBytes: () => 25 * 1024 * 1024 }, paths, createEmptySyncResult(), { prepare: async path => prepared(path), retry: false });
 		expect(uploadPreparedFiles.mock.calls.map(([files]) => files.length)).toEqual([perChunk, 1]);
 	});
 
@@ -39,8 +39,8 @@ describe('upload pipeline', () => {
 		const onFailure = vi.fn();
 		const onVersionConflicts = vi.fn(async () => {});
 		const uploadPreparedFiles = vi.fn(async (_files: PreparedUpload[], _result: unknown, _options: UploadPreparedFilesOptions) => {});
-		await uploadPipelined({ uploadPreparedFiles }, ['a.md'], createEmptySyncResult(), { prepare: async path => prepared(path), retry: false });
-		await uploadPipelined({ uploadPreparedFiles }, ['a.md'], createEmptySyncResult(), { prepare: async path => prepared(path), retry: false, onFailure, onVersionConflicts });
+		await uploadPipelined({ uploadPreparedFiles, maxFileBytes: () => 25 * 1024 * 1024 }, ['a.md'], createEmptySyncResult(), { prepare: async path => prepared(path), retry: false });
+		await uploadPipelined({ uploadPreparedFiles, maxFileBytes: () => 25 * 1024 * 1024 }, ['a.md'], createEmptySyncResult(), { prepare: async path => prepared(path), retry: false, onFailure, onVersionConflicts });
 		expect(Object.keys(uploadPreparedFiles.mock.calls[0]![2]).sort()).toEqual(['onProcessed', 'retry']);
 		expect(uploadPreparedFiles.mock.calls[1]![2]).toMatchObject({ retry: false, onFailure, onVersionConflicts });
 	});

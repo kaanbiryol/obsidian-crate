@@ -28,14 +28,16 @@ export const bundleBudgets = {
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
 		// Every feature loads at startup. Reading article images (vault image loading,
-		// encrypted image saves, offline copies, image highlights) measure 1.205 MB raw / 395.2 KB gzip.
-		maxBytes: 1205500,
+		// encrypted image saves, offline copies, image highlights) and the advertised
+		// server file limit measure 1.2055 MB raw / 395.5 KB gzip.
+		maxBytes: 1205600,
 		maxGzipBytes: 395500,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
-		// Reading article images, offline copies and image highlights measure 1.925 MB raw / 636.0 KB gzip.
-		maxBytes: 1926000,
+		// Reading article images, offline copies, image highlights and the advertised
+		// server file limit measure 1.926 MB raw / 636.4 KB gzip.
+		maxBytes: 1926100,
 		maxGzipBytes: 636500,
 	}],
 };

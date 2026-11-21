@@ -2,9 +2,9 @@ import type { BatchUploadFile } from '../../protocol/sync-types';
 import { isRecord, isSha256Hex } from '../../platform/validation';
 import { isUploadSession } from '../diagnostics/upload-diagnostics';
 import { isSyncDate, isSyncPath, isSyncSequence } from '../../protocol/sync-validation';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { MAX_CONFIGURABLE_FILE_BYTES } from '../../protocol/sync-limits';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/platform/base64';
-import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES, parseEncryptedFile } from '../../encryption/file-format';
+import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES, parseEncryptedFile } from '../../encryption/file-format';
 import { sha256Hex } from '../../platform/sha256';
 import { isWirePath } from '../../protocol/encrypted-path';
 
@@ -36,7 +36,9 @@ export async function mergeUploadIntent(content: ArrayBuffer): Promise<UploadInt
 	return { kind: 'merge', preimage: { content: arrayBufferToBase64(content), hash: await sha256Hex(content), size: content.byteLength } };
 }
 
-async function validateBytes(value: unknown, limit = MAX_FILE_SIZE_BYTES, verifyContent = true): Promise<void> {
+/** Journal entries are checked against the largest limit any server allows: preparation and
+ * the server apply the exact one, and an entry must stay replayable if a limit is lowered. */
+async function validateBytes(value: unknown, limit = MAX_CONFIGURABLE_FILE_BYTES, verifyContent = true): Promise<void> {
 	if (!isRecord(value) || !isSha256Hex(value.hash) || !isSyncSequence(value.size) || value.size > limit
 		|| typeof value.content !== 'string' || value.content.length > Math.ceil(limit / 3) * 4
 		|| value.content.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value.content)) throw new Error('Invalid upload journal bytes');
@@ -51,15 +53,15 @@ export async function validateUploadIntent(value: unknown, sealedInMemory = fals
 	if (!isRecord(value) || !isSyncPath(value.path) || typeof value.contentType !== 'string'
 		|| !(value.expectedHash === null || isSha256Hex(value.expectedHash)) || !isRecord(value.intent)) throw new Error('Invalid upload journal intent');
 	if (!isRecord(value.origin) || !isUploadSession(value.origin.clientSession) || !isSyncDate(value.origin.at)) throw new Error('Invalid upload journal origin');
-	await validateBytes(value, MAX_FILE_SIZE_BYTES, !sealedInMemory);
+	await validateBytes(value, MAX_CONFIGURABLE_FILE_BYTES, !sealedInMemory);
 	if (value.encryptedWire !== undefined) {
 		const wire = value.encryptedWire;
 		if (!isRecord(wire) || wire.format !== 'crate-e2ee-v1' || wire.contentType !== ENCRYPTED_FILE_CONTENT_TYPE
 			|| typeof wire.generation !== 'number' || !Number.isSafeInteger(wire.generation) || wire.generation < 1
 			|| typeof wire.path !== 'string' || !isWirePath(wire.path)
 			|| !(wire.expectedHash === null || isSha256Hex(wire.expectedHash))) throw new Error('Invalid encrypted upload journal');
-		await validateBytes(wire, MAX_ENCRYPTED_FILE_BYTES, !sealedInMemory);
-		if (!sealedInMemory) parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content as string)));
+		await validateBytes(wire, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES, !sealedInMemory);
+		if (!sealedInMemory) parseEncryptedFile(new Uint8Array(base64ToArrayBuffer(wire.content as string)), MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES);
 	}
 	if (value.intent.kind === 'merge') await validateBytes(value.intent.preimage);
 	else if (value.intent.kind !== 'local') throw new Error('Unsupported upload journal intent');

@@ -40,7 +40,7 @@ async function harness(destinationUploaded: boolean, destinationExists = true) {
 			remote[diff.path] = { ...entry, revision: 'v2' };
 			manifest.setEntry(diff.path, remote[diff.path]!);
 		} else if (diff.action === 'delete') {
-			await assertRenamePreserved(manifest, vault, diff.path);
+			await assertRenamePreserved(manifest, vault, diff.path, 25 * 1024 * 1024);
 			// The destination receipt must be durable before deleting the source.
 			if (destinationExists) expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
 			deleted(diff.path);
@@ -53,10 +53,11 @@ async function harness(destinationUploaded: boolean, destinationExists = true) {
 		paths.flatMap(path => remote[path] ? [[path, remote[path]]] : []),
 	));
 	const context: TargetedReconcileContext = {
+		maxFileBytes: () => 25 * 1024 * 1024,
 		deleteRemoteFiles: (files, result, options) => deleteRemoteFiles({ vault, localManifest: manifest, files: {
 		batchDelete: async paths => {
 			for (const path of paths) {
-				await assertRenamePreserved(manifest, vault, path);
+				await assertRenamePreserved(manifest, vault, path, 25 * 1024 * 1024);
 				if (destinationExists) expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
 				deleted(path); delete remote[path];
 			}
@@ -110,7 +111,7 @@ describe('targeted rename reconciliation', () => {
 		expect(h.remote[h.source]).toBeUndefined();
 		expect(h.manifest.getRenameDependencies()).toEqual({});
 		// Later deletions are no longer held back by the cleared dependency.
-		await expect(assertRenamePreserved(h.manifest, {} as Vault, h.source)).resolves.toBeUndefined();
+		await expect(assertRenamePreserved(h.manifest, {} as Vault, h.source, 25 * 1024 * 1024)).resolves.toBeUndefined();
 	});
 
 	it.each([true, false])('deletes the old name of a case-only rename before uploading the new one (case-insensitive disk: %s)', async caseInsensitive => {
@@ -121,6 +122,7 @@ describe('targeted rename reconciliation', () => {
 		const calls: string[] = [];
 		const result = await reconcileQueuePaths({
 			vault: disk.vault,
+			maxFileBytes: () => 25 * 1024 * 1024,
 			localManifest: { getEntry: path => path === 'todo.md' ? entry : undefined, setEntry: vi.fn(), removeEntry: vi.fn(), save: async () => {} },
 			getRemoteEntries: async paths => Object.fromEntries(paths.includes('todo.md') ? [['todo.md', entry]] : []),
 			shouldIgnore: () => false,
@@ -147,9 +149,9 @@ describe('targeted rename reconciliation', () => {
 		const manifest = new LocalManifest({ vault }, { dir: '.obsidian/plugins/crate' });
 		manifest.setEntry('Dashboard.md', { hash: 'a'.repeat(64), size: 1, modified: new Date(1).toISOString(), revision: 'v1' });
 		manifest.recordRename('Dashboard.md', destination);
-		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md')).resolves.toBeUndefined();
+		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md', 25 * 1024 * 1024)).resolves.toBeUndefined();
 		manifest.recordRename(destination, 'Elsewhere.md');
-		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md')).rejects.toThrow('renamed file is uploaded');
+		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md', 25 * 1024 * 1024)).rejects.toThrow('renamed file is uploaded');
 	});
 
 	it('does not upload an unselected destination or bypass the deletion guard', async () => {

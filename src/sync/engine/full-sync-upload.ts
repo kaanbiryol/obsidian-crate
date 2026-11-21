@@ -18,6 +18,7 @@ export interface FullSyncUploadContext {
 	reconcileVersionConflicts?(keys: PendingKey[], result: SyncResult): Promise<void>;
 	localManifest: Pick<LocalManifest, 'getEntry'>;
 	signal: AbortSignal;
+	maxFileBytes(): number;
 }
 
 /** Bound retained bytes while using the same CAS/receipt validation as initial sync.

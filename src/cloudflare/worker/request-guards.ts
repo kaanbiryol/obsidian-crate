@@ -1,29 +1,30 @@
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '../../protocol/server-info';
+import { CRATE_PROTOCOL_HEADER, isCrateMutation, type CrateProtocolRange } from '../../protocol/server-info';
 import { ENCRYPTION_VAULT_HEADER, type EncryptionServerState } from '../../encryption/server-state';
 import { corsResponse } from './http/cors';
 import { EncryptionStateError, hasEncryptionAuthority } from './encryption/state';
 import { shortcutCompatibility, shortcutTransport, type ShortcutTransport } from './reading/shortcut-transport';
 import { ENCRYPTION_RESET_PATHS, KEYLESS_ENCRYPTED_READ_PATHS, PLAINTEXT_ONLY_PATHS } from './routes/policy';
 
-function hasCompatibleProtocol(request: Request): boolean {
+function hasCompatibleProtocol(request: Request, range: CrateProtocolRange): boolean {
 	const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
-	return Number.isInteger(protocol) && protocol >= CRATE_PLUGIN_PROTOCOL.oldestCompatible && protocol <= CRATE_PLUGIN_PROTOCOL.current;
+	return Number.isInteger(protocol) && protocol >= range.oldestCompatible && protocol <= range.current;
 }
 
 /** Runs after admission, before public grants or authenticated route handling. */
-export function checkRequestProtocol(request: Request, shortcut: ShortcutTransport | null): Response | null {
+/** `range` is this server's protocol range, which a raised file limit narrows. */
+export function checkRequestProtocol(request: Request, shortcut: ShortcutTransport | null, range: CrateProtocolRange): Response | null {
 	const path = new URL(request.url).pathname;
 	const method = request.method;
 	const compatibility = shortcut && shortcutCompatibility(shortcut);
 	if (compatibility) return corsResponse({ error: compatibility.message, code: compatibility.code }, compatibility.status);
-	if (isCrateMutation(path, method) && path !== '/notifications/share/reading' && !shortcut && !hasCompatibleProtocol(request)) {
-		return corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: CRATE_PLUGIN_PROTOCOL }, 428);
+	if (isCrateMutation(path, method) && path !== '/notifications/share/reading' && !shortcut && !hasCompatibleProtocol(request, range)) {
+		return corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: range }, 428);
 	}
 	return null;
 }
 
 /** Uses freshly authenticated state before any forwarding or route dispatch. */
-export function assertRequestEncryption(request: Request, encryption: EncryptionServerState | null): void {
+export function assertRequestEncryption(request: Request, encryption: EncryptionServerState | null, range: CrateProtocolRange): void {
 	const path = new URL(request.url).pathname;
 	const method = request.method;
 	const managesAccess = path === '/health' || path.startsWith('/encryption') || path.startsWith('/auth/');
@@ -41,7 +42,7 @@ export function assertRequestEncryption(request: Request, encryption: Encryption
 		return;
 	}
 	if (encryption && !(KEYLESS_ENCRYPTED_READ_PATHS.includes(path) && method === 'GET') && !managesAccess) {
-		if (!hasCompatibleProtocol(request)) throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
+		if (!hasCompatibleProtocol(request, range)) throw new EncryptionStateError('Update Crate before accessing this encrypted vault', 428);
 		if (!hasEncryptionAuthority(request, encryption)) {
 			throw new EncryptionStateError('Unlock this vault with its current encryption keys before syncing', 428);
 		}

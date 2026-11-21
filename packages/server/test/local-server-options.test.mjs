@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { resolveServerOrigin, resolveStartMode, validateCommandOptions } from '../src/local-server-options.mjs';
+import { readFile } from 'node:fs/promises';
+import { MAX_FILE_MB, MIN_FILE_MB, resolveMaxFileBytes, resolveServerOrigin, resolveStartMode, validateCommandOptions } from '../src/local-server-options.mjs';
 
 test('rejects unknown commands and conflicting options before opening data', () => {
 	const rejects = (positionals, values, message, environment) => assert.throws(() => validateCommandOptions(positionals, values, environment), { message });
@@ -59,4 +60,25 @@ test('resolves the public origin and keeps plain HTTP on loopback', () => {
 		{ message: 'Remote setup is incomplete. Run npm run server -- setup again.' });
 	assert.throws(() => resolveServerOrigin({ remote: null, tailscale: false, port: 8787, host: '0.0.0.0' }),
 		{ message: 'Listening beyond localhost requires --origin with the HTTPS address of your reverse proxy.' });
+});
+
+test('reads the file limit from --max-file-size or CRATE_MAX_FILE_SIZE_MB', () => {
+	const MB = 1024 * 1024;
+	assert.equal(resolveMaxFileBytes({}, {}), undefined);
+	assert.equal(resolveMaxFileBytes({ 'max-file-size': '100' }, {}), 100 * MB);
+	assert.equal(resolveMaxFileBytes({}, { CRATE_MAX_FILE_SIZE_MB: ' 128 ' }), 128 * MB);
+	assert.equal(resolveMaxFileBytes({ 'max-file-size': '30' }, { CRATE_MAX_FILE_SIZE_MB: '200' }), 30 * MB);
+	for (const value of ['24', '129', '1.5', 'big', '']) {
+		assert.throws(() => resolveMaxFileBytes({ 'max-file-size': value }, {}), { message: '--max-file-size must be a whole number of MB from 25 to 128.' });
+	}
+	assert.throws(() => validateCommandOptions(['backup'], { 'max-file-size': '100' }), { message: '--max-file-size belongs to start, setup and service.' });
+	assert.throws(() => validateCommandOptions(['start'], { 'max-file-size': '1000' }), { message: '--max-file-size must be a whole number of MB from 25 to 128.' });
+	assert.doesNotThrow(() => validateCommandOptions(['service'], { 'max-file-size': '100' }));
+});
+
+test('mirrors the file limits in src/protocol/sync-limits.ts', async () => {
+	const source = await readFile(new URL('../../../src/protocol/sync-limits.ts', import.meta.url), 'utf8');
+	const megabytes = name => Number(source.match(new RegExp(`export const ${name} = (\\d+) \\* 1024 \\* 1024;`))?.[1]);
+	assert.equal(MIN_FILE_MB, megabytes('MAX_FILE_SIZE_BYTES'));
+	assert.equal(MAX_FILE_MB, megabytes('MAX_CONFIGURABLE_FILE_BYTES'));
 });

@@ -34,8 +34,9 @@ export function clientAddress(request, tunnel) {
  * @param {{ exchange(code: unknown): Promise<{ token: string } | null> }} [options.pairing]
  * @param {string} [options.instance] Answers the public readiness probe.
  * @param {ManagedTunnel | null} [options.tunnel]
+ * @param {number} [options.maxFileBytes] Lengthens the request timeout for larger uploads.
  */
-export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 8787, pairing, instance, tunnel = null } = {}) {
+export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 8787, pairing, instance, tunnel = null, maxFileBytes = 0 } = {}) {
 	const server = createServer(async (request, response) => {
 		try {
 			const active = typeof runtime === 'function' ? runtime() : runtime;
@@ -96,7 +97,8 @@ export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 87
 			response.end(JSON.stringify({ error: 'Local server unavailable' }));
 		}
 	});
-	server.requestTimeout = 120_000;
+	// Two minutes, or long enough to receive the largest file at 256 KiB/s.
+	server.requestTimeout = Math.max(120_000, Math.ceil(maxFileBytes / (256 * 1024)) * 1000);
 	await /** @type {Promise<void>} */ (new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); }));
 	return server;
 }

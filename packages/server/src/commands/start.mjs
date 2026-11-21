@@ -7,7 +7,7 @@ import { hostname as computerName } from 'node:os';
 import { listenLocalServer } from '../local-server-http.mjs';
 import { crateCommand, installKind } from '../local-server-install.mjs';
 import { keepAwake } from '../local-server-service.mjs';
-import { resolveServerOrigin, resolveStartMode } from '../local-server-options.mjs';
+import { resolveMaxFileBytes, resolveServerOrigin, resolveStartMode } from '../local-server-options.mjs';
 import { createPairing, startLocalControl } from '../local-server-pairing.mjs';
 import { startQuickServer } from '../local-server-quick.mjs';
 import { monitorPublicReadiness } from '../local-server-readiness.mjs';
@@ -51,22 +51,27 @@ export async function start(context, resources) {
 	}
 	if (values['keep-awake']) console.log(keepAwake() ? 'Keeping this Mac awake while Crate runs.' : 'Keep-awake works on macOS only; keep this computer from sleeping in its power settings.');
 	const { quick, tailscale, port, host } = resolveStartMode(command, values, remote);
+	const maxFileBytes = resolveMaxFileBytes(values);
+	if (maxFileBytes) {
+		console.log(`Syncing files up to ${maxFileBytes / 1024 / 1024} MB. Every device needs the current Crate plugin; mobile devices skip files over 25 MB.`);
+		if (maxFileBytes > 100_000_000 && (quick || (remote && !tailscale))) console.log('Cloudflare Tunnel refuses uploads over 100 MB, so larger files fail to sync through it.');
+	}
 	if (quick) {
-		await serveQuickTunnel(context, port, resources);
+		await serveQuickTunnel(context, port, resources, maxFileBytes);
 		return;
 	}
 	if (command === 'setup') {
 		remote = tailscale ? await setupTailscale(context, remote, port, resources) : await setupNamedTunnel(context, remote, port, resources);
 	}
-	await serve(context, { remote, tailscale, port, host }, resources);
+	await serve(context, { remote, tailscale, port, host, maxFileBytes }, resources);
 }
 
-/** @param {CommandContext} context @param {number} port @param {CommandResources} resources */
-async function serveQuickTunnel({ command, values, dataDir, docker, signal, stopped }, port, resources) {
+/** @param {CommandContext} context @param {number} port @param {CommandResources} resources @param {number | undefined} maxFileBytes */
+async function serveQuickTunnel({ command, values, dataDir, docker, signal, stopped }, port, resources, maxFileBytes) {
 	console.log('Starting Crate with a Cloudflare Quick Tunnel. Files stay on this computer; public HTTPS traffic passes through Cloudflare.');
 	console.log('This temporary address changes on restart. Keep the server computer awake and online.');
 	if (command === 'setup') await buildIfSource(signal);
-	const quickServer = resources.quickServer = await startQuickServer({ dataDir, port, name: values.name, signal, onReadiness: readinessChanged });
+	const quickServer = resources.quickServer = await startQuickServer({ dataDir, port, name: values.name, signal, onReadiness: readinessChanged, maxFileBytes });
 	await saveQuickSettings(dataDir, port);
 	console.log(`Server address to paste into Obsidian: ${quickServer.runtime.origin}\nInternal listener (diagnostics only): 127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (quickServer.server.address()).port}\nData: ${dataDir}`);
 	console.log(`${describeLastBackup(await readLastBackup(dataDir))}\n${describeAutoBackup(await readAutoBackup(dataDir))}`);
@@ -79,16 +84,16 @@ async function serveQuickTunnel({ command, values, dataDir, docker, signal, stop
 
 /** Serves through the saved Tailscale Funnel or named tunnel, or locally without one.
  * @param {CommandContext} context
- * @param {{ remote: RemoteSettings | null, tailscale: boolean, port: number, host: string }} mode
+ * @param {{ remote: RemoteSettings | null, tailscale: boolean, port: number, host: string, maxFileBytes: number | undefined }} mode
  * @param {CommandResources} resources */
-async function serve({ values, dataDir, docker, signal, stopped }, { remote, tailscale, port, host }, resources) {
+async function serve({ values, dataDir, docker, signal, stopped }, { remote, tailscale, port, host, maxFileBytes }, resources) {
 	signal.throwIfAborted();
 	const origin = resolveServerOrigin({ remote, tailscale, origin: values.origin, port, host });
-	const runtime = resources.runtime = await openLocalRuntime({ dataDir, origin, administrative: false, handleSignals: false });
+	const runtime = resources.runtime = await openLocalRuntime({ dataDir, origin, administrative: false, handleSignals: false, maxFileBytes });
 	signal.throwIfAborted();
 	const instance = randomUUID();
 	const pairing = createPairing({ db: () => runtime.db });
-	resources.server = await listenLocalServer(runtime, { host, port, pairing, instance, tunnel: remote ? (tailscale ? 'tailscale' : 'cloudflare') : null });
+	resources.server = await listenLocalServer(runtime, { host, port, pairing, instance, tunnel: remote ? (tailscale ? 'tailscale' : 'cloudflare') : null, maxFileBytes });
 	const control = resources.control = await startLocalControl({ dataDir, pairing, origin, runtime });
 	/** @type {{ count: number }} */
 	const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();

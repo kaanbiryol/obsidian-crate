@@ -15,7 +15,8 @@ import { apiRoutePolicy } from './routes/policy';
 import { requestPlacement } from './routes/placement';
 import { armNotificationCoordinator } from './notifications/lifecycle';
 import { notificationArming } from './notifications/arming';
-import { isCrateMutation } from '../../protocol/server-info';
+import { isCrateMutation, serverProtocolRange } from '../../protocol/server-info';
+import { maxFileBytes } from './server/file-limit';
 import { corsHeaders, corsResponse } from './http/cors';
 import { authenticateWorkerRequest } from './auth/index';
 import { handleAuthenticatedRoute, handlePublicRoute, isAuthenticatedRouteAllowed } from './router';
@@ -102,7 +103,8 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	// remembered credential below run a second time for transfer requests.
 	const rateLimited = execution.kind === 'coordinator' ? null : await admitApiRequest(request, admissionDb, env.NOTIFICATION_REQUEST_LIMITER);
 	if (rateLimited) return rateLimited;
-	const protocolError = checkRequestProtocol(request, shortcut);
+	const protocolRange = serverProtocolRange(maxFileBytes(env));
+	const protocolError = checkRequestProtocol(request, shortcut, protocolRange);
 	if (protocolError) return protocolError;
 	// One-use public Reading grants must be redeemed under the coordinator.
 	// Their bounded pre-auth admission runs above; ordinary routes authenticate
@@ -147,7 +149,7 @@ async function routeWorkerRequest(request: Request, env: Env, admissionDb: D1Dat
 	if (!isAuthenticatedRouteAllowed(authResult.principal, path, method)) return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
 	const encryption = authResult.encryption ?? null;
 	context.encryptionState = encryption ? 'on' : 'off';
-	assertRequestEncryption(request, encryption);
+	assertRequestEncryption(request, encryption, protocolRange);
 	if (placement === 'forward-transfer' && routeExecution?.kind === 'transfer') {
 		// Stream without decoding or hashing on the public Worker's CPU budget.
 		// The transfer object reauthenticates after queuing, before reading bytes.

@@ -37,6 +37,7 @@ async function fixture(count = 1, size = 4) {
 		verifyContent: async () => false,
 		runConcurrent: <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 		encrypted: () => false,
+		maxFileBytes: () => 25 * 1024 * 1024,
 	};
 	return { files, adapter, manifest, hash, verify, app, plugin, planner, verifier, signal, progress, disk };
 }

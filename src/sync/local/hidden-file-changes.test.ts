@@ -43,7 +43,7 @@ describe('hasLocalFileChanges for hidden paths', () => {
 			extension: 'json',
 		}]);
 
-		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false))
+		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false, 25 * 1024 * 1024))
 			.resolves.toBe(false);
 	});
 
@@ -56,7 +56,7 @@ describe('hasLocalFileChanges for hidden paths', () => {
 			extension: 'json',
 		}]);
 
-		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false))
+		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false, 25 * 1024 * 1024))
 			.resolves.toBe(true);
 	});
 
@@ -65,7 +65,7 @@ describe('hasLocalFileChanges for hidden paths', () => {
 		harness.exists.mockResolvedValue(false);
 		getAllVaultFilesMock.mockResolvedValue([]);
 
-		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false))
+		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false, 25 * 1024 * 1024))
 			.resolves.toBe(true);
 	});
 
@@ -73,7 +73,7 @@ describe('hasLocalFileChanges for hidden paths', () => {
 		const harness = createHarness();
 		getAllVaultFilesMock.mockResolvedValue([]);
 
-		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false))
+		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false, 25 * 1024 * 1024))
 			.resolves.toBe(false);
 	});
 });
@@ -98,7 +98,7 @@ describe('hasLocalFileChanges', () => {
 			extension: 'md',
 		}]);
 
-		await expect(hasLocalFileChanges(vault, manifest, () => false)).resolves.toBe(true);
+		await expect(hasLocalFileChanges(vault, manifest, () => false, 25 * 1024 * 1024)).resolves.toBe(true);
 	});
 
 	it('detects a missing visible file', async () => {
@@ -111,7 +111,7 @@ describe('hasLocalFileChanges', () => {
 		};
 		getAllVaultFilesMock.mockResolvedValue([]);
 
-		await expect(hasLocalFileChanges(vault, manifest, () => false)).resolves.toBe(true);
+		await expect(hasLocalFileChanges(vault, manifest, () => false, 25 * 1024 * 1024)).resolves.toBe(true);
 	});
 
 	it('ignores oversized files that sync skips', async () => {
@@ -127,6 +127,6 @@ describe('hasLocalFileChanges', () => {
 			{ path: tracked, size: MAX_FILE_SIZE_BYTES + 1, mtime: 1_700_000_000_001, extension: 'md' },
 		]);
 
-		await expect(hasLocalFileChanges(vault, manifest, () => false)).resolves.toBe(false);
+		await expect(hasLocalFileChanges(vault, manifest, () => false, 25 * 1024 * 1024)).resolves.toBe(false);
 	});
 });

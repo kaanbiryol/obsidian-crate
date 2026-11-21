@@ -250,8 +250,8 @@ npm run server -- start --origin https://crate.example.com
 ```
 
 Configure the proxy to forward that hostname to `http://127.0.0.1:8787`. Forward
-all paths, methods, request bodies and response headers; allow at least 25 MiB
-uploads and two-minute requests. Do not cache authenticated API responses. Use
+all paths, methods, request bodies and response headers; allow uploads of at least
+25 MiB (or your [larger file limit](#sync-larger-files)) and two-minute requests. Do not cache authenticated API responses. Use
 `https://crate.example.com` in each device's **Server address**. That origin also
 serves the PWA.
 
@@ -525,6 +525,34 @@ tunnel in Cloudflare and recover its credentials or remove the unused tunnel
 before retrying. A missing credential for a saved tunnel stops startup; restore
 the remote directory from backup. Stopping the launcher does not delete the DNS
 record or tunnel.
+
+## Sync larger files
+
+Crate syncs files up to 25 MB by default, the same limit as a Cloudflare
+deployment. A self-hosted server can allow up to 128 MB per file:
+
+```sh
+crate-server start --max-file-size 100
+```
+
+`setup` and `service` take the same option, and `service` keeps it for later
+starts. With Docker, set `CRATE_MAX_FILE_SIZE_MB=100` before `docker compose up -d`.
+The startup output shows the active limit.
+
+- Every device must run a Crate plugin that knows about the limit. Older
+  plugins stop before making changes with **Update the Crate server before
+  making changes**, and cannot read an encrypted vault. The fix is to update
+  the plugin on that device, not the server.
+- Mobile devices keep the 25 MB limit. Larger files show as sync errors on a
+  phone and still sync between desktops.
+- Whole files are held in memory while they transfer, on the server and in
+  Obsidian, so allow for several times the limit in free memory.
+- Cloudflare Tunnel, including Quick Tunnel, rejects uploads over 100 MB. Use
+  Tailscale Funnel or your own reverse proxy for a larger limit, and allow that
+  body size in the proxy. Large uploads over a slow link need a longer request
+  timeout; Crate's own listener scales its timeout with the limit.
+- Lowering the limit later keeps larger files on the server and downloadable,
+  but devices stop uploading them.
 
 ## Start Crate automatically
 

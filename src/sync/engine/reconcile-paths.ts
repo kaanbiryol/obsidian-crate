@@ -42,6 +42,8 @@ export interface TargetedReconcileContext {
 	): Promise<DiffApplyOutcome>;
 	/** Receives each file's failure with its HTTP status, so the caller can classify the result. */
 	onFailure?(failure: MutationFailure): void;
+	/** The largest file this device syncs with its server. */
+	maxFileBytes(): number;
 }
 
 /** Reconcile selected files or queue paths that lost a compare-and-swap race. */
@@ -172,7 +174,7 @@ async function reconcile(state: ReconcileState, queueKey: string, mode: Reconcil
  * `classifyPath` decides; the mode only chooses when a decision runs. */
 async function attemptPath(state: ReconcileState, queueKey: string, path: string, mode: ReconcileMode, canRetry: boolean): Promise<AttemptStep> {
 	const { context, result } = state;
-	const localEntry = await readLocalFileEntry(context.vault, path);
+	const localEntry = await readLocalFileEntry(context.vault, path, context.maxFileBytes());
 	const remoteEntry = getPathEntry(state.remoteEntries, path);
 	const baseEntry = context.localManifest.getEntry(path);
 	const decision = classifyPath(path, localEntry, remoteEntry, baseEntry);

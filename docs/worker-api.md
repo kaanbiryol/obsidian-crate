@@ -4,7 +4,7 @@ Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the 
 
 Each route is declared once in `routes/policy.ts`, with its methods, token scopes and execution. `routes/<domain>.ts` dispatches that domain's paths to handlers and holds no SQL. Handlers and their SQL live in the feature folders, such as `reminders/handlers/` and `reading/`, and throw domain errors that the request handler maps to responses.
 
-App mutations require `X-Crate-Protocol: 1`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. The versioned native Shortcut transport has its own compatibility contract, described below. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics. Authenticated responses also carry `X-Crate-Encryption-State: on|off`; clients skip the `/encryption` probe before plaintext requests while it reports `off`, and the server still rejects plaintext into an encrypted vault with 428.
+App mutations require an `X-Crate-Protocol` the server accepts (1 or 2, or only 2 on a self-hosted server with a raised file limit); check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. The versioned native Shortcut transport has its own compatibility contract, described below. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics. Authenticated responses also carry `X-Crate-Encryption-State: on|off`; clients skip the `/encryption` probe before plaintext requests while it reports `off`, and the server still rejects plaintext into an encrypted vault with 428.
 
 ## Authentication
 
@@ -78,7 +78,7 @@ All sync routes require `vault`.
 | `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (limit 5000 per page) |
 | `GET` | `/sync/manifest?limit=<n>&after=<path>&snapshotSeq=<seq>` | Stable, cursor-paginated remote manifest |
 | `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths |
-| `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
+| `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB unless the server advertises more) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 32 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
@@ -178,7 +178,7 @@ These routes are answered by `routes/public.ts` before authentication.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/.well-known/crate` | Public service, version, protocol range, and capability metadata |
+| `GET` | `/.well-known/crate` | Public service, version, protocol range, capability metadata, and `limits.maxFileBytes` |
 | `GET` | `/` | Returns the same metadata as `/.well-known/crate` |
 | `GET` | `/notifications` | Serves the reminders PWA HTML |
 | `GET` | `/notifications/app.js` | Serves the bundled PWA client |
@@ -203,7 +203,7 @@ These routes are answered by `routes/public.ts` before authentication.
 - Query: `?path=<url-encoded-path>`
 - Headers: `X-File-Hash`, `X-File-Size`, `X-Crate-Expected-Hash`, `X-Crate-Upload-Operation`, `Content-Type`
 - `X-Crate-Expected-Hash` is the 64-character remote hash observed while planning, or `absent` for a new path
-- Body: raw binary, consumed incrementally with a hard 25 MB cap; oversized declared or chunked requests stop before the remainder is buffered
+- Body: raw binary, consumed incrementally with a hard cap at the server's file limit (25 MB by default, `limits.maxFileBytes` in `/.well-known/crate`); oversized declared or chunked requests stop before the remainder is buffered
 - Response: `{ success, path, hash, revision }`
 - A stale expected hash returns `409` with `{ success: false, path, error, code: "version_conflict", currentHash }` and does not replace the committed object
 - Persist the exact request and its server-dated operation ID before dispatch. Replaying it returns the original success or rejected precondition, including after deletion. Missing IDs receive 428; mismatched payloads receive 409 `operation_mismatch`; expired IDs without receipts receive 410 `operation_expired`. See [upload recovery](upload-recovery.md).
@@ -836,7 +836,7 @@ Uploads to an active encrypted vault validate both the encrypted content type an
 
 Single and batch uploads stream through the existing eight-object transfer pool, where hashing, envelope validation and storage use the Durable Object CPU allowance. Each object processes one upload at a time. The public Worker checks authorization before forwarding; the transfer executor repeats authentication after queuing and captures current encryption/reset authority before reading the body. Markdown publication still uses the separate notification coordinator. This applies to hosted and self-hosted deployments without a new binding or schema migration.
 
-Encrypted file transfers permit up to 38 MiB wire bytes for the existing 25 MiB plaintext limit. Encrypted previews transfer ciphertext; the client applies the existing 256 KiB plaintext preview limit. Reminder clients enforce the existing 1 MiB plaintext note limit. See [encryption](e2ee-implementation.md) for metadata disclosure and recovery.
+Encrypted file transfers permit up to 38 MiB wire bytes for the default 25 MiB plaintext limit; a raised limit allows its base64url ciphertext plus 2 MiB of scheduling data and framing (`encryptedFileLimit`). Encrypted previews transfer ciphertext; the client applies the existing 256 KiB plaintext preview limit. Reminder clients enforce the existing 1 MiB plaintext note limit. See [encryption](e2ee-implementation.md) for metadata disclosure and recovery.
 
 ### Encrypted web app approval
 

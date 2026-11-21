@@ -12,9 +12,8 @@ import type { DiffApplyOutcome, TransferContext } from "./types";
 import type { SyncResult } from '../types';
 import type { ConflictDiff, FileDiff } from '../planner/types';
 import type { FileEntry, MutationFailure, UploadResult } from '../../protocol/sync-types';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
-import { OVERSIZED_REMOTE_FILE_MESSAGE, recordDeferredChange, recordSyncError } from '../issues';
+import { oversizedRemoteFileMessage, recordDeferredChange, recordSyncError } from '../issues';
 import { errorMessage } from '../../platform/logger';
 import { isAbortError } from '../abort';
 import { fileFailure, uploadResultError } from '../failures';
@@ -79,8 +78,8 @@ export async function processDiff(
 			if (review) return { status: "deferred", reason: review, review: true };
 			const response = await context.files.downloadFile(diff.path);
 			const remoteContent = response.content;
-			if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {
-				throw new Error(OVERSIZED_REMOTE_FILE_MESSAGE);
+			if (remoteContent.byteLength > context.maxFileBytes()) {
+				throw new Error(oversizedRemoteFileMessage(context.maxFileBytes()));
 			}
 			await validateDownloadedContent(
 				diff.path,

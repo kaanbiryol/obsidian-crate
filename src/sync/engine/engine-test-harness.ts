@@ -96,6 +96,8 @@ export function createHarness(settingsOverrides: Partial<SyncSettings> = {}) {
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
 		isEncrypted: vi.fn().mockReturnValue(false),
+		refreshFileLimit: vi.fn(async () => {}),
+		fileLimit: vi.fn().mockReturnValue(25 * 1024 * 1024),
 		setAbortSignal: vi.fn(),
 		// The engine wraps these mocks directly; see createFiles below.
 		getFileTransport: () => ({ transport: null, clientSession: 'test-session' }),

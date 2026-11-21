@@ -77,6 +77,7 @@ export function createTransferHarness() {
 				retryWithBackoff: retryWithBackoffTyped,
 				getModifiedIso,
 				encrypted: () => false,
+				maxFileBytes: () => 25 * 1024 * 1024,
 			},
 		};
 	}

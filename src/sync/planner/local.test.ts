@@ -46,6 +46,7 @@ describe('planner local diff helpers', () => {
 				verifyContent: async () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
+				maxFileBytes: () => 25 * 1024 * 1024,
 			},
 			new Set(['notes/present.md']),
 			5,
@@ -98,6 +99,7 @@ describe('planner local diff helpers', () => {
 				verifyContent: async () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
+				maxFileBytes: () => 25 * 1024 * 1024,
 			},
 			5,
 		);

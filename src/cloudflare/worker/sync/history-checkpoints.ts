@@ -4,6 +4,7 @@ import type { FileEntry } from '../../../protocol/sync-types';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { corsHeaders, corsResponse } from '../http/cors';
 import { fileTransportLimit } from '../../../encryption/file-format';
+import { MAX_CONFIGURABLE_FILE_BYTES } from '../../../protocol/sync-limits';
 import { FILE_VERSION_CUTOFF_SQL, FILE_VERSION_FLOOR_SQL, HISTORY_RETENTION_MS_SQL, LAST_SEQ_SQL, storedObjectMatchesMetadata } from './storage';
 import { sanitizePath } from '../http/request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
@@ -161,7 +162,7 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
 		.bind(portablePathKey(path), path, revision, revision, path, Date.now()).first<{ hash: string; size: number }>();
 	if (!file) return response({ error: 'A file version required by this checkpoint is no longer available.', code: 'version_unavailable' }, 410);
 	const object = await bucket.get(revision);
-	if (!object || object.size > fileTransportLimit(object.httpMetadata?.contentType) || !storedObjectMatchesMetadata(object, { hash: file.hash, size: file.size, storageKey: revision })) return response({ error: 'Checkpoint file contents are unavailable.' }, 503);
+	if (!object || object.size > fileTransportLimit(object.httpMetadata?.contentType, MAX_CONFIGURABLE_FILE_BYTES) || !storedObjectMatchesMetadata(object, { hash: file.hash, size: file.size, storageKey: revision })) return response({ error: 'Checkpoint file contents are unavailable.' }, 503);
 	return new Response(object.body, { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(object.size), [FILE_HASH_HEADER]: file.hash } });
 }
 

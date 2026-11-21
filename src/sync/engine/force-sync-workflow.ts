@@ -5,7 +5,6 @@ import { partitionSkippedUploads } from '../local/local-file-changes';
 import { uploadPipelined } from '../transfer/upload-pipeline';
 import { unsupportedLocalPathIssue } from '../local/local-path-safety';
 import { oversizedRemoteFileIssue } from '../issues';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -39,6 +38,8 @@ export interface ForceSyncWorkflowContext extends WorkflowCompletionContext {
 	localManifest: Pick<LocalManifest, 'getAllPaths' | 'removeEntry' | 'save'>;
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
 	encrypted(): boolean;
+	/** The largest file this device syncs with its server. */
+	maxFileBytes(): number;
 	/** Prepares a file even when unchanged, conditioned on the server's hash. */
 	prepareForceUpload(file: VaultFile, expectedHash: string | null): Promise<PreparedUpload | null>;
 	uploadPreparedFiles(
@@ -71,7 +72,7 @@ export async function runForceFullSyncWorkflow(
 		const localFiles = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path), () => context.signal.throwIfAborted());
 		// Skipped files stay local paths, so their server copy is neither replaced nor deleted.
 		const localPaths = new Set(localFiles.map(file => file.path));
-		const { eligible: files, skipped } = partitionSkippedUploads(localFiles, context.encrypted());
+		const { eligible: files, skipped } = partitionSkippedUploads(localFiles, context.encrypted(), context.maxFileBytes());
 		if (skipped.length) (result.issues ??= []).push(...skipped);
 
 		// A remote file this device cannot hold is absent here because it was skipped, not
@@ -81,7 +82,7 @@ export async function runForceFullSyncWorkflow(
 		for (const path of remotePaths) {
 			if (localPaths.has(path) || context.shouldIgnore(path)) continue;
 			const entry = getPathEntry(remoteManifest.files, path);
-			const kept = entry && entry.size > MAX_FILE_SIZE_BYTES ? oversizedRemoteFileIssue(path) : unsupportedLocalPathIssue(path);
+			const kept = entry && entry.size > context.maxFileBytes() ? oversizedRemoteFileIssue(path, context.maxFileBytes()) : unsupportedLocalPathIssue(path);
 			if (kept) (result.issues ??= []).push(kept);
 			else remoteOnlyPaths.push(path);
 		}

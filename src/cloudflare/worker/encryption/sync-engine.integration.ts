@@ -193,6 +193,25 @@ it('round-trips an encrypted attachment at the 25 MiB plaintext limit', async ()
 	expect((await stored('large.bin'))!.size).toBeGreaterThan(content.length);
 }, 30_000); // Two-device encryption and transfer of 25 MiB is a correctness check, not a 5-second benchmark.
 
+it('round-trips an encrypted attachment above the default limit on a server that allows it', async () => {
+	// Transfer objects read the binding from the shared environment, as a deployment does.
+	const bindings = env as { CRATE_MAX_FILE_BYTES?: string };
+	bindings.CRATE_MAX_FILE_BYTES = String(30 * 1024 * 1024);
+	try {
+		const content = new Uint8Array(28 * 1024 * 1024);
+		for (let index = 0; index < content.length; index += 4096) content[index] = (index / 4096) % 251;
+		const first = await device('raised-first');
+		first.disk.write('large.bin', content.buffer); await sync(first);
+		const second = await device('raised-second'); await sync(second);
+		expect(second.disk.read('large.bin')).toEqual(content.buffer);
+	} finally { delete bindings.CRATE_MAX_FILE_BYTES; }
+	// The same file is skipped, not failed, once the server is back at the default limit.
+	const capped = await device('capped');
+	const result = await capped.engine.sync();
+	expect(result.issues).toContainEqual(expect.objectContaining({ path: 'large.bin', code: 'file-too-large' }));
+	expect(capped.disk.paths()).not.toContain('large.bin');
+}, 60_000);
+
 it('skips files nested too deeply for an encrypted vault without failing the sync', async () => {
 	const folder = Array.from({ length: 37 }, (_, index) => `f${index}`).join('/');
 	const skipped = (path: string): unknown[] => [expect.objectContaining({ path, code: 'unsupported-device-path' })];

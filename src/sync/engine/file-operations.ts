@@ -17,6 +17,8 @@ export function createEngineFileOperations(
 	vault: Vault,
 	cache: MarkdownBaseCache,
 	clientSession: string,
+	/** The largest file this device syncs with its server. */
+	fileLimit: () => number,
 ) {
 	const uploads = new DurableUploads(manifest, transport, cache, clientSession);
 	const restores = new DurableRestores(manifest, transport);
@@ -30,7 +32,7 @@ export function createEngineFileOperations(
 			largeTransfers(size, () => uploads.single({ path, content: arrayBufferToBase64(content), hash, size, contentType, expectedHash, operationId }, mergePreimage, content)),
 		batchUpload: (files: BatchUploadFile[]) => uploads.batch(files),
 		async batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>) {
-			for (const path of paths) await assertRenamePreserved(manifest, vault, path);
+			for (const path of paths) await assertRenamePreserved(manifest, vault, path, fileLimit());
 			return transport.batchDelete(paths, expectedHashes, expectedRevisions);
 		},
 		downloadFile: (path: string, size?: number) => largeTransfers(size, () => transport.downloadFile(path, size)),

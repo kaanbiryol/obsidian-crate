@@ -44,12 +44,13 @@ const quoted = value => `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
  * @property {string} script Absolute Crate CLI script.
  * @property {string} dataDir
  * @property {boolean} keepAwake
+ * @property {string} [maxFileSize] --max-file-size in MB, forwarded to start.
  * @property {string} log
  */
 
 /** @param {ServiceCommand} command */
-function serviceArguments({ node, script, dataDir, keepAwake }) {
-	return [node, script, 'start', '--data-dir', dataDir, ...(keepAwake ? ['--keep-awake'] : [])];
+function serviceArguments({ node, script, dataDir, keepAwake, maxFileSize }) {
+	return [node, script, 'start', '--data-dir', dataDir, ...(keepAwake ? ['--keep-awake'] : []), ...(maxFileSize ? ['--max-file-size', maxFileSize] : [])];
 }
 
 /** PATH lets Crate find cloudflared or tailscale from a service. @param {string} node */
@@ -161,17 +162,17 @@ export async function stopService(environment) {
 }
 
 /** Writes the service for this data directory, replacing an earlier one, and starts it.
- * @param {{ dataDir: string, keepAwake: boolean, node?: string, script?: string }} options
+ * @param {{ dataDir: string, keepAwake: boolean, maxFileSize?: string, node?: string, script?: string }} options
  * @param {ServiceEnvironment} [environment]
  * @returns {Promise<{ file: string, log: string }>} */
-export async function installService({ dataDir, keepAwake, node = process.execPath, script = process.argv[1] }, environment) {
+export async function installService({ dataDir, keepAwake, maxFileSize, node = process.execPath, script = process.argv[1] }, environment) {
 	const env = resolveEnvironment(environment);
 	const paths = servicePaths(env);
 	if (!paths) throw new Error('Starting Crate automatically is supported on macOS and Linux. On Windows, use Docker Desktop.');
 	const resolvedScript = await realpath(script);
 	const folder = protectedMacFolder(resolvedScript, env) ?? protectedMacFolder(dataDir, env);
 	if (folder) throw new Error(`macOS blocks background services from reading ${folder}. Install Crate with npm install -g @kaanbiryol/crate-server, or move the checkout and data out of ${folder}.`);
-	const command = { node, script: resolvedScript, dataDir, keepAwake, log: paths.log };
+	const command = { node, script: resolvedScript, dataDir, keepAwake, maxFileSize, log: paths.log };
 	await mkdir(dirname(paths.file), { recursive: true });
 	await mkdir(dirname(paths.log), { recursive: true, mode: 0o700 });
 	await stopService(env);

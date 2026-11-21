@@ -17,6 +17,7 @@ function createController(options: Partial<{
 	const isConfigured = vi.fn(() => false);
 	const controller = new SyncQueueController({
 		finishInitialSetup: async () => {},
+		maxFileBytes: () => 25 * 1024 * 1024,
 		uploadPreparedFiles: async () => {},
 		deleteRemoteFiles: async () => [],
 		automaticSyncEnabled: () => options.automaticSync ?? false,
@@ -309,6 +310,7 @@ describe('exclusion changes', () => {
 		const deleted: string[] = [];
 		const controller = new SyncQueueController({
 			finishInitialSetup: async () => {},
+			maxFileBytes: () => 25 * 1024 * 1024,
 			uploadPreparedFiles: async () => {},
 			deleteRemoteFiles: async files => { deleted.push(...files.map(file => file.path)); return []; },
 			automaticSyncEnabled: () => true,
@@ -377,6 +379,7 @@ describe('large upload pacing', () => {
 		const prepared: string[] = [];
 		const controller = new SyncQueueController({
 			finishInitialSetup: async () => {},
+			maxFileBytes: () => 25 * 1024 * 1024,
 			uploadPreparedFiles: async () => {},
 			deleteRemoteFiles: async () => [],
 			automaticSyncEnabled: () => true,

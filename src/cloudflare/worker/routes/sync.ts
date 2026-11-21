@@ -14,6 +14,7 @@ import {
 import { handleListFileVersions, handleRestoreFileVersion } from '../sync/file-versions/handlers';
 import { readEncryptionState } from '../encryption/state';
 import type { Env } from '../types';
+import { maxFileBytes } from '../server/file-limit';
 import { mutationAuditContext } from '../http/request-diagnostics';
 import { beginInitialImport, finishInitialImport } from '../sync/import/initial-import';
 import { pruneInitialImport } from '../sync/import/initial-import-prune';
@@ -59,7 +60,7 @@ export async function handleSyncRoute(
 		return await handleGetFileMetadata(request, db);
 	}
 	if (path === '/sync/upload' && method === 'PUT') {
-		return await handleUpload(request, bucket, db, uploadCommitters, encryption, resetGeneration);
+		return await handleUpload(request, bucket, db, uploadCommitters, encryption, resetGeneration, maxFileBytes(env));
 	}
 	if (path === '/sync/download' && method === 'GET') {
 		return await handleDownload(request, bucket, db);

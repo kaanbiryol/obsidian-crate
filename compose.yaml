@@ -16,6 +16,9 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    environment:
+      # Largest synced file in MB, from 25 (the default) to 128. See docs/self-hosting.md.
+      CRATE_MAX_FILE_SIZE_MB: ${CRATE_MAX_FILE_SIZE_MB:-}
     volumes:
       - crate-data:/data
       # For automatic backups outside the data volume (see docs/self-hosting.md):

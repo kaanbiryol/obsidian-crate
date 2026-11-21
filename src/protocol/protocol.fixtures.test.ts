@@ -10,7 +10,7 @@
  */
 import { describe } from 'vitest';
 import { testFrozenFixtures } from '@/test/frozen-fixtures';
-import { isCompatibleCrateServer, parseCrateServerInfo } from './server-info';
+import { isCompatibleCrateServer, parseCrateServerInfo, serverMaxFileBytes } from './server-info';
 import { parseSharedCheckpointDocument, parseSharedCheckpointList } from './history-checkpoints';
 import { normalizeSharedSettingsValue } from './shared-settings';
 import { isReminderOperationId, reminderOperationDay } from './reminder-operation';
@@ -37,6 +37,22 @@ describe('frozen protocol fixtures', () => {
 			decode: (stored: unknown) => {
 				const info = parseCrateServerInfo(stored);
 				return { info, compatible: info ? isCompatibleCrateServer(info) : null };
+			},
+		},
+		{
+			// A self-hosted server that allows larger files and so refuses protocol 1 clients.
+			file: 'server-info.v2.json',
+			stored: () => ({
+				service: 'crate', serverVersion: '1.0.0', pwaAssetVersion: 'fixture-pwa-2',
+				protocol: { current: 2, oldestCompatible: 2 },
+				capabilities: ['web-pairing-v1', 'e2ee-v1', 'sync-v1', 'conditional-file-mutations'],
+				limits: { maxFileBytes: 100 * 1024 * 1024 },
+				shortcut: { version: 1, revision: 1, minimumRevision: 1 },
+				serverRevision: 2, schemaVersion: 1, deploymentFingerprint: hash('e'), reminderOperationDay: 20779,
+			}),
+			decode: (stored: unknown) => {
+				const info = parseCrateServerInfo(stored);
+				return { info, compatible: info ? isCompatibleCrateServer(info) : null, maxFileBytes: info ? serverMaxFileBytes(info) : null };
 			},
 		},
 		{

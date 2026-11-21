@@ -1,7 +1,7 @@
 import { parseSharedCheckpoint, parseSharedCheckpointList, parseSharedCheckpointDocument, type SharedCheckpoint } from '../../protocol/history-checkpoints';
 import { isRecord } from '../../platform/validation';
 import type { FileEntry } from '../../protocol/sync-types';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { MAX_CONFIGURABLE_FILE_BYTES } from '../../protocol/sync-limits';
 import { HttpError, TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
 import type { EncryptedFiles } from '../encryption/encrypted-files';
 import { sha256Hex } from '../../platform/sha256';
@@ -42,7 +42,7 @@ export class SharedHistoryApi {
 			throw error;
 		}
 		if (this.encryption) body = (await this.encryption.download(wire, body, { expected: path, historical: true })).content;
-		if (body.byteLength > MAX_FILE_SIZE_BYTES || body.byteLength !== file.size || await sha256Hex(body) !== file.hash) throw new Error(`${path}: checkpoint file failed integrity validation.`);
+		if (body.byteLength > MAX_CONFIGURABLE_FILE_BYTES || body.byteLength !== file.size || await sha256Hex(body) !== file.hash) throw new Error(`${path}: checkpoint file failed integrity validation.`);
 		return body;
 	}
 }

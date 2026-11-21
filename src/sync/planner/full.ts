@@ -4,7 +4,6 @@ import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "../local/file-discovery";
 import { createAbortError } from "../abort";
 import type { DownloadDiff, FileDiff, FullSyncPlan, FullSyncPlannerContext, UploadDiff } from "./types";
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import { prepareInitialConfigPull } from './initial-config-pull';
@@ -39,7 +38,7 @@ export async function createFullSyncPlan(
 	};
 	const localFiles = createPathRecord<FileEntry>();
 	const files = await scan(getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), throwIfStopped));
-	const { eligible, skipped } = partitionSkippedUploads(files, context.encrypted());
+	const { eligible, skipped } = partitionSkippedUploads(files, context.encrypted(), context.maxFileBytes());
 	const skippedLocalPaths = new Set(skipped.map(issue => issue.path));
 
 	const hashTasks = eligible
@@ -99,8 +98,8 @@ export async function createFullSyncPlan(
 			diffMap.delete(path);
 			continue;
 		}
-		if (remoteEntry && remoteEntry.size > MAX_FILE_SIZE_BYTES) {
-			issues.push(oversizedRemoteFileIssue(path));
+		if (remoteEntry && remoteEntry.size > context.maxFileBytes()) {
+			issues.push(oversizedRemoteFileIssue(path, context.maxFileBytes()));
 			diffMap.delete(path);
 			// The local copy was never reconciled with the server, so it must not become the baseline.
 			delete localFiles[path];

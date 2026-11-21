@@ -15,7 +15,7 @@ import { createPendingDiscard } from '../pending/pending-discard';
 
 interface EnginePendingChangesContext {
 	vault: Vault;
-	api: Pick<SyncApiClient, 'getFileMetadata' | 'downloadFile' | 'listFileVersions' | 'previewFileVersion'>;
+	api: Pick<SyncApiClient, 'getFileMetadata' | 'downloadFile' | 'listFileVersions' | 'previewFileVersion' | 'fileLimit'>;
 	manifest: Pick<LocalManifest, 'getEntry' | 'setEntry' | 'removeEntry' | 'save'>;
 	cache: Pick<MarkdownBaseCache, 'readBase'>;
 	queue: Pick<SyncQueueController, 'getPendingKeys' | 'snapshotPendingRevisions' | 'settleSyncResult' | 'settleKeys'>;
@@ -57,13 +57,13 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 				beforeBinaryReplace: path => context.beforeBinaryReplace(path),
 				applied: async (path, remote, content) => {
 					if (remote && content) {
-						const local = await readLocalFileEntry(context.vault, path);
+						const local = await readLocalFileEntry(context.vault, path, context.api.fileLimit());
 						context.manifest.setEntry(path, { ...remote, modified: local?.hash === remote.hash ? local.modified : UNVERIFIED_MODIFIED });
 					}
 					else context.manifest.removeEntry(path);
 					await context.manifest.save();
 					const revisions = context.queue.snapshotPendingRevisions();
-					const local = await readLocalFileEntry(context.vault, path);
+					const local = await readLocalFileEntry(context.vault, path, context.api.fileLimit());
 					if ((local?.hash ?? null) === (remote?.hash ?? null)) {
 						context.queue.settleKeys([pendingChangeKey('upload', path), pendingChangeKey('delete', path)], revisions);
 					}
@@ -104,7 +104,7 @@ export function createEnginePendingChanges(context: EnginePendingChangesContext)
 							continue;
 						}
 					}
-					const local = await readLocalFileEntry(context.vault, path);
+					const local = await readLocalFileEntry(context.vault, path, context.api.fileLimit());
 					if (context.signal.aborted) return;
 					if (context.manifest.getEntry(path) !== baseline) continue;
 					if (local?.hash === baseline?.hash) settled.push(key);

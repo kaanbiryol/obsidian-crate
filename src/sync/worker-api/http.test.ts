@@ -44,3 +44,26 @@ it('logs a request without its query, which can name a vault file', async () => 
 		for (const spy of logs) spy.mockRestore();
 	}
 });
+
+it('negotiates the protocol of encrypted reads and learns the server file limit', async () => {
+	const server = (protocol: { current: number; oldestCompatible: number }, limits?: { maxFileBytes: number }) => JSON.stringify({
+		service: 'crate', serverVersion: 'test', protocol, capabilities: ['sync-v1'], serverRevision: 1, reminderOperationDay: 20_000, ...limits ? { limits } : {} });
+	for (const [info, expected, limit] of [
+		[server({ current: 1, oldestCompatible: 1 }), '1', 25 * 1024 * 1024],
+		[server({ current: 2, oldestCompatible: 2 }, { maxFileBytes: 100 * 1024 * 1024 }), '2', 100 * 1024 * 1024],
+	] as const) {
+		const sent: Array<string | undefined> = [];
+		const transport = vi.fn(async (request: { url: string; headers?: Record<string, string> }) => {
+			const text = request.url.endsWith('/.well-known/crate') ? info : JSON.stringify({ files: {} });
+			if (!request.url.endsWith('/.well-known/crate')) sent.push(request.headers?.['X-Crate-Protocol']);
+			return { status: 200, text, arrayBuffer: new TextEncoder().encode(text).buffer, headers: {} };
+		});
+		const http = new WorkerApiHttpClient('https://worker.example', 'token', transport);
+		http.setEncryptionAuthority('vault-a', 1);
+		expect(http.serverFileLimit()).toBe(25 * 1024 * 1024);
+		await http.requestJson('/sync/manifest');
+		await http.requestJson('/sync/manifest');
+		expect(sent).toEqual([expected, expected]);
+		expect(http.serverFileLimit()).toBe(limit);
+	}
+});

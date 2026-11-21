@@ -115,6 +115,7 @@ describe('runIncrementalSync', () => {
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
 			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
+			maxFileBytes: () => 25 * 1024 * 1024,
 			uploadPreparedFiles: vi.fn(async () => {}),
 			reconcileVersionConflicts: vi.fn(async () => {}),
 			getRemoteEntries: vi.fn(async () => ({})),

@@ -9,7 +9,6 @@ import { oversizedRemoteFileIssue, recordSyncError } from '../issues';
 import type { ChangelogEntry, FileEntry } from '../../protocol/sync-types';
 import type { SyncResult } from '../types';
 import type { FileDiff } from './types';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { isVaultTFileLike } from '../local/local-delete';
 import { assertLocalSyncPath, unsupportedLocalPathIssue } from '../local/local-path-safety';
 
@@ -90,8 +89,8 @@ export async function reconcileIncrementalRemoteChanges(
 
 			// This device cannot store it, like an oversized local file: report it without
 			// failing the sync, so the changelog cursor still advances past it.
-			if (entry.size > MAX_FILE_SIZE_BYTES) {
-				(result.issues ??= []).push(oversizedRemoteFileIssue(path));
+			if (entry.size > context.maxFileBytes()) {
+				(result.issues ??= []).push(oversizedRemoteFileIssue(path, context.maxFileBytes()));
 				continue;
 			}
 
@@ -119,7 +118,7 @@ export async function reconcileIncrementalRemoteChanges(
 			}
 
 			const localEntry = localChangedPaths.has(path)
-				? await readLocalFileEntry(context.vault, path)
+				? await readLocalFileEntry(context.vault, path, context.maxFileBytes())
 				: await readUnchangedLocalEntry(context, path);
 			if (!localEntry) {
 				downloadRequests.push({
@@ -190,5 +189,5 @@ async function readUnchangedLocalEntry(context: IncrementalSyncPlannerContext, p
 			return { hash: baseline.hash, size: baseline.size, modified: baseline.modified };
 		}
 	}
-	return readLocalFileEntry(context.vault, path);
+	return readLocalFileEntry(context.vault, path, context.maxFileBytes());
 }

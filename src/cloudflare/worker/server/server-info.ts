@@ -4,10 +4,12 @@ import { SHARED_CHECKPOINT_CAPABILITY } from '../../../protocol/history-checkpoi
 import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 import release from '../../server-release.json';
 import type { Env } from '../types';
+import { maxFileBytes } from './file-limit';
 import { BULK_NEW_UPLOAD_CAPABILITY } from '../../../protocol/sync-limits';
 import {
 	CRATE_PLUGIN_PROTOCOL,
 	CRATE_SERVICE_ID,
+	serverProtocolRange,
 	type CrateServerInfo,
 } from '../../../protocol/server-info';
 import { corsResponse } from '../http/cors';
@@ -54,7 +56,8 @@ export const CRATE_SERVER_INFO: Omit<CrateServerInfo, 'serverRevision' | 'remind
 
 /** Reads no database, so installation can probe the build before creating its schema. */
 export async function handleServerInfo(env: Env): Promise<Response> {
-	return corsResponse({ ...CRATE_SERVER_INFO,
+	const limit = maxFileBytes(env);
+	return corsResponse({ ...CRATE_SERVER_INFO, protocol: serverProtocolRange(limit), limits: { maxFileBytes: limit },
 		shortcut: { version: READING_SHORTCUT_CONTRACT.version, revision: READING_SHORTCUT_CONTRACT.revision, minimumRevision: READING_SHORTCUT_CONTRACT.minimumRevision }, serverRevision: release.revision, ...(DEVELOPMENT_BUILD ? { developmentBuild: DEVELOPMENT_BUILD } : {}), schemaVersion: release.schemaVersion, deploymentFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT,
 		reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
 }

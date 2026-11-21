@@ -32,7 +32,7 @@ npm run server -- auto-backup --off [--data-dir PATH]
 npm run server -- upgrade --output NEW_BACKUP_PATH [--data-dir PATH]
 npm run server -- restore --backup PATH --data-dir EMPTY_PATH
 npm run server -- check-upgrade [--data-dir PATH]
-npm run server -- service [--keep-awake] [--data-dir PATH]
+npm run server -- service [--keep-awake] [--max-file-size MB] [--data-dir PATH]
 npm run server -- service --off
 npm run server -- update [--data-dir PATH]
 npm run server -- doctor [--data-dir PATH]
@@ -50,6 +50,9 @@ is stopped. A running server pauses sync for a moment while backup copies its da
 auto-backup makes a verified backup every day while the server runs and keeps the newest.
 service starts Crate at login (launchd on macOS, systemd on Linux) and restarts it after a failure.
 --keep-awake keeps a Mac from idle sleep while Crate runs.
+--max-file-size MB (start, setup, service; CRATE_MAX_FILE_SIZE_MB in Docker) syncs files up to
+that size, from 25 (the default) to 128. Above 25, every device needs the current Crate plugin,
+mobile devices still skip files over 25 MB, and Cloudflare Tunnels refuse uploads over 100 MB.
 update installs the newest release after a verified backup and rolls back if it fails;
 other installs print their own update steps. doctor checks the server and prints a fix for each problem.
 Stop the server before offline add-device administration.
@@ -75,7 +78,7 @@ try {
 	const { values, positionals } = parseArgs({ allowPositionals: true, options: {
 		'data-dir': { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, origin: { type: 'string' },
 		output: { type: 'string' }, backup: { type: 'string' }, keep: { type: 'string' }, off: { type: 'boolean' },
-		hostname: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, local: { type: 'boolean' }, 'keep-awake': { type: 'boolean' }, quick: { type: 'boolean' }, tailscale: { type: 'boolean' }, help: { type: 'boolean' }, json: { type: 'boolean' },
+		hostname: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' }, local: { type: 'boolean' }, 'keep-awake': { type: 'boolean' }, 'max-file-size': { type: 'string' }, quick: { type: 'boolean' }, tailscale: { type: 'boolean' }, help: { type: 'boolean' }, json: { type: 'boolean' },
 	} });
 	const command = positionals[0];
 	if (values.help || !command) console.log(help);

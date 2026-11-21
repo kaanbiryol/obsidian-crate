@@ -30,7 +30,7 @@ const REMINDER_NOTE_TOO_LARGE: IssueExplanation = {
 };
 const FILE_TOO_LARGE: IssueExplanation = {
 	summary: 'This file exceeds the sync size limit.',
-	recovery: 'Reduce the file to 25 MiB or smaller, or exclude it from sync in Crate settings. Then sync again.',
+	recovery: 'Reduce the file below the size in the message, or exclude it from sync in Crate settings. Then sync again.',
 };
 const VAULT_SCAN_INCOMPLETE: IssueExplanation = {
 	summary: 'Crate could not finish reading the vault.',

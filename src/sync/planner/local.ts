@@ -41,7 +41,7 @@ export async function getLocalChanges(
 
 	// Skipped files stay discovered (never local deletes) but are not changes:
 	// each would fail every sync and hold back the changelog cursor.
-	const { eligible, skipped } = partitionSkippedUploads(allFiles, context.encrypted());
+	const { eligible, skipped } = partitionSkippedUploads(allFiles, context.encrypted(), context.maxFileBytes());
 
 	const candidates = eligible.filter(file => context.pendingKeys?.has(pendingChangeKey('upload', file.path))
 		|| hasLocalMetadataChange(file, context.localManifest.getEntry(file.path)));

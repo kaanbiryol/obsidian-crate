@@ -1,4 +1,4 @@
-import { SkippedFileError, withSyncFileContext } from '../issues';
+import { SkippedFileError, skippedFileIssue, withSyncFileContext } from '../issues';
 import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "../local/file-discovery";
 import { isVaultTFileLike } from '../local/local-delete';
 import { skippedUploadIssue } from '../local/local-file-changes';
@@ -7,7 +7,6 @@ import type { PreparedUpload } from './types';
 import {
 	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,
 	BATCH_UPLOAD_MAX_FILES,
-	MAX_FILE_SIZE_BYTES,
 } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { TransferContext } from "./types";
@@ -21,7 +20,8 @@ export async function prepareUploadFromVaultFile(
 	options?: { force?: boolean; expectedHash?: string | null },
 ): Promise<PreparedUpload | null> {
 	return withSyncFileContext(file.path, async () => {
-		const skipped = skippedUploadIssue(file, context.encrypted());
+		const limit = context.maxFileBytes();
+		const skipped = skippedUploadIssue(file, context.encrypted(), limit);
 		if (skipped) {
 			logger.warn("Skipping file:", file.path);
 			throw new SkippedFileError(file.path, skipped);
@@ -30,9 +30,9 @@ export async function prepareUploadFromVaultFile(
 		let source = file;
 		let content = await context.vault.adapter.readBinary(file.path);
 		for (let attempt = 0; attempt < 2; attempt++) {
-			if (content.byteLength > MAX_FILE_SIZE_BYTES) {
+			if (content.byteLength > limit) {
 				logger.warn("Skipping large file:", file.path);
-				throw new SkippedFileError(file.path);
+				throw new SkippedFileError(file.path, skippedFileIssue(file.path, limit));
 			}
 
 			const stat = await context.vault.adapter.stat(file.path);

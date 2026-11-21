@@ -1,4 +1,4 @@
-import { OVERSIZED_REMOTE_FILE_MESSAGE, recordDeferredChange, recordSyncError } from '../issues';
+import { oversizedRemoteFileMessage, recordDeferredChange, recordSyncError } from '../issues';
 import { isAbortError } from "../abort";
 import { base64ToArrayBuffer } from "@/platform/base64";
 import { applyRemoteContentIfUnchanged, incomingReviewMessage } from "../local/local-apply";
@@ -11,7 +11,7 @@ import { errorMessage } from "../../platform/logger";
 import type { SyncResult } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { fileFailure, isAuthError, isTransientSyncFailure } from '../failures';
-import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 import { getBatchDownloadConcurrency, getDownloadApplyConcurrency } from './budget';
 
@@ -61,8 +61,8 @@ export async function downloadAndSaveFile(
 	const { path } = request;
 	const response = await context.files.downloadFile(path, request.remoteSize);
 	const content = response.content;
-	if (content.byteLength > MAX_FILE_SIZE_BYTES) {
-		return { status: "deferred", reason: OVERSIZED_REMOTE_FILE_MESSAGE };
+	if (content.byteLength > context.maxFileBytes()) {
+		return { status: "deferred", reason: oversizedRemoteFileMessage(context.maxFileBytes()) };
 	}
 	return saveDownloadedFile(context, request, response, result);
 }

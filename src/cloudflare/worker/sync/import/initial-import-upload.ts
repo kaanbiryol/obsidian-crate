@@ -1,5 +1,5 @@
 import type { BatchUploadResponse } from '@/protocol/sync-types';
-import { BATCH_UPLOAD_MAX_BYTES } from '@/protocol/sync-limits';
+import { BATCH_UPLOAD_MAX_BYTES, formatFileLimit, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 import { fileTransportLimit } from '@/encryption/file-format';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { base64ToArrayBuffer } from '@/platform/base64';
@@ -32,7 +32,7 @@ interface ImportScope { token: string; encryption: EncryptionServerState | null;
 /** Runs in a transfer object: the public Worker authenticated the request. An encrypted
  * vault's import is checked against the state read here, in the same transactions that
  * lease and publish its files, so a reset in between fences every later batch. */
-export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
+export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db: D1Database, maxFileBytes = MAX_FILE_SIZE_BYTES): Promise<Response> {
 	const token = request.headers.get(INITIAL_IMPORT_HEADER);
 	const current = await db.prepare(`SELECT import_token AS token, import_state AS state, encryption, reset_generation
     FROM server_state WHERE id = 1`).first<{ token: string | null; state: string | null; encryption: string | null; reset_generation: string | null }>();
@@ -45,7 +45,7 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
 	if (request.method === 'PUT') {
 		// Large attachments use a binary request, without base64 copies in memory.
 		// Ciphertext of a file at the plaintext limit is larger than that limit.
-		const body = await readLimitedRequestBody(request, fileTransportLimit(request.headers.get('Content-Type') ?? undefined), 'File exceeds 25MB limit');
+		const body = await readLimitedRequestBody(request, fileTransportLimit(request.headers.get('Content-Type') ?? undefined, maxFileBytes), `File exceeds ${formatFileLimit(maxFileBytes)} limit`);
 		if (!body.ok) return body.response;
 		input.push({ path: new URL(request.url).searchParams.get('path'),
 			hash: request.headers.get(FILE_HASH_HEADER), content: body.bytes.buffer,
@@ -78,7 +78,7 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
 		} catch { return corsResponse({ error: 'Invalid import content' }, 400); }
 		total += content.byteLength;
 		const contentType = typeof value.contentType === 'string' ? value.contentType : 'application/octet-stream';
-		if (content.byteLength > fileTransportLimit(contentType) || request.method !== 'PUT' && total > BATCH_UPLOAD_MAX_BYTES) return corsResponse({ error: 'Import payload too large' }, 413);
+		if (content.byteLength > fileTransportLimit(contentType, maxFileBytes) || request.method !== 'PUT' && total > BATCH_UPLOAD_MAX_BYTES) return corsResponse({ error: 'Import payload too large' }, 413);
 		if (await sha256Hex(content) !== value.hash) return corsResponse({ error: 'Import content hash mismatch' }, 400);
 		files.push({ path, hash: value.hash, size: content.byteLength, content, contentType, expectedHash });
 	}

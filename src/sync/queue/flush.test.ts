@@ -91,6 +91,7 @@ function createFlushHarness(overrides: Partial<{
 		save,
 		getModifiedIso,
 		context: {
+			maxFileBytes: () => 25 * 1024 * 1024,
 			uploadPreparedFiles: ((prepared, result, options) => uploadPreparedFiles({
 				files: {
 					uploadFile: (path, content, hash, size, contentType) => uploadFile({ path, content, hash, size, contentType }),

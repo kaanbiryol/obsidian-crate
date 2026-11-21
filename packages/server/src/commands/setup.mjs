@@ -133,11 +133,11 @@ async function lastingScript(signal) {
 /** Installs the service, then shows its log until the address is public and a pairing
  * code is on screen. Ctrl+C closes only this view; the service keeps running.
  * @param {CommandContext} context @param {boolean} keepAwake */
-async function startAsService({ dataDir, signal }, keepAwake) {
+async function startAsService({ dataDir, signal, values }, keepAwake) {
 	const script = await lastingScript(signal);
 	const logPath = /** @type {{ log: string }} */ (servicePaths()).log;
 	let offset = await stat(logPath).then(info => info.size, () => 0);
-	await installService({ dataDir, keepAwake, script });
+	await installService({ dataDir, keepAwake, script, maxFileSize: values['max-file-size'] });
 	console.log(`\nCrate now runs in the background and starts when you log in. Its log follows; press Ctrl+C to close this view, Crate keeps running.\nLog: ${logPath}\n`);
 	let shown = '', paired = false, ready = false;
 	const deadline = Date.now() + 15 * 60_000;

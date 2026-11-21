@@ -81,6 +81,7 @@ describe('createFullSyncPlan', () => {
 				signal: new AbortController().signal, shouldIgnore: (path: string) => path.startsWith('ignored/'),
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
+				maxFileBytes: () => 25 * 1024 * 1024,
 			},
 			{
 				'notes/deleted.md': { hash: 'same-hash', size: 1, modified: new Date(0).toISOString() },
@@ -123,6 +124,7 @@ describe('createFullSyncPlan', () => {
 				signal: new AbortController().signal, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
+				maxFileBytes: () => 25 * 1024 * 1024,
 			},
 			{ 'notes/video.md': { hash: 'remote-big', size: MAX_FILE_SIZE_BYTES + 1, modified: new Date(0).toISOString(), revision: 'r2' } },
 			5,
@@ -156,6 +158,7 @@ describe('createFullSyncPlan', () => {
 				signal: new AbortController().signal, shouldIgnore: path => held.has(path), isHeld: path => held.has(path),
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
+				maxFileBytes: () => 25 * 1024 * 1024,
 			},
 			{ 'notes/held.md': baseline },
 			5,
@@ -205,6 +208,7 @@ describe('createFullSyncPlan', () => {
 				signal: new AbortController().signal, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
+				maxFileBytes: () => 25 * 1024 * 1024,
 			},
 			{},
 			5,
@@ -254,6 +258,7 @@ describe('createFullSyncPlan', () => {
 				signal: new AbortController().signal, shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 				encrypted: () => false,
+				maxFileBytes: () => 25 * 1024 * 1024,
 			},
 			{},
 			5,
@@ -286,6 +291,7 @@ describe('createFullSyncPlan', () => {
 				return results;
 			},
 			encrypted: () => false,
+			maxFileBytes: () => 25 * 1024 * 1024,
 		}, remote, 1);
 		await expect(plan).rejects.toBe(failure);
 		expect(readBinary).toHaveBeenCalledTimes(1);

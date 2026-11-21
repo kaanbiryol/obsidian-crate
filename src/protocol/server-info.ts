@@ -1,5 +1,6 @@
 import { parseDevelopmentBuild, type DevelopmentBuild } from './server-build';
 import { isSha256Hex } from '../platform/validation';
+import { MAX_FILE_SIZE_BYTES, parseMaxFileBytes } from './sync-limits';
 export const CRATE_SERVICE_ID = 'crate';
 
 export interface CrateProtocolRange {
@@ -17,6 +18,8 @@ export interface CrateServerInfo {
 	readonly developmentBuild?: DevelopmentBuild;
 	readonly pwaAssetVersion?: string;
 	readonly deploymentFingerprint?: string;
+	/** Absent on servers older than protocol 2, which allow the default. */
+	readonly limits?: { readonly maxFileBytes: number };
 }
 
 /**
@@ -24,9 +27,24 @@ export interface CrateServerInfo {
  * when support for an older protocol is intentionally removed.
  */
 export const CRATE_PLUGIN_PROTOCOL: CrateProtocolRange = Object.freeze({
-	current: 1,
+	current: 2,
 	oldestCompatible: 1,
 });
+
+/** Protocol 2 clients honor the file limit a server advertises in `limits`. */
+export const ADVERTISED_FILE_LIMIT_PROTOCOL = 2;
+
+/** A server that allows larger files refuses older clients, which cannot read those files. */
+export function serverProtocolRange(maxFileBytes: number): CrateProtocolRange {
+	return maxFileBytes > MAX_FILE_SIZE_BYTES
+		? Object.freeze({ current: CRATE_PLUGIN_PROTOCOL.current, oldestCompatible: ADVERTISED_FILE_LIMIT_PROTOCOL })
+		: CRATE_PLUGIN_PROTOCOL;
+}
+
+/** The largest file the server accepts. */
+export function serverMaxFileBytes(info: Pick<CrateServerInfo, 'limits'>): number {
+	return info.limits?.maxFileBytes ?? MAX_FILE_SIZE_BYTES;
+}
 
 function isPositiveInteger(value: unknown): value is number {
 	return typeof value === 'number' && Number.isInteger(value) && value > 0;
@@ -81,6 +99,7 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 		serverRevision: info.serverRevision,
 		...(isSha256Hex(info.deploymentFingerprint) ? { deploymentFingerprint: info.deploymentFingerprint } : {}),
 		reminderOperationDay: info.reminderOperationDay,
+		limits: { maxFileBytes: parseMaxFileBytes(info.limits?.maxFileBytes) },
 	};
 }
 

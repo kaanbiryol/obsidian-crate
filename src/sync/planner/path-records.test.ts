@@ -23,6 +23,7 @@ function createPlanner(localPaths: string[] = []) {
 		vault, localManifest, signal: new AbortController().signal, shouldIgnore: () => false,
 		runConcurrent: async tasks => Promise.all(tasks.map(task => task())),
 		encrypted: () => false,
+		maxFileBytes: () => 25 * 1024 * 1024,
 	};
 	return { context, readBinary, localManifest };
 }

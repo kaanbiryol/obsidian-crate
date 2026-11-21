@@ -1,0 +1,54 @@
+{
+	"stored": {
+		"service": "crate",
+		"serverVersion": "1.0.0",
+		"pwaAssetVersion": "fixture-pwa-2",
+		"protocol": {
+			"current": 2,
+			"oldestCompatible": 2
+		},
+		"capabilities": [
+			"web-pairing-v1",
+			"e2ee-v1",
+			"sync-v1",
+			"conditional-file-mutations"
+		],
+		"limits": {
+			"maxFileBytes": 104857600
+		},
+		"shortcut": {
+			"version": 1,
+			"revision": 1,
+			"minimumRevision": 1
+		},
+		"serverRevision": 2,
+		"schemaVersion": 1,
+		"deploymentFingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		"reminderOperationDay": 20779
+	},
+	"decoded": {
+		"info": {
+			"service": "crate",
+			"serverVersion": "1.0.0",
+			"protocol": {
+				"current": 2,
+				"oldestCompatible": 2
+			},
+			"capabilities": [
+				"web-pairing-v1",
+				"e2ee-v1",
+				"sync-v1",
+				"conditional-file-mutations"
+			],
+			"pwaAssetVersion": "fixture-pwa-2",
+			"serverRevision": 2,
+			"deploymentFingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+			"reminderOperationDay": 20779,
+			"limits": {
+				"maxFileBytes": 104857600
+			}
+		},
+		"compatible": true,
+		"maxFileBytes": 104857600
+	}
+}

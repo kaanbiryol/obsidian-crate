@@ -27,7 +27,7 @@ async function fixture() {
 	});
 	const api = new SyncApiClient('https://server.test', 'token', transport);
 	const { transport: fileTransport, clientSession } = api.getFileTransport(manifest);
-	const files = createEngineFileOperations(fileTransport, manifest, disk.vault, cache, clientSession);
+	const files = createEngineFileOperations(fileTransport, manifest, disk.vault, cache, clientSession, () => 25 * 1024 * 1024);
 	return { disk, app, plugin, manifest, content, hash, transport, api, files };
 }
 

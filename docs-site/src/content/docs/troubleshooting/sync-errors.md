@@ -9,7 +9,7 @@ When a sync can't finish, run **Crate: Show sync activity** to see what went wro
 
 ### This file exceeds the sync size limit
 
-Files over 25 MB stay on this device. Make the file smaller, or [exclude it from sync](/docs/features/sync/#keep-files-on-one-device), then sync again.
+Files over 25 MB, or over your [self-hosted server's limit](/docs/reference/self-hosting/#sync-larger-files), stay on this device. Make the file smaller, or [exclude it from sync](/docs/features/sync/#keep-files-on-one-device), then sync again.
 
 ### This file's name or location is not compatible with sync on this device
 

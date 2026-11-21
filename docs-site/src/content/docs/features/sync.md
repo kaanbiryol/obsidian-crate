@@ -70,7 +70,7 @@ Everything in your vault syncs: new files, edits, renames, deletions, and attach
 
 - Crate's own plugin folder. Install and connect Crate on each device separately. Updates still reach your devices; see [Crate updates](#crate-updates).
 - Workspace layout, conflict copies, and common temporary files.
-- Files over 25 MB. They stay on the device and show up as sync errors.
+- Files over 25 MB. They stay on the device and show up as sync errors. A [self-hosted server](/docs/reference/self-hosting/#sync-larger-files) can raise this limit for desktop devices.
 
 Your other plugins and their settings sync too. After they download, restart Obsidian to load them.
 

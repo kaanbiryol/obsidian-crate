@@ -16,6 +16,7 @@
  * @property {string} [id]
  * @property {boolean} [local]
  * @property {boolean} [keep-awake]
+ * @property {string} [max-file-size] Largest synced file in MB.
  * @property {boolean} [quick]
  * @property {boolean} [tailscale]
  * @property {boolean} [off]
@@ -63,6 +64,25 @@ export function validateCommandOptions(positionals, values, { dockerWithoutTails
 	if (values['keep-awake'] && !['start', 'setup', 'service'].includes(command)) throw new Error('--keep-awake belongs to start, setup and service.');
 	if (values.json && command !== 'check-upgrade') throw new Error('--json belongs to check-upgrade.');
 	if (values['keep-awake'] && values.off) throw new Error('--keep-awake cannot be combined with --off.');
+	if (values['max-file-size'] !== undefined && !['start', 'setup', 'service'].includes(command)) throw new Error('--max-file-size belongs to start, setup and service.');
+	if (values['max-file-size'] !== undefined) maxFileSizeBytes(values['max-file-size']);
+}
+
+// Mirrors MAX_FILE_SIZE_BYTES and MAX_CONFIGURABLE_FILE_BYTES in src/protocol/sync-limits.ts.
+export const MIN_FILE_MB = 25, MAX_FILE_MB = 128;
+
+/** Bytes for a whole number of MB between the default and the ceiling. @param {string} value */
+function maxFileSizeBytes(value) {
+	const mb = /^\d+$/.test(value.trim()) ? Number(value) : NaN;
+	if (!Number.isInteger(mb) || mb < MIN_FILE_MB || mb > MAX_FILE_MB) throw new Error(`--max-file-size must be a whole number of MB from ${MIN_FILE_MB} to ${MAX_FILE_MB}.`);
+	return mb * 1024 * 1024;
+}
+
+/** The largest synced file from --max-file-size or CRATE_MAX_FILE_SIZE_MB (Docker), or
+ * undefined for the default 25 MB. @param {CommandOptions} values @param {NodeJS.ProcessEnv} [env] */
+export function resolveMaxFileBytes(values, env = process.env) {
+	const value = values['max-file-size'] ?? (env.CRATE_MAX_FILE_SIZE_MB?.trim() || undefined);
+	return value === undefined ? undefined : maxFileSizeBytes(value);
 }
 
 /** Chooses a Quick Tunnel, Tailscale Funnel, saved named tunnel or local listener from the

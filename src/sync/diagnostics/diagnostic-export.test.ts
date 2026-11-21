@@ -84,6 +84,7 @@ describe('periodic sync activity', () => {
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue();
 		await h.runtime.initialize({ skipStartupSync: true });
 		vi.spyOn(SyncApiClient.prototype, 'checkForChanges').mockResolvedValue({ hasChanges: true, lastSeq: 11, storageId: 'a'.repeat(32) });
+		vi.spyOn(SyncApiClient.prototype, 'refreshFileLimit').mockResolvedValue();
 		const changes = vi.spyOn(SyncWorkerApi.prototype, 'getChanges').mockResolvedValue({ changes: [], hasMore: false, lastSeq: 11 });
 		if (!success) changes.mockRejectedValue(new Error('temporary changelog failure'));
 		vi.spyOn(SyncApiClient.prototype, 'getManifest').mockRejectedValue(new Error('temporary manifest failure'));

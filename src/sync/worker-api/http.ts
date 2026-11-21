@@ -1,7 +1,8 @@
 import { emptyRequestTimings } from '../diagnostics/timings';
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { normalizeUploadOperationIds } from '../diagnostics/request-diagnostics';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol/server-info';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo, serverMaxFileBytes } from '../../protocol/server-info';
+import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, CLIENT_SESSION_HEADER, OPERATION_ID_HEADER, REQUEST_ID_HEADER } from '../../protocol/http-headers';
 import { requestUrl } from 'obsidian';
 import { createLogger } from '../logger';
@@ -158,6 +159,13 @@ function parseJsonResponse<T>(responseText: string, path: string): T {
 
 const encryptionDowngradeError = () => new HttpError('This vault was synced with end-to-end encryption, but this server reports none. Open Manage encryption to unlock it, or confirm syncing without encryption.', 428, null, 'encryption_downgrade');
 
+const SERVER_INFO_PATH = '/.well-known/crate';
+
+/** The newest protocol both this plugin and the server speak. */
+function negotiatedProtocol(info: CrateServerInfo): number {
+	return Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current);
+}
+
 export class WorkerApiHttpClient {
 	private readonly clientSession = crypto.randomUUID();
 	private requestDiagnostics: RequestDiagnostic[] = [];
@@ -168,6 +176,8 @@ export class WorkerApiHttpClient {
 	private requestTimings = emptyRequestTimings();
 	private serverInfo?: { expires: number; value: CrateServerInfo };
 	private serverInfoRequest?: Promise<CrateServerInfo>;
+	/** From the last server info this connection read. */
+	private maxFileBytes?: number;
 	private requestGeneration = 0;
 	private readonly encryptionGuard = new EncryptionDowngradeGuard();
 
@@ -207,17 +217,30 @@ export class WorkerApiHttpClient {
 		if (this.externalSignal?.aborted) throw createAbortError('Sync request aborted');
 		if (this.serverInfo && this.serverInfo.expires > performance.now()) return this.serverInfo.value;
 		if (this.serverInfoRequest) return this.serverInfoRequest;
-		const pending = this.requestJson<unknown>('/.well-known/crate', {}, timeout).then(value => {
+		const pending = this.requestJson<unknown>(SERVER_INFO_PATH, {}, timeout).then(value => {
 			if (this.serverInfoRequest !== pending) throw createAbortError('Server compatibility check was superseded');
 			const info = parseCrateServerInfo(value);
 			if (!info) throw new Error('Server returned invalid Crate compatibility metadata');
-			if (this.serverInfoRequest === pending) this.serverInfo = { value: info, expires: performance.now() + SERVER_INFO_CACHE_MS };
+			if (this.serverInfoRequest === pending) {
+				this.serverInfo = { value: info, expires: performance.now() + SERVER_INFO_CACHE_MS };
+				this.maxFileBytes = serverMaxFileBytes(info);
+			}
 			return info;
 		}).finally(() => {
 			if (this.serverInfoRequest === pending) this.serverInfoRequest = undefined;
 		});
 		this.serverInfoRequest = pending;
 		return pending;
+	}
+
+	/** The largest file the server accepts, as of the last `getServerInfo`; the default until then. */
+	serverFileLimit(): number {
+		return this.maxFileBytes ?? MAX_FILE_SIZE_BYTES;
+	}
+
+	/** Whether this connection has read the server's file limit. */
+	knowsServerFileLimit(): boolean {
+		return this.maxFileBytes !== undefined;
 	}
 
 	setAbortSignal(signal: AbortSignal): void {
@@ -243,7 +266,14 @@ export class WorkerApiHttpClient {
 	private preflight(path: string, options: ApiRequestOptions, timeout: number, generation: number): Promise<number> | null {
 		const keyed = Boolean(this.encryptionHeaders[ENCRYPTION_VAULT_HEADER]);
 		const mutation = isCrateMutation(path, options.method);
-		if (!mutation && !this.encryptionGuard.readNeedsProbe(path, options.method, keyed)) return null;
+		if (!mutation && !this.encryptionGuard.readNeedsProbe(path, options.method, keyed)) {
+			// Encrypted vaults check the protocol of reads too, so negotiate one before the first.
+			if (!keyed || this.serverInfo || path === SERVER_INFO_PATH) return null;
+			return this.getServerInfo(Math.min(timeout, REQUEST_TIMEOUT_MS)).then(info => {
+				this.assertRequestCurrent(generation);
+				return negotiatedProtocol(info);
+			});
+		}
 		const checkTimeout = Math.min(timeout, REQUEST_TIMEOUT_MS);
 		// Probe without a private body before dispatching plaintext.
 		const probeEncryption = async (capable: boolean) => {
@@ -257,12 +287,12 @@ export class WorkerApiHttpClient {
 			this.assertRequestCurrent(generation);
 			if (!mutation) {
 				await probeEncryption(info.capabilities.includes(ENCRYPTION_CAPABILITY));
-				return CRATE_PLUGIN_PROTOCOL.current;
+				return negotiatedProtocol(info);
 			}
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			const capable = info.capabilities.includes(ENCRYPTION_CAPABILITY);
 			if (this.encryptionGuard.mutationNeedsProbe(path, capable, keyed)) await probeEncryption(capable);
-			return Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current);
+			return negotiatedProtocol(info);
 		})();
 	}
 
@@ -277,7 +307,7 @@ export class WorkerApiHttpClient {
 		this.assertRequestCurrent(generation);
 		const checks = this.preflight(path, options, timeout, generation);
 		// Without checks, the request dispatches before this call returns.
-		const protocol = checks ? await checks : CRATE_PLUGIN_PROTOCOL.current;
+		const protocol = checks ? await checks : this.serverInfo ? negotiatedProtocol(this.serverInfo.value) : CRATE_PLUGIN_PROTOCOL.current;
 
 		const headersWithoutContentType = Object.fromEntries(
 			Object.entries(options.headers ?? {}).filter(([key]) => key.toLowerCase() !== 'content-type'),

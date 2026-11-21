@@ -102,6 +102,8 @@ export interface LocalDiffPlannerContext {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
 	encrypted(): boolean;
+	/** The largest file this device syncs with its server. */
+	maxFileBytes(): number;
 }
 
 export interface IncrementalSyncPlannerContext {
@@ -138,6 +140,8 @@ export interface IncrementalSyncPlannerContext {
 	/** Paths whose incoming version is saved for review. */
 	awaitingReviewPaths?(): string[];
 	getRemoteEntries(paths: string[]): Promise<Record<string, FileEntry>>;
+	/** The largest file this device syncs with its server. */
+	maxFileBytes(): number;
 }
 
 export interface FullSyncPlannerContext {
@@ -157,6 +161,8 @@ export interface FullSyncPlannerContext {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	/** Whether uploads are encrypted, which limits how deep a synced file can be. */
 	encrypted(): boolean;
+	/** The largest file this device syncs with its server. */
+	maxFileBytes(): number;
 }
 
 export interface FullSyncPlan {

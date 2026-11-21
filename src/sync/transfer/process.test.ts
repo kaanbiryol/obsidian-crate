@@ -66,6 +66,7 @@ function createProcessHarness() {
 		retryWithBackoff: async <T>(fn: () => Promise<T>) => fn(),
 		getModifiedIso: vi.fn(async () => '2026-02-15T00:00:00.000Z'),
 		encrypted: () => false,
+		maxFileBytes: () => 25 * 1024 * 1024,
 	};
 
 	return {

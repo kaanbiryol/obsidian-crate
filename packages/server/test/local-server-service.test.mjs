@@ -21,6 +21,12 @@ test('writes a systemd unit that quotes each argument', () => {
 	assert.match(unit, /^StandardOutput=append:\/Users\/me\/Library\/Logs\/crate-server.log$/m);
 });
 
+test('forwards the file limit to the service start command', () => {
+	assert.match(systemdUnit({ ...command, keepAwake: false, maxFileSize: '100' }), /"--data-dir" "[^\n]*" "--max-file-size" "100"$/m);
+	assert.match(launchdPlist({ ...command, maxFileSize: '100' }), /<string>--keep-awake<\/string>\s*<string>--max-file-size<\/string>\s*<string>100<\/string>/);
+	assert.doesNotMatch(systemdUnit(command), /max-file-size/);
+});
+
 test('refuses macOS folders a background service cannot read', () => {
 	assert.equal(protectedMacFolder('/Users/me/Documents/crate/scripts/local-server.mjs', { platform: 'darwin', home: '/Users/me' }), 'Documents');
 	assert.equal(protectedMacFolder('/Users/me/.crate/server', { platform: 'darwin', home: '/Users/me' }), null);

@@ -107,7 +107,7 @@ export class SyncEngine {
 		this.localManifest = stores.localManifest ?? new LocalManifest(plugin.app, plugin.manifest, getCheckpointAuthority(settings) || 'unconfigured');
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
 		const { transport, clientSession } = this.api.getFileTransport(this.localManifest);
-		this.files = (stores.createFiles ?? createEngineFileOperations)(transport, this.localManifest, this.vault, this.markdownBaseCache, clientSession);
+		this.files = (stores.createFiles ?? createEngineFileOperations)(transport, this.localManifest, this.vault, this.markdownBaseCache, clientSession, () => this.api.fileLimit());
 		const latestAttempt = settings.syncHistory[0];
 		const lastError = latestAttempt && !latestAttempt.success
 			? latestAttempt.errors?.[0] || 'The last sync failed. Open sync activity for details, then retry.'
@@ -169,6 +169,8 @@ export class SyncEngine {
 			getState: () => this.state,
 			updateState: updates => this.updateState(updates),
 			apiConfigured: () => this.api.isConfigured(),
+			fileLimit: () => this.api.fileLimit(),
+			refreshFileLimit: () => this.api.refreshFileLimit(),
 			hasPendingRestores: () => this.files.getPendingRestores().length > 0,
 			restorePendingKeys: keys => this.queueController.restorePendingKeys(keys),
 			captureSyncActivity: () => this.captureSyncActivity(),

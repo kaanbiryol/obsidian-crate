@@ -110,6 +110,7 @@ export class SyncEngineContexts {
 			retryWithBackoff: d.retryWithBackoff,
 			getModifiedIso: d.getModifiedIso,
 			encrypted: this.encrypted,
+			maxFileBytes: this.maxFileBytes,
 		};
 		this.localDiffPlanner = {
 			signal: d.signal,
@@ -120,6 +121,7 @@ export class SyncEngineContexts {
 			verifyContent: d.verifyContent,
 			runConcurrent: d.runConcurrent,
 			encrypted: this.encrypted,
+			maxFileBytes: this.maxFileBytes,
 		};
 		this.completion = { updateState: d.updateState, setLastSync: this.setLastSync, reconnectNotice: d.reconnectNotice };
 		// Members shared by the standard, initial and forced sync workflows.
@@ -176,6 +178,7 @@ export class SyncEngineContexts {
 			reconcileVersionConflicts: this.reconcileVersionConflicts,
 			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles,
 			setLastSeq: this.setLastSeq,
+			maxFileBytes: this.maxFileBytes,
 		};
 		this.forceSyncWorkflow = {
 			...base,
@@ -183,10 +186,12 @@ export class SyncEngineContexts {
 			shouldIgnore: d.shouldIgnore,
 			prepareForceUpload: (file, expectedHash) => prepareUploadFromVaultFile(this.transfer, file, { force: true, expectedHash }),
 			encrypted: this.encrypted,
+			maxFileBytes: this.maxFileBytes,
 		};
 		this.queue = {
 			finishInitialSetup: this.finishInitialSetup,
 			uploadPreparedFiles: this.uploadPreparedFiles,
+			maxFileBytes: this.maxFileBytes,
 			deleteRemoteFiles: this.deleteRemoteFiles,
 			automaticSyncEnabled: () => d.getSettings().automaticSync,
 			recoverUploads: async () => {
@@ -260,12 +265,14 @@ export class SyncEngineContexts {
 					reconcileVersionConflicts: async keys => { retryPaths.push(...keys); },
 					localManifest: d.localManifest,
 					signal: d.signal,
+					maxFileBytes: this.maxFileBytes,
 				}, diffs, createPathRecord<FileEntry>(), result, () => {});
 				for (const failure of failures) onFailure?.(failure);
 				return retryPaths;
 			},
 			processDiff: this.processDiff,
 			onFailure,
+			maxFileBytes: this.maxFileBytes,
 		}, queueKeys);
 	};
 
@@ -293,6 +300,9 @@ export class SyncEngineContexts {
 	private readonly markUploadOnly = (): void => this.dependencies.updateState({ writesVault: false });
 
 	private readonly encrypted = (): boolean => this.dependencies.api.isEncrypted();
+
+	/** Read from the server info each sync refreshes before it plans anything. */
+	readonly maxFileBytes = (): number => this.dependencies.api.fileLimit();
 
 	/** Replays interrupted uploads before any path is planned, reporting recovery progress.
 	 * Every upload path recovers first, so none runs before a confirmed replacement. */
@@ -323,7 +333,8 @@ export class SyncEngineContexts {
 		if (recover) await this.replayUploads();
 	};
 
-	private replayUploads(): Promise<void> {
+	private async replayUploads(): Promise<void> {
+		await this.dependencies.api.refreshFileLimit();
 		return this.dependencies.files.recoverUploads((current, total) => this.dependencies.updateState({ work: { phase: 'recovering', current, total } }));
 	}
 
@@ -363,6 +374,7 @@ export class SyncEngineContexts {
 			files: d.files,
 			localManifest: d.localManifest,
 			shouldIgnore: this.skipPath,
+			maxFileBytes: this.maxFileBytes,
 			getLocalChanges: onUnchanged => planLocalChanges({
 				...this.localDiffPlanner,
 				pendingKeys: new Set(d.getPendingKeys()),

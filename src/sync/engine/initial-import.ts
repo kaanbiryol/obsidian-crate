@@ -1,6 +1,6 @@
 import { recordSyncError, SyncIssueError, withSyncFileContext } from '../issues';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
-import { BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT } from '@/protocol/sync-limits';
 import type { SyncApiClient } from '../worker-api/client';
 import type { SyncResult, SyncWork } from '../types';
 import type { PreparedUpload } from '../transfer/types';
@@ -9,6 +9,7 @@ import type { LocalManifest } from '../manifest/manifest';
 import { getAllVaultFiles } from '../local/file-discovery';
 import { partitionSkippedUploads } from '../local/local-file-changes';
 import { getTransferBudgetBytes, prepareUploadChunks } from '../transfer/budget';
+import { PREPARE_CONCURRENCY } from '../transfer/constants';
 
 const IMPORT_UPLOAD_CONCURRENCY = 3;
 const IMPORT_SAVE_FILES = 256;
@@ -108,7 +109,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 		else if (localPaths.has(path)) transfer.localManifest.removeEntry(path);
 	}
 	// Skipped files are reported, not uploaded; a server row they already have stays as it is.
-	const { eligible: files, skipped } = partitionSkippedUploads(local.filter(file => !held.has(file.path)), transfer.encrypted());
+	const { eligible: files, skipped } = partitionSkippedUploads(local.filter(file => !held.has(file.path)), transfer.encrypted(), transfer.maxFileBytes());
 	for (const issue of skipped) {
 		(result.issues ??= []).push(issue);
 		const existing = remote.files[issue.path!];
@@ -118,7 +119,8 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	let saved = 0;
 	let savedAt = Date.now();
 	try {
-		const maxBytes = getTransferBudgetBytes();
+		const maxFileBytes = transfer.maxFileBytes();
+		const maxBytes = getTransferBudgetBytes(maxFileBytes);
 		// Bytes of prepared files that wait for or are in an upload request.
 		let retained = 0;
 		const source = prepareUploadChunks(files, async file => {
@@ -134,7 +136,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 				return null;
 			}
 			return upload;
-		}, maxBytes, INITIAL_IMPORT_MAX_FILES, () => maxBytes - retained);
+		}, maxBytes, INITIAL_IMPORT_MAX_FILES, () => maxBytes - retained, PREPARE_CONCURRENCY, maxFileBytes);
 		const queue: PreparedUpload[][] = [];
 		let exhausted = false;
 		let producing: Promise<void> | undefined;
@@ -145,7 +147,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 		// Prepare one request per slot ahead while the byte budget still holds a
 		// maximum-size file beside the prepared files every request retains.
 		const produce = () => producing ??= (async () => {
-			while (!exhausted && !stopped() && queue.length < IMPORT_UPLOAD_CONCURRENCY && maxBytes - retained >= MAX_FILE_SIZE_BYTES) {
+			while (!exhausted && !stopped() && queue.length < IMPORT_UPLOAD_CONCURRENCY && maxBytes - retained >= maxFileBytes) {
 				const next = await source.next();
 				if (next.done) { exhausted = true; break; }
 				for (const batch of importBatches(next.value)) {

@@ -4,6 +4,8 @@ export interface Env {
 	READING_FETCH?: { fetch(request: Request): Promise<Response> };
 	CRATE_DEPLOYMENT_FINGERPRINT?: string;
 	CRATE_PUBLIC_ORIGIN?: string;
+	/** Self-hosted only: the largest synced file in bytes. Absent means the default. */
+	CRATE_MAX_FILE_BYTES?: string;
 	NOTIFICATION_REQUEST_LIMITER?: NotificationRateLimiter;
 	BUCKET: R2Bucket;
 	DB: D1Database;

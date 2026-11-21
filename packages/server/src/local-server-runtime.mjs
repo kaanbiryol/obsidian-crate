@@ -297,9 +297,10 @@ async function removeStaleLock(path, previous) {
  * @param {boolean} [options.administrative] Registers no Durable Objects, so no alarm runs.
  * @param {boolean} [options.handleSignals] Keeps Miniflare's own signal handlers.
  * @param {string} [options.upgradeBackup] Migrates the database after backing up here.
+ * @param {number} [options.maxFileBytes] Largest synced file; the Worker's default when unset.
  * @returns {Promise<LocalRuntime>}
  */
-export async function openLocalRuntime({ dataDir, origin = 'http://localhost:8787', administrative = false, handleSignals = true, upgradeBackup }) {
+export async function openLocalRuntime({ dataDir, origin = 'http://localhost:8787', administrative = false, handleSignals = true, upgradeBackup, maxFileBytes }) {
 	dataDir = resolve(dataDir);
 	origin = normalizeLocalOrigin(origin);
 	const [schema, releaseText, runtimeText, worker] = await Promise.all([
@@ -365,7 +366,8 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			host: '127.0.0.1', port: 0, cf: false, telemetry: { enabled: false },
 			resourcePersistencePath: join(dataDir, 'resources'),
 			isolatedResourcePersistencePath: join(dataDir, 'isolated'),
-			bindings: { CRATE_PUBLIC_ORIGIN: origin, CRATE_DEPLOYMENT_FINGERPRINT: localDeploymentFingerprint({ worker, schema, release }) },
+			bindings: { CRATE_PUBLIC_ORIGIN: origin, CRATE_DEPLOYMENT_FINGERPRINT: localDeploymentFingerprint({ worker, schema, release }),
+				...(maxFileBytes ? { CRATE_MAX_FILE_BYTES: String(maxFileBytes) } : {}) },
 			d1Databases: { [bindings.database]: 'crate-local-db' },
 		};
 		// Validate and initialize with no Durable Objects registered: overdue

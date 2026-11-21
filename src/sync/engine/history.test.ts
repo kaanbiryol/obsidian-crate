@@ -29,7 +29,7 @@ async function harness(local: Record<string, string>, saved: Record<string, stri
 	const getFiles = () => [...files].filter(([path]) => !path.split('/').some(part => part.startsWith('.')))
 		.map(([path, text]) => ({ path, extension: 'md', stat: { size: bytes(text).byteLength, mtime: 1, ctime: 1 } }));
 	const vault = { adapter, getFiles, getAbstractFileByPath: (path: string) => getFiles().find(file => file.path === path) ?? null };
-	const api = { sharedHistory: {
+	const api = { refreshFileLimit: vi.fn(async () => {}), fileLimit: () => 25 * 1024 * 1024, sharedHistory: {
 		load: vi.fn(async () => ({ files: target })),
 		download: vi.fn(async (_checkpoint: string, path: string) => bytes(saved[path]!)),
 	} };

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Platform } from 'obsidian';
-import { createLargeTransferGate, getBatchUploadConcurrency, MOBILE_LARGE_TRANSFER_BYTES as LARGE, prepareUploadChunks, pipelineUploadChunks } from './budget';
+import { createLargeTransferGate, getBatchUploadConcurrency, getTransferBudgetBytes, MOBILE_LARGE_TRANSFER_BYTES as LARGE, prepareUploadChunks, pipelineUploadChunks } from './budget';
 
 describe('bounded upload preparation', () => {
 	it('uploads each chunk before preparing the remaining files', async () => {
@@ -95,6 +95,21 @@ it('settles preparation before closing an interrupted pipeline', async () => {
 	expect(finished).toBe(true);
 });
 
+it('sizes the desktop budget and reservations for a raised file limit', async () => {
+	const MIB = 1024 * 1024, limit = 100 * MIB;
+	expect(getTransferBudgetBytes()).toBe(128 * MIB);
+	expect(getTransferBudgetBytes(limit)).toBe(128 * MIB);
+	expect(getTransferBudgetBytes(128 * MIB)).toBe(136 * MIB);
+	const large = new ArrayBuffer(60 * MIB);
+	const chunks: number[] = [];
+	for await (const chunk of pipelineUploadChunks(['a', 'b'], async path => ({ path, content: large, size: large.byteLength, hash: 'hash', mtime: 1 }), getTransferBudgetBytes(limit), 64, limit)) {
+		chunks.push(chunk.length);
+	}
+	// Each in-flight preparation reserves a maximum-size file, so the second waits.
+	expect(chunks).toEqual([1, 1]);
+	await expect(prepareUploadChunks(['a'], async () => null, 64 * MIB, 1, () => 64 * MIB, 1, limit).next()).rejects.toThrow('Invalid upload preparation budget');
+});
+
 describe('mobile transfer policy', () => {
 	const mobile = Platform.isMobile;
 	afterEach(() => { Platform.isMobile = mobile; });
@@ -116,6 +131,13 @@ describe('mobile transfer policy', () => {
 		expect(await overlap(true, [LARGE, LARGE * 3, LARGE])).toBe(1);
 		expect(await overlap(true, [LARGE, LARGE - 1, LARGE - 1])).toBe(3);
 		expect(await overlap(false, [LARGE, LARGE])).toBe(2);
+	});
+
+	it('runs files above the default limit one at a time on desktop', async () => {
+		const limit = 25 * 1024 * 1024;
+		expect(await overlap(false, [limit, limit])).toBe(2);
+		expect(await overlap(false, [limit + 1, limit * 2, limit])).toBe(2);
+		expect(await overlap(false, [limit + 1, limit * 2])).toBe(1);
 	});
 
 	it('reads the platform when batch upload concurrency is requested', () => {

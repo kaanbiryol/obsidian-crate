@@ -23,6 +23,7 @@ async function fixture() {
 		signal: new AbortController().signal, shouldIgnore: (path: string) => path.startsWith(`${TEST_PLUGIN_DIR}/`) || path === TEST_PLUGIN_DIR,
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 		encrypted: () => false,
+		maxFileBytes: () => 25 * 1024 * 1024,
 		initialConfigPull: {
 			firstSync: true,
 			get: () => manifest.getInitialConfigPull(),

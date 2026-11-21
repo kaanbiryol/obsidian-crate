@@ -9,8 +9,10 @@ const MOBILE_TRANSFER_BUDGET_BYTES = 48 * MIB;
 const DESKTOP_TRANSFER_BUDGET_BYTES = 128 * MIB;
 const MAX_TRANSFER_CHUNK_FILES = 128;
 
-export function getTransferBudgetBytes(): number {
-	return Platform.isMobile ? MOBILE_TRANSFER_BUDGET_BYTES : DESKTOP_TRANSFER_BUDGET_BYTES;
+/** Room for prepared uploads. A desktop limit above the default still leaves a margin
+ * beside one maximum-size file. */
+export function getTransferBudgetBytes(maxFileBytes = MAX_FILE_SIZE_BYTES): number {
+	return Platform.isMobile ? MOBILE_TRANSFER_BUDGET_BYTES : Math.max(DESKTOP_TRANSFER_BUDGET_BYTES, maxFileBytes + 8 * MIB);
 }
 
 /** Batch upload requests in flight. Desktop overlaps small requests without increasing per-request server work. */
@@ -33,11 +35,12 @@ export function getDownloadApplyConcurrency(): number {
  * decrypted bytes), so two 25 MiB files at once can exhaust a phone's memory. */
 export const MOBILE_LARGE_TRANSFER_BYTES = 8 * MIB;
 
-/** On mobile, runs transfers of large files one at a time; smaller files and desktop are not held back. */
+/** Runs transfers of large files one at a time: over 8 MiB on mobile, and on desktop over the
+ * default file limit, which only a self-hosted server's raised limit allows. Smaller files are not held back. */
 export function createLargeTransferGate() {
 	let tail: Promise<unknown> = Promise.resolve();
 	return <T>(size: number | undefined, run: () => Promise<T>): Promise<T> => {
-		if (!Platform.isMobile || (size ?? 0) < MOBILE_LARGE_TRANSFER_BYTES) return run();
+		if ((size ?? 0) < (Platform.isMobile ? MOBILE_LARGE_TRANSFER_BYTES : MAX_FILE_SIZE_BYTES + 1)) return run();
 		const next = tail.then(run);
 		tail = next.catch(() => {});
 		return next;
@@ -46,8 +49,8 @@ export function createLargeTransferGate() {
 
 /** Retain only one upload chunk, reserving room for the next maximum-size file.
  * Up to `concurrency` items prepare at once; each in-flight preparation reserves a
- * maximum-size file, and chunks keep item order. A failure waits for preparations
- * already started before it propagates. */
+ * maximum-size file (`maxFileBytes`), and chunks keep item order. A failure waits for
+ * preparations already started before it propagates. */
 export async function* prepareUploadChunks<T>(
 	items: T[],
 	prepare: (item: T) => Promise<PreparedUpload | null>,
@@ -55,8 +58,9 @@ export async function* prepareUploadChunks<T>(
 	maxFiles = MAX_TRANSFER_CHUNK_FILES,
 	availableBytes = () => maxBytes,
 	concurrency = PREPARE_CONCURRENCY,
+	maxFileBytes = MAX_FILE_SIZE_BYTES,
 ): AsyncGenerator<PreparedUpload[]> {
-	if (!Number.isSafeInteger(maxBytes) || maxBytes < MAX_FILE_SIZE_BYTES
+	if (!Number.isSafeInteger(maxBytes) || maxBytes < maxFileBytes
 		|| !Number.isSafeInteger(maxFiles) || maxFiles < 1) throw new Error('Invalid upload preparation budget');
 	let chunk: PreparedUpload[] = [];
 	let bytes = 0;
@@ -64,7 +68,7 @@ export async function* prepareUploadChunks<T>(
 	const preparing: Array<Promise<PreparedUpload | null>> = [];
 	// An empty chunk always takes its first item, as a chunk never yields empty.
 	const canStart = () => next < items.length && preparing.length < concurrency && (chunk.length + preparing.length === 0
-		|| (chunk.length + preparing.length < maxFiles && bytes + (preparing.length + 1) * MAX_FILE_SIZE_BYTES <= availableBytes()));
+		|| (chunk.length + preparing.length < maxFiles && bytes + (preparing.length + 1) * maxFileBytes <= availableBytes()));
 	try {
 		while (next < items.length || preparing.length) {
 			while (canStart()) {
@@ -81,7 +85,7 @@ export async function* prepareUploadChunks<T>(
 			}
 			const upload = await preparing.shift()!;
 			if (!upload) continue;
-			if (upload.content.byteLength > MAX_FILE_SIZE_BYTES) throw new Error('Prepared upload exceeds file size limit');
+			if (upload.content.byteLength > maxFileBytes) throw new Error('Prepared upload exceeds file size limit');
 			chunk.push(upload);
 			bytes += upload.content.byteLength;
 		}
@@ -97,16 +101,17 @@ export async function* pipelineUploadChunks<T>(
 	prepare: (item: T) => Promise<PreparedUpload | null>,
 	maxBytes = getTransferBudgetBytes(),
 	maxFiles = MAX_TRANSFER_CHUNK_FILES / 2,
+	maxFileBytes = MAX_FILE_SIZE_BYTES,
 ): AsyncGenerator<PreparedUpload[]> {
 	let available = maxBytes;
-	const source = prepareUploadChunks(items, prepare, maxBytes, maxFiles, () => available);
+	const source = prepareUploadChunks(items, prepare, maxBytes, maxFiles, () => available, PREPARE_CONCURRENCY, maxFileBytes);
 	let pending: Promise<IteratorResult<PreparedUpload[]>> | undefined;
 	try {
 		let next = await source.next();
 		while (!next.done) {
 			const chunk = next.value;
 			available = maxBytes - chunk.reduce((sum, file) => sum + file.content.byteLength, 0);
-			if (available >= MAX_FILE_SIZE_BYTES) {
+			if (available >= maxFileBytes) {
 				pending = source.next();
 				// Observe failures immediately, then propagate them after the active upload.
 				void pending.catch(() => {});

@@ -2,7 +2,7 @@ import { assertLocalSyncPath } from './local-path-safety';
 import type { Vault } from 'obsidian';
 import { isVaultTFileLike } from './local-delete';
 import type { FileEntry } from '../../protocol/sync-types';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { formatFileLimit } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 import { localPathExists } from './stored-name';
 
@@ -10,6 +10,8 @@ import { localPathExists } from './stored-name';
 export async function readLocalFileEntry(
 	vault: Vault,
 	path: string,
+	/** The device's file limit for its server; larger files throw. */
+	maxFileBytes: number,
 ): Promise<FileEntry | undefined> {
 	assertLocalSyncPath(path);
 	const abstractFile = vault.getAbstractFileByPath(path);
@@ -20,14 +22,14 @@ export async function readLocalFileEntry(
 	const adapterStat = visibleFile ? null : await vault.adapter.stat(path);
 	if (!visibleFile && adapterStat?.type !== 'file') return undefined;
 	const stat = visibleFile?.stat ?? adapterStat;
-	if ((stat?.size ?? 0) > MAX_FILE_SIZE_BYTES) {
-		throw new Error('Skipped local file larger than 25MB');
+	if ((stat?.size ?? 0) > maxFileBytes) {
+		throw new Error(`Skipped local file larger than ${formatFileLimit(maxFileBytes)}`);
 	}
 
 	try {
 		const content = await vault.adapter.readBinary(path);
-		if (content.byteLength > MAX_FILE_SIZE_BYTES) {
-			throw new Error('Skipped local file larger than 25MB');
+		if (content.byteLength > maxFileBytes) {
+			throw new Error(`Skipped local file larger than ${formatFileLimit(maxFileBytes)}`);
 		}
 		return {
 			hash: await sha256Hex(content),

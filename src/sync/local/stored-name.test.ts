@@ -21,7 +21,7 @@ describe('exact local names after a case-only rename', () => {
 		expect(await disk.vault.adapter.exists('notes/todo.md')).toBe(caseInsensitive);
 		expect(await localPathExists(disk.vault, 'notes/todo.md')).toBe(false);
 		expect(await localPathExists(disk.vault, 'notes/TODO.md')).toBe(true);
-		expect(await readLocalFileEntry(disk.vault, 'notes/todo.md')).toBeUndefined();
+		expect(await readLocalFileEntry(disk.vault, 'notes/todo.md', 25 * 1024 * 1024)).toBeUndefined();
 		await expect(assertLocalFileAbsent(disk.vault, 'notes/todo.md')).resolves.toBeUndefined();
 		await expect(assertLocalFileAbsent(disk.vault, 'notes/TODO.md')).rejects.toThrow('Local file exists again');
 	});

@@ -4,6 +4,7 @@ import { isRecord } from '../platform/validation';
 import { errorMessage } from '../platform/logger';
 import { isAbortError } from './abort';
 import type { SyncIssue, SyncResult } from './types';
+import { formatFileLimit, MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 // Preserve exception identity so cancellation, authentication and retry policy still work.
 const fileContexts = new WeakMap<Error, SyncIssue[]>();
@@ -22,8 +23,10 @@ export class SyncIssueError extends Error {
 	constructor(message: string, readonly issues: SyncIssue[]) { super(message); }
 }
 
-export const OVERSIZED_LOCAL_FILE_MESSAGE = 'Skipped local file larger than 25MB; this file is not synced';
-export const OVERSIZED_REMOTE_FILE_MESSAGE = 'Skipped remote file larger than 25MB';
+export const oversizedLocalFileMessage = (limit: number): string => `Skipped local file larger than ${formatFileLimit(limit)}; this file is not synced`;
+export const oversizedRemoteFileMessage = (limit: number): string => `Skipped remote file larger than ${formatFileLimit(limit)}`;
+export const OVERSIZED_LOCAL_FILE_MESSAGE = oversizedLocalFileMessage(MAX_FILE_SIZE_BYTES);
+export const OVERSIZED_REMOTE_FILE_MESSAGE = oversizedRemoteFileMessage(MAX_FILE_SIZE_BYTES);
 
 /** A file sync deliberately leaves out. It is reported as an issue, but it is not a
  * failure: it must not block the sync cursor, the queue or a completed sync. */
@@ -31,8 +34,8 @@ export class SkippedFileError extends Error {
 	constructor(readonly path: string, readonly issue: SyncIssue = skippedFileIssue(path)) { super(issue.message); }
 }
 
-export const skippedFileIssue = (path: string): SyncIssue => ({ path, message: OVERSIZED_LOCAL_FILE_MESSAGE, code: 'file-too-large' });
-export const oversizedRemoteFileIssue = (path: string): SyncIssue => ({ path, message: OVERSIZED_REMOTE_FILE_MESSAGE, code: 'file-too-large' });
+export const skippedFileIssue = (path: string, limit = MAX_FILE_SIZE_BYTES): SyncIssue => ({ path, message: oversizedLocalFileMessage(limit), code: 'file-too-large' });
+export const oversizedRemoteFileIssue = (path: string, limit: number): SyncIssue => ({ path, message: oversizedRemoteFileMessage(limit), code: 'file-too-large' });
 /** Every encrypted folder name becomes a tag, so a file this deep exceeds the server path limit. */
 export const deepEncryptedFileIssue = (path: string): SyncIssue => ({ path, code: 'unsupported-device-path',
 	message: 'Skipped local file nested more than 36 folders deep, which an encrypted vault cannot sync. Move it higher, then sync again.' });

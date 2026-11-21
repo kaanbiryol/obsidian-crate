@@ -9,7 +9,7 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 | Server candidate revision | 1 |
 | Fresh database schema | 1 |
 | Oldest supported database schema | 1 |
-| Wire protocol | 1 |
+| Wire protocol | 2 |
 | Oldest compatible wire protocol | 1 |
 | Shortcut capture contract | 1 |
 | Shortcut template revision | 1 |
@@ -20,7 +20,7 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 | Download batch | 50 files |
 | Upload batch bytes | 10485760 |
 | Download batch bytes | 8388608 |
-| Largest file | 26214400 bytes |
+| Largest file | 26214400 bytes by default; a self-hosted server may advertise up to 134217728 bytes |
 
 Schema 1 is the baseline with no registered migrations. Matching numbers alone
 do not establish compatibility. See [server upgrades](server-upgrades.md),

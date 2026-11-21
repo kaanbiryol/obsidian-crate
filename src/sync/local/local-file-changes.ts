@@ -1,28 +1,28 @@
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from './file-discovery';
 import type { FileEntry } from '../../protocol/sync-types';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { fitsEncryptedPathLimit } from '../../encryption/path-tags';
 import { deepEncryptedFileIssue, skippedFileIssue } from '../issues';
 import type { SyncIssue } from '../types';
 import { localPathExists } from './stored-name';
 
-/** Oversized files stay discovered (never local deletes) but sync never transfers them. */
-export const isOversizedSyncFile = (file: Pick<VaultFile, 'size'>): boolean => file.size > MAX_FILE_SIZE_BYTES;
+/** Oversized files stay discovered (never local deletes) but sync never transfers them.
+ * `limit` is the device's file limit for its server. */
+export const isOversizedSyncFile = (file: Pick<VaultFile, 'size'>, limit: number): boolean => file.size > limit;
 
 /** Why sync leaves a local file out, if it does: it is oversized, or too deep for an encrypted vault.
  * Such files stay discovered but are never uploaded, so they cannot fail every sync. */
-export function skippedUploadIssue(file: Pick<VaultFile, 'path' | 'size'>, encrypted: boolean): SyncIssue | null {
-	if (isOversizedSyncFile(file)) return skippedFileIssue(file.path);
+export function skippedUploadIssue(file: Pick<VaultFile, 'path' | 'size'>, encrypted: boolean, limit: number): SyncIssue | null {
+	if (isOversizedSyncFile(file, limit)) return skippedFileIssue(file.path, limit);
 	return encrypted && !fitsEncryptedPathLimit(file.path) ? deepEncryptedFileIssue(file.path) : null;
 }
 
 /** Splits discovered files into those sync may upload and the issues for those it leaves out. */
-export function partitionSkippedUploads<T extends Pick<VaultFile, 'path' | 'size'>>(files: T[], encrypted: boolean): { eligible: T[]; skipped: SyncIssue[] } {
+export function partitionSkippedUploads<T extends Pick<VaultFile, 'path' | 'size'>>(files: T[], encrypted: boolean, limit: number): { eligible: T[]; skipped: SyncIssue[] } {
 	const eligible: T[] = [];
 	const skipped: SyncIssue[] = [];
 	for (const file of files) {
-		const issue = skippedUploadIssue(file, encrypted);
+		const issue = skippedUploadIssue(file, encrypted, limit);
 		if (issue) skipped.push(issue);
 		else eligible.push(file);
 	}
@@ -46,6 +46,7 @@ export async function hasLocalFileChanges(
 	vault: Vault,
 	manifest: LocalFileManifest,
 	shouldIgnore: (path: string) => boolean,
+	maxFileBytes: number,
 	verifyContent?: (files: VaultFile[]) => Promise<boolean>,
 	assertActive?: () => void,
 ): Promise<boolean> {
@@ -56,7 +57,7 @@ export async function hasLocalFileChanges(
 	const currentPaths = new Set(currentFiles.map((file) => file.path));
 
 	for (const file of currentFiles) {
-		if (!isOversizedSyncFile(file) && hasLocalMetadataChange(file, manifest.getEntry(file.path))) return true;
+		if (!isOversizedSyncFile(file, maxFileBytes) && hasLocalMetadataChange(file, manifest.getEntry(file.path))) return true;
 	}
 
 	for (const path of manifest.getAllPaths()) {

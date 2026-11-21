@@ -105,7 +105,7 @@ it('discards a local deletion offline and preserves the last-synced revision', a
  h.vault.adapter.readBinary = vi.fn(async () => base);
  h.vault.createBinary.mockImplementation(() => { restored = true; });
  for (const [name, method] of Object.entries(h.api)) {
-	if (name !== 'isConfigured' && vi.isMockFunction(method)) method.mockClear().mockImplementation(() => { throw new Error('Offline'); });
+	if (name !== 'isConfigured' && name !== 'fileLimit' && vi.isMockFunction(method)) method.mockClear().mockImplementation(() => { throw new Error('Offline'); });
  }
  const review = await h.engine.createPendingDiscard([pendingChangeKey('delete', 'note.md')]);
  await review.discard();
@@ -113,6 +113,6 @@ it('discards a local deletion offline and preserves the last-synced revision', a
  expect(h.localManifest.getEntry('note.md')).toMatchObject({ hash, revision: baseline.revision });
  expect(h.engine.getPendingKeys()).not.toContain(pendingChangeKey('delete', 'note.md'));
  for (const [name, method] of Object.entries(h.api)) {
-	if (name !== 'isConfigured' && vi.isMockFunction(method)) expect(method).not.toHaveBeenCalled();
+	if (name !== 'isConfigured' && name !== 'fileLimit' && vi.isMockFunction(method)) expect(method).not.toHaveBeenCalled();
  }
 });

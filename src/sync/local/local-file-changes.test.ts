@@ -14,7 +14,8 @@ describe('local change predicates', () => {
 	});
 
 	it('flags files above the sync size limit', () => {
-		expect(isOversizedSyncFile({ size: MAX_FILE_SIZE_BYTES })).toBe(false);
-		expect(isOversizedSyncFile({ size: MAX_FILE_SIZE_BYTES + 1 })).toBe(true);
+		expect(isOversizedSyncFile({ size: MAX_FILE_SIZE_BYTES }, MAX_FILE_SIZE_BYTES)).toBe(false);
+		expect(isOversizedSyncFile({ size: MAX_FILE_SIZE_BYTES + 1 }, MAX_FILE_SIZE_BYTES)).toBe(true);
+		expect(isOversizedSyncFile({ size: MAX_FILE_SIZE_BYTES + 1 }, 2 * MAX_FILE_SIZE_BYTES)).toBe(false);
 	});
 });

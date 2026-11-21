@@ -31,7 +31,7 @@ Run \`node scripts/check-contract-docs.mjs --write\` after changing those contra
 | Download batch | ${limits.BATCH_DOWNLOAD_MAX_FILES} files |
 | Upload batch bytes | ${limits.BATCH_UPLOAD_MAX_BYTES} |
 | Download batch bytes | ${limits.BATCH_DOWNLOAD_MAX_BYTES} |
-| Largest file | ${limits.MAX_FILE_SIZE_BYTES} bytes |
+| Largest file | ${limits.MAX_FILE_SIZE_BYTES} bytes by default; a self-hosted server may advertise up to ${limits.MAX_CONFIGURABLE_FILE_BYTES} bytes |
 
 Schema 1 is the baseline with no registered migrations. Matching numbers alone
 do not establish compatibility. See [server upgrades](server-upgrades.md),

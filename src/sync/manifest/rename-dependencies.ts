@@ -82,11 +82,11 @@ export function parseRenameDependencies(value: unknown): Map<string, string> {
 	return new Map(Object.entries(value) as Array<[string, string]>);
 }
 
-export async function assertRenamePreserved(manifest: LocalManifest, vault: Vault, path: string): Promise<void> {
+export async function assertRenamePreserved(manifest: LocalManifest, vault: Vault, path: string, maxFileBytes: number): Promise<void> {
 	if (manifest.uploadJournal.pending().length) throw new Error('Remote deletion deferred until pending uploads are resolved. The previous remote copies are preserved.');
 	const destination = manifest.renameDestination(path);
 	if (!destination) return;
-	const local = await readLocalFileEntry(vault, destination);
+	const local = await readLocalFileEntry(vault, destination, maxFileBytes);
 	// The renamed copy was deleted or excluded locally, so nothing remains to
 	// upload; deleting the old path is the user's intent.
 	if (!local) return;

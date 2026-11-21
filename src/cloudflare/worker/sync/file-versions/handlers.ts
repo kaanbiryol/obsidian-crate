@@ -5,6 +5,7 @@ import { corsResponse } from '../../http/cors';
 import { commitStagedFile } from '../mutations';
 import { FileNamespaceConflictError } from '../file-namespace';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../../encryption/file-format';
+import { MAX_CONFIGURABLE_FILE_BYTES } from '../../../../protocol/sync-limits';
 import {
 	storedObjectMatchesMetadata,
 } from '../storage';
@@ -49,7 +50,7 @@ export async function handleRestoreFileVersion(
 	if (version.path !== path) return corsResponse({ error: 'Retained version does not belong to the requested path' }, 409);
 
 	const object = await bucket.get(version.storage_key);
-	if (!object || object.size > fileTransportLimit(object.httpMetadata?.contentType) || !storedObjectMatchesMetadata(object, {
+	if (!object || object.size > fileTransportLimit(object.httpMetadata?.contentType, MAX_CONFIGURABLE_FILE_BYTES) || !storedObjectMatchesMetadata(object, {
 		hash: version.hash,
 		size: version.size,
 		storageKey: version.storage_key,
