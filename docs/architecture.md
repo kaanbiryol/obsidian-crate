@@ -680,9 +680,9 @@ only their own capability.
 storage identities, and mutation lock; `worker/notifications/dispatcher.ts` owns
 reminder delivery and retries from the schedule columns of `reminder_projections`.
 `coordinator.ts` names every role instance (coordinator, notification dispatcher,
-maintenance, Reading, transfer and Reading image pools) and owns the internal endpoint paths behind
+maintenance, Reading and transfer pools) and owns the internal endpoint paths behind
 typed helpers. `coordinator-requests.ts` dispatches those endpoints with that lock,
-keeping upload preparation and Reading image batches outside it. `coordinator-alarms.ts` dispatches the
+keeping upload preparation outside it. `coordinator-alarms.ts` dispatches the
 dispatcher, Reading, maintenance and projection roles' alarms by instance name.
 
 `worker/sync/` is also the committed-file store every feature writes through.

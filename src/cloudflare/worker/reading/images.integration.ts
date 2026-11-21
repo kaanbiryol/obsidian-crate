@@ -5,8 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { publishCapture, type PendingCapture } from './captures';
-import { handleReadingImageBatch, stageArticleImages, stageReadingImageBatch } from './extraction/images';
-import { stageReadingImagesRemotely } from '../coordinator/coordinator';
+import { stageArticleImages } from './extraction/images';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readCommittedMarkdownFileVersion } from '../sync/markdown-files';
 import { getStoredFileRow } from '../sync/storage';
@@ -44,7 +43,7 @@ const fetchPublic = vi.fn(async (request: Request) => {
 
 it('saves a capture\'s images beside its note, serves them to the reader and deletes them with the note', async () => {
 	const row = await savedCapture();
-	const images = await stageArticleImages(article, 'Reading', row.id, batch => stageReadingImageBatch(env, batch, fetchPublic));
+	const images = await stageArticleImages(env, article, 'Reading', row.id, fetchPublic);
 	expect(images.map(image => image.path)).toEqual([`Reading/attachments/${row.id}/1.png`]);
 	// Staged only: nothing is published before the note.
 	expect(await getStoredFileRow(env.DB, images[0]!.path)).toBeNull();
@@ -102,18 +101,8 @@ it('stores the choice to load images from the website and then keeps web links',
 
 it('cleans up staged images whose folder changed before publication', async () => {
 	const row = await savedCapture();
-	const images = await stageArticleImages(article, 'Elsewhere', row.id, batch => stageReadingImageBatch(env, batch, fetchPublic));
+	const images = await stageArticleImages(env, article, 'Elsewhere', row.id, fetchPublic);
 	await publishCapture(env, row.id, row.generation, article, undefined, images);
 	expect(await getStoredFileRow(env.DB, images[0]!.path)).toBeNull();
 	expect(await env.DB.prepare('SELECT 1 FROM object_cleanup_queue WHERE storage_key = ?').bind(images[0]!.objectKey).first()).not.toBeNull();
-});
-
-it('stages a batch in the image pool and refuses a malformed one', async () => {
-	const row = await savedCapture();
-	const batch = { folder: 'Reading', id: row.id, images: [{ url: 'https://cdn.example/chart.png', number: 3 }, { url: 'https://cdn.example/logo.svg', number: 4 }] };
-	const response = await handleReadingImageBatch(new Request('https://do/reading-images', { method: 'POST', body: JSON.stringify(batch) }), { ...env, READING_FETCH: { fetch: fetchPublic } });
-	expect(await response.json()).toMatchObject([{ url: 'https://cdn.example/chart.png', path: `Reading/attachments/${row.id}/3.png` }]);
-	// The pool routes the request to the same handler, which checks the batch first.
-	for (const body of ['not json', JSON.stringify({ ...batch, images: Array.from({ length: 11 }, (_, i) => ({ url: 'https://cdn.example/a.png', number: i + 1 })) }), JSON.stringify({ ...batch, id: '../x' })])
-		expect((await stageReadingImagesRemotely(env, 0, body)).status).toBe(400);
 });

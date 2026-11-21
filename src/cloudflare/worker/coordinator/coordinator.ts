@@ -14,8 +14,6 @@ const MAINTENANCE_NAME = '__crate__/maintenance';
 const READING_NAME = '__crate__/reading';
 /** Transfers spread over a fixed pool; reads use a separate pool of the same size. */
 const TRANSFER_SHARDS = 8;
-/** One instance per batch of an article's images, so batches staged together do not queue. */
-const READING_IMAGE_SHARDS = 10;
 
 export type CoordinatorRole = 'coordinator' | 'dispatcher' | 'maintenance' | 'reading';
 const ROLES: Readonly<Record<string, CoordinatorRole>> = {
@@ -53,7 +51,6 @@ export const TRANSFER_PATHS = {
 	batchDownload: '/batch-download',
 	historyCheckpoint: '/history-checkpoint',
 	historyCheckpointFile: '/history-checkpoint-file',
-	readingImages: '/reading-images',
 } as const;
 export type TransferPath = typeof TRANSFER_PATHS[keyof typeof TRANSFER_PATHS];
 
@@ -85,12 +82,6 @@ export function forwardToCoordinator(env: AlarmBinding, request: Request): Promi
 export function transferStub(env: AlarmBinding, pool: 'transfer' | 'transfer-read'): DurableObjectStub {
 	const shard = crypto.getRandomValues(new Uint8Array(1))[0]! % TRANSFER_SHARDS;
 	return roleStub(env, `__crate__/${pool}/${shard}`);
-}
-
-/** Stages one batch of a Reading article's images in an instance of their own pool, which
- * gives the batch its own invocation and subrequest budget. These hold no storage. */
-export function stageReadingImagesRemotely(env: AlarmBinding, batch: number, body: string): Promise<Response> {
-	return roleStub(env, `__crate__/reading-images/${batch % READING_IMAGE_SHARDS}`).fetch(`https://do${TRANSFER_PATHS.readingImages}`, { method: 'POST', body });
 }
 
 /** Arms projection for the current parser version. Returns whether the coordinator accepted. */

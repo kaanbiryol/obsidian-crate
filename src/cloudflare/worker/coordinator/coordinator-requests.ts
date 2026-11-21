@@ -24,10 +24,6 @@ export async function handleCoordinatorRequest(
 	withStateLock: StateLock,
 ): Promise<Response> {
 	const path = new URL(request.url).pathname;
-	if (path === TRANSFER_PATHS.readingImages && request.method === 'POST') {
-		const { handleReadingImageBatch } = await import('../reading/extraction/images');
-		return handleReadingImageBatch(request, env);
-	}
 	if ((path === TRANSFER_PATHS.syncUpload && request.method === 'PUT') || (path === TRANSFER_PATHS.syncBatchUpload && request.method === 'POST')) {
 		// Reauthenticate inside the transfer queue so reset/revocation fences waiting writers.
 		const target = new URL(request.url);

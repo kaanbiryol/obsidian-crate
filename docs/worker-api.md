@@ -169,19 +169,39 @@ note to their trash. A note still in the capture queue has no file and returns 4
 
 ### Reading images
 
-While `readingImages` is `save`, server captures and article jobs save up to 100 `https`
-images per article (PNG, JPEG, GIF, WebP or AVIF by their bytes, 10 MiB each, 40 MiB in all, one
-redirect each). The Reading alarm sends them in batches of 10, at most five at a time, to the
-`__crate__/reading-images/<n>` Durable Objects (`/reading-images`), so each batch has its own
-invocation and Free-plan subrequest budget. A batch downloads two images at a time and puts each
-in R2 under its own upload lease as it arrives; one that fails leaves its images with their web
-links. A run that handled a capture leaves the next article job for the following alarm. The
-publication sent to the coordinator carries only object keys. Under the lock, each image still
-inside the current folder's `attachments/<Reading ID>/` commits as a new file (or is kept when
-that exact content is already live), in groups of 32 per D1 batch, before the note, which links
-only the committed ones; every other image, including any past the 40 MiB total, keeps its web
-link and its object is queued for cleanup. `reading/image-budget.integration.ts` counts each
-invocation's subrequests for 100 images.
+While `readingImages` is `save`, server captures and article jobs download up to 10 `https`
+images per article (PNG, JPEG, GIF, WebP or AVIF by their bytes, 5 MiB each, 20 MiB in all, one
+redirect each) in the Reading alarm, and put them in R2 under one upload lease. The publication
+sent to the coordinator carries only their object keys. Under the lock, each image still inside
+the current folder's `attachments/<Reading ID>/` commits as a new file (or is kept when that exact
+content is already live) before the note, which links only the committed ones; every other
+image keeps its web link and its object is queued for cleanup.
+
+#### Image limits
+
+| Saved by | Images per article | Each | In all | Set in |
+| --- | --- | --- | --- | --- |
+| Obsidian | No count limit | 10 MiB | 40 MiB | `READING_IMAGE_LIMITS` in `src/reading/core/article-images.ts` |
+| Server, plaintext vault | 10 | 5 MiB | 20 MiB | `WORKER_IMAGE_LIMITS` in `src/cloudflare/worker/reading/extraction/images.ts` |
+| Server, encrypted vault | 10 | 2 MiB | 8 MiB | `ENCRYPTED_IMAGE_LIMITS` in the same file |
+
+Obsidian downloads on the device, so only file size bounds it. The server limits come from the
+Cloudflare Free plan:
+
+- An invocation may make 50 subrequests. Fetches, R2 calls and D1 queries all count (a
+  `db.batch()` counts once), and so does each redirect. Each image costs several (its fetch, any
+  redirect and its R2 write), so one alarm run fits about 10 images next to the capture itself.
+  `reading/image-budget.integration.ts` checks that the alarm run and the publication each stay
+  within 50.
+- A Worker isolate has 128 MiB of memory, which bounds the total held during a run.
+- Each saved image writes about 3 D1 rows and reads about 45, against 100,000 rows written and
+  5 million read per day.
+- In an encrypted vault, `POST /reading/encrypted-extract` returns every image in one response and
+  they commit beside the new note, under the 24 MiB encrypted commit limit.
+
+The Paid plan allows 10,000 subrequests, but the limits stay the same on every plan. Saving more
+on Free would need each group of images in its own invocation, for example a Durable Object
+request per batch.
 
 `GET /reading/file?path=…` (library credential, plaintext vaults) returns one image file inside
 the Reading folder, typed by its name with `X-Content-Type-Options: nosniff` and a sandboxing

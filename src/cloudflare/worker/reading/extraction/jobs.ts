@@ -1,7 +1,7 @@
 import { readEncryptionState } from '../../encryption/state';
 import { capturePath, MAX_FETCH_ATTEMPTS, publishCapture, runCapture, stageImages, type CapturePublication } from '../captures';
 import { featureEnabled, featurePolicy } from '../../server/feature-policy';
-import type { ReadingImageBatchStager, StagedReadingImage } from './images';
+import type { StagedReadingImage } from './images';
 import type { FeaturePolicy } from '../../../../protocol/feature-policy';
 import type { EncryptionServerState } from '../../../../encryption/server-state';
 import type { Env } from '../../types';
@@ -78,8 +78,7 @@ export async function armReadingCoordinator(state: DurableObjectState): Promise<
 	if (await state.storage.getAlarm() === null) await state.storage.setAlarm(Date.now() + 100);
 }
 
-/** `stageBatch` stages image batches in place of the image pool, for tests. */
-export async function runReadingExtraction(state: DurableObjectState, env: Env, stageBatch?: ReadingImageBatchStager): Promise<void> {
+export async function runReadingExtraction(state: DurableObjectState, env: Env): Promise<void> {
 	if (await readEncryptionState(env.DB)) return ;
 	// A persisted maintenance fence stops new network work during backup/upgrade.
 	if (await deploymentFenceHeld(env.DB)) { await state.storage.setAlarm(Date.now() + 60_000); return; }
@@ -89,7 +88,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env, 
 	if (!current) return;
 	const saveImages = features.readingImages !== 'remote';
 	let captured = true;
-	try { captured = await runCapture(env, state, Boolean(current.enabled), saveImages, stageBatch); } catch { /* The durable lease retries an uncertain publication. */ }
+	try { captured = await runCapture(env, state, Boolean(current.enabled), saveImages); } catch { /* The durable lease retries an uncertain publication. */ }
 	// Saving images uses most of a run's subrequests (50 on the Workers Free plan), so a run
 	// that handled a capture leaves the next job for an alarm a second later.
 	const deferred = saveImages && captured;
@@ -119,7 +118,7 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env, 
 					const fetchPublic = env.READING_FETCH ? (request: Request) => env.READING_FETCH!.fetch(request) : fetch;
 					try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, fetchPublic, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
 					catch { if (job.attempts < MAX_FETCH_ATTEMPTS - 1) return; }
-					images = result && saveImages ? await stageImages(env, result, job.item_id, stageBatch) : undefined;
+					images = result && saveImages ? await stageImages(env, result, job.item_id, fetchPublic) : undefined;
 				}
 				if (!await publishReading(env, { job, result, resolvedUrl, ...(images?.length ? { images } : {}) } satisfies Publication)) throw new Error('Reading publication unavailable');
 			}

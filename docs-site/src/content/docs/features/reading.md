@@ -40,7 +40,7 @@ By default, Crate saves an article's images in your vault when it downloads the 
 
 To keep only the images' links, go to **Settings** → **Crate** → **Reading** and set **Article images** to **Load from the website**. The choice applies to every device and to articles saved from then on. The websites hosting the images then see your IP address each time you open the article, and the images need a connection.
 
-Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. Obsidian saves every image in an article, up to 10 MB each and 40 MB in all. Your server saves up to 100 per article with the same size limits, or 10 of up to 2 MB each in an encrypted vault. An image that is too large or fails to download keeps its link.
+Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. Obsidian saves every image in an article, up to 10 MB each and 40 MB in all. Your server saves the first 10 (5 MB each), or 10 of up to 2 MB each in an encrypted vault, which keeps each save within the Cloudflare free plan's limits. An image that is too large or fails to download keeps its link.
 
 ### When a page won't download
 

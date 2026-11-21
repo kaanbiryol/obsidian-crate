@@ -190,13 +190,12 @@ export async function commitStagedFile(
 	return settleStagedFile(bucket, db, params, results.slice(0, plan.statements.length), plan.mutationIndex);
 }
 
-/** `commitStagedFile` for several uploads in one transaction and one round trip. An
- * upload with an operation has its outcome as a durable receipt: a retry of the same
- * operations, together or one at a time, answers from those receipts. One without (saved
- * Reading images) is settled by its revision guard, as `commitStagedFile` does. The files
- * share one server state, so the first one's Reading policy serves all. Results keep the
+/** `commitStagedFile` for several uploads in one transaction and one round trip. Each
+ * upload has an operation, so its outcome is its durable receipt: a retry of the same
+ * operations, together or one at a time, answers from those receipts. The files share
+ * one server state, so the first one's Reading policy serves all. Results keep the
  * order of `files`. */
-export async function commitStagedFiles(bucket: R2Bucket, db: D1Database, files: StagedFileCommitInput[]): Promise<CommitResult[]> {
+export async function commitStagedFiles(bucket: R2Bucket, db: D1Database, files: Array<StagedFileCommitInput & { operation: UploadOperation }>): Promise<CommitResult[]> {
 	if (!files.length) return [];
 	const plans = await Promise.all(files.map(file => stagedFileStatements(db, file, false)));
 	const statements: D1PreparedStatement[] = [];
