@@ -5,14 +5,7 @@ description: Keep your Obsidian vault in sync, review pending changes, and under
 
 Crate keeps the same vault on all your Obsidian devices, through a server you own. Your notes stay ordinary files on each device, so you can stop using Crate at any time and keep everything.
 
-## Your first sync
-
-Connecting a server does not move any files yet. When you're ready:
-
-1. Open Obsidian's command palette and run **Crate: Sync now**.
-2. Wait for it to finish. On a phone, keep Obsidian open until it does.
-
-That's it. From now on you can sync by hand whenever you like, or let Crate do it for you.
+Just connected? Start with [your first sync](/docs/getting-started/first-sync/). After that, run **Crate: Sync now** whenever you like, or let Crate sync for you.
 
 ## Sync automatically
 
@@ -47,7 +40,7 @@ The web app and reminder notifications keep working either way, because they use
 
 Run **Crate: Show sync activity** and open **Pending** to see every file waiting to sync. Select a file to see what you changed since this device last synced it.
 
-A plugin's code files (`main.js`, `manifest.json` and `styles.css`) show as one row with the plugin's name, such as **Dataview** with **Plugin updated** or **Plugin removed**. They're checked and synced together, so another device never gets only part of a plugin. A plugin's settings (`data.json`) stay a separate row. When the list has plugin rows, the button counts items, such as **Sync 3 items**.
+Each plugin shows as one row with its name, such as **Dataview** marked **Plugin updated**, so another device never gets only part of a plugin. Its settings show as a separate row.
 
 ![Sync activity with one pending note, showing the line that changed since the last sync](../../../assets/screenshots/crate-sync-pending.png)
 
@@ -61,7 +54,7 @@ To hold a file back, uncheck it. It stays on this device, untouched by changes f
 - The comparison shows your local edits only, not newer edits from another device.
 - If you undo an edit, the file can stay in the list, labeled **Unchanged**, until the next sync.
 - Images, PDFs, and very large files show a size summary instead of a text comparison.
-- Select several rows with Shift-click or Cmd/Ctrl-click, or select all with **Cmd+A** (macOS) or **Ctrl+A**. **Space** toggles the focused file's checkbox, and **Shift+F10** or right-click opens its menu. From the menu you can open the file in Obsidian or show it in your file manager.
+- Select several rows with Shift-click or Cmd/Ctrl-click. Right-click a file to open it in Obsidian or show it in your file manager.
 
 </details>
 
@@ -81,6 +74,12 @@ Everything in your vault syncs: new files, edits, renames, deletions, and attach
 
 Your other plugins and their settings sync too. After they download, restart Obsidian to load them.
 
+## Use one sync tool per vault
+
+If another tool, such as Obsidian Sync or iCloud Drive, also syncs the same vault, both write the same files. That causes duplicates and conflicts, and a deletion made by one spreads through the other.
+
+To move a vault to Crate, turn off the other sync tool for that vault first, or move the vault out of a synced folder such as iCloud Drive. A backup tool that only copies your vault elsewhere is fine, and recommended.
+
 ## Crate updates
 
 Update Crate on one device and your other devices get the same version on their next sync. Restart Obsidian on each device to load it.
@@ -89,7 +88,7 @@ Until you sync, the device you updated lists the update in sync activity as a **
 
 - In an encrypted vault, the update installs on its own, because only your own unlocked devices can create it.
 - Without encryption, Crate shows a notice first. Select **Install update** to accept it.
-- A device never installs an older version than the one it has, and never touches Crate's settings or sync state.
+- Updates never downgrade Crate or change its settings.
 
 To turn this off on a device, open **Settings → Crate → Sync → Sync options** and turn off **Sync Crate updates**.
 
@@ -116,8 +115,8 @@ Exclusions apply to all your Obsidian devices. Adding a rule stops future syncin
 ## When something goes wrong
 
 - **Two devices changed the same note:** Crate keeps both versions for you to compare. See [Resolve conflicts](/docs/troubleshooting/conflicts/).
-- **You need an earlier version:** the server keeps replaced and deleted files for 30 days by default (change it in **Sync options → Keep history for**), about one version every 10 minutes while you edit, and you can restore your whole vault to an earlier synced state. See [History and recovery](/docs/troubleshooting/recovery/) before you restore.
+- **You need an earlier version:** restore one file or your whole vault from [History and recovery](/docs/troubleshooting/recovery/).
 
-:::caution[Sync is not a backup]
-Deleting a file on one device deletes it everywhere. Keep a separate backup of notes you can't afford to lose.
+:::note[Deletions sync too]
+Deleting a file on one device deletes it on your other devices too. You can [recover it](/docs/troubleshooting/recovery/#get-back-a-deleted-file) for your history period, 30 days by default. For anything older, keep a separate backup.
 :::

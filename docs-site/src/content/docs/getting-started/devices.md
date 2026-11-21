@@ -10,50 +10,32 @@ There are two ways to use Crate on another device:
 
 ## Another Obsidian device
 
-1. Let a sync finish on your first device. Until it does, other devices stop with "Another device is uploading this vault for the first time." If you see this on the device that started the upload, for example after reconnecting it, select **Replace server files** under **Settings → Crate → Server → Advanced server actions** to finish. This replaces the server's files with this device's, so use it only on that device.
+1. Let a sync finish on your first device.
 2. On the other device, open a vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy. If the vault already has files and the server does too, Crate asks before replacing them: everything in the vault moves to Obsidian's `.trash` folder and the server's contents download.
 3. Connect to the **same server**:
-   - **Cloudflare:** on your first device (a device that has your Cloudflare sign-in saved), open **Settings → Crate → Account and devices** and select **Add a device**. Scan the code on the new device, or copy the link and paste it into **Pairing link** in Crate settings there, then select **Connect**. The code works once and expires after 10 minutes. You can also select **Connect with Cloudflare** on the new device and choose the existing server; on a phone or tablet, select **Open Cloudflare** in the connection dialog first.
+   - **Cloudflare:** on your first device (one that has your Cloudflare sign-in saved), open **Settings → Crate → Account and devices** and select **Add a device**. Scan the code on the new device, or paste the link into **Pairing link** in Crate settings there, then select **Connect**.
    - **Your own server:** on the server computer, run the `pair` command from [Add another device](/docs/getting-started/self-hosting/#add-another-device). Scan its QR code with the new device, or open its link there, then select **Connect**. **Settings → Crate → Account and devices → Add a device** shows the right command.
-4. Crate turns on the features your first device chose for this vault. If no device has chosen yet, **Choose what Crate manages in this vault** opens: turn on Reminders and Reading to use them, then select **Finish**. You can change them later under **Settings → Crate**.
-5. If you use encryption and added the device with a code, keep **Add a device** open on your first device. Check that both screens show the same code, select **Approve** there, then **Confirm and unlock** on the new device. If that screen closed, select **Manage encryption → Request keys** on the new device and approve it from **Manage encryption → Connect web app** on your first device. Otherwise, open **Manage encryption** in Crate’s Sync settings and enter your recovery key.
-6. Run **Crate: Sync now** and wait for it to finish.
-7. Open a note on both devices to check that it matches. If both devices changed the same content, [review the conflicts](/docs/troubleshooting/conflicts/).
-8. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**. It starts off on every new device.
+4. Using encryption? [Unlock the new device](/docs/features/encryption/#obsidian) before it syncs.
+5. Run **Crate: Sync now**, then open a note on both devices to check that it matches.
 
-:::caution[One vault per server]
-Connecting another vault to a server that already has files replaces that vault's contents with the server's. Give each unrelated vault its own server.
-:::
+The new device turns on the features your first device [chose for this vault](/docs/getting-started/first-sync/#choose-what-crate-manages), or asks if no device has chosen yet. **Automatic sync** starts off; [turn it on](/docs/features/sync/#sync-automatically) if you want it.
+
+Each unrelated vault needs [its own server](/docs/getting-started/hosting/#one-server-for-each-vault).
+
+<details>
+<summary>If the new device doesn't connect</summary>
+
+- **The code expired:** **Add a device** codes work once and expire after 10 minutes. Select **Add a device** again. You can also select **Connect with Cloudflare** on the new device and choose the existing server; on a phone or tablet, select **Open Cloudflare** in the connection dialog first.
+- **"Another device is uploading this vault for the first time":** let the first device finish its sync. If you see this on the device that started the upload, see [Sync errors](/docs/troubleshooting/sync-errors/#another-device-is-uploading-this-vault-for-the-first-time).
+- **Both devices changed the same note:** [review the conflicts](/docs/troubleshooting/conflicts/).
+
+</details>
 
 ## Open the web app
 
-Once Obsidian is connected and your vault has synced:
+Once your vault has synced, open **Settings → Crate → Crate web app** and select **Open app**, or **Set up on phone** to show a QR code. The web app holds your reading list and reminders and talks to your server directly, so Obsidian doesn't need to stay open.
 
-1. Open **Settings → Crate → Crate web app**.
-2. Select **Open app** to use it on this device, or **Set up on phone** (**Set up on another device** in Obsidian mobile) to show a QR code. **Copy link** gives you the same link to open elsewhere.
-3. Open the link or scan the code on the device you want to connect.
-
-The web app holds both Reading and Reminders. It talks to your server directly, so Obsidian doesn't need to stay open.
-
-Anyone with a connection link can see your library and reminders, so keep links private.
-
-**Using encryption?** If the app asks to unlock, select **Connect with Obsidian** and approve the matching code on both devices, or use your recovery key. See the [encryption guide](/docs/features/encryption/#reading-and-reminders-web-app). Encrypted article downloads the browser can't finish wait until an unlocked Obsidian device is available.
-
-## Add it to your Home Screen
-
-Use your browser's install option. On iPhone, open the connected app in Safari, then select **Share → Add to Home Screen**.
-
-Open the installed app soon afterwards: the handoff from Safari expires after ten minutes. If it does, generate a fresh connection link.
-
-To get reminder alerts, turn on the vault's **Push notifications** setting in Obsidian, then register this device in the web app. [Set up notifications](/docs/features/notifications/) walks through both.
-
-For Android installation, navigation preferences, and everyday use, see [Use the web app](/docs/features/web-app/).
-
-## Offline use
-
-Obsidian always has your local vault. The web app can show cached reminders and articles you've opened. Reading saves and edits wait until you're back online; reminder changes need a connection.
-
-Before signing out or clearing browser data, check for pending work. [Recovery](/docs/troubleshooting/recovery/#pending-work-in-the-web-app) explains how to keep it.
+[Use the web app](/docs/features/web-app/) covers connecting, installing it on your phone, and offline use.
 
 ## Disconnect a device
 

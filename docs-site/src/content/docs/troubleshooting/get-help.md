@@ -3,7 +3,7 @@ title: Get help
 description: Check your connection with diagnostics, turn on debug logs, and report a problem without sharing private notes.
 ---
 
-Start with the page for what you're seeing: [connection](/docs/troubleshooting/connection/), [conflicts](/docs/troubleshooting/conflicts/), [history and recovery](/docs/troubleshooting/recovery/), [notifications](/docs/troubleshooting/notifications/), or [updates](/docs/troubleshooting/updates/). If that doesn't solve it, these tools help you, or whoever helps you, find the cause.
+Start with the page for what you're seeing: [sync errors](/docs/troubleshooting/sync-errors/), [connection](/docs/troubleshooting/connection/), [conflicts](/docs/troubleshooting/conflicts/), [history and recovery](/docs/troubleshooting/recovery/), [notifications](/docs/troubleshooting/notifications/), or [updates](/docs/troubleshooting/updates/). If that doesn't solve it, these tools help you, or whoever helps you, find the cause.
 
 All of them are in **Settings → Crate → Troubleshooting**.
 

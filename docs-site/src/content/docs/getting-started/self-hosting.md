@@ -1,6 +1,12 @@
 ---
 title: Set up your own server
 description: Run Crate on your own hardware with one command, then connect Obsidian by scanning a code.
+prev:
+  link: /docs/getting-started/hosting/
+  label: Choose your hosting
+next:
+  link: /docs/getting-started/first-sync/
+  label: Your first sync
 ---
 
 Run Crate on a computer or server you control, and your synced data is stored there. You don't need a Cloudflare account or a domain. Choose one way to run it:
@@ -46,7 +52,7 @@ Install the Crate plugin in Obsidian first. When the server is ready it shows a 
 - **On a phone or tablet,** scan the QR code with the camera.
 - **On a computer,** open the link.
 
-Obsidian opens and asks to connect the vault. Select **Connect**, choose what Crate manages, and it starts syncing.
+Obsidian opens and asks to connect the vault. Select **Connect**, then [choose what Crate manages and run your first sync](/docs/getting-started/first-sync/).
 
 You can also enter the server address and pairing code shown below the QR code in **Settings → Crate → Connect to your server**. Codes work once and expire after ten minutes.
 
@@ -108,4 +114,3 @@ Every device keeps a full copy of your notes. The server adds history, pairing, 
 
 Copy backups to another disk or computer now and then. The [server command reference](/docs/reference/self-hosting/#verified-backups-restore-and-updates) covers restoring one.
 
-[Connect your other devices →](/docs/getting-started/devices/)

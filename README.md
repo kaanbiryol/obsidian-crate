@@ -22,7 +22,7 @@ Crate is early self-hosted software. Review the code, understand the Cloudflare 
 
 ## Documentation
 
-Start with the [documentation site](https://crate.kaanbiryol.com/docs/) and its [common questions](https://crate.kaanbiryol.com/docs/getting-started/faq/): [install the plugin](https://crate.kaanbiryol.com/docs/getting-started/installation/), [choose your hosting](https://crate.kaanbiryol.com/docs/getting-started/hosting/), then [connect your devices](https://crate.kaanbiryol.com/docs/getting-started/devices/). Feature guides cover [vault sync](https://crate.kaanbiryol.com/docs/features/sync/), [reminders](https://crate.kaanbiryol.com/docs/features/reminders/), [Reading](https://crate.kaanbiryol.com/docs/features/reading/), the [web app](https://crate.kaanbiryol.com/docs/features/web-app/), [encryption](https://crate.kaanbiryol.com/docs/features/encryption/) and [practical limits](https://crate.kaanbiryol.com/docs/getting-started/limits/).
+Start with the [documentation site](https://crate.kaanbiryol.com/docs/): [install the plugin](https://crate.kaanbiryol.com/docs/getting-started/installation/), [choose your hosting](https://crate.kaanbiryol.com/docs/getting-started/hosting/), then [connect your devices](https://crate.kaanbiryol.com/docs/getting-started/devices/). Feature guides cover [vault sync](https://crate.kaanbiryol.com/docs/features/sync/), [reminders](https://crate.kaanbiryol.com/docs/features/reminders/), [Reading](https://crate.kaanbiryol.com/docs/features/reading/), the [web app](https://crate.kaanbiryol.com/docs/features/web-app/), [encryption](https://crate.kaanbiryol.com/docs/features/encryption/) and [practical limits](https://crate.kaanbiryol.com/docs/getting-started/limits/).
 
 For operators and contributors:
 

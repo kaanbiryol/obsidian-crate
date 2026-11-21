@@ -1,23 +1,15 @@
 ---
-title: Choose and manage features
-description: Turn Crate features on or off, understand which devices a setting affects, and choose folders and preferences.
+title: Settings
+description: Turn Crate features on or off, pause them, choose folders, and look up every setting, what it affects, and its default.
 ---
 
 Crate does several things: vault sync, Reading, and Reminders. Use one, two, or all three. Notifications and encryption are optional extras you can add whenever you like.
 
 Everything lives under **Settings → Crate** in Obsidian. Expand **Reading** or **Reminders** under **Features** to see their controls, with or without a server. **Sync**, **Crate web app** and **Appearance** appear once a server is connected, and **Notifications** once Reminders is on too.
 
-## What starts on?
+## Choose your features
 
-Here's what a new installation looks like. If you connect to a server you already use, its shared settings come along.
-
-| Feature | Starts | Where to change it |
-| --- | --- | --- |
-| Automatic vault sync | Off on each Obsidian device | **Sync → Automatic sync** |
-| Reading | Off until you turn it on in this vault | **Reading → Enable reading** |
-| Reminders | Off until you turn them on in this vault | **Reminders → Enable reminders** |
-| Reminder notifications | Off | **Notifications → Push notifications**, then [register each receiving device](/docs/features/notifications/) |
-| End-to-end encryption | Off | **Sync → End-to-end encryption** |
+Everything starts off: automatic sync, Reading, Reminders, notifications, and encryption. If you connect to a server you already use, its shared settings come along.
 
 Reading and Reminders change the notes in their folders: Reading adds properties to every Markdown note in the `Reading` folder, and Reminders adds hidden tracking IDs to checkboxes in the `Reminders` folder. That's why neither starts on its own. When you turn one on, Crate names the folder it will use and asks first. To use a different folder, change **Reading folder** or **Reminders folder** before turning the feature on.
 
@@ -38,30 +30,12 @@ Turn off **Enable reading** or **Enable reminders** in its section. Turn it back
 :::note[These switches affect every device]
 They apply to **all devices connected to this server**, so changing them needs a connection. Other devices pick up the change when they next check the server. An offline device keeps its last known setting until it reconnects.
 
-When you connect the first device, you choose these in the last setup step, **Choose what Crate manages in this vault**. [After you connect](/docs/getting-started/hosting/#after-you-connect) explains that step.
+When you connect the first device, you choose these in the last setup step, [Choose what Crate manages in this vault](/docs/getting-started/first-sync/#choose-what-crate-manages).
 :::
 
 ## Pause sync on one device
 
-- **Sync only when you ask:** turn off **Sync → Automatic sync**. You can still run **Crate: Sync now**, and a sync already running can finish.
-- **Stop right now:** select **Stop sync** in Sync activity, or run **Crate: Stop sync**. This also turns off automatic sync until you turn it back on.
-
-This only affects this Obsidian device. Other devices, the web app, and notifications carry on. To stop alerts everywhere, turn off **Notifications → Push notifications**.
-
-## Know which settings are shared
-
-Crate labels settings **This device** or **All devices** where it matters.
-
-| Setting | Applies to |
-| --- | --- |
-| Automatic sync, delay after editing, and **Sync Crate updates** | This Obsidian device |
-| Remote check interval and excluded files | Your connected Obsidian devices, through shared settings |
-| Reading and Reminders on/off switches, **Article images**, and **Keep history for** | All devices on the server |
-| Push notifications, notification folder, timezone, and all-day alert time | The server's alert schedule for all subscribed devices |
-| List style, default reminders tab, default due date, startup view, upcoming range, and **Desktop notifications** | This Obsidian device |
-| Web app theme, tabs, and list style | That browser or installed web app |
-
-Shared changes reach other devices the next time they contact or sync with the server. On a phone, the browser and the Home Screen app can have their own preferences and connections.
+Turn off **Sync → Automatic sync**, or run **Crate: Stop sync** to stop right away. Both affect only this device. [Take a break from syncing](/docs/features/sync/#take-a-break-from-syncing) explains the difference.
 
 ## Choose your folders
 
@@ -81,10 +55,82 @@ Crate just starts looking somewhere else. If you want existing notes in the new 
 
 </details>
 
-## Make the views your own
+## All settings
 
-Under **Reminders**, choose **Default due date**, **Open reminders on startup**, **Default reminders tab**, and **Upcoming range (days)**. These change what you see and the starting values for new reminders; they never reschedule existing tasks.
+**Applies to** matches the **This device** or **All devices** label Crate shows next to each setting. Shared changes reach other devices the next time they contact or sync with the server.
 
-With a server connected, **Appearance → List style** switches between **Flat** rows and **Cards** for reminders, projects, and Reading. The web app has its own [appearance and tab settings](/docs/features/web-app/#make-it-yours).
+### Sync
 
-Looking for something else? To disconnect a device, see the [device guide](/docs/getting-started/devices/#disconnect-a-device). Turning [encryption off](/docs/features/encryption/#turn-encryption-off) resets your server data, so read that guide first.
+Appears once a server is connected. **Sync options** holds everything except **Automatic sync** and encryption.
+
+| Setting | What it does | Applies to | Default |
+| --- | --- | --- | --- |
+| **Automatic sync** | Syncs after edits, on startup and resume, and at the check interval. Turning it off lets a running sync finish. | This device | Off |
+| **Sync delay after editing (seconds)** | How long to wait after a change before syncing. 0 syncs right away. | This device | 5 |
+| **Check for remote changes** | How often to look for edits from your other devices while automatic sync is on: **Off**, 1, 5 or 15 minutes, or a custom number of seconds. | All devices | 5 minutes |
+| **Sync Crate updates** | Shares the Crate version installed here with your other devices and installs newer ones they share. See [Crate updates](/docs/features/sync/#crate-updates). | This device | On |
+| **Keep history for** | How long the server keeps earlier file versions and saved vault states: 7, 14, 30, 60 or 90 days. | All devices | 30 days |
+| **Excluded files and folders** | Files that stay local, one pattern per line. See [Keep files on one device](/docs/features/sync/#keep-files-on-one-device). | All devices | Common temporary and system files, such as `.git/`, `.trash/` and `.DS_Store` |
+| **Remove excluded server files** | Removes server copies of files you've since excluded. | All devices | - |
+| **End-to-end encryption** | Turns encryption on or off and manages keys. See [Encryption](/docs/features/encryption/). | All devices | Off |
+
+### Crate web app and Appearance
+
+| Setting | What it does | Applies to | Default |
+| --- | --- | --- | --- |
+| **Crate web app** | Opens the web app here, or shows a QR code or link to connect another device. See [Use the web app](/docs/features/web-app/). | - | - |
+| **Appearance → List style** | **Flat** rows or **Cards** for reminders, projects, and Reading, including reminders in notes. | This device | Flat |
+
+### Reminders
+
+Under **Features → Reminders**.
+
+| Setting | What it does | Applies to | Default |
+| --- | --- | --- | --- |
+| **Enable reminders** | Pauses or resumes reminders and their notifications. Notes and vault sync are kept. | All devices | Off |
+| **Reminders folder** | Where Crate looks for reminders. Changing it doesn't move notes; see [Choose your folders](#choose-your-folders). | This device; the server and web app follow it | `Reminders` |
+| **Default due date** | The date filled in for new reminders: **None**, **Today** or **Tomorrow**. | This device | None |
+| **Open reminders on startup** | Opens the reminders view when Obsidian starts. | This device | Off |
+| **Default reminders tab** | The tab the reminders view opens to. | This device | Inbox |
+| **Upcoming range (days)** | How many days ahead the Upcoming view shows. | This device | 7 |
+| **Desktop notifications** | Shows reminder alerts from Obsidian on this computer while it's open. See [Desktop notifications without a server](/docs/features/notifications/#desktop-notifications-without-a-server). | This device | On |
+| **All-day notification time** | When reminders with a date but no time alert. Here only without a server; with one, it's under **Notifications**. | This device | Empty, so they don't alert |
+
+### Reading
+
+Under **Features → Reading**.
+
+| Setting | What it does | Applies to | Default |
+| --- | --- | --- | --- |
+| **Enable reading** | Pauses or resumes Reading and article downloads. | All devices | Off |
+| **Reading folder** | Where Crate looks for Reading notes. Changing it doesn't move notes. | This device; the server and web app follow it | `Reading` |
+| **Article images** | **Save in the vault** or **Load from the website**, for articles saved from then on. See [Article images](/docs/features/reading/#article-images). | All devices | Save in the vault |
+
+### Notifications
+
+Appears once a server is connected and Reminders is on. See [Set up notifications](/docs/features/notifications/).
+
+| Setting | What it does | Applies to | Default |
+| --- | --- | --- | --- |
+| **Push notifications** | Sends reminder alerts to subscribed phones and browsers. | All devices | Off |
+| **Notification folder and timezone** | The reminders folder and timezone the server schedules alerts with. **Use this device’s settings** copies this device's. | All devices | - |
+| **All-day notification time** | When reminders with a date but no time alert. Leave empty to skip them. | All devices | Empty |
+| **Notification devices** | Lists subscribed devices, and removes ones you no longer use. | - | - |
+| **Test notification** | Sends a test alert to every subscribed device. | - | - |
+
+### Management
+
+| Setting | What it does |
+| --- | --- |
+| **Account and devices → Add a device** | Shows a one-time code or link to connect another Obsidian device. See [Connect your devices](/docs/getting-started/devices/). |
+| **Account and devices → Connected devices and sessions** | Lists devices, browsers and shortcuts with access, and disconnects them. |
+| **Account and devices → Disconnect this device** | Stops sync here and keeps your files. See [Disconnect a device](/docs/getting-started/devices/#disconnect-a-device). |
+| **Usage** | Cloudflare's usage estimates compared with the free allowances. See [Cloudflare's free daily limits](/docs/getting-started/limits/#cloudflares-free-daily-limits). |
+| **Server → Update server address** | Points this device at a server's new address. |
+| **Server → Server backup recovery** | Restores a Cloudflare server backup as a separate server. See [Keep a backup of your own](/docs/troubleshooting/recovery/#keep-a-backup-of-your-own). |
+| **Server → Advanced server actions** | **Replace server files** and **Delete server and all data**. Both remove data for good; read [Move or remove Crate](/docs/features/move-or-remove/) first. |
+| **Troubleshooting** | **Run diagnostics**, **Export diagnostics** and **Debug logging**. See [Get help](/docs/troubleshooting/get-help/). |
+
+### Web app settings
+
+Open **Settings** in the web app. Its theme, tabs, list style and **Open app to** belong to that browser or installed app; on a phone, the browser and the Home Screen app keep their own. Feature switches, folders and the notification schedule are managed in Obsidian. See [Make it yours](/docs/features/web-app/#make-it-yours).

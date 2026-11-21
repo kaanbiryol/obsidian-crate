@@ -7,7 +7,7 @@ Lost a change? There's a good chance Crate still has it. Start with the smallest
 
 ## Get back an earlier version of a file
 
-Your server keeps replaced and deleted files for 30 days by default. To change this, open Crate settings and select **Sync options** → **Keep history for**, then choose 7, 14, 30, 60 or 90 days. Shorter periods use less storage; choosing a shorter one removes older history for good. While you keep editing a file, it keeps the version from before you started and then about one version every 10 minutes, or every hour for files of 1 MB or more, so not every save is kept.
+Your server keeps replaced and deleted files for 30 days by default. To change this, open Crate settings and select **Sync options** → **Keep history for**. Shorter periods use less storage; choosing a shorter one removes older history for good. Not every save is kept while you edit: [History limits](/docs/getting-started/limits/#history) explains how often a version is saved.
 
 1. In Obsidian, open the file's menu and select **File history**, or run **Crate: Show file sync history** for the open file.
 2. Pick an earlier version and compare it with what you have now.
@@ -42,7 +42,7 @@ Crate saves recent snapshots of your synced vault, called checkpoints.
 <details>
 <summary>Good to know</summary>
 
-- Crate keeps the latest 20 checkpoints, for up to your history period, and all your connected devices can see them.
+- Crate keeps a [limited number of checkpoints](/docs/getting-started/limits/#history), and all your connected devices can see them.
 - Restoring keeps local recovery copies of what it replaces.
 - If a file was saved in the middle of an editing session, its exact version at that point may no longer be kept. Crate restores everything else, leaves that file as it is now, and lists it when the restore finishes.
 - Files you've excluded on the restoring device aren't touched.

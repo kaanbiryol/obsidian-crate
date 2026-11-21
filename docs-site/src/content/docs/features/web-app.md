@@ -39,7 +39,22 @@ Open **Settings** in the web app to adjust appearance and preferences. Under **T
 
 These preferences belong to this browser or installed app. Feature switches, folders, and the notification schedule are managed in [Obsidian's Crate settings](/docs/features/settings/).
 
-To save links from other apps, see the [Reading share options](/docs/features/reading/#read-on-your-phone).
+
+## Save links from other apps
+
+Share a link from any app straight into your Reading list.
+
+### iPhone
+
+With iOS 27 or later, open **Settings → Install → Save from iPhone** in the web app and follow the steps to install and pair **Save to Crate**. After that, select **Share → Save to Crate** from any app. The shortcut needs a connection.
+
+You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to **Save from iPhone** in the web app to create a pairing code. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is. Logging out of the web app you paired from, or removing that session from connected devices in Obsidian, also disconnects the shortcut.
+
+The shortcut isn't offered in [encrypted vaults](/docs/getting-started/limits/#with-encryption). Save links in the web app or in Obsidian instead.
+
+### Android
+
+In browsers that support sharing to web apps, install the web app, then select **Share → Crate**. Crate opens and saves the link right away, offline too. If this browser isn't connected to Reading yet, the link stays on the device and is saved once you connect. It works with encrypted vaults too.
 
 ## Before going offline
 

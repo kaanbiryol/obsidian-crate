@@ -75,7 +75,7 @@ Crate picks up every checkbox in the reminders folder except its **Archive** sub
 
 ## Archive completed reminders
 
-Completed reminders stay in their project until you archive them. In a project you use every day, such as **Inbox**, they add up and make the note slower to sync and edit. Very large projects stop appearing in the web app until they get smaller.
+Completed reminders stay in their project until you archive them. In a project you use every day, such as **Inbox**, they add up and make the note slower to sync and edit. Projects over the [web app's size limit](/docs/getting-started/limits/#files-and-notes) stop appearing there until they get smaller.
 
 Run **Crate: Archive completed reminders**, then select **All projects** or one project. Crate moves each completed reminder to a matching note in the **Archive** folder inside your reminders folder. For example, `Reminders/Inbox.md` goes to `Reminders/Archive/Inbox.md`. Open reminders stay where they are, and each run adds to the same archive notes.
 
@@ -104,24 +104,14 @@ Select a reminder to change its title, date, project, or priority. Pick a projec
 
 ## Get alerts
 
-1. In Obsidian, turn on **Settings → Crate → Notifications → Push notifications**.
-2. Register each device that should receive alerts in the web app.
-3. For reminders with a date but no time, set an **All-day notification time**.
-
-[Set up notifications](/docs/features/notifications/) walks through each step and a test.
+To get a notification when a reminder is due, even with Obsidian closed, follow [Set up notifications](/docs/features/notifications/).
 
 ## Change defaults
 
-Under **Settings → Crate → Reminders**, choose a **Default due date**, **Default reminders tab**, and **Upcoming range (days)**. Turn on **Open reminders on startup** to have the view ready when Obsidian opens. These apply to this Obsidian device only.
+Under **Settings → Crate → Reminders**, set the default due date, the tab the view opens to, the upcoming range, and whether the view opens on startup. They never reschedule existing tasks. [Settings](/docs/features/settings/#reminders) lists each one.
 
 Changing **Reminders folder** changes where Crate looks, not where your notes are. Read [Choose your folders](/docs/features/settings/#choose-your-folders) before switching an established setup.
 
 ## Offline and pausing
 
-Your reminders are always available in Obsidian. The web app shows cached reminders offline, but you need a connection to make new changes there. If you submitted a change that hasn't been confirmed yet, keep it pending until the server responds.
-
-To pause Reminders everywhere, turn off **Enable reminders** in Crate settings. This stops reminder processing and notifications on all connected devices, but keeps your notes, connections, and vault sync.
-
-:::note[Keep reminder notes small for the web app]
-The web app handles reminder notes up to 1 MB. If a note is reported as too large or unavailable, split it into smaller project notes and sync again. See [practical limits](/docs/getting-started/limits/) and [recovery](/docs/troubleshooting/recovery/) for more help.
-:::
+Your reminders are always available in Obsidian. For the web app, see [offline use](/docs/features/web-app/#before-going-offline). To pause Reminders on every device, see [Pause Reading or Reminders](/docs/features/settings/#pause-reading-or-reminders).

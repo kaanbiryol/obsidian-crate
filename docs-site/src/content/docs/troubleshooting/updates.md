@@ -39,13 +39,7 @@ The **Server update available** message names the command for your server. See [
 
 Each way makes a backup first and checks that the new version can open your existing data before it starts.
 
-<details>
-<summary>Good to know</summary>
-
-- If storage needs a format upgrade, you run it on purpose, with the server stopped. A normal start never quietly converts storage it doesn't support.
-- If an upgrade is rejected, leave the original data as it is. Don't edit version details or delete storage to get past the check.
-
-</details>
+If the check rejects an update, leave your data as it is and follow the [update and migrate steps](/docs/reference/self-hosting/#update-and-migrate). Don't delete storage to get past it.
 
 ## Update the web app
 

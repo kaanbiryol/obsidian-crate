@@ -26,13 +26,7 @@ New notes are named after the article and its site, such as `The Hidden Cost - e
 
 ## Where articles are downloaded
 
-The save form tells you which device does the downloading:
-
-| Where you save | What happens |
-| --- | --- |
-| Obsidian | This device downloads the article and writes a Markdown note. Vault sync carries it to your other devices. |
-| Web app without encryption | Your Crate server downloads it, so Obsidian can stay closed. |
-| Web app with encryption | Your Crate server downloads it without keeping the link, and the web app encrypts it. If the website blocks the server, the link is saved with **Try again**. |
+Saving in Obsidian downloads the article on that device, and vault sync carries it to your others. Saving in the web app has your Crate server download it, so Obsidian can stay closed. The save form tells you which one happens.
 
 ### Article images
 
@@ -40,13 +34,11 @@ By default, Crate saves an article's images in your vault when it downloads the 
 
 To keep only the images' links, go to **Settings** → **Crate** → **Reading** and set **Article images** to **Load from the website**. The choice applies to every device and to articles saved from then on. The websites hosting the images then see your IP address each time you open the article, and the images need a connection.
 
-Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. Obsidian saves every image in an article, up to 10 MB each and 40 MB in all. When your server downloads the article, it saves the first 10 images, up to 5 MB each and 20 MB in all, or up to 2 MB each and 8 MB in all in an encrypted vault. An image that is too large or fails to download keeps its link.
+An image that is too large, in an unsupported format such as SVG, or fails to download keeps its link. [Reading images](/docs/getting-started/limits/#reading-images) lists the sizes and formats.
 
 ### When a page won't download
 
 Pages behind a login, pages that block downloads, and pages that rely on scripts may stay as saved links. Server downloads don't use your browser cookies or Crate sign-in. Select **Try again**, open the original page, or use [Web Clipper](#use-obsidian-web-clipper) to save what you can see in your browser.
-
-With [end-to-end encryption](/docs/features/encryption/), article text, links, tags, highlights, and note names stay encrypted on the server.
 
 ## Organize your library
 
@@ -64,7 +56,7 @@ Already use Web Clipper? Point it at your Reading folder in the right vault. No 
 
 Every Markdown note in that folder and its subfolders shows up in Reading. Crate keeps the clip's text and file name, picks up its tags, and doesn't download the article again. Notes without a source link show up as vault notes.
 
-Highlights you made in Web Clipper show up in Reading when they're saved in the note as `==text==`. To also keep each highlight's date and notes, use the optional [Reading Clipper template](https://github.com/kaanbiryol/obsidian-crate/blob/master/templates/crate-reading-clipper.json). If a highlighted passage appears more than once or can't be found, it goes to the article's **Highlights** list for you to review.
+Highlights you made in Web Clipper show up in Reading when they're saved in the note as `==text==`. To also keep each highlight's date and notes, or to save YouTube transcripts, use the optional [Reading Clipper template](https://github.com/kaanbiryol/obsidian-crate/blob/master/templates/crate-reading-clipper.json). If a highlighted passage appears more than once or can't be found, it goes to the article's **Highlights** list for you to review.
 
 <details>
 <summary>Duplicates and empty bookmarks</summary>
@@ -79,21 +71,7 @@ Save a YouTube link the same way as an article. Crate saves the video's public d
 
 To watch, select the play icon, tap a transcript passage, or select transcript text. The player starts from that point. If it can't play inside Crate, select **Open in YouTube**. Crate never downloads the video itself.
 
-You can highlight transcript passages and add notes, and saved transcripts stay readable offline. Transcripts without timestamps work too.
-
-<details>
-<summary>Pin and resize the video</summary>
-
-**Pin video** keeps the video above the transcript and follows along as it plays, including when you skip around. Scrolling holds still while you select text or edit a highlight. **Unpin video** lets you scroll freely. Drag the handle below the video to resize it, up to the full reader width. Pinning a very large video shrinks it to leave room for the transcript.
-
-</details>
-
-<details>
-<summary>Save transcripts with Web Clipper</summary>
-
-Web Clipper can save a transcript into your Reading folder too. Check its preview first: a note with only a video embed doesn't include the transcript. The repository has an optional [Reading Clipper template](https://github.com/kaanbiryol/obsidian-crate/blob/master/templates/crate-reading-clipper.json) for saving the full content.
-
-</details>
+You can highlight transcript passages and add notes, and saved transcripts stay readable offline. **Pin video** keeps the video above the transcript, which follows along as it plays.
 
 ## Highlight and revisit passages
 
@@ -103,23 +81,11 @@ The library's **Highlights** view collects highlights from your inbox, favorites
 
 ![The Highlights view in the web app on iPhone, grouping highlights by article](../../../assets/screenshots/phone-reading-highlights.png)
 
-Highlights are saved in the note, so they sync with it. Most use Obsidian's own `==highlight==` syntax. Selections that can't safely use those markers, and image highlights, are stored as annotations that Crate's reader displays; Obsidian's own note view doesn't show them. See the [highlight format reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/reading-highlights.md) for details.
+Highlights are saved in the note, so they sync with it. Most use Obsidian's own `==highlight==` syntax, so they show in Obsidian too. Image highlights and a few text selections show only in Crate's reader. The [highlights reference](/docs/reference/reading-highlights/) explains the format.
 
 ## Read on your phone
 
-[Connect the web app](/docs/getting-started/devices/#open-the-web-app) to use the same library outside Obsidian. You can paste a link straight into the library.
-
-### Save from the share sheet on iPhone
-
-With iOS 27 or later, open **Settings → Install → Save from iPhone** in the web app and follow the steps to install and pair **Save to Crate**. After that, select **Share → Save to Crate** from any app. The shortcut needs a connection.
-
-Pairing codes work once and expire after ten minutes. You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to **Save from iPhone** in the web app to create a pairing code. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is. Logging out of the web app you paired from, or removing that session from connected devices in Obsidian, also disconnects the shortcut.
-
-The shortcut doesn't work with [encryption](/docs/features/encryption/). It can't encrypt a note or make it searchable, so encrypted vaults don't offer it. Save links in the web app or in Obsidian instead.
-
-### Save from the share sheet on Android
-
-In browsers that support sharing to web apps, install the web app, then select **Share → Crate**. Crate opens and saves the link right away, offline too. If this browser isn't connected to Reading yet, the link stays on the device and is saved once you connect. It works with encrypted vaults too.
+[Connect the web app](/docs/features/web-app/) to use the same library outside Obsidian. You can paste a link straight into the library, or [save from your phone's share sheet](/docs/features/web-app/#save-links-from-other-apps).
 
 ## Read offline
 
@@ -137,17 +103,8 @@ Crate's reader blocks active content inside articles. It shows images saved in y
 - **The YouTube player:** it loads only when you select the play icon or a timed transcript passage. It contacts YouTube, may use YouTube's cookies, and may see the web app's address as the referring page. It never receives your Crate sign-in or note contents.
 - **Article downloads on the server:** these use your hosting resources.
 
-Reading notes can be up to 1 MB, even though larger files can still sync as ordinary vault files.
-
-<details>
-<summary>Services contacted for some sites</summary>
-
-When a page is only a login screen or needs more data, links from X, Reddit, Bilibili, and C2 wiki may also contact a fixed list of public services: X's embed service and the third-party FxTwitter service for X posts, Reddit's own pages and feeds, and the Bilibili and C2 wiki services. These requests send the saved link, not your cookies or Crate sign-in. The service also sees the IP address of the device or server doing the download, and on Cloudflare, server requests include your Crate server's web address.
-
-</details>
+For some sites, such as X and Reddit, Crate may also ask a public service for the article, sending only the saved link. The [README](https://github.com/kaanbiryol/obsidian-crate#accounts-costs-and-network-use) lists every service Crate contacts.
 
 ## Pause or resume Reading
 
-Under **Settings → Crate → Reading**, turn off **Enable reading** to pause scanning and downloads on all connected devices. Turn it back on to resume. Your library, notes, connections, and vault sync are all kept. Changing this shared switch needs a connection.
-
-There's no separate switch just for downloads. See [Choose and manage features](/docs/features/settings/) for the other controls and what they affect.
+Turn off **Settings → Crate → Reading → Enable reading** to pause scanning and downloads on every device, and turn it back on to resume. Your library and notes are kept. There's no separate switch just for downloads. [Pause Reading or Reminders](/docs/features/settings/#pause-reading-or-reminders) explains what pausing affects.

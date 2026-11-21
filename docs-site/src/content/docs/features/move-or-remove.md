@@ -39,7 +39,7 @@ Stop the server and remove its data. With Docker, run this from the repository f
 docker compose down --volumes
 ```
 
-This deletes the server's files, history, and settings for good. Use the same `-p` project name if you started it with one. For a server you started with Node, delete its data directory (`~/.crate/server` by default) and the `server.remote` folder beside it. Keep any backups you still want first.
+This deletes the server's files, history, and settings for good. Use the same `-p` project name if you started it with one, and keep any backups you still want first. For a server you started with Node, delete its data directory; [Data and additional devices](/docs/reference/self-hosting/#data-and-additional-devices) shows where it is.
 
 ## Uninstall Crate
 

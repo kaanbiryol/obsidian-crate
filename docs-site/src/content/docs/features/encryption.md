@@ -5,7 +5,7 @@ description: Enable optional end-to-end encryption, connect your devices, and ke
 
 End-to-end encryption means your server stores only scrambled data. Your devices encrypt notes before uploading them, so not even whoever runs the server can read them. It works on both Cloudflare and self-hosted servers.
 
-Encryption is optional and off by default. Updating Crate never turns it on.
+Encryption is optional and off by default. Updating Crate never turns it on. A few things work differently in an encrypted vault; [Limits with encryption](/docs/getting-started/limits/#with-encryption) lists them before you decide.
 
 ## Enable encryption
 
@@ -37,10 +37,6 @@ Your local vault stays ordinary, readable files.
 5. Type **encrypt**, then select **Delete server copy and encrypt**.
 6. Keep Obsidian open until setup finishes. Sync and notifications pause while Crate replaces the server copy.
 
-:::caution[This deletes the server copy]
-Step 5 removes your files, file history, and checkpoints from the server. Make sure every device has synced first, so nothing exists only on the server.
-:::
-
 <details>
 <summary>If setup stops or is interrupted</summary>
 
@@ -63,7 +59,10 @@ Your other devices are disconnected. Reconnect each one:
 
 ### Obsidian
 
-[Connect the device to the same server](/docs/getting-started/devices/#another-obsidian-device), then open **Manage encryption** in Crate's Sync settings before syncing. Enter your recovery key and select **Unlock vault**, or select **Request keys** and approve the request on an unlocked Obsidian device under **Manage encryption → Connect web app**.
+[Connect the device to the same server](/docs/getting-started/devices/#another-obsidian-device), then unlock it before syncing:
+
+- **Added with Add a device:** keep **Add a device** open on your first device. Check that both screens show the same code, select **Approve** there, then **Confirm and unlock** on the new device.
+- **Otherwise, or if that screen closed:** open **Manage encryption** in Crate's Sync settings on the new device. Enter your recovery key and select **Unlock vault**, or select **Request keys** and approve the request on an unlocked Obsidian device under **Manage encryption → Connect web app**.
 
 ### Reading and Reminders web app
 
@@ -85,45 +84,15 @@ If you lose your recovery key and every unlocked device, your encrypted server c
 
 To save another copy, open **Manage encryption → Recovery key → Copy** on an unlocked Obsidian device.
 
-Only unlock web apps you trust. An unlocked web app holds the vault key, which can decrypt every synced note, not only its Reading and Reminders folders. Encryption can't protect you from a compromised device, or from malicious code served from your web app's address.
+Only unlock the web app on devices you trust: once unlocked, it can decrypt your whole vault, not only Reading and Reminders.
 
-Encryption only protects data from now on. Earlier exports, hosting provider snapshots, backups, and copies on other devices stay as they were.
+Encryption protects data from when you turn it on. Earlier exports, backups, and copies on other devices stay as they were.
 
 ## What stays private
 
-Your notes, attachments, file and folder names, file history, shared settings, reminder text, and notification text are all encrypted. So are Reading articles, links, tags, highlights, and queued saves. To let the web app search Reading, the server keeps scrambled word beginnings that it can match against a search but can't read.
+Your notes, attachments, file and folder names, file history, settings, reminder text, notification text, and Reading articles, links, tags and highlights are all encrypted.
 
-Your server can still see some details about your data, such as folder structure, file sizes, and when reminders are due.
-
-<details>
-<summary>Everything the server can still see</summary>
-
-- Folder structure: how deep folders go and how many items each holds
-- Which files are Markdown notes
-- Exact file sizes and how long each file's full path is
-- When files change and sync
-- Reminder IDs, whether reminders are complete, and due times
-- Notification delivery information
-- When a file gets back a name it had before in the same folder
-- How long each notification's text is, and whether it changed
-- For each Reading note: when it was saved and last highlighted, whether it is archived or a favorite, and whether it has highlights
-- Which Reading notes share the first three letters of a word in their title, highlights or highlight notes, a tag or a link, and which notes a search matches
-- How many tags your Reading library has
-
-Without encryption, your server can also read your synced content.
-
-Encryption stops the server from reading your content or changing it undetected, but someone who controls your server could still bring back an older version of a file or a note you deleted.
-
-</details>
-
-<details>
-<summary>How links are fetched with encryption</summary>
-
-When you save an article in the web app, your server downloads it without keeping the link, and the web app encrypts it. In Obsidian, the download happens on your device. Links pasted into reminders work the same way: your server fetches the page title without keeping the link.
-
-</details>
-
-Encrypted names take more room, so files can be nested at most 36 folders deep.
+Your server can still see some details about your data, such as folder structure, file sizes, and when reminders are due. It can't read or change your notes, but someone who controls it could bring back an older version of a file or a note you deleted. The [encryption reference](/docs/reference/e2ee-implementation/#protection-boundary) lists exactly what the server can see.
 
 ## Turn encryption off
 
@@ -139,4 +108,4 @@ Crate syncs this device first and stops if that sync has errors or conflicts, or
 
 Afterwards, other Obsidian devices must reconnect, and web apps must log out and use a fresh setup link. A device that synced this vault encrypted refuses to send notes to a server without encryption. On that device, select **Enable encryption** in Crate's Sync settings, then **Sync without encryption** in the dialog that opens. Save any pending browser work before logging out. Keep your old recovery key for any encrypted backups.
 
-For more detail, see the [privacy policy](/privacy/) and the [encryption implementation reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/e2ee-implementation.md).
+For more detail, see the [privacy policy](/privacy/) and the [encryption reference](/docs/reference/e2ee-implementation/).

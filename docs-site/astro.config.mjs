@@ -31,12 +31,11 @@ export default defineConfig({
           label: 'Getting started',
           items: [
             'getting-started/installation',
-            'getting-started/limits',
             'getting-started/hosting',
             'getting-started/cloudflare',
             'getting-started/self-hosting',
+            'getting-started/first-sync',
             'getting-started/devices',
-            'getting-started/faq',
           ],
         },
         {
@@ -50,13 +49,13 @@ export default defineConfig({
             'features/reading',
             'features/web-app',
             'features/encryption',
-            'features/commands',
             'features/move-or-remove',
           ],
         },
         {
           label: 'Troubleshooting',
           items: [
+            'troubleshooting/sync-errors',
             'troubleshooting/connection',
             'troubleshooting/conflicts',
             'troubleshooting/recovery',
@@ -64,6 +63,10 @@ export default defineConfig({
             'troubleshooting/updates',
             'troubleshooting/get-help',
           ],
+        },
+        {
+          label: 'Reference',
+          items: ['features/commands', 'getting-started/limits'],
         },
         {
           label: 'Developer reference',

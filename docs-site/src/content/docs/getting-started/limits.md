@@ -1,75 +1,82 @@
 ---
-title: What to know before you start
-description: The practical limits of Crate, including background sync, file sizes, offline use, history, and privacy.
+title: Limits
+description: File sizes, history, Reading images, codes, Cloudflare's free allowances, and what changes with encryption, in one place.
 ---
 
-Crate keeps your notes in your vault and lets you run the server yourself. Here are the limits you're most likely to notice day to day.
+The numbers Crate works within. Feature guides link here when a limit applies.
 
-:::caution[Crate is in beta]
-Try it with a vault you don't depend on yet, and keep a separate backup of your notes. Sync carries deletions as well as edits, so a backup is your safety net.
-:::
+## Files and notes
 
-## Sync needs an open Obsidian app
-
-Crate syncs while Obsidian is open and running. Phones pause apps in the background, and sync pauses with them. Before switching devices, let sync finish on the first one, then sync the second.
-
-**Automatic sync starts off on each device.** Connecting a server doesn't move any files. Run **Crate: Sync now**, or turn on **Settings → Crate → Sync → Automatic sync**.
-
-The web app and scheduled notifications talk to your server directly, so Obsidian can be closed once your notes have synced. If your server runs on your own hardware, it needs to stay awake and online.
-
-## File and storage limits
-
-| Limit | What it means for you |
+| Limit | What happens |
 | --- | --- |
-| 25 MB per synced file | Bigger files stay on the device and show up as sync errors. Keep large media outside the synced vault, or exclude it. |
+| 25 MB per synced file | Bigger files stay on the device and show up as sync errors. Keep large media outside the vault, or [exclude it](/docs/features/sync/#keep-files-on-one-device). |
+| 1 MB or 20,000 lines for merging | When two devices change a bigger note, Crate keeps both versions as a [conflict](/docs/troubleshooting/conflicts/) instead of combining them. |
 | 1 MB per Reading note | Bigger notes are reported instead of opened in Reading. Shorten the note or read the original source. |
-| 1 MB per reminder note in the web app | Bigger notes, or notes with a very large number of reminders, are left out with an explanation. Split them into smaller project notes to edit and schedule them in the web app again. |
-| Web app search matches article titles | Each word you type matches the start of a word in a title. With [encryption](/docs/features/encryption/), short words of one or two letters match only whole words. Search notes, authors and highlights in Obsidian. |
-| No iPhone shortcut with encryption | **Save to Crate** can't encrypt notes, so encrypted vaults don't offer it. Save links in the web app or in Obsidian. |
-| 30 days of server history for replaced or deleted files by default (7, 14, 60 or 90 days available), about one version every 10 minutes while editing (every hour for files of 1 MB or more) | Recover promptly. Files that only ever existed on one device may have no server history. |
-| Latest 20 checkpoints, for up to your history period | Checkpoints are saved states of your whole vault you can return to. They cover recent syncs, not an unlimited backup archive. |
+| 1 MB per reminder note in the web app | Bigger notes, or notes with a very large number of reminders, are left out with an explanation. [Archive completed reminders](/docs/features/reminders/#archive-completed-reminders) or split the note into smaller projects. |
 
 Sizes are rounded down, so a file under the listed size always fits. The Reading and reminder limits can apply even when a note is small enough to sync.
 
-<details>
-<summary>Good to know about files</summary>
+File names also have to work on every device. [Sync errors](/docs/troubleshooting/sync-errors/#this-files-name-or-location-is-not-compatible-with-sync-on-this-device) lists the names that can block sync.
 
-- **Attachments:** new attachments download on their own. When an existing image, PDF, or other attachment changes, you [review it](/docs/troubleshooting/conflicts/#attachments-and-binary-files) before it's replaced.
-- **File names have to work on every device.** Names that differ only by capitalization, names Windows reserves, and names ending in a dot or space can block sync. Windows and Android devices skip files with `< > : " | ? *` in their names. Rename the file named in the error and sync again.
-- **With [encryption](/docs/features/encryption/),** files can be nested at most 36 folders deep.
+## History
 
-</details>
+| Limit | What it means for you |
+| --- | --- |
+| 30 days of server history by default | Replaced and deleted files are kept this long. Choose 7, 14, 30, 60 or 90 days under **Sync options → Keep history for**. |
+| About one version every 10 minutes while editing | Crate keeps the version from before you started editing, then about one every 10 minutes, or every hour for files of 1 MB or more. Not every save is kept. |
+| Latest 20 checkpoints | Saved states of your whole vault, kept for up to your history period. They cover recent syncs, not an unlimited backup archive. |
 
-## Offline access is different in each app
+Files that only ever existed on one device may have no server history. [History and recovery](/docs/troubleshooting/recovery/) shows how to restore.
 
-**In Obsidian,** your notes, reminders, and saved article text are always there. Changes sync when you're back online and sync runs, automatically or by hand.
+## Reading images
 
-**In the web app,** cached reminders are read-only offline. Reading can queue saves and edits, but downloading new articles needs a connection. Your browser can clear cached data, and signing out clears pending work and drafts. See [offline use and pending saves](/docs/features/web-app/#before-going-offline).
+| Saved by | Limit |
+| --- | --- |
+| Obsidian | Every image in the article, up to 10 MB each and 40 MB in all |
+| Your server | The first 10 images, up to 5 MB each and 20 MB in all |
+| Your server, encrypted vault | The first 10 images, up to 2 MB each and 8 MB in all |
 
-## Some websites can't be saved as full articles
+Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. An image that is too large or fails to download keeps its link.
 
-Pages that need a login, block automated downloads, or depend heavily on scripts may stay as bookmarks. YouTube transcripts need captions to exist; videos are streamed, not downloaded.
+## Codes and links
 
-Keep the link and try again later, or [use Web Clipper](/docs/features/reading/#use-obsidian-web-clipper) to save text you can see in your browser.
+Pairing codes and **Add a device** codes work once and expire after 10 minutes. Web app connection links also expire after 10 minutes, and so does the handoff from Safari to a newly installed Home Screen app. Create a fresh one if it expires.
 
 ## Cloudflare's free daily limits
 
 On Cloudflare's Free plan, the database Crate uses allows 100,000 row writes and 5 million row reads a day. The first upload of a very large vault, or turning on encryption for one (which uploads the whole vault again), can hit the write limit.
 
-If that happens, sync stops with **Cloudflare’s free daily database limit stopped this sync**. Nothing is lost: your changes stay on the device. After 00:00 UTC, sync again or resume encryption setup, and the upload picks up where it stopped.
+If that happens, nothing is lost: the upload picks up where it stopped after the limit resets at 00:00 UTC. See [the daily limit error](/docs/troubleshooting/sync-errors/#cloudflares-free-daily-database-limit-stopped-this-sync).
 
 ### Will my vault fit?
 
 As a guide, a vault of 50,000 notes and 5 GB of PDFs uploads within one day of the free limits, with or without encryption. Its first upload uses about two-thirds of the day's database writes and just over half of its reads. The number of files matters more than their size: about 90,000 files fit in a day, fewer when many of them are larger than 1 MB.
 
-File storage includes 10 GB a month for free. Your vault counts toward it, and so does server history. A shorter history period uses less. With encryption, stored files take about a third more space, so a 5 GB vault uses about 7 GB.
+File storage includes 10 GB a month for free. Your vault counts toward it, and so does server history. A shorter history period uses less, and [encryption](#with-encryption) uses more.
 
 To see where you stand, open **Settings → Crate → Usage** and select **Refresh**. It compares your usage, including storage, with the free allowances. File storage beyond its free allowance is billed rather than stopped.
 
-## Privacy and backups
+## With encryption
 
-**Without [end-to-end encryption](/docs/features/encryption/),** your server can read synced content. **With it,** content and file and folder names are encrypted, but folder structure, approximate sizes, and some scheduling information stay visible. Keep your recovery key outside your vault; Crate can't replace a lost key.
+[End-to-end encryption](/docs/features/encryption/) changes a few limits and behaviors. Everything else on this page applies to encrypted vaults too.
 
-Reading can contact saved websites to fetch article text, icons, or video playback. [Reading's privacy notes](/docs/features/reading/#privacy-and-availability) explain when.
+| Difference | What it means for you |
+| --- | --- |
+| 36 folders deep | Encrypted names take more room. Encryption setup stops if a synced file is nested deeper, and deeper files created later don't sync. |
+| About a third more storage | Stored files are larger, so a 5 GB vault uses about 7 GB of file storage. |
+| Turning it on uploads the whole vault again | A large vault can reach [Cloudflare's daily write limit](#cloudflares-free-daily-limits). Setup picks up where it stopped after 00:00 UTC. |
+| Smaller article images from your server | When your server downloads an article, it keeps smaller images. See [Reading images](#reading-images). |
+| Shorter search words match whole words only | In web app search, words of one or two letters match only whole words. |
+| No iPhone shortcut | **Save to Crate** can't encrypt notes, so encrypted vaults don't offer it. Save links in the web app or in Obsidian. |
+| Alerts need smaller project notes | A project note with too many reminders stops sending encrypted alerts until you split it into smaller projects. Its reminders stay readable and editable. |
+| Crate updates install without asking | Other devices install a Crate update on their next sync. See [Crate updates](/docs/features/sync/#crate-updates). |
+| Keys can't be changed | There's no way to replace your recovery key or the keys that encrypt your notes. Disconnecting a device or web app removes its access to the server, not keys it already has. |
+| Turning it off resets the server | The server copy and its history are deleted, then one device uploads its vault without encryption. See [Turn encryption off](/docs/features/encryption/#turn-encryption-off). |
+| Older versions can come back | Your server can't read or change your notes, but someone who controls it could bring back an older version of a file or a note you deleted. |
 
-Keep an independent backup, and use [history and recovery](/docs/troubleshooting/recovery/) when you need an earlier version. Cloudflare may charge for usage, and self-hosting means looking after storage, maintenance, and backups yourself.
+## Other limits
+
+- **Sync runs only while Obsidian is open.** Phones pause it in the background. See [Sync automatically](/docs/features/sync/#sync-automatically).
+- **Web app search matches article titles.** Each word you type matches the start of a word in a title. Search notes, authors and highlights in Obsidian.
+- **Some websites can't be saved as full articles.** See [When a page won't download](/docs/features/reading/#when-a-page-wont-download).
+- **The web app is limited offline.** See [Before going offline](/docs/features/web-app/#before-going-offline).

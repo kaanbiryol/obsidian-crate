@@ -5,7 +5,7 @@ description: Install the Crate beta in Obsidian using BRAT, or install release f
 
 Crate is an Obsidian plugin, so you install it inside Obsidian on each device where you want it. You need **Obsidian 1.13.0 or newer**.
 
-Crate isn't in Obsidian's community plugin catalog yet. Until it is, a helper plugin called BRAT installs it for you and keeps it updated. Before you start, read [what to know about the beta](/docs/getting-started/limits/).
+Crate isn't in Obsidian's community plugin catalog yet. Until it is, a helper plugin called BRAT installs it for you and keeps it updated. Crate is in beta, so keep a separate backup of your vault.
 
 ## Install with BRAT
 
@@ -23,10 +23,8 @@ Crate is now installed. Open **Settings → Crate** to finish setup. If BRAT giv
 
 ## What next?
 
-- **Sync your vault or use the web app:** [choose where your server runs](/docs/getting-started/hosting/), either your Cloudflare account or your own computer with Docker. After connecting, Crate asks which features to manage in this vault.
+- **Sync your vault or use the web app:** [choose where your server runs](/docs/getting-started/hosting/), either your Cloudflare account or your own computer with Docker.
 - **Just try it on this device:** in **Settings → Crate → Features**, turn on **Reading → Enable reading** or **Reminders → Enable reminders**, then run **Crate: Add link to reading list** or **Crate: Create reminder** from Obsidian's command palette. Both work without a server. Crate shows the folder each feature will use before it changes any notes.
-
-Vault sync, the web app, and notifications need a server.
 
 When you're ready, follow [Reading](/docs/features/reading/) or [Reminders](/docs/features/reminders/) for everyday use, and [Choose and manage features](/docs/features/settings/) to adjust your setup.
 

@@ -12,48 +12,23 @@ import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 Crate brings vault sync, reminders, and read-it-later articles to Obsidian. Your notes stay in your vault as ordinary files, so nothing is locked in. For sync and the web app, you run your own Crate server in your Cloudflare account or on your own hardware. There is no Crate account to create.
 
-Use only the features you want. Reading and Reminders stay off until you turn them on. Wondering about cost, privacy, or other sync tools? See [common questions](/docs/getting-started/faq/).
-
-:::caution[Crate is in beta]
-Try it with a vault you don't depend on yet, and keep a separate backup of your notes. [What to know before you start](/docs/getting-started/limits/) covers the practical limits.
-:::
+Use only the features you want. Reading and Reminders stay off until you turn them on.
 
 ## What would you like to do?
 
 | I want to… | Start here |
 | --- | --- |
-| Keep my whole vault on several devices | Install Crate, choose a host, then connect each Obsidian device below. |
-| Save articles in Obsidian | [Turn on Reading](/docs/features/reading/) in Crate settings. Saving on your device doesn't need a server. |
-| Keep tasks in my notes | [Turn on Reminders](/docs/features/reminders/) and create a reminder. Reminders on your device work without a server. |
+| Keep my whole vault on several devices | Follow the four steps below. |
+| Save articles in Obsidian | [Turn on Reading](/docs/features/reading/). Saving on your device doesn't need a server. |
+| Keep tasks in my notes | [Turn on Reminders](/docs/features/reminders/). Reminders on your device work without a server. |
 | Read and manage reminders on my phone without Obsidian | Set up a server, then [connect the web app](/docs/features/web-app/). |
-| Choose what runs and where | [Manage features and settings](/docs/features/settings/). |
+| Fix something that went wrong | [Troubleshooting](/docs/troubleshooting/connection/), or [get help](/docs/troubleshooting/get-help/). |
 
-## Start here
+## Set up sync
 
 <CardGrid>
   <LinkCard title="01 · Install Crate" description="Add the beta to Obsidian with BRAT." href="/docs/getting-started/installation/" />
   <LinkCard title="02 · Choose your hosting" description="Your Cloudflare account or your own hardware." href="/docs/getting-started/hosting/" />
-  <LinkCard title="03 · Connect your devices" description="Sync a second Obsidian device or connect the web app." href="/docs/getting-started/devices/" />
-  <LinkCard title="04 · Make it yours" description="Choose features, turn on automatic sync, and set your preferences." href="/docs/features/settings/" />
+  <LinkCard title="03 · Run your first sync" description="Choose what Crate manages, then sync." href="/docs/getting-started/first-sync/" />
+  <LinkCard title="04 · Connect your devices" description="Sync a second Obsidian device or connect the web app." href="/docs/getting-started/devices/" />
 </CardGrid>
-
-:::tip[Your first sync]
-Connecting a server doesn't move any files yet. Run **Crate: Sync now** in Obsidian. If you want Crate to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync** on each device.
-:::
-
-## Get more from Crate
-
-- [Sync](/docs/features/sync/): see what syncs and review changes before they go.
-- [Reminders](/docs/features/reminders/): plan your day with tasks stored as Markdown.
-- [Reading](/docs/features/reading/): collect articles, highlight passages, and read offline.
-- [Notifications](/docs/features/notifications/): choose when and where reminders alert you.
-- [Web app](/docs/features/web-app/): install it on your phone and see what works offline.
-- [Encryption](/docs/features/encryption/): protect synced content, connect devices, and save your recovery key.
-
-## When you need a hand
-
-Resolve [conflicts](/docs/troubleshooting/conflicts/), [recover an earlier version](/docs/troubleshooting/recovery/),
-or fix [connection](/docs/troubleshooting/connection/) and [notification](/docs/troubleshooting/notifications/) problems.
-Still stuck? [Get help](/docs/troubleshooting/get-help/) shows how to run diagnostics and report a problem.
-
-Building on Crate or running a server for others? The collapsed **Developer reference** section has the technical details, starting with the [architecture reference](/docs/reference/architecture/).

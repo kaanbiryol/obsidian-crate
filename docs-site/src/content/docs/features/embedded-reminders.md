@@ -18,8 +18,6 @@ show-completed: false
 ```
 ````
 
-Leave out `project` to show reminders from every project. Completed reminders are hidden by default; set `show-completed: true` to include them.
-
 ## Show today
 
 ````markdown
@@ -35,8 +33,17 @@ show-completed: true
 ```
 ````
 
+## Options
+
+All three blocks accept the same two lines:
+
+| Option | What it does |
+| --- | --- |
+| `project: <name>` | Shows only that project. Leave it out to show every project. |
+| `show-completed: true` | Includes completed reminders. The default is `false`. |
+
+Selecting the completed-reminders toggle in the block updates its `show-completed` line for you. Inside a callout or quote the toggle can't edit the line, so change it in the note instead.
+
 ## Seeing code instead of a list?
 
 Switch to Reading view or Live Preview, and check that **Settings → Crate → Reminders → Enable reminders** is on.
-
-For every option and more examples, see the [embedded-reminders reference](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/embedded-reminders.md).

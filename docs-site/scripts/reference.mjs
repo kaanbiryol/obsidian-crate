@@ -9,6 +9,8 @@ export const referencePages = [
   { slug: 'compatibility', title: 'Compatibility', description: 'Supported formats, upgrades, and rollback policy.' },
   { slug: 'server-upgrades', title: 'Server upgrades', description: 'Versioning, migration, and server release contracts.' },
   { slug: 'self-hosting', title: 'Self-hosting commands', description: 'Docker and local server operations, tunnels, backups, and restore.' },
+  { slug: 'e2ee-implementation', title: 'Encryption', description: 'Encryption design, what the server can see, and current limits.' },
+  { slug: 'reading-highlights', title: 'Reading highlights', description: 'How Reading stores highlights and notes in Markdown.' },
 ];
 
 const publishedSources = new Map(referencePages.map(({ slug }) => [`docs/${slug}.md`, `/docs/reference/${slug}/`]));

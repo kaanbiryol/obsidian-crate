@@ -44,7 +44,7 @@ On desktop, Obsidian can show reminder alerts itself, so reminders work even whe
 2. Check that **Desktop notifications** is on.
 3. For reminders with a date but no time, set **All-day notification time**. Without a server it's under **Reminders**. With a server it's under **Notifications** and applies to every device, even with **Push notifications** off.
 
-When Obsidian opens, reminders that fell due while it was closed alert once, up to a day late. With sync on, this waits for the first sync, so a reminder completed on another device doesn't alert. If more than three fall due together, you get one summary instead. Reminders that were already past due when the device first saw them don't alert.
+When Obsidian opens, it alerts once for reminders that fell due in the last day while it was closed. With sync on, it syncs first, so a reminder you completed on another device stays quiet. Several at once arrive as one summary.
 
 Desktop notifications also work with a server connected. To get alerts on your computer with Obsidian closed, open the web app in your browser and turn on notifications there. If you do, turn off **Desktop notifications** on that computer so you don't get each reminder twice. Each device with Obsidian open checks its own copy of the vault, so two open computers both alert.
 
@@ -59,14 +59,4 @@ Desktop notifications also work with a server connected. To get alerts on your c
 
 To clean up a device you no longer use, select **Notification devices → Remove notification subscription**. To remove its access to Crate entirely, [disconnect its session](/docs/getting-started/devices/#disconnect-a-device).
 
-## What to expect
-
-Alerts usually just work, but a few things can get in the way:
-
-- Device permissions, Focus modes, network access, and your hosting provider all affect delivery.
-- Crate can't schedule a reminder that exists only on an offline Obsidian device.
-- A server on your own hardware must stay awake and online.
-
-Turning alerts back on doesn't replay reminders you missed. If a missed reminder still matters, give it a new time in the future and sync it.
-
-If an alert doesn't arrive, see [Notification troubleshooting](/docs/troubleshooting/notifications/).
+If an alert doesn't arrive, or you turned alerts back on and missed some, see [Notification problems](/docs/troubleshooting/notifications/).
