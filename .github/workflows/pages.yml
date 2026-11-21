@@ -103,6 +103,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node scripts/build-changelog.mjs site/changelog
+      # Mermaid diagrams render to static SVG at build time in headless Chromium.
+      - name: Install the diagram browser
+        run: npm --prefix docs-site exec -- playwright install --with-deps chromium
       # Documentation links include the generated shortcut installation page.
       - name: Build static site and documentation
         run: npm run build:site

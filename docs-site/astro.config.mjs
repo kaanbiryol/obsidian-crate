@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { unified } from '@astrojs/markdown-remark';
 import { referencePages, remarkReferenceLinks } from './scripts/reference.mjs';
+import { remarkMermaid } from './scripts/mermaid.mjs';
 
 export default defineConfig({
   site: 'https://crate.kaanbiryol.com',
@@ -9,7 +10,7 @@ export default defineConfig({
   trailingSlash: 'always',
   output: 'static',
   outDir: '../site/docs',
-  markdown: { processor: unified({ remarkPlugins: [remarkReferenceLinks] }) },
+  markdown: { processor: unified({ remarkPlugins: [remarkReferenceLinks, remarkMermaid] }) },
   integrations: [
     starlight({
       title: 'Crate Docs',

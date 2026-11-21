@@ -32,6 +32,27 @@ the complete transcript, including origin, request ID, vault, generation,
 commitment and both public keys. Private ephemeral keys remain in memory and
 are never exportable. Reloading either pairing screen requires a new attempt.
 
+```mermaid
+sequenceDiagram
+  accTitle: Approving a web app or device
+  accDescr: The requester commits to its key, the unlocked Obsidian device answers with its own key, the requester pins that key and reveals its own, and both show the same comparison code. After a person approves and confirms the matching code on both screens, the vault keys travel sealed through the server, which sees only public handshake data and ciphertext.
+  participant R as Requester<br/>(web app or locked device)
+  participant S as Crate server<br/>(relay)
+  participant A as Unlocked<br/>Obsidian device
+  R->>S: Request with key commitment
+  A->>S: Responder public key
+  S->>R: Responder public key
+  Note over R: Pins the responder key
+  R->>S: Requester public key
+  S->>A: Requester public key
+  Note over A: Checks the reveal<br/>against the commitment
+  Note over R,A: Both show the same three four-digit groups
+  Note over A: Person compares the codes<br/>and selects Approve
+  A->>S: Sealed vault keys<br/>(AES-256-GCM)
+  S->>R: Sealed packet
+  Note over R: Person confirms the same code.<br/>Keys are checked against the<br/>server's public configuration<br/>before they are stored
+```
+
 Only the explicit **Approve** action seals the vault key bundle.
 The recipient requires its own explicit code confirmation, then checks every key identity against the server's public configuration
 before storing keys. Import preserves existing wrapped local secrets for drafts
@@ -54,7 +75,7 @@ A newly paired Obsidian device uses the same protocol as the requester. After
 and shows **Unlock this vault**; the desktop answers in **Approve new device**.
 Both confirmations stay required. The device stores the vault key bundle without
 a recovery key, because pairing never transfers it, so **Copy recovery key** is
-unavailable there. **Server details → Update server address** still works on such a
+unavailable there. **Server → Update server address** still works on such a
 device: it checks that the new address names this device's own vault keys. A device
 cannot list or accept its own request. A locked
 Obsidian device can start a request again from **Manage encryption → Request
@@ -72,7 +93,7 @@ On the Obsidian device whose local vault should become the new server copy, expa
 
 Crate saves a reset checkpoint before contacting the server. Sync and notifications pause; the server revokes existing device credentials, PWA sessions and unused enrollment links. If interrupted, keep this device’s vault and Crate configuration, reopen **Manage encryption**, and select **Resume reset**. A retry continues the same reset and never repeats a completed wipe. Automatic sync resumes with its previous setting only after the local upload and settings save succeed.
 
-After the wipe, uploads and retries use normal conflict-aware sync. Changes made by another device that reconnects during recovery are preserved. If the server definitively rejects the first reset request, Crate releases the checkpoint so you can reconnect; an uncertain response keeps the recovery checkpoint. If a self-hosted tunnel changes address during a reset, select **Server details → Update server address**, then **Manage encryption → Resume reset**. Crate verifies the original vault or reset receipt before moving the saved connection.
+After the wipe, uploads and retries use normal conflict-aware sync. Changes made by another device that reconnects during recovery are preserved. If the server definitively rejects the first reset request, Crate releases the checkpoint so you can reconnect; an uncertain response keeps the recovery checkpoint. If a self-hosted tunnel changes address during a reset, select **Server → Update server address**, then **Manage encryption → Resume reset**. Crate verifies the original vault or reset receipt before moving the saved connection.
 
 Other Obsidian devices must **Disconnect this device** and reconnect. Existing local files on those devices are preserved and may sync back after reconnecting; review them first if you want to keep only the initiating device’s contents. The server refuses requests that carry vault keys while encryption is off, so a device that kept its keys stores nothing until **Manage encryption** removes them, through **Sync without encryption** or **Turn on encryption**. In each PWA, select **Log out**, including from the expired-session screen, then open a fresh app link. Logout discards that browser’s keys, drafts and pending edits. Enable notifications again. An offline browser cannot be remotely erased; it retains its encrypted local copy until it reconnects or its data is cleared.
 

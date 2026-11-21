@@ -43,6 +43,47 @@ read; with automatic sync on, the next periodic check starts it.
 Adding an exclusion drops queued uploads and deletes for the paths it covers. A
 transfer already in flight finishes, but a failed one is not queued again.
 
+## How a standard sync runs
+
+```mermaid
+flowchart TD
+  accTitle: How a standard sync runs
+  accDescr: A trigger starts a sync. If the server's storage identity changed or its changelog is behind this device's cursor, the device drops its baselines and runs a full sync that merges with the server. Otherwise it runs an incremental sync from the changelog, falling back to a full sync when the changelog can't be used. Both plan with three-way reconciliation, transfer files, and then save the local manifest and cursor.
+  trigger["`**Trigger**
+  Sync now, an edit, startup,
+  foreground, or a periodic check`"]
+  identity{"`Same server,
+  history intact?`"}
+  forget["`Drop baselines and cursor
+  (merge as with a new server)`"]
+  cursor{"`lastSeq above 0?`"}
+  incremental["`**Incremental sync**
+  GET /sync/changes since lastSeq`"]
+  full["`**Full sync**
+  remote manifest and
+  every local file`"]
+  plan["`**Three-way reconciliation**
+  local file, server file,
+  last synced baseline`"]
+  transfer["`Uploads, downloads,
+  merges and conflict copies,
+  then deletions`"]
+  save["`Save local manifest
+  and lastSeq`"]
+  trigger --> identity
+  identity -- yes --> cursor
+  identity -- no --> forget --> full
+  cursor -- yes --> incremental
+  cursor -- no --> full
+  incremental -. "cursor expired or
+  changelog unreadable" .-> full
+  incremental --> plan
+  full --> plan
+  plan --> transfer --> save
+```
+
+"Same server, history intact" means the server's storage identity matches the one saved beside this device's cursor and its changelog has not fallen behind that cursor. The sections below describe each mode and step.
+
 ## Sync Modes
 
 ### 1. Periodic Check

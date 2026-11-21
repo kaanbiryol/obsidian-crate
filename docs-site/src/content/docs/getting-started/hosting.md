@@ -8,6 +8,34 @@ Vault sync and the web app need a Crate server. You decide where it runs, and yo
 - **Cloudflare:** Crate sets up a server in your own Cloudflare account. It stays online without your computer.
 - **Your own hardware:** run Crate with Docker on a computer or server you manage. Your data is stored there.
 
+```mermaid
+flowchart TB
+  accTitle: Where your Crate server runs
+  accDescr: Obsidian and the Crate web app connect to one Crate server. With Cloudflare, the server and its file storage and database run in your Cloudflare account. With your own hardware, an HTTPS tunnel reaches the server running in Docker, which stores its data in a Docker volume on your machine.
+  devices["`**Your devices**
+  Obsidian with Crate,
+  Crate web app`"]
+  subgraph home["Your own hardware"]
+    tunnel["`HTTPS tunnel
+    (Quick Tunnel or
+    Tailscale Funnel)`"]
+    server["`Crate server
+    in Docker`"]
+    volume[("`Docker volume
+    on your machine`")]
+    tunnel --> server --> volume
+  end
+  subgraph cf["Cloudflare"]
+    worker["`Crate server
+    (Cloudflare Worker)`"]
+    storage[("`File storage (R2)
+    and database (D1)`")]
+    worker --> storage
+  end
+  devices --> worker
+  devices --> tunnel
+```
+
 | | Cloudflare | Your own hardware |
 | --- | --- | --- |
 | Setup | Connect your Cloudflare account in Obsidian | Run the repository's Docker setup |

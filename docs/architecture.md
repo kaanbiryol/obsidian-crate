@@ -2,27 +2,45 @@
 
 ## Overview
 
+```mermaid
+flowchart TB
+  accTitle: Crate architecture
+  accDescr: The Obsidian plugin and the web app call one Worker over HTTPS. The Worker keeps file bytes in R2, metadata in D1, and runs coordination, notifications and maintenance in a Durable Object.
+  plugin["`**Obsidian plugin**
+  SyncRuntime → SyncEngine
+  Reminders, Reading runtimes
+  Status bar, Sync activity,
+  settings, SyncApiClient,
+  SecretStorageService`"]
+  pwa["`**Web app (PWA)**
+  Reminders, Reading runtimes
+  Outboxes, offline cache,
+  service worker`"]
+  subgraph worker["Worker (Cloudflare, or Miniflare locally)"]
+    routes["`Admission, authentication,
+    routes, PWA assets`"]
+    r2[("`**R2 bucket**
+    File bytes,
+    retained versions`")]
+    d1[("`**D1 database**
+    Files, changelog,
+    tokens, receipts,
+    reminders, Reading`")]
+    alarms["`**REMINDER_ALARMS**
+    **Durable Object**
+    Coordinator (write lock),
+    notification dispatcher,
+    maintenance, Reading,
+    transfer pools`"]
+    routes --> r2
+    routes --> d1
+    routes --> alarms
+  end
+  plugin -- "HTTPS, vault token" --> routes
+  pwa -- "HTTPS, web session" --> routes
 ```
-┌──────────────── Obsidian plugin ───────────────┐  ┌──────── Web app (PWA) ────────┐
-│ SyncRuntime -> SyncEngine                      │  │ Reminders and Reading         │
-│ Reminders and Reading runtimes                 │  │ runtimes, outboxes, offline   │
-│ Status bar, Sync activity, settings            │  │ cache, service worker         │
-│ SyncApiClient (HTTP)   SecretStorageService    │  └───────────────┬───────────────┘
-└────────────────────────┬───────────────────────┘                  │
-                         │ HTTPS, vault bearer token                │ HTTPS, web session
-                         v                                          v
-┌──────────── Worker (Cloudflare, or Miniflare in packages/server) ─────────────────┐
-│ Admission, authentication, routes, PWA assets                                     │
-│                                                                                   │
-│ ┌──────────────┐ ┌─────────────────────────┐ ┌──────────────────────────────────┐ │
-│ │ R2 BUCKET    │ │ D1 DB                   │ │ REMINDER_ALARMS Durable Object   │ │
-│ │ file bytes,  │ │ files, changelog,       │ │ coordinator (write lock),        │ │
-│ │ retained     │ │ tokens, receipts,       │ │ notification dispatcher,         │ │
-│ │ versions     │ │ reminders, Reading      │ │ maintenance, Reading,            │ │
-│ │              │ │                         │ │ transfer pools                   │ │
-│ └──────────────┘ └─────────────────────────┘ └──────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────────────────────────────┘
-```
+
+The notification dispatcher sends reminder alerts to subscribed web apps through each browser's push service.
 
 Crate has three hosts: the Obsidian plugin, the Reminders and Reading web app (PWA), and one Worker that runs on Cloudflare or locally through `packages/server`. The Worker serves the PWA.
 

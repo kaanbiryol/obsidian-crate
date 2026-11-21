@@ -1,5 +1,39 @@
 # Notification processing and database reads
 
+```mermaid
+flowchart TD
+  accTitle: From a reminder change to a push alert
+  accDescr: A committed Markdown change records source state and queues projection work in the same database transaction and arms the coordinator. A coordinator pass projects reminder schedules and wakes the notification dispatcher, which sends due alerts through the browser push service and retries failures with backoff.
+  change["`**Committed Markdown change**
+  from sync or a web app save`"]
+  commit["`Same D1 transaction:
+  source state and queued job,
+  coordinator alarm armed`"]
+  pass["`**Coordinator pass**
+  verifies sources, projects
+  up to 8 changed files`"]
+  rows[("`reminder_projections
+  due_at, push text,
+  recipients still owed`")]
+  dispatcher["`**Notification dispatcher**
+  one alarm at the
+  earliest due_at`"]
+  deliver["`Up to 20 due rows:
+  check recipients,
+  send Web Push`"]
+  push(["Browser push service"])
+  retry["`Rescheduled with backoff,
+  1 minute to 6 hours; stops after
+  10 attempts or 24 hours`"]
+  change --> commit --> pass
+  pass --> rows
+  pass -- "earliest due time" --> dispatcher
+  dispatcher --> deliver
+  rows -. "due rows" .-> deliver
+  deliver --> push
+  deliver -- failure --> retry
+```
+
 Obsidian changes reach the server according to the device's sync settings. Web app changes reach it when their save request succeeds. Each committed Markdown mutation records its source state and affected notification work in the same D1 transaction. Mutations affecting reminder files, notification policy or explicit retries run under the coordinator Durable Object lock. Deletions and restores wake notification processing only when they name a reminder or Reading note, decided from the request's paths and the folders read under the lock. A reminder command wakes it once its receipt check shows a new command, so a replay wakes nothing. Settings, binary uploads, Markdown commits outside the reminder and Reading folders, token, checkpoint and push subscription changes, and coordinated reads do not wake it; plaintext Reading list and item reads wake it only when they ran a Reading index rebuild step, which can queue article extractions. Article extraction queues the next articles itself and never wakes it. Sync checks and reminder-list access initialize migrations once per parser version. Upload transfer, hashing and R2 staging finish outside the lock; each Markdown publication then uses a short coordinated commit. Before a mutation can commit work, it persists an immediate alarm. The alarm cannot process work until the mutation releases that lock; if the request crashes after committing, the alarm still exists. There is no post-save wake-up gap or recurring notification cron. Coordinated commits are serialized per vault. Most reads stay outside this lock; the plaintext Reading list and item reads, `GET /encryption/reset` and `PUT /settings` take it so they observe or continue serialized state.
 
 The plugin scans local Markdown only for its own UI; the server derives notification schedules from committed Markdown. One `notification_policy` row holds the shared reminders folder, timezone, all-day time, enabled flag and a revision. Startup only initializes an absent policy; an explicit settings edit updates it only while the revision it captured still matches.

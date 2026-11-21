@@ -20,7 +20,9 @@
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
+    "mermaid-isomorphic": "3.1.0",
     "parse5": "8.0.1",
+    "playwright": "1.64.1",
     "typescript": "6.0.3"
   }
 }

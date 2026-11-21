@@ -83,3 +83,18 @@ main > .content-panel + .content-panel { border-top: 0; padding-top: 0.5rem; }
 .sl-markdown-content img { border-radius: 10px; }
 .sl-markdown-content img[src*="phone-"] { display: inline-block; width: calc(50% - 0.75rem); max-width: 16rem; margin-right: 0.75rem; vertical-align: top; }
 .sl-markdown-content img[src*="phone-"] + img[src*="phone-"] { margin-top: 0; margin-right: 0; }
+
+/* Mermaid diagrams are rendered once per theme at build time (scripts/mermaid.mjs). */
+.crate-diagram {
+  margin: 1.5rem 0;
+  overflow-x: auto;
+}
+.crate-diagram svg {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+}
+:root[data-theme="light"] .crate-diagram-dark,
+:root:not([data-theme="light"]) .crate-diagram-light {
+  display: none;
+}

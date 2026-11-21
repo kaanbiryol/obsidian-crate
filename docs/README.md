@@ -1,6 +1,6 @@
 # Crate documentation
 
-Maintainer and contributor documentation for the plugin, Worker and PWA. User-facing guides live on [the documentation site](https://crate.kaanbiryol.com/docs/). Start with the [architecture](architecture.md) and the [testing guide](testing.md).
+Maintainer and contributor documentation for the plugin, Worker and PWA. User-facing guides live on [the documentation site](https://crate.kaanbiryol.com/docs/). Start with the [architecture](architecture.md) and the [testing guide](testing.md). Draw diagrams as `mermaid` code blocks; the [documentation website guide](../docs-site/README.md#diagrams) explains how they render.
 
 ## Architecture and protocol
 
