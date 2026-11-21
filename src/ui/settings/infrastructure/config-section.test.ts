@@ -96,15 +96,18 @@ describe('renderConfigSection integration', () => {
 		const context = {
 			containerEl: new FakeElement('div') as never,
 			plugin: { secretStorage: { get: () => null }, manifest: { version: '0.3.0' }, settings: { cloudflareDeployment: null, workerUrl: 'http://localhost:8787' },
-				syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: vi.fn(async () => ({ serverRevision: 56 })) },
+				syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, getVersionInfo: vi.fn(async () => ({ serverRevision: 56 })),
+					getApiClient: () => ({ getHostStatus: async () => ({ install: 'npm', startedAt: new Date(Date.now() - 3 * 3_600_000).toISOString(), lastBackupAt: null,
+						autoBackup: { on: false, lastFailureAt: null }, publicAccess: 'waiting', diskFreeBytes: 1024 ** 3 }) }) },
 			} as never,
 			rerender: vi.fn(),
 		};
 		renderServerSection(context);
 		renderServerUpdateNotice(context);
-		await flushMicrotasks();
+		await new Promise(resolve => setTimeout(resolve, 0));
 		const names = MockSetting.instances.map(setting => setting.nameEl.textContent);
-		expect(names).toContain('Self-hosted server');
+		const host = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Server computer')!;
+		expect(host.descEl.textContent).toContain('Installed with npm · running since 3h ago · no backup yet · daily backups off.');
 		expect(names).not.toContain('Cloudflare dashboard');
 		expect(names).not.toContain('Cloudflare update available');
 	});

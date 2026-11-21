@@ -20,6 +20,7 @@ import type {
 } from '../../protocol/sync-types';
 import type { SharedSettings } from '../../protocol/shared-settings';
 import type { CrateServerInfo } from '../../protocol/server-info';
+import type { HostStatus } from '../../protocol/host-status';
 import { WorkerApiHttpClient } from './http';
 import type { ApiHttpTransport } from './http';
 import type {
@@ -152,6 +153,10 @@ export class SyncApiClient {
 
 	async getDiagnostics(): Promise<BackendDiagnostics> {
 		return this.syncApi.getDiagnostics();
+	}
+
+	getHostStatus(): Promise<HostStatus | null> {
+		return this.syncApi.getHostStatus();
 	}
 
 	async getManifest(): Promise<FileManifest> {

@@ -1,0 +1,38 @@
+{
+	"stored": {
+		"install": "npm",
+		"startedAt": "2026-11-21T09:00:00.000Z",
+		"lastBackupAt": "2026-11-21T03:00:00Z",
+		"autoBackup": {
+			"on": true,
+			"lastFailureAt": null
+		},
+		"publicAccess": "ready",
+		"diskFreeBytes": 52000000000
+	},
+	"decoded": {
+		"record": {
+			"install": "npm",
+			"startedAt": "2026-11-21T09:00:00.000Z",
+			"lastBackupAt": "2026-11-21T03:00:00Z",
+			"autoBackup": {
+				"on": true,
+				"lastFailureAt": null
+			},
+			"publicAccess": "ready",
+			"diskFreeBytes": 52000000000
+		},
+		"response": {
+			"install": "npm",
+			"startedAt": "2026-11-21T09:00:00.000Z",
+			"lastBackupAt": "2026-11-21T03:00:00Z",
+			"autoBackup": {
+				"on": true,
+				"lastFailureAt": null
+			},
+			"publicAccess": "ready",
+			"diskFreeBytes": 52000000000
+		},
+		"none": null
+	}
+}

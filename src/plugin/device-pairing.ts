@@ -10,7 +10,9 @@ import { normalizeCloudflareDeployment } from '../cloudflare/deployment/state';
 import { workersDevOrigin } from '../cloudflare/deployment/worker-origin';
 import { HttpError, WorkerApiHttpClient } from '../sync/worker-api/http';
 import { readServerEncryption } from '../sync/encryption/server-encryption';
-import { DEVICE_PAIRING_PATH, parseDevicePairingLink, parseDevicePairingTarget } from '../protocol/device-pairing';
+import { DEVICE_PAIRING_PATH, parseDevicePairingLink, parseDevicePairingTarget, type DevicePairingTarget } from '../protocol/device-pairing';
+import { connectSelfHostedServer } from './self-hosted-connection';
+import { selfHostedConnectionMessage } from '../ui/settings/infrastructure/self-hosted-errors';
 import { openConfirmationModal } from '../ui/plugin/confirmation-modal';
 import { DeviceKeyPairingModal } from '../ui/settings/device-key-pairing-modal';
 import { errorMessage } from '../platform/logger';
@@ -43,8 +45,38 @@ export async function redeemDevicePairing(plugin: CratePlugin, target: { origin:
 	return { encrypted: (await readServerEncryption(keyed))?.mode === 'active', synced: connection.success };
 }
 
-export async function startDevicePairing(plugin: CratePlugin, target: { origin: string; code: string } | null): Promise<void> {
+const confirming = new WeakSet<CratePlugin>();
+
+/** A self-hosted code connects through the same checks as the Connect form; it claims the connection itself. */
+async function startSelfHostedPairing(plugin: CratePlugin, target: DevicePairingTarget): Promise<void> {
+	if (confirming.has(plugin)) return;
+	confirming.add(plugin);
+	let confirmed;
+	try {
+		confirmed = await openConfirmationModal(plugin.app, {
+			title: 'Connect this vault',
+			message: `Connect this vault to ${new URL(target.origin).hostname}?`,
+			details: ['This vault will sync with your Crate server.'],
+			confirmText: 'Connect',
+		});
+	} finally { confirming.delete(plugin); }
+	if (!confirmed) return;
+	new Notice('Connecting to your Crate server…');
+	try {
+		const { encrypted } = await connectSelfHostedServer(plugin, target.origin, target.code);
+		plugin.refreshSettingsTab();
+		if (encrypted) { new DeviceKeyPairingModal(plugin).open(); return; }
+		void offerFeatureChoice(plugin).finally(() => {
+			if (!startVaultReplacement(plugin)) new Notice('Connected. Open the command palette and select Crate: Sync now.');
+		});
+	} catch (error) {
+		if (!getPluginLifecycleSignal(plugin).aborted) new Notice(`Could not connect: ${selfHostedConnectionMessage(error, target.origin)}`);
+	}
+}
+
+export async function startDevicePairing(plugin: CratePlugin, target: DevicePairingTarget | null): Promise<void> {
 	if (!target) { new Notice('This pairing link is invalid. Create a new one in Crate settings on your desktop.'); return; }
+	if (target.kind === 'self-hosted') { await startSelfHostedPairing(plugin, target); return; }
 	const release = beginConnectionOperation(plugin, 'pairing');
 	if (!release) {
 		// A repeated link for the pairing already open needs no answer.

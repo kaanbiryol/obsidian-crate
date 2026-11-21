@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { readLastBackup } from './local-server-backup.mjs';
 import { startBackups } from './local-server-backup-schedule.mjs';
+import { createAlerts } from './local-server-alerts.mjs';
+import { createHostStatus } from './local-server-host-status.mjs';
+import { installKind } from './local-server-install.mjs';
 import { issueLocalDevice, listLocalDevices, readResetGeneration, revokeLocalDevice } from './local-server-runtime.mjs';
 
 const hash = (/** @type {string} */ value) => createHash('sha256').update(value).digest('hex');
@@ -88,7 +91,19 @@ export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 	// The caller holds the data directory lock, so a socket already there was left by a crash.
 	if (socket === inData) await unlink(socket).catch(error => { if (error.code !== 'ENOENT') throw error; });
 	const secret = randomBytes(32).toString('hex');
-	const backups = startBackups({ dataDir, runtime });
+	const alerts = createAlerts({ dataDir, send: kind => runtime.alert(kind) });
+	/** @type {ReturnType<typeof createHostStatus>} */
+	let host;
+	const backups = startBackups({ dataDir, runtime, onChange: automaticFailure => {
+		void host.refresh();
+		if (automaticFailure) void alerts.notify('backup-failed');
+	} });
+	host = createHostStatus({ runtime, dataDir, install: installKind(), public: origin.startsWith('https://'),
+		autoBackup: () => backups.status(), onDisk: bytes => alerts.disk(bytes) });
+	void host.refresh();
+	// Hourly, so devices see current disk space and a low disk raises its alert.
+	const heartbeat = setInterval(() => { void host.refresh(); }, 60 * 60_000);
+	heartbeat.unref();
 	/** @template T @param {() => Promise<T>} task @returns {Promise<T>} */
 	const withRuntime = async task => {
 		const release = await runtime.request();
@@ -139,14 +154,24 @@ export async function startLocalControl({ dataDir, pairing, origin, runtime }) {
 		if (process.platform !== 'win32') await chmod(socket, 0o600);
 		await writeFile(file, JSON.stringify({ socket, secret }), { mode: 0o600 });
 		await chmod(file, 0o600);
-	} catch (error) { server.close(); await backups.close(); throw error; }
-	return { async close() {
-		// A running backup holds the runtime paused; it finishes before storage closes.
-		await backups.close();
-		server.closeAllConnections();
-		await new Promise(resolve => server.close(resolve));
-		await unlink(file).catch(error => { if (error.code !== 'ENOENT') throw error; });
-	} };
+	} catch (error) { server.close(); clearInterval(heartbeat); await alerts.close(); await backups.close(); throw error; }
+	return {
+		/** The public address became reachable, or stopped being reachable. @param {boolean} ready */
+		onReadiness(ready) {
+			void host.refresh({ publicAccess: ready ? 'ready' : 'waiting' });
+			alerts.publicAccess(ready);
+		},
+		async close() {
+			clearInterval(heartbeat);
+			await alerts.close();
+			// A running backup holds the runtime paused; it finishes before storage closes.
+			await backups.close();
+			await host.settled();
+			server.closeAllConnections();
+			await new Promise(resolve => server.close(resolve));
+			await unlink(file).catch(error => { if (error.code !== 'ENOENT') throw error; });
+		},
+	};
 }
 
 /** The running server's control socket and secret (`control.json`).

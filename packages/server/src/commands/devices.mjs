@@ -4,12 +4,15 @@ import { join } from 'node:path';
 import { resolveServerOrigin, resolveStartMode } from '../local-server-options.mjs';
 import { requestLocalControl, requestLocalPairing } from '../local-server-pairing.mjs';
 import { issueLocalDevice, listLocalDevices, openLocalRuntime, revokeLocalDevice } from '../local-server-runtime.mjs';
+import { pairingLink, terminalQr } from '../local-server-qr.mjs';
 
 /** @typedef {import('../local-server-options.mjs').Command} Command */
 
-/** @param {{ code: string }} pairing */
-export function printPairing(pairing) {
-	console.log(`Pairing code (single use, expires in 10 minutes): ${pairing.code}\nPaste this code into Crate → Connect to your server. Keep it private.`);
+/** Prints a link and QR code that connect Obsidian in one step, and the code for pasting.
+ * @param {{ code: string }} pairing @param {string} origin */
+export function printPairing(pairing, origin) {
+	const link = pairingLink(origin, pairing.code);
+	console.log(`\nConnect Obsidian (single use, expires in 10 minutes). Keep this private.\nOn a phone or tablet, scan this code with the camera. On a computer, open the link:\n${terminalQr(link)}\n${link}\nOr paste the server address and this pairing code into Crate → Connect to your server:\n${pairing.code}\n`);
 }
 
 /** Uses the running server's control socket, or opens the stopped server's data.
@@ -65,7 +68,7 @@ export async function revoke({ dataDir, values }) {
 export async function pair({ dataDir, values }) {
 	const pairing = await requestLocalPairing(dataDir, values.name);
 	console.log(`Server address to paste into Obsidian: ${pairing.origin}`);
-	printPairing(pairing);
+	printPairing(pairing, pairing.origin);
 }
 
 /** Issues a token offline, so the server must be stopped. It resolves the listener and

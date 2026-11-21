@@ -103,6 +103,7 @@ All sync routes require `vault`.
 |---|---|---|---|
 | `GET` | `/health` | `vault`, `reminders` | Health check, returns `{ status, timestamp }` |
 | `GET` | `/diagnostics` | `vault` | Backend counts, delivery failures, queue pressure, and scheduled-maintenance state |
+| `GET` | `/server/host-status` | `vault` | A self-hosted server's own report: `{ host }` with install type, start time, last backup, daily backup state, public access and free disk space; `null` on Cloudflare |
 | `POST` | `/links/title` | `vault`, `reminders` | Page-title lookup `{ url }`, returns `{ title: string \| null }` |
 | `GET` | `/auth/tokens` | `vault` | List all registered auth tokens |
 | `DELETE` | `/auth/tokens` | `vault` | Revoke an auth token `{ id }` |

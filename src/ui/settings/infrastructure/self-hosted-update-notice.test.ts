@@ -6,13 +6,14 @@ const bundled = 'a'.repeat(64);
 
 type Live = { serverRevision?: number; deploymentFingerprint?: string; developmentBuild?: { worker: string; number: number } };
 
-async function render(live: Live | Error, options: { deployment?: object } = {}) {
+async function render(live: Live | Error, options: { deployment?: object; host?: object | null } = {}) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../../cloudflare/deployment/embedded-artifacts', () => ({ EMBEDDED_CLOUDFLARE_ARTIFACT: { fingerprint: bundled } }));
 	const { renderSelfHostedUpdateNotice } = await import('./self-hosted-update-notice');
 	const plugin = {
 		settings: { workerUrl: 'https://crate.example', cloudflareDeployment: options.deployment ?? null },
-		syncRuntime: { isConfigured: () => true, getVersionInfo: vi.fn(async () => { if (live instanceof Error) throw live; return live; }) },
+		syncRuntime: { isConfigured: () => true, getVersionInfo: vi.fn(async () => { if (live instanceof Error) throw live; return live; }),
+			getApiClient: () => ({ getHostStatus: async () => options.host ?? null }) },
 	};
 	const show = () => renderSelfHostedUpdateNotice({ containerEl: new FakeElement('div'), plugin, rerender: vi.fn() } as never);
 	show();
@@ -33,6 +34,12 @@ it('tells a self-hosted user to update an older server on its host', async () =>
 	expect(MockSetting.instances[0]!.nameEl.textContent).toBe('Server update available');
 	expect(MockSetting.instances[0]!.descEl.textContent).toContain(`Current version: ${release.revision - 1} · Bundled version: ${release.revision}`);
 	expect(MockSetting.instances[0]!.descEl.textContent).toContain('computer running your server');
+});
+
+it('names the update command for how the server was installed', async () => {
+	await render({ serverRevision: release.revision - 1 }, { host: { install: 'docker', startedAt: '2026-11-21T09:00:00Z', lastBackupAt: null,
+		autoBackup: { on: false, lastFailureAt: null }, publicAccess: null, diskFreeBytes: null } });
+	expect(MockSetting.instances[0]!.descEl.textContent).toContain('run: docker compose pull && docker compose up -d');
 });
 
 it('flags a development server build that this stable plugin can replace', async () => {

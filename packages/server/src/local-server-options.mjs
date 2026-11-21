@@ -15,10 +15,12 @@
  * @property {string} [name]
  * @property {string} [id]
  * @property {boolean} [local]
+ * @property {boolean} [keep-awake]
  * @property {boolean} [quick]
  * @property {boolean} [tailscale]
  * @property {boolean} [off]
  * @property {boolean} [help]
+ * @property {boolean} [json]
  */
 
 /**
@@ -38,7 +40,7 @@
  * @typedef {(context: CommandContext, resources: import('./local-server-lifecycle.mjs').CommandResources) => Promise<void>} Command
  */
 
-const COMMANDS = ['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'status', 'backup', 'auto-backup', 'restore', 'check-upgrade', 'upgrade'];
+const COMMANDS = ['start', 'setup', 'add-device', 'pair', 'devices', 'revoke', 'status', 'backup', 'auto-backup', 'restore', 'check-upgrade', 'upgrade', 'service', 'update', 'doctor'];
 const LOOPBACK_HOSTS = ['127.0.0.1', '::1', 'localhost'];
 
 /** Rejects an unknown command or conflicting options. `dockerWithoutTailscale` reports a
@@ -56,7 +58,11 @@ export function validateCommandOptions(positionals, values, { dockerWithoutTails
 	if (values.tailscale && dockerWithoutTailscale()) throw new Error('In Docker, start Tailscale Funnel with compose.tailscale.yaml. See docs/self-hosting.md.');
 	if (command === 'add-device' && !values.name?.trim()) throw new Error('Provide --name for this device.');
 	if (values.name !== undefined && (!values.name.trim() || values.name.trim().length > 128)) throw new Error('Provide a device name between 1 and 128 characters.');
-	if ((values.keep !== undefined || values.off) && command !== 'auto-backup') throw new Error('--keep and --off belong to auto-backup.');
+	if (values.keep !== undefined && command !== 'auto-backup') throw new Error('--keep belongs to auto-backup.');
+	if (values.off && !['auto-backup', 'service'].includes(command)) throw new Error('--off belongs to auto-backup and service.');
+	if (values['keep-awake'] && !['start', 'setup', 'service'].includes(command)) throw new Error('--keep-awake belongs to start, setup and service.');
+	if (values.json && command !== 'check-upgrade') throw new Error('--json belongs to check-upgrade.');
+	if (values['keep-awake'] && values.off) throw new Error('--keep-awake cannot be combined with --off.');
 }
 
 /** Chooses a Quick Tunnel, Tailscale Funnel, saved named tunnel or local listener from the

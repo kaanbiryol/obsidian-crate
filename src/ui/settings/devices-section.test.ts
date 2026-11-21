@@ -254,17 +254,22 @@ describe('device list caching', () => {
 	});
 });
 
-it('offers Add a device only for a vault connected to a Cloudflare server with its saved Cloudflare login', async () => {
+it('offers Add a device with a code for a Cloudflare server with its saved login, and the pair command for a self-hosted one', async () => {
 	const { renderDevicesSection } = await loadDevicesSectionModule();
-	const names = (settings: Record<string, unknown>, connected = true) => {
+	const install = { install: 'docker', startedAt: '2026-11-21T09:00:00Z', lastBackupAt: null, autoBackup: { on: false, lastFailureAt: null }, publicAccess: null, diskFreeBytes: null };
+	const render = (settings: Record<string, unknown>, connected = true) => {
 		resetObsidianUiMocks();
 		renderDevicesSection({ containerEl: new FakeElement('div') as never,
-			plugin: { app: {}, settings, cloudflareSavedLogin: { connected }, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => ({ listTokens: vi.fn(async () => ({ tokens: [] })) }) } } as never });
-		return MockSetting.instances.map(setting => setting.nameEl.textContent);
+			plugin: { app: {}, settings, cloudflareSavedLogin: { connected }, settingsUiState: { devices: null },
+				syncRuntime: { getApiClient: () => ({ listTokens: vi.fn(async () => ({ tokens: [] })), getHostStatus: async () => install }) } } as never });
+		return MockSetting.instances.filter(setting => setting.nameEl.textContent === 'Add a device');
 	};
 	const cloudflare = { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } };
-	expect(names(cloudflare)).toContain('Add a device');
-	expect(names({})).not.toContain('Add a device');
+	expect(render(cloudflare)).toHaveLength(1);
 	// A device added with a code holds no Cloudflare login, so it cannot issue codes.
-	expect(names(cloudflare, false)).not.toContain('Add a device');
+	expect(render(cloudflare, false)).toHaveLength(0);
+	// Self-hosted codes come only from the server computer.
+	const [selfHosted] = render({ workerUrl: 'https://crate.example.ts.net' });
+	await flushMicrotasks();
+	expect(selfHosted!.descEl.textContent).toContain('docker compose exec crate crate pair --name "My phone"');
 });

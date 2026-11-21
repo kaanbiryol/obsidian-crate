@@ -35,18 +35,26 @@ export function devicePairingLink(origin: string, code: string): string {
 	return `${new URL(origin).origin}${DEVICE_PAIRING_PAGE}#${code}`;
 }
 
+/** A self-hosted server's own code, issued on the server computer and redeemed at `/__crate/pair`. */
+export const SELF_HOSTED_PAIRING_CODE = /^crate-pair-[a-f0-9]{64}$/;
+
+/** `cloudflare` codes are redeemed through DEVICE_PAIRING_PATH, `self-hosted` ones by the local server. */
+export interface DevicePairingTarget { origin: string; code: string; kind: 'cloudflare' | 'self-hosted' }
+
 /** Accepts the page link or the `obsidian://crate-pair` parameters, returning the server origin and code. */
-export function parseDevicePairingTarget(server: unknown, code: unknown): { origin: string; code: string } | null {
-	if (typeof server !== 'string' || !isSha256Hex(code)) return null;
+export function parseDevicePairingTarget(server: unknown, code: unknown): DevicePairingTarget | null {
+	if (typeof server !== 'string' || typeof code !== 'string') return null;
+	const kind = isSha256Hex(code) ? 'cloudflare' : SELF_HOSTED_PAIRING_CODE.test(code) ? 'self-hosted' : null;
+	if (!kind) return null;
 	try {
 		const url = new URL(server);
 		const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
 		if (url.protocol !== 'https:' && !(local && url.protocol === 'http:') || url.username || url.password) return null;
-		return { origin: url.origin, code };
+		return { origin: url.origin, code, kind };
 	} catch { return null; }
 }
 
-export function parseDevicePairingLink(link: string): { origin: string; code: string } | null {
+export function parseDevicePairingLink(link: string): DevicePairingTarget | null {
 	try {
 		const url = new URL(link.trim());
 		if (url.protocol === 'obsidian:') return parseDevicePairingTarget(url.searchParams.get('server'), url.searchParams.get('code'));

@@ -40,6 +40,7 @@ export const COORDINATOR_PATHS = {
 	commitUploads: '/commit-uploads',
 	commitNewFiles: '/commit-new-files',
 	revokeCredential: '/revoke-credential',
+	hostAlert: '/host-alert',
 } as const;
 type CoordinatorPath = typeof COORDINATOR_PATHS[keyof typeof COORDINATOR_PATHS];
 
@@ -115,6 +116,14 @@ export async function armReminderDispatcher(env: AlarmBinding, at?: number): Pro
 	return (await post(roleStub(env, NOTIFICATION_DISPATCHER_NAME), COORDINATOR_PATHS.armDispatcher, {
 		body: JSON.stringify(at === undefined ? {} : { at }),
 	})).ok;
+}
+
+/** Pushes a self-hosted server's alert (`HostAlertKind`) through the dispatcher role, which
+ * sends reminders the same way. Returns how many devices received it. */
+export async function sendHostAlert(env: AlarmBinding, kind: string): Promise<number> {
+	const response = await post(roleStub(env, NOTIFICATION_DISPATCHER_NAME), COORDINATOR_PATHS.hostAlert, { body: JSON.stringify({ kind }) });
+	if (!response.ok) throw new Error(`The server could not send the alert (${response.status}).`);
+	return (await response.json() as { sent: number }).sent;
 }
 
 /** Commits a staged upload under the coordinator lock. */

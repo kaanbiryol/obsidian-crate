@@ -14,7 +14,7 @@ const { Miniflare, convertV4MiniflareOptions } = await import(packaged
 /** @type {typeof import('../../../src/cloudflare/worker/auth/revocation.ts')} */
 const { RESET_GENERATION_SQL, revokeCredential } = await import(pathToFileURL(revocationPath).href);
 /** @type {typeof import('../../../src/cloudflare/worker/coordinator/coordinator.ts')} */
-const { armReminderDispatcher, revokeCoordinatedCredential } = await import(pathToFileURL(coordinatorPath).href);
+const { armReminderDispatcher, revokeCoordinatedCredential, sendHostAlert } = await import(pathToFileURL(coordinatorPath).href);
 
 /**
  * The D1 subset the server uses. Miniflare types its bindings with workers types this
@@ -71,6 +71,7 @@ const { armReminderDispatcher, revokeCoordinatedCredential } = await import(path
  * @property {string} dataDir
  * @property {string} origin
  * @property {(id: string) => Promise<boolean>} revoke
+ * @property {(kind: string) => Promise<number>} alert Pushes a host alert; returns how many devices received it.
  * @property {Promise<never>} failed Rejects when a serving runtime stops responding; never settles for administrative runtimes.
  * @property {number} crashes Unexpected workerd exits Miniflare recovered from.
  * @property {RequestGate['request']} request Hold the result while using `mf` or `db`; a pause waits for it.
@@ -421,7 +422,12 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			watch();
 		}
 		const gate = createRequestGate();
-		return { get mf() { return live; }, get db() { return db; }, dataDir, origin, revoke, failed,
+		/** @type {(kind: string) => Promise<number>} */
+		const alert = async kind => {
+			if (administrative) throw new Error('Alerts need the serving runtime.');
+			return sendHostAlert(await alarms(), kind);
+		};
+		return { get mf() { return live; }, get db() { return db; }, dataDir, origin, revoke, alert, failed,
 			get crashes() { return crashes; },
 			request: gate.request,
 			async pause() {

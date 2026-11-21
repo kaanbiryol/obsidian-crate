@@ -1,5 +1,9 @@
 # Run Crate on your own computer
 
+For the shortest path, run `npx @kaanbiryol/crate-server` and answer its questions, or use the
+published Docker image. [Set up your own server](https://kaanbiryol.github.io/obsidian-crate/docs/getting-started/self-hosting/)
+walks through both. This page is the reference behind it.
+
 Crate can run its existing Worker and reminders web app on your Mac using
 Miniflare/workerd. Miniflare supplies local D1, R2, and Durable Objects, including
 persistent reminder alarms. No Cloudflare account, R2 subscription, or OAuth
@@ -26,21 +30,26 @@ your notes; the server adds history, pairing, push setup and reminder state. See
 ## Run with Docker
 
 Install and start Docker Desktop on your Mac or Windows computer, or Docker
-Engine with the Compose plugin on a Linux host. From this repository, run:
+Engine with the Compose plugin on a Linux host. In a new folder, or in this
+repository, run:
 
 ```sh
-docker compose up -d --build
+curl -fsSLO https://raw.githubusercontent.com/kaanbiryol/obsidian-crate/master/compose.yaml
+docker compose up -d
 docker compose logs -f crate
 ```
 
-The first command builds the image and starts Crate in the background. Node,
-Miniflare, the built Worker/PWA, and a checksum-verified `cloudflared` are included.
-You do not need Node or npm installed on the host. The build targets the host's
-architecture; the Dockerfile supports Linux ARM64 and AMD64. No image is published
-to a registry yet, so this command builds from the checkout.
+Compose pulls `ghcr.io/kaanbiryol/crate-server`, published for Linux AMD64 and
+ARM64 with each release, and starts Crate in the background. Set `CRATE_VERSION`
+to pin a release instead of `latest`. Node, Miniflare, the built Worker/PWA, and a
+checksum-verified `cloudflared` are included. You do not need Node or npm on the
+host. From a checkout, `docker compose up -d --build` builds the same image from
+source instead.
 
-Logs show **Server address to paste into Obsidian** and a **Pairing code**. Enter
-those in **Settings → Crate → Connect to your server**, select **Sync now**, then
+Logs show **Server address to paste into Obsidian**, a QR code and a link. Scan
+the code with a phone, or open the link on a computer, and Obsidian connects the
+vault after you confirm. You can also enter the address and **Pairing code** in
+**Settings → Crate → Connect to your server**. Select **Sync now**, then
 use **Crate web app → Set up on phone** (or **Open app** on the same device) to enroll the PWA. Codes expire after
 ten minutes and can be redeemed once. The long-lived device token is returned
 directly to Obsidian, not printed in the container's startup logs. Ctrl+C exits
@@ -267,24 +276,44 @@ services need separate acceptance checks. To start Crate at login or boot, see
 
 ## One-command remote setup without a domain
 
-From the repository, run `npm ci` once, then:
+From the repository, run `npm ci` once, then `npm run server -- setup`. With the
+published package, run `npx @kaanbiryol/crate-server`, which runs setup.
 
-```sh
-npm run server -- setup
-```
+In a terminal, setup with no options asks a few questions. Enter accepts each
+suggestion:
 
-Setup builds the server, initializes an empty database or validates existing
-data, installs a verified official `cloudflared` release if it is not on PATH,
-and starts a Quick Tunnel. It prints the public HTTPS address and, for a fresh
-server, a single-use pairing code. Connect in **Settings → Crate → Connect to your
-server**, then select **Sync now**. The Obsidian plugin must be installed
-separately. The command does not access an Obsidian vault on its own.
+1. **How devices reach this computer:** [Tailscale Funnel](#stable-address-without-a-domain-tailscale-funnel)
+   (recommended), a [named Cloudflare Tunnel](#access-away-from-home-with-cloudflare-tunnel)
+   on your domain, or a temporary Quick Tunnel.
+2. **Start at login and keep running**, through [a service](#start-crate-automatically).
+   Not offered for a Quick Tunnel, whose address changes on restart. From npx,
+   setup first runs `npm install -g @kaanbiryol/crate-server` at the same
+   version, so the service survives npx's cache.
+3. **Keep this Mac awake** (macOS): `--keep-awake` runs `caffeinate -i` for as
+   long as Crate runs.
+4. **Daily backups to a folder:** iCloud Drive when this Mac has it, otherwise
+   `~/Crate backups`. Type `none` to skip. See [automatic backups](#automatic-backups).
 
-No Cloudflare account, domain, Homebrew, or administrator access is needed for
-this flow. Node.js and npm must already be installed. Automatic binary downloads
+With a service, setup provisions the address, installs the service, and shows
+its log until the address is public and a pairing QR code is on screen.
+**Ctrl+C** then closes only that view. Without one, Crate runs in the terminal as
+before. Options (`--tailscale`, `--hostname`, `--quick`) and a non-interactive
+terminal skip the questions; Docker never asks.
+
+Setup builds the server from a checkout, initializes an empty database or
+validates existing data, and prints the public HTTPS address with a QR code and
+link for the first device. Scan or open it to connect Obsidian, or paste the
+address and pairing code into **Settings → Crate → Connect to your server**. The
+Obsidian plugin must be installed separately. The command does not access an
+Obsidian vault on its own.
+
+### Quick Tunnel
+
+A Quick Tunnel needs no Cloudflare account, domain, Homebrew, or administrator
+access. Crate uses `cloudflared` from PATH, or downloads a pinned Cloudflare GitHub
+release with SHA-256 verification into `~/.crate/bin`. Automatic downloads
 support macOS and Linux on x64/arm64, and Windows x64; the runtime still needs
-separate platform acceptance checks. Downloads use a pinned Cloudflare GitHub
-release and SHA-256 checksums, and are cached under `~/.crate/bin`.
+separate platform acceptance checks.
 
 Keep the terminal open and the computer awake. **Ctrl+C** stops the tunnel and
 server. Run `npm run server -- start` to resume. Configuration beside the data
@@ -317,7 +346,7 @@ release publishes the matching version; see [releases](releases.md#publish-the-s
 Subsequent runs reuse `~/.crate/server` by default.
 Pass **--data-dir** to keep multiple vault servers separate. Run
 `npx ./dist/kaanbiryol-crate-server-*.tgz pair --name "My phone"`
-while running to issue another pairing code without restarting.
+while running to issue another pairing code, with its QR code and link, without restarting.
 
 Package source and its dependency shrinkwrap live in `packages/server`.
 `npm run build:server` stages only runtime scripts, built assets, licensing, and
@@ -500,25 +529,28 @@ record or tunnel.
 ## Start Crate automatically
 
 `start` runs in the foreground, so closing the terminal, logging out or rebooting
-stops Crate. A service manager can start it for you and restart it if it stops.
-Docker users already have this: Compose restarts Crate, and Docker Desktop can
-start at login.
-
-First run `setup` once in a terminal, since the first Cloudflare login or Funnel
-approval needs you. Then install Crate somewhere a background service can read.
-On a Mac, macOS blocks background services from reading **Documents**, **Desktop**
-and **Downloads** without a permission prompt, so do not point the service at a
-checkout in those folders. Installing the package globally avoids that:
+stops Crate. A service starts it at login and restarts it 30 seconds after it
+stops with an error. Docker users already have this: Compose restarts Crate, and
+Docker Desktop can start at login. Setup's questions install the service for you;
+to install it later, run setup once in a terminal (the first Cloudflare login or
+Funnel approval needs you), then:
 
 ```sh
-npm install -g @kaanbiryol/crate-server
-node -p process.execPath
-echo "$(npm root -g)/@kaanbiryol/crate-server/scripts/crate-server.mjs"
+crate-server service --keep-awake
 ```
 
-The last two commands print the absolute Node and Crate paths for the files
-below. Use those exact paths: version managers put shims on `PATH` that a service
-cannot use. After upgrading Node, update the Node path and restart the service.
+Use `npm run server -- service` from a checkout. `--keep-awake` keeps a Mac from
+idle sleep while Crate runs. Turn the service off, which also stops Crate, with
+`crate-server service --off`. Pass the same `--data-dir` as setup for a custom
+data directory; one service runs one data directory.
+
+The service names the exact Node and Crate paths, since version-manager shims on
+`PATH` do not work for background services. After upgrading Node, run `service`
+again. Its `PATH` adds Homebrew and the system directories, so Crate finds
+`cloudflared` or `tailscale`. From npx the command refuses, since npx's cache is
+temporary: install with `npm install -g @kaanbiryol/crate-server` first. macOS blocks
+background services from reading **Documents**, **Desktop** and **Downloads**,
+so `service` refuses a checkout or data directory there.
 
 A Quick Tunnel gets a new address on each restart, so use a service with a
 [named tunnel](#access-away-from-home-with-cloudflare-tunnel) or
@@ -527,90 +559,25 @@ saved setup is reused, and `crate-server pair` still works while the service run
 
 ### macOS (launchd)
 
-Save this as `~/Library/LaunchAgents/local.crate.server.plist`, replacing the
-paths and `you` with your own:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>local.crate.server</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/path/to/node</string>
-		<string>/path/to/crate-server.mjs</string>
-		<string>start</string>
-		<string>--data-dir</string>
-		<string>/Users/you/.crate/server</string>
-	</array>
-	<key>EnvironmentVariables</key>
-	<dict>
-		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-	</dict>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>KeepAlive</key>
-	<dict>
-		<key>SuccessfulExit</key>
-		<false/>
-	</dict>
-	<key>ThrottleInterval</key>
-	<integer>30</integer>
-	<key>StandardOutPath</key>
-	<string>/Users/you/Library/Logs/crate-server.log</string>
-	<key>StandardErrorPath</key>
-	<string>/Users/you/Library/Logs/crate-server.log</string>
-</dict>
-</plist>
-```
-
-`PATH` lets Crate find `cloudflared` or `tailscale`. Then load it, and check the log:
-
-```sh
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.crate.server.plist
-tail -f ~/Library/Logs/crate-server.log
-```
-
-Crate now starts when you log in and restarts 30 seconds after it stops with an
-error, such as a tunnel that exited. Stop it with
-`launchctl bootout gui/$(id -u)/local.crate.server`, which shuts it down cleanly.
-A launch agent runs only while you are logged in. Under **System Settings →
-Energy** (or **Battery**), keep the Mac from sleeping while it serves devices.
-The log can contain a first pairing code; keep it private.
+The service is the launch agent `~/Library/LaunchAgents/local.crate.server.plist`,
+logging to `~/Library/Logs/crate-server.log`. It runs only while you are logged in.
+`service --off` runs `launchctl bootout gui/$(id -u)/local.crate.server`, which
+shuts Crate down cleanly. Without `--keep-awake`, keep the Mac from sleeping under
+**System Settings → Energy** (or **Battery**) while it serves devices. The log can
+contain a first pairing code; keep it private.
 
 ### Linux (systemd)
 
-Save this as `~/.config/systemd/user/crate.service`, replacing the paths:
-
-```ini
-[Unit]
-Description=Crate server
-
-[Service]
-ExecStart=/path/to/node /path/to/crate-server.mjs start --data-dir /home/you/.crate/server
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
-Restart=on-failure
-RestartSec=30
-TimeoutStopSec=30
-
-[Install]
-WantedBy=default.target
-```
-
-Enable it, keep it running after you log out, and follow its log:
+The service is the user unit `~/.config/systemd/user/crate.service`, logging to
+`~/.local/state/crate/server.log`. `systemctl --user stop crate` shuts Crate down
+cleanly. To keep it running after you log out, run once:
 
 ```sh
-systemctl --user daemon-reload
-systemctl --user enable --now crate
 sudo loginctl enable-linger "$USER"
-journalctl --user -u crate -f
 ```
 
-`systemctl --user stop crate` shuts Crate down cleanly. If the network or
-Tailscale is not ready at boot, Crate exits and systemd retries it 30 seconds later.
+If the network or Tailscale is not ready at boot, Crate exits and systemd retries
+it 30 seconds later.
 
 ### After a crash or power loss
 
@@ -635,6 +602,26 @@ Tailscale is not ready at boot, Crate exits and systemd retries it 30 seconds la
 Check a server with `npm run server -- status` (or `crate-server status`,
 `docker compose exec crate crate status`). It reports whether Crate is running,
 how many runtime crashes it recovered from, the last verified backup, and the automatic backup setting.
+
+`crate-server doctor` checks more and prints one fix for each problem: Node, the
+data directory, whether Crate and its service run, Tailscale or `cloudflared`, the
+public address, daily backups and their age, free disk space, and Mac sleep. It
+changes nothing and exits with status 1 when a check fails.
+
+### What devices see
+
+The running server also records a short status for connected devices, in
+`maintenance_state` under `crate_host_status`: how Crate was installed, when it
+started and last backed up, whether daily backups are on or last failed, whether
+the public address works, and free disk space. Paths and error text stay on the
+server computer. Obsidian shows it under **Settings → Crate → Server → Server computer**,
+and uses the install type to name the right `pair` and update commands.
+
+When an automatic backup fails, the public address stays unreachable for 15
+minutes, or free space on the data or backup disk drops below 2 GB, Crate sends a
+push notification to browsers enrolled for reminders, at most once a day per kind
+(`alerts.json` in the data directory remembers when). Alerts are not end-to-end
+encrypted, so their text names no paths or vault data. Paused reminders send none.
 
 ## Verified backups, restore, and updates
 
@@ -743,25 +730,35 @@ servers.
 
 ### Update and migrate
 
-Make a verified backup, stop the server, keep the current installation, build the
-update, then run the read-only compatibility check. Start the new version only if
-the check succeeds.
+**Server update available** in Obsidian names the command for your install.
+
+With a global npm install, `crate-server update` does every step:
+
+1. Checks npm for a newer release, and refuses while Crate runs in a terminal.
+2. Stops the service, then makes a verified backup in the automatic backup folder,
+   or `~/.crate/backups`.
+3. Installs the release and runs its read-only `check-upgrade`. If the database
+   needs a migration, it runs `upgrade`, which makes its own verified backup first.
+4. Starts the service again and waits for it to answer.
+
+If installing, the check, or the first start fails before data changed, it
+reinstalls the previous release and starts that. After a migration it cannot go
+back automatically; it prints the backup to restore with the previous release.
+With npx, stop Crate and run `npx @kaanbiryol/crate-server@latest`; startup
+refuses data it cannot read.
 
 With Docker:
 
 ```sh
-docker compose stop
-docker image tag crate-server:local crate-server:before-update
-docker compose build
-docker compose run --rm crate check-upgrade
-docker compose up -d
+docker compose pull && docker compose up -d
 ```
 
-If the check rejects the upgrade, retag `crate-server:before-update` as
-`crate-server:local` and resume the previous image. If it reports that the
-database needs a migration, run
-`docker compose run --rm crate upgrade --output /data/backups/before-migration`
-before starting.
+Before serving, the container runs the compatibility check. When the release
+needs a migration, it makes a verified backup to `/backups/before-migration-<time>`
+(or `/data/backups/…` when no backup folder is mounted), then migrates. Data it
+cannot read stops startup with the reason, and Compose retries; pin the previous
+release with `CRATE_VERSION` to go back. Set `CRATE_AUTO_MIGRATE=0` to migrate by
+hand with `docker compose run --rm crate upgrade --output /data/backups/before-migration`.
 
 For a source installation: update the source, run `npm ci` and
 `npm run build:worker`, then run

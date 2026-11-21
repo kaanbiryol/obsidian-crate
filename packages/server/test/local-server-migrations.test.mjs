@@ -95,3 +95,16 @@ test('a changed local schema needs an older recorded version with a registered m
 	assert.throws(() => assertLocalMigrationPath(release.schemaVersion, release), /No tested migration/);
 	assert.throws(() => assertLocalMigrationPath(0, target), /Unsupported database schema/);
 });
+
+test('Docker start migrates nothing on a fresh volume or current data', { timeout: 60_000 }, async () => {
+	const { migrateBeforeStart } = await import('../src/commands/data.mjs');
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-docker-migrate-test-'));
+	try {
+		assert.equal(await migrateBeforeStart(join(dataDir, 'server'), join(dataDir, 'backups')), null);
+		const runtime = await openLocalRuntime({ dataDir: join(dataDir, 'server'), administrative: true });
+		await runtime.close();
+		assert.equal(await migrateBeforeStart(join(dataDir, 'server'), join(dataDir, 'backups')), null);
+		await writeFile(join(dataDir, 'server', 'server.json'), JSON.stringify({ ...JSON.parse(await readFile(join(dataDir, 'server', 'server.json'), 'utf8')), serverRevision: 999 }));
+		await assert.rejects(migrateBeforeStart(join(dataDir, 'server'), join(dataDir, 'backups')));
+	} finally { await rm(dataDir, { recursive: true, force: true }); }
+});

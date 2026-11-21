@@ -14,6 +14,7 @@ import { isCompatibleCrateServer, parseCrateServerInfo } from './server-info';
 import { parseSharedCheckpointDocument, parseSharedCheckpointList } from './history-checkpoints';
 import { normalizeSharedSettingsValue } from './shared-settings';
 import { isReminderOperationId, reminderOperationDay } from './reminder-operation';
+import { parseHostStatus, parseHostStatusResponse } from './host-status';
 
 const hash = (digit: string) => digit.repeat(64);
 const checkpoint = { id: '0f0f0f0f-1111-4222-8333-444444444444', sequence: 12, timestamp: '2026-09-20T10:00:00.000Z', expiresAt: Date.parse('2026-10-20T10:00:00.000Z'), fileCount: 3 };
@@ -37,6 +38,13 @@ describe('frozen protocol fixtures', () => {
 				const info = parseCrateServerInfo(stored);
 				return { info, compatible: info ? isCompatibleCrateServer(info) : null };
 			},
+		},
+		{
+			// A self-hosted host process's `maintenance_state` record and the route body serving it.
+			file: 'host-status.v1.json',
+			stored: () => ({ install: 'npm', startedAt: '2026-11-21T09:00:00.000Z', lastBackupAt: '2026-11-21T03:00:00Z',
+				autoBackup: { on: true, lastFailureAt: null }, publicAccess: 'ready', diskFreeBytes: 52_000_000_000 }),
+			decode: (stored: unknown) => ({ record: parseHostStatus(stored), response: parseHostStatusResponse({ host: stored }), none: parseHostStatusResponse({ host: null }) }),
 		},
 		{
 			file: 'shared-checkpoint-list.v1.json',

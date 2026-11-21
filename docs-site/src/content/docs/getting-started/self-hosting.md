@@ -1,84 +1,102 @@
 ---
-title: Set up with Docker
-description: Run Crate on your own hardware and connect Obsidian using the HTTPS address and pairing code.
+title: Set up your own server
+description: Run Crate on your own hardware with one command, then connect Obsidian by scanning a code.
 ---
 
-Run Crate on a computer or server you control, and your synced data is stored there. Docker brings everything Crate needs, including an HTTPS tunnel. You don't need a Cloudflare account, a domain, or Node.js.
+Run Crate on a computer or server you control, and your synced data is stored there. You don't need a Cloudflare account or a domain. Choose one way to run it:
 
-## Start the server
+- **Node.js** on a Mac or Linux computer: one command asks a few questions and sets everything up.
+- **Docker** on any computer that runs it, including Windows and home servers.
 
-You need Docker Desktop on macOS or Windows, or Docker Engine with the Compose plugin on Linux, plus Git. Then run:
+## With Node.js
+
+Install [Node.js](https://nodejs.org/) 26, then run:
 
 ```sh
-git clone https://github.com/kaanbiryol/obsidian-crate.git
-cd obsidian-crate
-docker compose up -d --build
+npx @kaanbiryol/crate-server
+```
+
+Crate asks a few questions, and pressing Enter accepts each suggestion:
+
+1. **How your devices reach this computer.** Tailscale Funnel gives a permanent address for free. You need the [Tailscale app](https://tailscale.com/download) on this computer only, with **MagicDNS** and **HTTPS certificates** turned on in its [admin console](https://login.tailscale.com/admin/dns). You can also use your own domain on Cloudflare, or a temporary address to try Crate out.
+2. **Start Crate when you log in**, and restart it if it stops. Crate installs itself so it keeps running after you close the terminal.
+3. **Keep this Mac awake** while Crate runs, so your devices can always sync.
+4. **Where to keep daily backups.** On a Mac with iCloud Drive, Crate suggests a folder there, so backups also leave the computer.
+
+The first time, Tailscale or Cloudflare may print a link to approve access. When setup finishes, it shows a code to [connect Obsidian](#connect-obsidian).
+
+## With Docker
+
+You need Docker Desktop on macOS or Windows, or Docker Engine with the Compose plugin on Linux. In a new folder, run:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/kaanbiryol/obsidian-crate/master/compose.yaml
+docker compose up -d
 docker compose logs -f crate
 ```
 
-The first run builds Crate from the repository, so it takes a little while. Wait for the log message saying the public HTTPS address reaches this Crate server.
+Docker downloads Crate, including an HTTPS tunnel, and starts it in the background. It restarts Crate after a failure, and Docker Desktop can start at login. Wait for the log message saying the public HTTPS address reaches this Crate server. Press **Ctrl+C** to leave the log; Crate keeps running.
+
+The default Docker tunnel address changes every time the server restarts. For an address that never changes, see [Tailscale Funnel with Docker](/docs/reference/self-hosting/#tailscale-funnel-with-docker).
 
 ## Connect Obsidian
 
-1. In the logs, find **Server address to paste into Obsidian** and **Pairing code**.
-2. In Obsidian, open **Settings → Crate → Connect to your server**.
-3. Enter the full HTTPS address and the pairing code.
-4. In **Choose what Crate manages in this vault**, turn Reminders and Reading on or off, then select **Finish**. [After you connect](/docs/getting-started/hosting/#after-you-connect) explains the defaults.
-5. Open the command palette and select **Crate: Sync now**.
+Install the Crate plugin in Obsidian first. When the server is ready it shows a QR code and a link:
 
-When it finishes, check **Crate: Show sync activity** for errors. If you want this device to keep syncing on its own, turn on **Settings → Crate → Sync → Automatic sync**; it starts off.
+- **On a phone or tablet,** scan the QR code with the camera.
+- **On a computer,** open the link.
 
-Pairing codes work once and expire after ten minutes. If yours expires, [create another code](#create-another-pairing-code).
+Obsidian opens and asks to connect the vault. Select **Connect**, choose what Crate manages, and it starts syncing.
 
-<details>
-<summary>Good to know</summary>
+You can also enter the server address and pairing code shown below the QR code in **Settings → Crate → Connect to your server**. Codes work once and expire after ten minutes.
 
-- Press **Ctrl+C** to leave the log viewer. Crate keeps running in the background.
-- Use the public HTTPS address even if Obsidian is on the same computer. The `127.0.0.1:8787` address in the logs is inside the container and isn't reachable from your computer.
+## Add another device
 
-</details>
+Each device needs its own code. On the computer running the server, run the command that matches how you installed it:
 
-## Create another pairing code
-
-Each device needs its own code. With the server running, run this from the same repository folder:
+```sh
+crate-server pair --name "My phone"
+```
 
 ```sh
 docker compose exec crate crate pair --name "My phone"
 ```
 
-On the next Obsidian device, enter the new code and the same server address under **Connect to your server**. There's no need to restart the server.
+It shows a new QR code and link. In Obsidian, **Settings → Crate → Account and devices → Add a device** shows the right command and copies it for you.
 
-Running the server directly with Node instead of Docker? See the [server command reference](/docs/reference/self-hosting/#storage-and-lifecycle).
+## Keep it healthy
 
-## Keep it available
+**Settings → Crate → Server → Server computer** shows when the server last backed up, whether it is reachable from the internet, and anything that needs your attention. Phones with the Crate web app and notifications turned on also get a notification when a backup fails, the server stops being reachable, or its disk is nearly full.
 
-Sync and scheduled notifications only work while the server is running. Keep the machine awake, online, and running Docker.
+To check everything and get a fix for each problem, run this on the server computer:
 
-The default tunnel address changes every time the server restarts. When it does, on each Obsidian device use **Settings → Crate → Server → Update server address**, sync, then reconnect the web app. To avoid this, [get an address that never changes](#get-an-address-that-never-changes).
+```sh
+crate-server doctor
+```
 
-## Get an address that never changes
+With Docker, use `docker compose exec crate crate doctor`.
 
-Without your own domain, use Tailscale Funnel. It gives the server a permanent address like `https://crate.your-tailnet.ts.net`, and your phone doesn't need Tailscale installed. You need a free Tailscale account:
+## Update the server
 
-1. In the [Tailscale admin console](https://login.tailscale.com/admin/dns), turn on **MagicDNS** and **HTTPS certificates**, and [allow Funnel](/docs/reference/self-hosting/#tailscale-funnel-with-docker) for your devices.
-2. Start Crate with the Tailscale setup instead:
+When Obsidian shows **Server update available**, run this on the server computer:
 
-   ```sh
-   docker compose -f compose.yaml -f compose.tailscale.yaml up -d --build
-   docker compose -f compose.yaml -f compose.tailscale.yaml logs -f crate
-   ```
+```sh
+crate-server update
+```
 
-3. Open the Tailscale sign-in link from the logs. Crate then prints its address and pairing code as before.
+Crate makes a verified backup, installs the new release, checks your data, and restarts. If anything fails before your data changes, it goes back to the previous release.
 
-Use both `-f` files in every later command, including `exec crate crate pair`. If you already connected devices with the default tunnel, use **Update server address** on each one and reconnect the web app once.
+With Docker, run this in the folder with `compose.yaml`:
 
-If you have a domain on Cloudflare, you can use a [custom-domain tunnel](/docs/reference/self-hosting/#access-away-from-home-with-cloudflare-tunnel) instead.
+```sh
+docker compose pull && docker compose up -d
+```
+
+The new container checks your data before it starts. If the release needs a database migration, it makes a verified backup first.
 
 ## Look after your data
 
-Your server's data lives in a Docker volume, so it survives when the container is replaced. Don't remove that volume, and keep backups outside it.
-
-### Turn on daily backups
+Every device keeps a full copy of your notes. The server adds history, pairing, notifications and reminder state, so keep its backups. Setup with Node.js turns on daily backups. With Docker, turn them on yourself:
 
 1. Create a folder named `backups` next to `compose.yaml`. On Linux, make it writable by user ID 1000.
 2. In `compose.yaml`, uncomment the `./backups:/backups` line, then run `docker compose up -d`.
@@ -88,36 +106,6 @@ Your server's data lives in a Docker volume, so it survives when the container i
    docker compose exec crate crate auto-backup --output /backups --keep 7
    ```
 
-Crate makes the first backup right away, then a verified backup each day while it runs, without stopping sync for more than a moment, and deletes the oldest beyond seven. Copy the `backups` folder to another disk or computer now and then. The [server command reference](/docs/reference/self-hosting/#verified-backups-restore-and-updates) covers restoring one.
-
-### Update the server
-
-When Obsidian shows **Server update available**, update the server to the same version as your plugin:
-
-1. Let sync finish on your devices, and make a backup:
-
-   ```sh
-   docker compose exec crate crate backup --output /backups/before-update
-   ```
-
-   This needs the `backups` folder from [daily backups](#turn-on-daily-backups). Use a new name each time.
-2. From the repository folder, switch to the release that matches your plugin version, for example `0.14.3`:
-
-   ```sh
-   git fetch --tags
-   git checkout 0.14.3
-   ```
-
-3. Stop the server, keep a copy of the current image, build the new one, and check it before you start it:
-
-   ```sh
-   docker compose stop
-   docker image tag crate-server:local crate-server:before-update
-   docker compose build
-   docker compose run --rm crate check-upgrade
-   docker compose up -d
-   ```
-
-Start the server only if `check-upgrade` succeeds. If it reports that the database needs a migration, or rejects the update, follow the [update and migrate steps](/docs/reference/self-hosting/#update-and-migrate) instead of starting it.
+Copy backups to another disk or computer now and then. The [server command reference](/docs/reference/self-hosting/#verified-backups-restore-and-updates) covers restoring one.
 
 [Connect your other devices →](/docs/getting-started/devices/)

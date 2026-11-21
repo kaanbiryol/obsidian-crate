@@ -2,7 +2,9 @@ name: crate
 
 services:
   crate:
-    image: crate-server:local
+    # The published image; set CRATE_VERSION to pin a release. From a checkout,
+    # docker compose up -d --build builds this tag from source instead.
+    image: ghcr.io/kaanbiryol/crate-server:${CRATE_VERSION:-latest}
     build: .
     init: true
     restart: unless-stopped

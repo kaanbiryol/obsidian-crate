@@ -69,8 +69,9 @@ async function pruneAutomaticBackups(dir, keep) {
  * @param {number} [options.firstCheck] Milliseconds after start before the first check.
  * @param {number} [options.interval] Milliseconds between checks.
  * @param {typeof backupLocalServer} [options.backup]
+ * @param {(automaticFailure: boolean) => void} [options.onChange] After a verified backup, or a failed automatic one.
  */
-export function startBackups({ dataDir, runtime, now = Date.now, firstCheck = 5 * 60_000, interval = 60 * 60_000, backup = backupLocalServer }) {
+export function startBackups({ dataDir, runtime, now = Date.now, firstCheck = 5 * 60_000, interval = 60 * 60_000, backup = backupLocalServer, onChange = () => {} }) {
 	/** @type {Promise<{ output: string, pausedMs: number }> | null} */
 	let running = null;
 	/** @type {{ at: string, message: string } | null} */
@@ -91,6 +92,7 @@ export function startBackups({ dataDir, runtime, now = Date.now, firstCheck = 5 
 				return async () => { try { await resume(); } finally { pausedMs = Date.now() - started; } };
 			};
 			const created = await backup(dataDir, output, { alreadyLocked: true, pause, linkFrom });
+			onChange(false);
 			return { output: created, pausedMs };
 		})().finally(() => { running = null; });
 		return running;
@@ -111,6 +113,7 @@ export function startBackups({ dataDir, runtime, now = Date.now, firstCheck = 5 
 			if (error?.code === 'EBUSY' || closed) return;
 			lastFailure = { at: new Date(now()).toISOString(), message: error instanceof Error ? error.message : String(error) };
 			console.warn(`Automatic backup failed; Crate retries within the hour: ${lastFailure.message}`);
+			onChange(true);
 		}
 	}
 

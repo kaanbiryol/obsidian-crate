@@ -1,6 +1,7 @@
 // Data maintenance: backup (online or stopped), automatic backups, and the stopped-server
 // restore, upgrade and upgrade check.
-import { resolve } from 'node:path';
+import { access } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { backupLocalServer, checkLocalUpgrade, restoreLocalServer } from '../local-server-backup.mjs';
 import { saveAutoBackup } from '../local-server-backup-schedule.mjs';
 import { requestLocalControl } from '../local-server-pairing.mjs';
@@ -52,7 +53,23 @@ export async function restore({ dataDir, values }) {
 }
 
 /** @type {Command} */
-export async function checkUpgrade({ dataDir }) {
+export async function checkUpgrade({ dataDir, values }) {
 	const checked = await checkLocalUpgrade(dataDir);
+	if (values.json) { console.log(JSON.stringify(checked)); return; }
 	console.log(`Compatible: server revision ${checked.from} → ${checked.to}, runtime ${checked.runtime}.${checked.requiresMigration ? ' The database needs a migration: run upgrade with a new --output backup directory before starting.' : ''} Back up before updating; no data was changed by this check.`);
+}
+
+/** Before Docker serves a newer image, migrates data that needs it, after a verified backup
+ * into `backupRoot`. Incompatible data throws the check's reason; a fresh volume has nothing to check.
+ * @param {string} dataDir @param {string} backupRoot @param {() => Date} [now]
+ * @returns {Promise<string | null>} The migration backup, or null when none was needed. */
+export async function migrateBeforeStart(dataDir, backupRoot, now = () => new Date()) {
+	if (!await access(join(dataDir, 'server.json')).then(() => true, () => false)) return null;
+	if (!(await checkLocalUpgrade(dataDir)).requiresMigration) return null;
+	const output = join(backupRoot, `before-migration-${now().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}`);
+	console.log(`This release needs a database migration. Backing up to ${output} first.`);
+	const upgraded = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false, upgradeBackup: output });
+	await upgraded.close();
+	console.log('Server data migrated.');
+	return output;
 }

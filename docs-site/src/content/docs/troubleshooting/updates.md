@@ -31,8 +31,11 @@ Crate reuses your saved Cloudflare sign-in when it can, and asks you to sign in 
 
 Obsidian shows **Server update available** when your plugin includes a newer server than the one you run. Update it on the computer that runs it:
 
-- **Docker:** follow [Update the server](/docs/getting-started/self-hosting/#update-the-server).
-- **Started with Node:** follow the [update and migrate steps](/docs/reference/self-hosting/#update-and-migrate).
+- **Installed with npm:** run `crate-server update`.
+- **Docker:** run `docker compose pull && docker compose up -d`.
+- **Other installs:** follow the [update and migrate steps](/docs/reference/self-hosting/#update-and-migrate).
+
+The **Server update available** message names the command for your server. See [Update the server](/docs/getting-started/self-hosting/#update-the-server).
 
 Each way makes a backup first and checks that the new version can open your existing data before it starts.
 

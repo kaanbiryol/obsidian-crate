@@ -12,6 +12,7 @@ import { requestFileVersions } from './version-contract';
 import { parseChanges, parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
 import { parseBatchDelete, parseBatchDownload, parseBatchUpload, parseUploadResult } from './mutation-contracts';
 import { errorMessage } from '../../platform/logger';
+import { HOST_STATUS_PATH, parseHostStatusResponse, type HostStatus } from '../../protocol/host-status';
 import { refusedUploadResult } from '../failures';
 import { runConcurrentTasks } from '../concurrency';
 import type {
@@ -152,6 +153,12 @@ export class SyncWorkerApi {
 
 	async getDiagnostics(): Promise<BackendDiagnostics> {
 		return this.http.requestJson<BackendDiagnostics>('/diagnostics');
+	}
+
+	/** Null for a Cloudflare deployment, or a server too old to report one. */
+	async getHostStatus(): Promise<HostStatus | null> {
+		try { return parseHostStatusResponse(await this.http.requestJson<unknown>(HOST_STATUS_PATH)); }
+		catch (error) { if (error instanceof HttpError && error.status === 404) return null; throw error; }
 	}
 
 	/** One raw manifest entry is enough to tell whether the server stores any file. */

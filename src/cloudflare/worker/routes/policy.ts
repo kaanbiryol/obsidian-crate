@@ -61,6 +61,7 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /reading/encrypted-extract': { scopes: LIBRARY, rateLimit: 30 },
 	'GET /health': { scopes: REMINDERS, duringEncryptionReset: true },
 	'GET /diagnostics': { scopes: VAULT },
+	'GET /server/host-status': { scopes: VAULT },
 	'GET /settings': { scopes: VAULT },
 	'PUT /settings': { scopes: VAULT, execution: COORDINATOR_READ },
 	'GET /features': { scopes: LIBRARY, keylessEncryptedRead: true },

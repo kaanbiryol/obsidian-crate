@@ -1,80 +1,68 @@
 # Crate server
 
 Run Crate's sync server and reminders PWA on your computer. Requires Node.js
-26.8.2+ in the 26.x series. No Cloudflare account or domain is needed for the
-default Quick Tunnel mode. For a permanent address without a domain, use
-Tailscale Funnel: `npx @kaanbiryol/crate-server setup --tailscale`. See the
-self-hosting docs for its one-time Tailscale setup.
+26.8.2+ in the 26.x series. No Cloudflare account or domain is needed.
 
 ```sh
 npx @kaanbiryol/crate-server
 ```
 
-The package includes the built server. On first launch it initializes persistent
-storage, uses an existing `cloudflared` or downloads a pinned official release
-with SHA-256 verification, starts a Cloudflare Quick Tunnel, and prints the HTTPS
-address and your first single-use pairing code. No administrator privileges are needed for
-the downloaded binary. Install the Crate Obsidian plugin separately, enter the
-address and pairing code in **Settings → Crate → Connect to your server**, then select
-**Sync now**. The launcher does not scan or modify your local Obsidian vault.
+In a terminal, setup asks a few questions; Enter accepts each suggestion:
 
-Keep the terminal open and the computer awake. Ctrl+C stops the server and tunnel.
-Run the same command again to resume with the same local data.
+1. How your devices reach this computer: Tailscale Funnel (a permanent address,
+   free, no domain), your own domain on Cloudflare, or a temporary Quick Tunnel.
+2. Whether Crate starts at login and restarts after a failure. Setup installs the
+   package globally for this, then a launchd agent (macOS) or systemd user
+   service (Linux).
+3. Whether to keep this Mac awake while Crate runs.
+4. Where to keep daily verified backups.
 
-**The public address changes when the tunnel restarts.** Existing device tokens
-remain valid. On each connected Obsidian device, use **Settings → Crate → Server details → Update server address**.
-Use a fresh **Copy app link** or **Show QR code** to enroll the PWA at the new
-address. Browser storage and push subscriptions belong to each address. Sync
-pending PWA changes before stopping a tunnel. Quick Tunnels are intended for
-testing and development and have no uptime guarantee.
-
-The default data directory is `~/.crate/server`. Stop the server before copying
-the entire directory for backup or updating
-the package. Runtime/schema compatibility is checked before opening stored data.
+It then prints the server address with a QR code and a link. Install the Crate
+Obsidian plugin, then scan the code with a phone or open the link on a computer,
+and Obsidian connects the vault. You can also paste the address and pairing code
+into **Settings → Crate → Connect to your server**. The launcher does not scan or
+modify your local Obsidian vault.
 
 ```sh
-npx @kaanbiryol/crate-server pair --name "My phone"
-npx @kaanbiryol/crate-server devices
-npx @kaanbiryol/crate-server revoke --id TOKEN_ID
-npx @kaanbiryol/crate-server status
-npx @kaanbiryol/crate-server auto-backup --output /path/to/backups
-npx @kaanbiryol/crate-server --data-dir /path/to/another-vault
+crate-server pair --name "My phone"   # a new QR code and pairing code
+crate-server doctor                   # check everything and print a fix for each problem
+crate-server update                   # back up, install the newest release, check, restart
+crate-server status
+crate-server devices
+crate-server revoke --id TOKEN_ID
+crate-server service --keep-awake     # start at login; service --off stops that
+crate-server auto-backup --output /path/to/backups
+crate-server --data-dir /path/to/another-vault
 ```
 
-Use the pair command while the server is running. Pairing codes expire after ten
-minutes and can be exchanged once; they never contain the device token itself.
-The plugin receives a separate device token and saves it in Obsidian secret
-storage. The server stores only its hash. Long-lived tokens are not printed by
-normal startup. An expired or lost code can be replaced with the pair command. List and revoke
-device credentials from the server computer with the devices and revoke commands.
-The status command reports whether the server runs, how many runtime crashes it
-recovered from, the last verified backup and the automatic backup setting.
+Without a global install, prefix commands with `npx @kaanbiryol/crate-server`.
+The default data directory is `~/.crate/server`; pass the same `--data-dir` to
+every command for another one.
 
-The launcher reports public access as ready only after an HTTPS probe reaches
-this running instance. It keeps retrying while DNS or the tunnel is unavailable.
+Pairing codes expire after ten minutes and can be exchanged once; they never
+contain the device token itself. The plugin receives a separate device token and
+saves it in Obsidian secret storage. The server stores only its hash.
 
-Use backup --output PATH to create a checksum-verified backup; a running server
-pauses sync for a moment while its database is copied. Use auto-backup --output
-DIR [--keep 7] to back up daily while the server runs and keep the newest, and
-auto-backup --off to stop.
-Use restore --backup PATH --data-dir EMPTY_PATH to validate and restore it, and
-check-upgrade to check compatibility without changing stored data. If it reports
-a database migration, run upgrade --output NEW_BACKUP_PATH while stopped; it
-creates a verified backup before migrating. Runtime changes, and schema changes
-without a registered migration, are rejected.
+`update` makes a verified backup, installs the release, and runs its read-only
+compatibility check. If the database needs a migration, it runs `upgrade`, which
+backs up again before migrating. If a step fails before data changed, it
+reinstalls the previous release. Runtime changes, and schema changes without a
+registered migration, are rejected.
 
-Running the command opts into remote access through Cloudflare. Cloudflare
-terminates public HTTPS and handles traffic through the tunnel. Files, database,
-and alarm state remain on your computer. Crate does not end-to-end encrypt vault
-contents. The launcher downloads its tunnel binary from Cloudflare's official
-GitHub releases to `~/.crate/bin` if needed. Miniflare telemetry is disabled.
+Connected devices show the server's health in **Settings → Crate → Server**, and
+browsers enrolled for reminders get a push notification when an automatic backup
+fails, the public address stops working, or the disk is nearly full. These
+reports name no paths or vault data.
 
-For a permanent address, use a new data directory with
-`setup --hostname crate.example.com` and a domain you control in Cloudflare, or
-run `start --local --origin https://your-address` with your own HTTPS proxy.
+Remote access is opt-in through setup. Cloudflare or Tailscale terminates public
+HTTPS and relays traffic; files, database and alarm state stay on your computer.
+Use Crate's optional end-to-end encryption to protect content from the server.
+The launcher downloads `cloudflared` from Cloudflare's official GitHub releases,
+with SHA-256 verification, to `~/.crate/bin` if needed. Miniflare telemetry is
+disabled.
 
-See the repository's [self-hosting guide](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/self-hosting.md)
-for installation, recovery, backups, and updates.
+See the [self-hosting guide](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/self-hosting.md)
+for Docker, recovery, backups, and updates.
 
 This directory is the package source. Build and pack the distributable from the
 repository with `npm run pack:server`; do not publish this source directory.

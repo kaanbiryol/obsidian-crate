@@ -8,6 +8,7 @@ import { errorMessage } from '../../platform/logger';
 import type { SettingsSectionContext } from './section-helpers';
 import { formatTimeAgo, parseServerTimestamp } from '../shared/format';
 import { AddDeviceModal, canAddDeviceWithCode } from './add-device-modal';
+import { renderSelfHostedAddDevice } from './infrastructure/self-hosted-status';
 
 const log = createLogger('DeviceSettings');
 
@@ -28,6 +29,7 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 			.setDesc('Connect another Obsidian vault to this server by scanning a code. No Cloudflare sign-in is needed on that device.')
 			.addButton(button => button.setButtonText('Add a device').onClick(() => { new AddDeviceModal(plugin).open(); }));
 	}
+	const stopAddDevice = plugin.settings.cloudflareDeployment ? undefined : renderSelfHostedAddDevice(devicesEl, plugin);
 	new Setting(devicesEl)
 		.setName('Connected devices and sessions')
 		.setDesc('Browsers and home screen apps appear separately, even on the same device.')
@@ -127,7 +129,7 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 
 	renderList();
 	void refresh();
-	return () => { disposed = true; };
+	return () => { disposed = true; stopAddDevice?.(); };
 }
 
 function orderDevices(tokens: RegisteredDevice[]): RegisteredDevice[] {

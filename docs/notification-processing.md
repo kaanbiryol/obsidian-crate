@@ -56,6 +56,8 @@ Each push subscription records the session that created it as its owner, and mai
 
 Delivery accepts only endpoints of known browser push services (`notifications/push-endpoint.ts`), rejects redirects and has a ten-second network deadline. A 404 or 410 response deletes the subscription; 408, 425, 429 and 5xx responses and network errors are retried with the delivery; any other failure quarantines the subscription (`disabled_at`). An exhausted delivery keeps its `delivery_failed_at` record, which server diagnostics count; a new occurrence clears it and starts a new attempt.
 
+A self-hosted server's host process can also push an alert (`notifications/host-alerts.ts`): an automatic backup failed, the public address stayed unreachable, or the disk is nearly full. It calls the dispatcher role's `/host-alert` path through the local Durable Object namespace, never a public route, and the same recipients receive it unless reminders are paused. Alert text is fixed and plaintext, since the host has no notification key, so it names no paths or vault data. The host sends each kind at most once a day.
+
 When a browser replaces a subscription, the PWA service worker renews it with the same server key and asks open pages to register the new endpoint. It holds no credential, so a closed app registers the endpoint at its next launch.
 
 ## Regression measurement

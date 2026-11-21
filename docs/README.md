@@ -53,7 +53,7 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 ## Server and deployment
 
 - [Deploying and operating the server](deployment.md) - Cloudflare OAuth setup, deployment, updates, recovery and deletion.
-- [Self-hosting](self-hosting.md) - running the server locally or in Docker, remote access, starting automatically, crash recovery, backups and updates.
+- [Self-hosting](self-hosting.md) - running the server locally or in Docker, the setup questions, remote access, starting automatically, `doctor`, crash recovery, backups and updates.
 - [Server upgrades](server-upgrades.md) - server revision, schema versioning, migration and release contracts.
 - [Cloudflare backup and recovery](recovery.md) - paired D1 and R2 archives, restoring automatic upgrade backups and investigating missing notes. Self-hosted backups are in [self-hosting](self-hosting.md#verified-backups-restore-and-updates).
 

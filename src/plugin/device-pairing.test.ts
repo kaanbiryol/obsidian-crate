@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 	notices: [] as string[],
 	featureChoice: vi.fn(async () => {}),
 	replacement: vi.fn(() => false),
+	selfHosted: vi.fn(async (): Promise<{ encrypted: boolean }> => ({ encrypted: false })),
 }));
 
 vi.mock('obsidian', () => ({ Notice: class { constructor(message: string) { mocks.notices.push(message); } } }));
@@ -20,6 +21,9 @@ vi.mock('./device-identity', () => ({ getCurrentDeviceName: () => 'iPhone', getC
 vi.mock('./device-token', () => ({ generateSecureToken: () => 'phone-token', hashToken: async () => 'phone-token-hash' }));
 vi.mock('../sync/encryption/server-encryption', () => ({ readServerEncryption: mocks.encryption }));
 vi.mock('../ui/plugin/confirmation-modal', () => ({ openConfirmationModal: mocks.confirm }));
+vi.mock('./self-hosted-connection', () => ({ connectSelfHostedServer: mocks.selfHosted }));
+vi.mock('../ui/settings/infrastructure/self-hosted-errors', () => ({ selfHostedConnectionMessage: (error: Error) => error.message }));
+vi.mock('./lifecycle-state', () => ({ getPluginLifecycleSignal: () => new AbortController().signal }));
 vi.mock('../ui/settings/device-key-pairing-modal', () => ({ DeviceKeyPairingModal: class { open = mocks.keysModal; } }));
 vi.mock('../sync/worker-api/http', () => {
 	class HttpError extends Error { constructor(message: string, readonly status: number) { super(message); } }
@@ -57,6 +61,7 @@ beforeEach(() => {
 	mocks.exchange.mockReset().mockResolvedValue({ tokenId: 'token-id', deployment });
 	mocks.configure.mockClear(); mocks.encryption.mockReset().mockResolvedValue(null); mocks.confirm.mockClear(); mocks.keysModal.mockClear();
 	mocks.replacement.mockReset().mockReturnValue(false);
+	mocks.selfHosted.mockReset().mockResolvedValue({ encrypted: false });
 });
 
 describe('redeemDevicePairing', () => {
@@ -125,5 +130,37 @@ describe('redeemDevicePairing', () => {
 		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#short`);
 		expect(mocks.requests).toEqual([]);
 		expect(mocks.notices).toEqual([expect.stringContaining('invalid')]);
+	});
+});
+
+describe('self-hosted pairing links', () => {
+	const local = `crate-pair-${'d'.repeat(64)}`;
+	const link = `https://crate.tail1234.ts.net/notifications/pair#${local}`;
+
+	it('connects through the self-hosted flow after confirmation, then offers features', async () => {
+		mocks.featureChoice.mockClear();
+		await handleDevicePairingLink(plugin as never, link);
+		expect(mocks.confirm).toHaveBeenCalledOnce();
+		expect(mocks.selfHosted).toHaveBeenCalledWith(plugin, 'https://crate.tail1234.ts.net', local);
+		expect(mocks.requests).toEqual([]);
+		expect(mocks.featureChoice).toHaveBeenCalledWith(plugin);
+		expect(plugin.refreshSettingsTab).toHaveBeenCalled();
+	});
+
+	it('opens key approval for an encrypted vault', async () => {
+		mocks.selfHosted.mockResolvedValue({ encrypted: true });
+		await handleDevicePairingLink(plugin as never, link);
+		expect(mocks.keysModal).toHaveBeenCalledOnce();
+		expect(mocks.replacement).not.toHaveBeenCalled();
+	});
+
+	it('reports a failed connection and connects nothing when cancelled', async () => {
+		mocks.selfHosted.mockRejectedValueOnce(new Error('Pairing code expired'));
+		await handleDevicePairingLink(plugin as never, link);
+		expect(mocks.notices).toContainEqual('Could not connect: Pairing code expired');
+		mocks.selfHosted.mockClear();
+		mocks.confirm.mockResolvedValueOnce(false);
+		await handleDevicePairingLink(plugin as never, link);
+		expect(mocks.selfHosted).not.toHaveBeenCalled();
 	});
 });

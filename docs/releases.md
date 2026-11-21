@@ -177,3 +177,14 @@ version is published by hand:
 
 A development build is always refused. npm never accepts the same version twice,
 so a failed publish after upload needs a new release version.
+
+## Publish the server image
+
+Publishing the GitHub release also starts **Publish server image**
+(`.github/workflows/publish-image.yml`). It checks out the release tag, refuses a
+draft, a pre-release, or a tag that does not match the version, then builds the
+`Dockerfile` for Linux AMD64 and ARM64 and pushes `ghcr.io/kaanbiryol/crate-server:<version>`
+with provenance. It moves `latest` only when the tag is the newest published
+release. Rerun it from **Actions** with a tag to retry. GitHub creates the
+package as private on the first push: in the package's settings, change its
+visibility to public once, so `docker compose pull` works without signing in.

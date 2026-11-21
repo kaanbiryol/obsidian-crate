@@ -35,7 +35,7 @@ export const OPEN_OBSIDIAN_HTML = `<!DOCTYPE html>
 export const PAIR_DEVICE_JS = `(()=>{
 var code = location.hash.slice(1);
 var link = document.getElementById('pair-link');
-if (!/^[a-f0-9]{64}$/.test(code)) {
+if (!/^(crate-pair-)?[a-f0-9]{64}$/.test(code)) {
 document.getElementById('pair-title').textContent = 'This pairing link is incomplete.';
 link.remove();
 return;

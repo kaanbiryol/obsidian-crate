@@ -5,6 +5,7 @@ import { requireNormalizedWorkerUrl } from '../sync/connection/worker-url';
 import { exchangeSelfHostedPairingCode } from '../sync/connection/self-hosted-pairing';
 import { loadEncryptionKeys } from '../sync/encryption/key-storage';
 import { isSha256Hex } from '../platform/validation';
+import { SELF_HOSTED_PAIRING_CODE } from '../protocol/device-pairing';
 import { SECRET_KEYS } from '../platform/secret-keys';
 import { verifyVaultCredential, writeSyncSettings } from './sync-connection';
 import { confirmVaultReplacement } from './vault-replacement';
@@ -64,7 +65,7 @@ export async function connectSelfHostedServer(plugin: CratePlugin, address: stri
 	const workerUrl = requireNormalizedWorkerUrl(address);
 	if (reconnect && workerUrl !== requireNormalizedWorkerUrl(expected.workerUrl)) throw new ConnectionSetupError('address-update-required');
 	let authToken = token.trim();
-	const pairing = /^crate-pair-[a-f0-9]{64}$/.test(authToken);
+	const pairing = SELF_HOSTED_PAIRING_CODE.test(authToken);
 	if (!pairing && !isSha256Hex(authToken)) throw new ConnectionSetupError('invalid-token');
 	const signal = getPluginLifecycleSignal(plugin);
 	signal.throwIfAborted();

@@ -6,6 +6,7 @@ import type { CrateServerInfo } from '../../../protocol/server-info';
 import type CratePlugin from '../../../plugin/CratePlugin';
 import { isBundledServerNewer } from '../../../plugin/cloudflare/server-version';
 import type { SettingsSectionContext } from '../section-helpers';
+import { loadHostStatus, updateCommand } from './self-hosted-status';
 
 const CHECK_INTERVAL_MS = 10 * 60_000;
 const checks = new WeakMap<CratePlugin, { url: string; at: number; info: Promise<CrateServerInfo | null> }>();
@@ -25,11 +26,14 @@ export function renderSelfHostedUpdateNotice({ containerEl, plugin }: SettingsSe
 	if (!plugin.syncRuntime.isConfigured() || plugin.settings.cloudflareDeployment || !url) return;
 	const slot = containerEl.createDiv();
 	let active = true;
-	void serverInfo(plugin, url).then(info => {
+	void serverInfo(plugin, url).then(async info => {
 		if (!active || !info || url !== plugin.settings.workerUrl || !isBundledServerNewer(info)) return;
+		const host = await loadHostStatus(plugin);
+		if (!active || url !== plugin.settings.workerUrl) return;
 		const current = serverBuildLabel(info.serverRevision, info.developmentBuild);
+		const how = host ? `On the computer running your server, run: ${updateCommand(host.install)}` : 'Update Crate on the computer running your server, then restart it.';
 		new Setting(slot).setName('Server update available')
-			.setDesc(`Current version: ${current} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}. Update Crate on the computer running your server, then restart it.`);
+			.setDesc(`Current version: ${current} · Bundled version: ${serverBuildLabel(release.revision, EMBEDDED_CLOUDFLARE_ARTIFACT.development)}. ${how}`);
 	});
 	return () => { active = false; };
 }

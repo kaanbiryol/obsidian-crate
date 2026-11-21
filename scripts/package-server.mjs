@@ -49,7 +49,8 @@ for (const file of ['server-release.json', 'worker-runtime.json']) await copyFil
 await cp(join(root, 'src/cloudflare/migrations'), join(destination, 'assets/migrations'), { recursive: true });
 // Installed packages cannot strip TypeScript, so ship the shared modules as JavaScript.
 for (const [source, asset] of [['src/cloudflare/deployment/database-upgrade-rules.ts', 'database-upgrade-rules.mjs'],
-	['src/cloudflare/worker/auth/revocation.ts', 'credential-revocation.mjs'], ['src/cloudflare/worker/coordinator/coordinator.ts', 'coordinator.mjs']]) {
+	['src/cloudflare/worker/auth/revocation.ts', 'credential-revocation.mjs'], ['src/cloudflare/worker/coordinator/coordinator.ts', 'coordinator.mjs'],
+	['node_modules/qrcode-generator/dist/qrcode.mjs', 'qrcode.mjs']]) {
 	await build({ absWorkingDir: root, entryPoints: [source], outfile: join(destination, 'assets', asset), bundle: true, format: 'esm', platform: 'node', logLevel: 'warning' });
 }
 console.log(`Standalone server package prepared in ${destination}`);

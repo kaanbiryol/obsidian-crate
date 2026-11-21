@@ -6,7 +6,7 @@ description: Compare hosting Crate in your Cloudflare account with running it on
 Vault sync and the web app need a Crate server. You decide where it runs, and you don't need a Crate account. There are two options:
 
 - **Cloudflare:** Crate sets up a server in your own Cloudflare account. It stays online without your computer.
-- **Your own hardware:** run Crate with Docker on a computer or server you manage. Your data is stored there.
+- **Your own hardware:** run Crate with one command, or with Docker, on a computer or server you manage. Your data is stored there.
 
 ```mermaid
 flowchart TB
@@ -38,11 +38,11 @@ flowchart TB
 
 | | Cloudflare | Your own hardware |
 | --- | --- | --- |
-| Setup | Connect your Cloudflare account in Obsidian | Run the repository's Docker setup |
-| Where your data lives | Storage and a database in your Cloudflare account | A persistent Docker volume on your machine |
+| Setup | Connect your Cloudflare account in Obsidian | Run one command, or Docker, then scan a code |
+| Where your data lives | Storage and a database in your Cloudflare account | A folder or Docker volume on your machine |
 | Availability | Your computer can sleep | Your machine must stay awake and online |
-| Address | A server address from your deployment | A temporary tunnel address by default; Tailscale or a custom domain makes it permanent |
-| What you look after | Cloudflare account, usage, and server updates | The machine, Docker, backups, and server updates |
+| Address | A server address from your deployment | A permanent Tailscale address, your own domain, or a temporary tunnel address |
+| What you look after | Cloudflare account, usage, and server updates | The machine, and running one command to update |
 
 ## Cloudflare
 
@@ -54,11 +54,11 @@ Before connecting, you need to turn on R2, Cloudflare's file storage. Cloudflare
 
 ## Your own computer or server
 
-Choose Docker if you want the server's files and database on hardware you manage. The default setup includes an HTTPS tunnel, so you don't need a Cloudflare account or your own domain.
+Choose your own hardware if you want the server's files and database on a machine you manage. One command asks a few questions and sets up a permanent address with a free Tailscale account, start at login, and daily backups. You don't need a Cloudflare account or your own domain. Docker works too, including on Windows.
 
-Your machine needs to stay awake, online, and running Docker for sync and scheduled notifications to work. The default tunnel address changes whenever it restarts; a free Tailscale account gives you [one that never changes](/docs/getting-started/self-hosting/#get-an-address-that-never-changes), without a domain.
+Your machine needs to stay awake and online for sync and scheduled notifications to work.
 
-[Set up with Docker →](/docs/getting-started/self-hosting/)
+[Set up your own server →](/docs/getting-started/self-hosting/)
 
 ## After you connect
 

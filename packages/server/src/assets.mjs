@@ -8,6 +8,8 @@ const metadata = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'u
 export const packaged = metadata.crateServerAssets === true;
 export const runtimeRoot = packaged ? packageRoot : resolve(packageRoot, '../..');
 const runtimePackage = packaged ? metadata : JSON.parse(await readFile(join(runtimeRoot, 'package.json'), 'utf8'));
+/** The installed package's version, or the repository's for a source checkout. */
+export const packageVersion = /** @type {string} */ (runtimePackage.version);
 /** @type {string} */
 export const runtimeVersion = runtimePackage.crateServerRuntime ?? runtimePackage.devDependencies.miniflare;
 /** @param {string} name */
@@ -19,3 +21,5 @@ const sharedModulePath = (source, asset) => packaged ? serverAssetPath(asset) : 
 export const upgradeRulesPath = sharedModulePath('src/cloudflare/deployment/database-upgrade-rules.ts', 'database-upgrade-rules.mjs');
 export const revocationPath = sharedModulePath('src/cloudflare/worker/auth/revocation.ts', 'credential-revocation.mjs');
 export const coordinatorPath = sharedModulePath('src/cloudflare/worker/coordinator/coordinator.ts', 'coordinator.mjs');
+// The plugin's QR encoder: a repository dependency for source, bundled into the package.
+export const qrcodeModule = packaged ? serverAssetPath('qrcode.mjs') : join(runtimeRoot, 'node_modules/qrcode-generator/dist/qrcode.mjs');

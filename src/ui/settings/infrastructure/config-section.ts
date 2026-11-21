@@ -11,6 +11,7 @@ import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-
 import { openExternalBrowserModal } from '../external-browser-modal';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
 import { addServerChangeButton } from './server-change-button';
+import { renderSelfHostedStatus } from './self-hosted-status';
 
 export function renderConfigSection(context: SettingsSectionContext, showHeading = true): void {
 	const { containerEl, plugin } = context;
@@ -88,7 +89,7 @@ export function renderServerUpdateNotice(context: SettingsSectionContext): void 
 	});
 }
 
-export function renderServerSection(context: SettingsSectionContext): void {
+export function renderServerSection(context: SettingsSectionContext): (() => void) | void {
 	const { containerEl, plugin } = context;
 	const deployment = plugin.settings.cloudflareDeployment;
 	renderVersionSettings(containerEl, plugin);
@@ -113,6 +114,7 @@ export function renderServerSection(context: SettingsSectionContext): void {
 		}));
 	if (!deployment) {
 		renderSelfHostedAddressSetting({ ...context, containerEl: details });
+		if (plugin.syncRuntime.isConfigured()) return renderSelfHostedStatus(details, plugin);
 		new Setting(details).setName('Self-hosted server')
 			.setDesc('Manage updates, backups, and new device tokens on the computer running this server.');
 		return;

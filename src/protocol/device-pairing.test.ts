@@ -7,9 +7,18 @@ describe('device pairing links', () => {
 	it('keeps the code in the fragment and reads it back from the page or the Obsidian link', () => {
 		const link = devicePairingLink('https://crate-0123456789abcdef.example.workers.dev/', code);
 		expect(link).toBe(`https://crate-0123456789abcdef.example.workers.dev/notifications/pair#${code}`);
-		expect(parseDevicePairingLink(link)).toEqual({ origin: 'https://crate-0123456789abcdef.example.workers.dev', code });
+		expect(parseDevicePairingLink(link)).toEqual({ origin: 'https://crate-0123456789abcdef.example.workers.dev', code, kind: 'cloudflare' });
 		expect(parseDevicePairingLink(`obsidian://crate-pair?server=${encodeURIComponent('https://crate.example.workers.dev')}&code=${code}`))
-			.toEqual({ origin: 'https://crate.example.workers.dev', code });
+			.toEqual({ origin: 'https://crate.example.workers.dev', code, kind: 'cloudflare' });
+	});
+
+	it('reads a self-hosted server code from the page or the Obsidian link', () => {
+		const local = `crate-pair-${code}`;
+		expect(parseDevicePairingLink(devicePairingLink('https://crate.tail1234.ts.net', local)))
+			.toEqual({ origin: 'https://crate.tail1234.ts.net', code: local, kind: 'self-hosted' });
+		expect(parseDevicePairingLink(`obsidian://crate-pair?server=${encodeURIComponent('http://localhost:8787')}&code=${local}`))
+			.toEqual({ origin: 'http://localhost:8787', code: local, kind: 'self-hosted' });
+		expect(parseDevicePairingTarget('https://crate.example.com', `crate-pair-${'a'.repeat(63)}`)).toBeNull();
 	});
 
 	it.each([
@@ -23,7 +32,7 @@ describe('device pairing links', () => {
 	});
 
 	it('allows local development servers over HTTP', () => {
-		expect(parseDevicePairingTarget('http://localhost:8787', code)).toEqual({ origin: 'http://localhost:8787', code });
+		expect(parseDevicePairingTarget('http://localhost:8787', code)).toEqual({ origin: 'http://localhost:8787', code, kind: 'cloudflare' });
 	});
 
 	it('rejects links to other pages', () => {

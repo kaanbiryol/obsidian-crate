@@ -107,7 +107,8 @@ export async function startQuickServer({ dataDir, port = 0, name = hostname().sl
 		const pairingCode = existing.count === 0 ? pairing.issue(name) : null;
 		control = await startLocalControl({ dataDir, pairing, origin: runtime.origin, runtime });
 		active = runtime;
-		readiness = monitorPublicReadiness({ origin: runtime.origin, instance, signal, onChange: onReadiness });
+		const started = control;
+		readiness = monitorPublicReadiness({ origin: runtime.origin, instance, signal, onChange: ready => { started.onReadiness(ready); onReadiness?.(ready); } });
 		return { runtime, tunnel, server, pairingCode, name, close };
 	} catch (error) { await close(error); throw error; }
 }

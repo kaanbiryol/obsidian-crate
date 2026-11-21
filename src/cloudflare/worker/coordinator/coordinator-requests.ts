@@ -15,6 +15,7 @@ import { scheduleMaintenance } from '../maintenance/schedule';
 import { armMaintenanceCoordinator, MAINTENANCE_COORDINATOR_KEY } from '../maintenance/lifecycle';
 import { isCrateMutation } from '../../../protocol/server-info';
 import { revokeCredential } from '../auth/revocation';
+import { deliverHostAlert, isHostAlertKind } from '../notifications/host-alerts';
 
 export type StateLock = <T>(action: () => Promise<T>) => Promise<T>;
 
@@ -57,6 +58,12 @@ export async function handleCoordinatorRequest(
 		const { at } = await request.json() as { at?: unknown };
 		await armDispatcher(state, env, withStateLock, typeof at === 'number' && Number.isFinite(at) ? at : undefined);
 		return new Response(null, { status: 204 });
+	}
+	// Sending a push changes no coordinated state, so it takes no lock.
+	if (path === COORDINATOR_PATHS.hostAlert && request.method === 'POST') {
+		const { kind } = await request.json() as { kind?: unknown };
+		if (!isHostAlertKind(kind)) return new Response('Unknown alert', { status: 400 });
+		return Response.json(await deliverHostAlert(env, kind));
 	}
 	// Schedule cleanup before queuing, so a running maintenance pass delays only
 	// this request rather than every coordinated mutation behind it. Reads arm nothing.

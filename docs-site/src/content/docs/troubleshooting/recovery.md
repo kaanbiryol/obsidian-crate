@@ -86,5 +86,5 @@ Your notes aren't changed. Neither file holds sign-in credentials; those stay in
 
 Crate's history only goes back so far, and deletions sync like any other change. Keep a separate backup of vaults that matter to you.
 
-- **Self-hosted:** [turn on daily backups](/docs/getting-started/self-hosting/#turn-on-daily-backups). The [server command reference](/docs/reference/self-hosting/#restore) explains restoring one.
+- **Self-hosted:** [turn on daily backups](/docs/getting-started/self-hosting/#look-after-your-data). The [server command reference](/docs/reference/self-hosting/#restore) explains restoring one.
 - **Cloudflare:** Crate backs up your server before a server update that changes its database. To restore one of these backups, open **Settings → Crate → Server** on a desktop and select **Restore backup…** under **Server backup recovery**. Crate creates a separate server marked **(restored)** and keeps your current one, so you can connect your devices to it when you're ready. For other recovery, see the [operator recovery runbook](https://github.com/kaanbiryol/obsidian-crate/blob/master/docs/recovery.md).
