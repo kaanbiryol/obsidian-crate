@@ -11,7 +11,7 @@ import { policy } from './common';
 import { assembleReadingArticle } from '@/reading/core/article';
 import type { Publication } from './extraction/jobs';
 import { publishReading } from '@/cloudflare/worker/coordinator/coordinator';
-import type { StagedReadingImage } from './extraction/images';
+import type { ReadingImageBatchStager, StagedReadingImage } from './extraction/images';
 
 /** Page fetches per job or capture; failed fetches and failed publications both count. */
 export const MAX_FETCH_ATTEMPTS = 3;
@@ -57,7 +57,7 @@ export async function publishCapture(env: Env, id: string, generation: string, r
 }
 
 /** Handles the next due capture, if any. Returns whether there was one. */
-export async function runCapture(env: Env, state: DurableObjectState, enabled: boolean, saveImages = false): Promise<boolean> {
+export async function runCapture(env: Env, state: DurableObjectState, enabled: boolean, saveImages = false, stageBatch?: ReadingImageBatchStager): Promise<boolean> {
 	if (await readEncryptionState(env.DB)) return false;
 	const capture = await env.DB.prepare('SELECT id, generation, note, attempts FROM reading_captures WHERE available_at<=? ORDER BY available_at LIMIT 1').bind(Date.now()).first<Pick<PendingCapture, 'id' | 'generation' | 'note' | 'attempts'>>();
 	if (!capture) return false;
@@ -75,17 +75,18 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
 			const captureResult = await fetchReadingCapture(item.source_url, fetchPublic, env.CRATE_PUBLIC_ORIGIN);
 			result = captureResult.article; resolvedUrl = captureResult.url;
 		} catch { if (capture.attempts < MAX_FETCH_ATTEMPTS - 1) return true; }
-		images = result && saveImages ? await stageImages(env, result, item.crate_reading_id, fetchPublic) : undefined;
+		images = result && saveImages ? await stageImages(env, result, item.crate_reading_id, stageBatch) : undefined;
 	}
 	const publication: CapturePublication = { captureId: capture.id, generation: capture.generation, result, resolvedUrl, ...(images?.length ? { images } : {}) };
 	if (!await publishReading(env, publication)) throw new Error('Reading capture publication unavailable');
 	return true;
 }
 
-/** Images are optional: a failed download or R2 write leaves the article with its links. */
-export async function stageImages(env: Env, article: NonNullable<Publication['result']>, id: string, fetchPublic: (request: Request) => Promise<Response>): Promise<StagedReadingImage[] | undefined> {
+/** Images are optional: a failed download or R2 write leaves the article with its links. Each
+ * batch goes to the image pool unless `stageBatch` stages it, as tests do. */
+export async function stageImages(env: Env, article: NonNullable<Publication['result']>, id: string, stageBatch?: ReadingImageBatchStager): Promise<StagedReadingImage[] | undefined> {
 	const current = await policy(env.DB);
 	if (!current) return undefined;
-	const { stageArticleImages } = await import('./extraction/images');
-	return stageArticleImages(env, article, current.folder_path, id, fetchPublic, env.CRATE_PUBLIC_ORIGIN).catch(() => undefined);
+	const { stageArticleImages, stageImageBatchRemotely } = await import('./extraction/images');
+	return stageArticleImages(article, current.folder_path, id, stageBatch ?? (batch => stageImageBatchRemotely(env, batch))).catch(() => undefined);
 }

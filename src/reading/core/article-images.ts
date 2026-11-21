@@ -68,35 +68,54 @@ function remoteImageUrl(href: string): string | null {
 }
 function escapeAlt(text: string): string { return text.replace(/[\\[\]]/g, '\\$&'); }
 
+/** The article's `https` image links, each once, in document order: the first `count` when given. */
+export function readingImageUrls(markdown: string, count?: number): string[] {
+	const urls: string[] = [];
+	for (const image of markdownImages(markdown)) {
+		const url = remoteImageUrl(image.href);
+		if (url && !urls.includes(url) && (count === undefined || urls.length < count)) urls.push(url);
+	}
+	return urls;
+}
+
 /**
  * Downloads an article's `https` images for `readingImageFolder`. An image that fails, is not a
  * supported raster format or is over a limit is left out and keeps its link. Nothing is stored.
  */
-export async function downloadArticleImages(markdown: string, options: {
+export function downloadArticleImages(markdown: string, options: {
 	folder: string; id: string; fetchImage: ReadingImageFetch; signal: AbortSignal; limits?: ReadingImageLimits; concurrency?: number;
 }): Promise<ReadingImageFile[]> {
 	const limits = options.limits ?? READING_IMAGE_LIMITS;
-	const urls: string[] = [];
-	for (const image of markdownImages(markdown)) {
-		const url = remoteImageUrl(image.href);
-		if (url && !urls.includes(url) && (limits.count === undefined || urls.length < limits.count)) urls.push(url);
-	}
+	return downloadReadingImages(readingImageUrls(markdown, limits.count).map((url, index) => ({ url, number: index + 1 })), { ...options, limits });
+}
+
+/**
+ * Downloads the numbered images of one article, saving image `number` as `<number>.<extension>`
+ * in its image folder. `onFile` receives each image as it arrives, so a caller can store it
+ * before the next one is held in memory; it then keeps nothing itself.
+ */
+export async function downloadReadingImages(entries: readonly { url: string; number: number }[], options: {
+	folder: string; id: string; fetchImage: ReadingImageFetch; signal: AbortSignal; limits: ReadingImageLimits; concurrency?: number;
+	onFile?: (file: ReadingImageFile) => Promise<void>;
+}): Promise<ReadingImageFile[]> {
+	const { limits } = options;
 	const directory = readingImageFolder(options.folder, options.id);
 	const files: ReadingImageFile[] = [];
 	let total = 0, next = 0;
 	const worker = async () => {
-		while (next < urls.length) {
-			const index = next++, url = urls[index]!;
+		while (next < entries.length) {
+			const { url, number } = entries[next++]!;
 			options.signal.throwIfAborted();
 			const bytes = await options.fetchImage(url, limits.bytes, options.signal).catch(() => null);
 			options.signal.throwIfAborted();
 			const format = bytes && bytes.length <= limits.bytes ? readingImageFormat(bytes) : null;
 			if (!bytes || !format || total + bytes.length > limits.totalBytes) continue;
 			total += bytes.length;
-			files.push({ url, path: `${directory}/${index + 1}.${format.extension}`, bytes, type: format.type });
+			const file = { url, path: `${directory}/${number}.${format.extension}`, bytes, type: format.type };
+			if (options.onFile) await options.onFile(file); else files.push(file);
 		}
 	};
-	await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, urls.length) }, worker));
+	await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, entries.length) }, worker));
 	return files.sort((a, b) => a.path.localeCompare(b.path, 'en', { numeric: true }));
 }
 

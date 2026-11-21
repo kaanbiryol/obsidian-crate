@@ -169,13 +169,19 @@ note to their trash. A note still in the capture queue has no file and returns 4
 
 ### Reading images
 
-While `readingImages` is `save`, server captures and article jobs download up to 10 `https`
-images per article (PNG, JPEG, GIF, WebP or AVIF by their bytes, 5 MiB each, 20 MiB in all, one
-redirect each) in the Reading alarm, and put them in R2 under one upload lease. The publication
-sent to the coordinator carries only their object keys. Under the lock, each image still inside
-the current folder's `attachments/<Reading ID>/` commits as a new file (or is kept when that exact
-content is already live) before the note, which links only the committed ones; every other
-image keeps its web link and its object is queued for cleanup.
+While `readingImages` is `save`, server captures and article jobs save up to 100 `https`
+images per article (PNG, JPEG, GIF, WebP or AVIF by their bytes, 10 MiB each, 40 MiB in all, one
+redirect each). The Reading alarm sends them in batches of 10, at most five at a time, to the
+`__crate__/reading-images/<n>` Durable Objects (`/reading-images`), so each batch has its own
+invocation and Free-plan subrequest budget. A batch downloads two images at a time and puts each
+in R2 under its own upload lease as it arrives; one that fails leaves its images with their web
+links. A run that handled a capture leaves the next article job for the following alarm. The
+publication sent to the coordinator carries only object keys. Under the lock, each image still
+inside the current folder's `attachments/<Reading ID>/` commits as a new file (or is kept when
+that exact content is already live), in groups of 32 per D1 batch, before the note, which links
+only the committed ones; every other image, including any past the 40 MiB total, keeps its web
+link and its object is queued for cleanup. `reading/image-budget.integration.ts` counts each
+invocation's subrequests for 100 images.
 
 `GET /reading/file?path=…` (library credential, plaintext vaults) returns one image file inside
 the Reading folder, typed by its name with `X-Content-Type-Options: nosniff` and a sandboxing

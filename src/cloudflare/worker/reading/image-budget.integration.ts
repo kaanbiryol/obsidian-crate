@@ -6,7 +6,7 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { publishCapture, type PendingCapture } from './captures';
 import { runReadingExtraction } from './extraction/jobs';
-import { stageArticleImages, WORKER_IMAGE_LIMITS } from './extraction/images';
+import { stageArticleImages, stageReadingImageBatch, WORKER_IMAGE_LIMITS, type ReadingImageBatch } from './extraction/images';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { getStoredFileRow } from '../sync/storage';
 import { createReadingNote } from '@/reading/core/notes';
@@ -72,9 +72,20 @@ it('saves an article\'s images within the free plan\'s subrequests in each invoc
 		.bind(other, generation, (await getStoredFileRow(env.DB, 'Reading/Other.md'))!.storageKey).run();
 	const fetched = vi.fn(publicWeb);
 	const alarm = metered(fetched);
-	await runReadingExtraction({ storage: { setAlarm: async () => {} } } as unknown as DurableObjectState, alarm.env);
-	// The run's one Durable Object request publishes the article under the coordinator lock.
-	expect(alarm.count() + 1).toBeLessThanOrEqual(FREE_PLAN_SUBREQUESTS);
+	// Each batch is its own Durable Object request: one subrequest here, and its own invocation.
+	const batches: number[] = [];
+	const stageBatch = async (batch: ReadingImageBatch) => {
+		const invocation = metered(fetched);
+		const staged = await stageReadingImageBatch(invocation.env, batch, request => invocation.env.READING_FETCH!.fetch(request));
+		batches.push(invocation.count());
+		return staged;
+	};
+	await runReadingExtraction({ storage: { setAlarm: async () => {} } } as unknown as DurableObjectState, alarm.env, stageBatch);
+	// The run also sends one Durable Object request per batch and one to publish the article.
+	const run = alarm.count() + batches.length + 1;
+	expect(run).toBeLessThanOrEqual(FREE_PLAN_SUBREQUESTS);
+	expect(batches).toHaveLength(WORKER_IMAGE_LIMITS.count! / 10);
+	for (const batch of batches) expect(batch).toBeLessThanOrEqual(FREE_PLAN_SUBREQUESTS);
 	expect(fetched.mock.calls.map(([request]) => request.url)).not.toContain('https://example.com/other');
 	expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).not.toBeNull();
 	const note = (await env.DB.prepare("SELECT path FROM files WHERE path LIKE 'Reading/Pictures%.md'").first<{ path: string }>())!;
@@ -88,10 +99,10 @@ it('saves an article\'s images within the free plan\'s subrequests in each invoc
 	expect((await command('capture', { url: 'https://example.com/article', operationId: operation() })).status).toBe(200);
 	const row = (await env.DB.prepare('SELECT * FROM reading_captures').first<PendingCapture>())!;
 	const article = { title: 'Pictures', markdown: images.map(i => `![Picture ${i}](https://cdn.example/${i}.png)`).join('\n\n') };
-	const staged = await stageArticleImages(env, article, 'Reading', row.id, publicWeb);
+	const staged = await stageArticleImages(article, 'Reading', row.id, batch => stageReadingImageBatch(env, batch, publicWeb));
 	expect(staged).toHaveLength(WORKER_IMAGE_LIMITS.count!);
 	const publish = metered(publicWeb);
 	await publishCapture(publish.env, row.id, row.generation, article, undefined, staged);
 	expect(publish.count()).toBeLessThanOrEqual(FREE_PLAN_SUBREQUESTS);
-	console.warn(`subrequests: alarm ${alarm.count() + 1}, publish ${publish.count()}`);
-}, 30_000);
+	console.warn(`subrequests: run ${run}, batches ${Math.max(...batches)}, publish ${publish.count()}`);
+}, 60_000);

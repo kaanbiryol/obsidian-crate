@@ -1,20 +1,28 @@
 import { extractionUrl } from '@/reading/extraction/url';
-import { downloadArticleImages, linkSavedImages, readingImageFolder, type ReadingImageLimits } from '@/reading/core/article-images';
+import { downloadArticleImages, downloadReadingImages, linkSavedImages, readingImageFolder, readingImageUrls, type ReadingImageLimits } from '@/reading/core/article-images';
 import { isPathInFolder } from '@/protocol/note-paths';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
 import { sha256Hex } from '@/platform/sha256';
 import type { CapturedArticle } from '@/reading/core/article';
 import { trackUploadLease, finishUploadLeases } from '../../sync/staging/upload-leases';
-import { commitStagedFile } from '../../sync/mutations';
-import { getStoredFileRow } from '../../sync/storage';
+import { commitStagedFiles } from '../../sync/mutations';
+import { loadStoredFileRows } from '../../sync/storage';
 import type { ReadingIndexPolicy } from '../library-index';
+import { stageReadingImagesRemotely } from '../../coordinator/coordinator';
 import type { Env } from '../../types';
 
-/** The Workers Free plan allows 50 subrequests per invocation, and fetches, R2 and D1 calls all
- * count. Staging an image costs its fetch (2 with a redirect) and an R2 write, beside the page
- * fetch and the run's own queries; publishing costs 2 D1 queries per image beside the note's
- * commit. Ten images keep both invocations under 50 (see image-budget.integration.ts). */
-export const WORKER_IMAGE_LIMITS: ReadingImageLimits = { count: 10, bytes: 5 * 1024 * 1024, totalBytes: 20 * 1024 * 1024 };
+/** The Workers Free plan allows 50 subrequests per invocation, and fetches, R2 and D1 calls
+ * all count. A saved image costs its fetch (2 with a redirect), an upload lease and an R2
+ * write, so an article's images are staged in batches, each its own Durable Object request
+ * and so its own invocation; publication commits them in groups (see image-budget.integration.ts). */
+export const WORKER_IMAGE_LIMITS: ReadingImageLimits = { count: 100, bytes: 10 * 1024 * 1024, totalBytes: 40 * 1024 * 1024 };
+export const READING_IMAGE_BATCH = 10;
+/** Batches staged at once. Each holds at most two images in memory, and batches may share an isolate. */
+const BATCH_CONCURRENCY = 5;
+/** Images committed in one D1 batch, as many as a sync batch upload commits. */
+const IMAGE_COMMIT_GROUP = 32;
+/** Each batch finishes well within the minute a capture or job lease lasts. */
+const BATCH_TIMEOUT_MS = 25_000;
 const TIMEOUT_MS = 10_000, MAX_REDIRECTS = 1;
 
 /** An image stored in R2 under an upload lease, waiting for its note to publish. JSON-safe,
@@ -64,26 +72,63 @@ function base64(bytes: Uint8Array): string {
 	return btoa(binary);
 }
 
-/** Downloads an article's images and stores them in R2 under one lease. Nothing is
- * published: an image the publication does not commit is cleaned up with its lease. */
-export async function stageArticleImages(env: Env, article: CapturedArticle, folder: string, id: string,
+/** One batch of an article's images, numbered by their place among its image links. */
+export interface ReadingImageBatch { folder: string; id: string; images: { url: string; number: number }[] }
+export type ReadingImageBatchStager = (batch: ReadingImageBatch) => Promise<StagedReadingImage[]>;
+export function parseReadingImageBatch(value: unknown): ReadingImageBatch | null {
+	if (!value || typeof value !== 'object') return null;
+	const { folder, id, images } = value as Record<string, unknown>;
+	if (typeof folder !== 'string' || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id) || !Array.isArray(images) || images.length > READING_IMAGE_BATCH) return null;
+	const entries = images.filter((image): image is { url: string; number: number } => !!image && typeof (image as { url?: unknown }).url === 'string'
+		&& Number.isInteger((image as { number?: unknown }).number) && (image as { number: number }).number >= 1 && (image as { number: number }).number <= WORKER_IMAGE_LIMITS.count!);
+	return entries.length === images.length ? { folder, id, images: entries.map(({ url, number }) => ({ url, number })) } : null;
+}
+
+/** Downloads one batch and stores each image in R2 under its own upload lease as it arrives.
+ * Nothing is published: an image the publication does not commit is cleaned up with its lease. */
+export async function stageReadingImageBatch(env: Env, batch: ReadingImageBatch,
 	fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string): Promise<StagedReadingImage[]> {
-	if (article.transcript) return [];
-	const signal = AbortSignal.timeout(30_000);
-	const files = await downloadArticleImages(article.markdown, { folder, id, signal, limits: WORKER_IMAGE_LIMITS,
-		fetchImage: (url, maxBytes, abort) => fetchImage(url, maxBytes, abort, fetchPublic, ownOrigin) });
-	if (!files.length) return [];
-	const prepared = await Promise.all(files.map(async file => {
-		const hash = await sha256Hex(file.bytes.slice().buffer);
-		return { ...file, hash, objectKey: createManagedObjectKey(hash) };
-	}));
-	const { id: leaseId } = await trackUploadLease(env.DB, prepared.map(file => ({ storageKey: file.objectKey, path: file.path })));
 	const staged: StagedReadingImage[] = [];
-	for (const file of prepared) {
-		await env.BUCKET.put(file.objectKey, file.bytes.slice().buffer, { httpMetadata: { contentType: file.type }, customMetadata: { hash: file.hash } });
-		staged.push({ url: file.url, path: file.path, hash: file.hash, size: file.bytes.byteLength, objectKey: file.objectKey, leaseId, type: file.type });
-	}
+	await downloadReadingImages(batch.images.slice(0, READING_IMAGE_BATCH), { folder: batch.folder, id: batch.id, signal: AbortSignal.timeout(BATCH_TIMEOUT_MS),
+		limits: WORKER_IMAGE_LIMITS, concurrency: 2, fetchImage: (url, maxBytes, abort) => fetchImage(url, maxBytes, abort, fetchPublic, ownOrigin),
+		onFile: async file => {
+			const body = file.bytes.slice().buffer, hash = await sha256Hex(body), objectKey = createManagedObjectKey(hash);
+			const { id: leaseId } = await trackUploadLease(env.DB, [{ storageKey: objectKey, path: file.path }]);
+			await env.BUCKET.put(objectKey, body, { httpMetadata: { contentType: file.type }, customMetadata: { hash } });
+			staged.push({ url: file.url, path: file.path, hash, size: body.byteLength, objectKey, leaseId, type: file.type });
+		} }).catch(() => {});
 	return staged;
+}
+
+/** The image pool's request handler: stages the batch with the server's own transport. */
+export async function handleReadingImageBatch(request: Request, env: Env): Promise<Response> {
+	const batch = parseReadingImageBatch(await request.json().catch(() => null));
+	if (!batch) return new Response('Invalid image batch', { status: 400 });
+	const fetchPublic = env.READING_FETCH ? (outbound: Request) => env.READING_FETCH!.fetch(outbound) : fetch;
+	return Response.json(await stageReadingImageBatch(env, batch, fetchPublic, env.CRATE_PUBLIC_ORIGIN));
+}
+
+/** Sends a batch to its instance of the image pool. */
+export async function stageImageBatchRemotely(env: Env, batch: ReadingImageBatch): Promise<StagedReadingImage[]> {
+	const response = await stageReadingImagesRemotely(env, Math.floor((batch.images[0]!.number - 1) / READING_IMAGE_BATCH), JSON.stringify(batch));
+	if (!response.ok) throw new Error('Reading image batch unavailable');
+	return await response.json() as StagedReadingImage[];
+}
+
+/** Stages an article's images, sending each batch of `READING_IMAGE_BATCH` to `stageBatch`.
+ * A batch that fails leaves its images with their links. */
+export async function stageArticleImages(article: CapturedArticle, folder: string, id: string,
+	stageBatch: ReadingImageBatchStager): Promise<StagedReadingImage[]> {
+	if (article.transcript) return [];
+	const images = readingImageUrls(article.markdown, WORKER_IMAGE_LIMITS.count).map((url, index) => ({ url, number: index + 1 }));
+	const batches: ReadingImageBatch[] = [];
+	for (let start = 0; start < images.length; start += READING_IMAGE_BATCH) batches.push({ folder, id, images: images.slice(start, start + READING_IMAGE_BATCH) });
+	const staged: StagedReadingImage[] = [];
+	let next = 0;
+	await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, batches.length) }, async () => {
+		while (next < batches.length) staged.push(...await stageBatch(batches[next++]!).catch(() => []));
+	}));
+	return staged.sort((a, b) => a.path.localeCompare(b.path, 'en', { numeric: true }));
 }
 
 /**
@@ -96,17 +141,26 @@ export async function publishArticleImages(env: Env, article: CapturedArticle, i
 	policy: { folder_path: string } & ReadingIndexPolicy, id: string): Promise<CapturedArticle> {
 	if (!images?.length) return article;
 	const folder = readingImageFolder(policy.folder_path, id);
-	const published: StagedReadingImage[] = [], skipped: StagedReadingImage[] = [];
-	for (const image of images) {
-		if (!isPathInFolder(image.path, folder)) { skipped.push(image); continue; }
+	const published: StagedReadingImage[] = [], skipped: StagedReadingImage[] = [], candidates: StagedReadingImage[] = [];
+	let total = 0;
+	for (const image of [...images].sort((a, b) => a.path.localeCompare(b.path, 'en', { numeric: true }))) {
+		// Batches cannot share a size budget, so the article's total applies here, in order.
+		if (!isPathInFolder(image.path, folder) || candidates.some(other => other.path === image.path) || total + image.size > WORKER_IMAGE_LIMITS.totalBytes) { skipped.push(image); continue; }
+		total += image.size; candidates.push(image);
+	}
+	for (let start = 0; start < candidates.length; start += IMAGE_COMMIT_GROUP) {
+		const group = candidates.slice(start, start + IMAGE_COMMIT_GROUP);
 		try {
-			const current = await getStoredFileRow(env.DB, image.path);
-			// A retried publication finds the copy an earlier attempt committed.
-			if (current?.hash === image.hash) { published.push(image); skipped.push(image); continue; }
-			const result = await commitStagedFile(env.BUCKET, env.DB, { ...image, content: new ArrayBuffer(0), expectedHash: current?.hash ?? null,
-				...(current?.storageKey ? { expectedRevision: current.storageKey } : {}), readingPolicy: policy, encryptionState: null });
-			if (result.committed) published.push(image);
-		} catch { skipped.push(image); }
+			const current = await loadStoredFileRows(env.DB, group.map(image => image.path));
+			// A retried publication finds the copies an earlier attempt committed.
+			const fresh = group.filter(image => current.get(image.path)?.hash !== image.hash);
+			for (const image of group) if (!fresh.includes(image)) { published.push(image); skipped.push(image); }
+			const results = await commitStagedFiles(env.BUCKET, env.DB, fresh.map(image => {
+				const row = current.get(image.path);
+				return { ...image, content: new ArrayBuffer(0), expectedHash: row?.hash ?? null, ...(row?.storageKey ? { expectedRevision: row.storageKey } : {}), readingPolicy: policy, encryptionState: null };
+			}));
+			fresh.forEach((image, index) => { if (results[index]?.committed) published.push(image); });
+		} catch { skipped.push(...group.filter(image => !published.includes(image) && !skipped.includes(image))); }
 	}
 	if (skipped.length) await env.DB.batch(finishUploadLeases(env.DB, skipped));
 	return published.length ? { ...article, markdown: linkSavedImages(article.markdown, policy.folder_path, published) } : article;
