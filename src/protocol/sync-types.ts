@@ -49,6 +49,8 @@ export interface CheckResponse {
 	lastSeq: number;
 	hasChanges: boolean;
 	cursorExpired?: boolean;
+	/** The server database's random identity; absent from servers that predate it. */
+	storageId?: string;
 }
 
 export const MUTATION_FAILURE_CODES = ['version_conflict', 'namespace_conflict', 'validation', 'operation_expired', 'operation_mismatch', 'storage', 'unknown'] as const;

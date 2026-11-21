@@ -192,7 +192,8 @@ it('preserves confirmed uploads when a resumed standard sync fails', async () =>
 	vi.spyOn(client.api.initialImport, 'finish').mockRejectedValueOnce(new Error('offline'));
 	const interrupted = await client.engine.sync();
 	expect(interrupted).toMatchObject({ success: false, uploaded: 1, uploadedPaths: ['note.md'], errors: ['offline'] });
-	expect(client.engine.getTimings().requests?.d1).toMatchObject({ rowsWritten: 6 });
+	// One of these records the new server's storage identity, once per server.
+	expect(client.engine.getTimings().requests?.d1).toMatchObject({ rowsWritten: 7 });
 	client.close(); await client.open();
 	expect(await client.engine.sync()).toMatchObject({ success: true, uploaded: 0 });
 });

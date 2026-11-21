@@ -121,6 +121,20 @@ export async function getChangelogBounds(db: D1Database): Promise<ChangelogBound
 	};
 }
 
+/** This database's random storage identity, kept in `maintenance_state`. A new or restored
+ * server gets a new one, so a device can tell that its baselines describe another server
+ * even when the changelog has caught up with its cursor. */
+export const STORAGE_ID_SQL = "SELECT value FROM maintenance_state WHERE key = 'storage_id'";
+
+/** The storage identity `/sync/check` reports, created by the first check that finds none.
+ * `maintenance_state` is a control table, so upgrade write guards never block this. */
+export async function storageIdField(db: D1Database, current: string | null): Promise<{ storageId?: string }> {
+	if (current) return { storageId: current };
+	await db.prepare("INSERT INTO maintenance_state (key, value) VALUES ('storage_id', lower(hex(randomblob(16)))) ON CONFLICT(key) DO NOTHING").run();
+	const row = await db.prepare(STORAGE_ID_SQL).first<{ value: string }>();
+	return row ? { storageId: row.value } : {};
+}
+
 /** The `since` changelog cursor of a request, or null when it is not a sequence number. */
 export function parseChangelogSince(url: URL): number | null {
 	const since = parseInt(url.searchParams.get('since') || '0', 10);

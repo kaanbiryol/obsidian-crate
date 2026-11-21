@@ -25,6 +25,9 @@ async function joinedVault(overrides: { replaceVault?: boolean } = {}) {
 		let value: unknown;
 		if (url.pathname === '/.well-known/crate') {
 			value = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) };
+		} else if (url.pathname === '/sync/check') {
+			// A server that predates storage identities.
+			value = { lastSeq: Number(url.searchParams.get('since')), hasChanges: false };
 		} else if (url.pathname === '/sync/changes') {
 			value = { changes: [], lastSeq: 5, hasMore: false };
 		} else if (url.pathname === '/sync/manifest') {

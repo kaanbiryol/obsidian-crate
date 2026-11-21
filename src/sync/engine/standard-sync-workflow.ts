@@ -29,6 +29,8 @@ export interface SyncWorkflowContext extends FullSyncUploadContext, WorkflowComp
 	tryInitialImport(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
+	/** Forgets this device's baselines when the address now serves another server. */
+	reconcileServerIdentity(): Promise<void>;
 	getStatus(): SyncStatus;
 	getManifest(): Promise<RemoteManifest>;
 	incrementalSync(
@@ -71,6 +73,7 @@ export async function runSyncWorkflow(
 		await context.replaceLocalVault?.();
 		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
+		await context.reconcileServerIdentity();
 		const imported = await context.tryInitialImport(result, progressCallback);
 		if (imported) {
 			result = imported;

@@ -60,6 +60,12 @@ describe('frozen Worker read responses', () => {
 			decode: (stored: { since: number; response: unknown }) => parseChangesCheck(stored.response, stored.since),
 		},
 		{
+			// Servers that know their storage identity report it with every check.
+			file: 'changes-check-storage-id.v1.json',
+			stored: () => ({ since: 2, response: { lastSeq: 2, hasChanges: false, storageId: '5d41402abc4b2a76b9719d911017c592' } }),
+			decode: (stored: { since: number; response: unknown }) => parseChangesCheck(stored.response, stored.since),
+		},
+		{
 			// Requested paths that do not exist are omitted rather than reported.
 			file: 'file-metadata.v1.json',
 			stored: () => ({ requested: ['b.md', 'missing.md'], response: { files: { 'b.md': batch } } }),

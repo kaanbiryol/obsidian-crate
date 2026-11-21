@@ -1,0 +1,15 @@
+{
+	"stored": {
+		"since": 2,
+		"response": {
+			"lastSeq": 2,
+			"hasChanges": false,
+			"storageId": "5d41402abc4b2a76b9719d911017c592"
+		}
+	},
+	"decoded": {
+		"lastSeq": 2,
+		"hasChanges": false,
+		"storageId": "5d41402abc4b2a76b9719d911017c592"
+	}
+}

@@ -1,6 +1,7 @@
 import { isRecord, normalizeNonNegativeInteger, normalizeNullableString, normalizeStringArray } from '../platform/validation';
 import { MAX_TIMER_SECONDS } from '../protocol/shared-settings';
 import { isCheckpointId } from '../protocol/history-checkpoints';
+import { isStorageId } from '../protocol/sync-validation';
 import { normalizeWorkerUrl } from './connection/worker-url';
 import { normalizeSyncTimings } from './diagnostics/timings';
 import { normalizeRequestDiagnostics } from './diagnostics/request-diagnostics';
@@ -31,6 +32,9 @@ export interface PersistedSyncSettings {
 	 * under it while moving the cursor past them, so the next standard sync compares the
 	 * whole server inventory. A successful full sync clears it. */
 	fullSyncRequested?: boolean;
+	/** The storage identity of the server the checkpoint was built against. Another one
+	 * at this address is a new or restored server that these baselines do not describe. */
+	serverStorageId?: string;
 }
 
 export interface SyncSettings extends PersistedSyncSettings {
@@ -98,6 +102,7 @@ export function normalizePersistedSyncSettings(
 		encryptedVaultId: normalizeNullableString(value?.encryptedVaultId),
 		replaceVault: normalizeBoolean(value?.replaceVault, defaults.replaceVault),
 		...(value?.fullSyncRequested === true ? { fullSyncRequested: true } : {}),
+		...(isStorageId(value?.serverStorageId) ? { serverStorageId: value.serverStorageId } : {}),
 	};
 }
 

@@ -1,5 +1,5 @@
 import { isRecord, isSha256Hex } from '../../platform/validation';
-import { isOptionalDescriptor, isSyncDate, isSyncPath, isSyncRevision, isSyncSequence, parseSyncFiles } from '../../protocol/sync-validation';
+import { isOptionalDescriptor, isStorageId, isSyncDate, isSyncPath, isSyncRevision, isSyncSequence, parseSyncFiles } from '../../protocol/sync-validation';
 import type { ChangesResponse, CheckResponse, FileManifest, FileMetadataResponse } from '../../protocol/sync-types';
 import type { WorkerApiHttpClient } from './http';
 
@@ -69,8 +69,10 @@ export async function requestChangesCheck(http: WorkerApiHttpClient, since: numb
 
 export function parseChangesCheck(value: unknown, since: number): CheckResponse {
 	if (!isRecord(value) || !isSyncSequence(value.lastSeq) || typeof value.hasChanges !== 'boolean'
-		|| !optionalBoolean(value.cursorExpired) || value.hasChanges !== (value.lastSeq > since)) return invalid();
+		|| !optionalBoolean(value.cursorExpired) || value.hasChanges !== (value.lastSeq > since)
+		|| !(value.storageId === undefined || isStorageId(value.storageId))) return invalid();
+	const storageId = value.storageId === undefined ? {} : { storageId: value.storageId };
 	// A server behind this cursor cannot continue it; the sync this starts finds out why.
-	if (value.lastSeq < since) return { lastSeq: value.lastSeq, hasChanges: false, cursorExpired: true };
-	return { lastSeq: value.lastSeq, hasChanges: value.hasChanges, ...(value.cursorExpired === undefined ? {} : { cursorExpired: value.cursorExpired }) };
+	if (value.lastSeq < since) return { lastSeq: value.lastSeq, hasChanges: false, cursorExpired: true, ...storageId };
+	return { lastSeq: value.lastSeq, hasChanges: value.hasChanges, ...(value.cursorExpired === undefined ? {} : { cursorExpired: value.cursorExpired }), ...storageId };
 }

@@ -3,7 +3,7 @@ import { MAX_ENCRYPTED_SETTINGS_REQUEST_BYTES, MAX_SHARED_SETTINGS_BYTES, valida
 import { normalizeSharedSettingsValue } from '../../../protocol/shared-settings';
 import { corsResponse } from '../http/cors';
 import { parseJsonObject, sanitizePath } from '../http/request-validation';
-import { CHANGELOG_BOUNDS_SQL, getChangelogBounds, isChangelogCursorExpired, parseChangelogSince } from './storage';
+import { CHANGELOG_BOUNDS_SQL, isChangelogCursorExpired, parseChangelogSince, STORAGE_ID_SQL, storageIdField } from './storage';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import type { FileEntry } from '../../../protocol/sync-types';
 import { createPathRecord } from '../../../protocol/path-record';
@@ -20,9 +20,12 @@ function batchRows<T>(result: unknown): T[] {
 export async function handleCheckChanges(request: Request, db: D1Database): Promise<Response> {
 	const since = parseChangelogSince(new URL(request.url));
 	if (since === null) return corsResponse({ error: 'Invalid since parameter' }, 400);
-	const bounds = await getChangelogBounds(db);
+	const [boundsResult, storageResult] = await db.batch([db.prepare(CHANGELOG_BOUNDS_SQL), db.prepare(STORAGE_ID_SQL)]);
+	const [row] = batchRows<{ lastSeq: number | null; minSeq: number | null; snapshotSeq: number | null }>(boundsResult);
+	const bounds = { lastSeq: row?.lastSeq ?? 0, minSeq: row?.minSeq ?? null, snapshotSeq: row?.snapshotSeq ?? 0 };
 	const cursorExpired = isChangelogCursorExpired(since, bounds);
-	return corsResponse({ lastSeq: bounds.lastSeq, hasChanges: bounds.lastSeq > since, ...(cursorExpired && { cursorExpired: true }) });
+	return corsResponse({ lastSeq: bounds.lastSeq, hasChanges: bounds.lastSeq > since, ...(cursorExpired && { cursorExpired: true }),
+		...await storageIdField(db, batchRows<{ value: string }>(storageResult)[0]?.value ?? null) });
 }
 
 export async function handleGetChanges(request: Request, db: D1Database): Promise<Response> {

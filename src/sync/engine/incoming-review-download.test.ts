@@ -31,6 +31,9 @@ async function awaitingReview(options: { expiredCursor?: boolean } = {}) {
 		let value: unknown;
 		if (url.pathname === '/.well-known/crate') {
 			value = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) };
+		} else if (url.pathname === '/sync/check') {
+			// A server that predates storage identities.
+			value = { lastSeq: Number(url.searchParams.get('since')), hasChanges: false };
 		} else if (url.pathname === '/sync/changes') {
 			const since = Number(url.searchParams.get('since'));
 			value = since >= 11 ? { changes: [], lastSeq: 11, hasMore: false }

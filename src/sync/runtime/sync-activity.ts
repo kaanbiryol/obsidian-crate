@@ -88,6 +88,7 @@ export function recordSyncHistory(
 
 export function resetStoredSyncState(settings: SyncSettings): void {
 	delete settings.checkpointScope;
+	delete settings.serverStorageId;
 	settings.replaceVault = false;
 	updateSyncProgress(settings, { lastSeq: 0, lastSync: null, syncHistory: [] });
 }

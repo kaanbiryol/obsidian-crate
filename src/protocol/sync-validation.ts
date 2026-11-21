@@ -19,6 +19,11 @@ export function isSyncDate(value: unknown): value is string {
 }
 
 /** Revisions are opaque object identities. */
+/** A server database's storage identity: 128 random bits in lowercase hex. */
+export function isStorageId(value: unknown): value is string {
+	return typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+}
+
 export function isSyncRevision(value: unknown): value is string {
 	return typeof value === 'string' && value.length > 0 && value.length <= 1024
 		&& !/[\u0000-\u001f\u007f\\]/.test(value) && value.split('/').every(part => part && part !== '.' && part !== '..');

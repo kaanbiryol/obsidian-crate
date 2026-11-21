@@ -30,6 +30,7 @@ import type { InitialConfigPull } from '../manifest/initial-config-pull';
 import { MAX_DEBOUNCE_WAIT_MS, updateSyncProgress, type SyncSettings } from '../settings';
 import type { ReconnectNotice, WorkflowCompletionContext } from '../sync-outcome';
 import { runSyncWorkflow, type SyncWorkflowContext } from './standard-sync-workflow';
+import { reconcileServerIdentity } from './server-identity';
 import type { ForceSyncWorkflowContext } from './force-sync-workflow';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { uploadFullSyncPlan } from './full-sync-upload';
@@ -138,6 +139,8 @@ export class SyncEngineContexts {
 		this.syncWorkflow = {
 			...base,
 			replaceLocalVault: this.replaceLocalVault,
+			reconcileServerIdentity: () => reconcileServerIdentity({ settings: d.getSettings(), localManifest: d.localManifest,
+				checkForChanges: since => d.api.checkForChanges(since), setLastSeq: this.setLastSeq, persistSettings: d.persistSettings }),
 			tryInitialImport: (result, progress) => runInitialImport({ transfer: this.transfer, api: d.api,
 				prepareReminderScope: d.prepareReminderScope,
 				beforeUpload: async () => {

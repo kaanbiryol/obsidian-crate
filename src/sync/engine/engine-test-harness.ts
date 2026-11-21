@@ -115,7 +115,7 @@ export function createHarness(settingsOverrides: Partial<SyncSettings> = {}) {
 		downloadFile: vi.fn(),
 		getManifest: vi.fn<() => Promise<FileManifest>>(),
 		getPendingRestores: vi.fn<() => Array<{ path: string }>>(() => []),
-		checkForChanges: vi.fn(),
+		checkForChanges: vi.fn().mockResolvedValue({ lastSeq: 0, hasChanges: false }),
 		batchUpload: vi.fn().mockImplementation(async (files: Array<{ path: string; hash: string; size: number }>) => ({
 			success: true,
 			results: files.map(f => ({ path: f.path, success: true, hash: f.hash })),

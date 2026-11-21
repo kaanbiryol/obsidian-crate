@@ -78,8 +78,11 @@ when it connects to a new server, saves both, and runs the full sync without
 baselines: local-only files upload, server-only files download, and a file that
 differs on both sides keeps the local version as a conflict copy. Upload journals,
 restore intents and local files are kept. The periodic check reports such a server
-as an expired cursor, so a sync starts. A restored server whose sequence has since
-reached this device's cursor again is not detected.
+as an expired cursor, so a sync starts. A new or restored server whose sequence
+has reached this device's cursor is found by its storage identity instead: before
+planning, the standard sync compares `/sync/check`'s `storageId` with the one saved
+beside the cursor and, when they differ, merges the same way
+(`engine/server-identity.ts`).
 
 Entry point: `planner/incremental.ts:runIncrementalSync()`.
 The coordinator retains phase ordering, progress, manifest saves and cursor
