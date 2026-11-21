@@ -158,7 +158,7 @@ it('answers a checkpoint read of a version that is no longer retained with a dis
 	const checkpoint = await createCheckpoint();
 	await save('single', 'notes.txt', 'third');
 	// The saved version is no longer kept.
-	await env.DB.prepare('UPDATE file_versions SET expires_at = 0 WHERE storage_key = ?').bind(checkpointed).run();
+	await env.DB.prepare('UPDATE file_versions SET kept_at = 0 WHERE storage_key = ?').bind(checkpointed).run();
 	const response = await checkpointFile(checkpoint.id, 'notes.txt', checkpointed);
 	expect(response.status).toBe(410);
 	expect(await response.json()).toMatchObject({ code: 'version_unavailable' });

@@ -20,7 +20,7 @@ it('reads about two rows per revision at 50,000 files', { timeout: 120_000 }, as
     INSERT INTO files(path, portable_path, hash, size, storage_key, descriptor)
     SELECT 'n/' || x || '.md', 'n/' || x || '.md', 'hash', 1, '__crate__/files/live-' || x, ? FROM n`).bind(FILES, descriptor).run();
 	await env.DB.prepare(`INSERT INTO changelog(seq, path, action, hash, size, revision, descriptor) SELECT CAST(substr(path, 3) AS INTEGER), path, 'put', hash, size, storage_key, descriptor FROM files`).run();
-	await env.DB.prepare(`INSERT INTO file_versions(storage_key, path, hash, size, reason, descriptor, expires_at)
+	await env.DB.prepare(`INSERT INTO file_versions(storage_key, path, hash, size, reason, descriptor, kept_at)
     SELECT '__crate__/files/old-' || CAST(substr(path, 3) AS INTEGER), path, hash, size, 'replaced', descriptor, 9999999999999 FROM files WHERE CAST(substr(path, 3) AS INTEGER) <= 500`).run();
 	const lookup = async (files: Array<{ path: string; revision: string }>) => {
 		const meter = meterD1Usage(env.DB);

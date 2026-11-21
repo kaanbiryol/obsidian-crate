@@ -34,7 +34,7 @@ it('cleans owned batches using primary lookups among 10,000 files and protects r
 	await applySchema(env.DB);
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 10000)
     INSERT INTO files(path, portable_path, storage_key) SELECT 'Note-' || x, 'note-' || x, 'key-' || x FROM n`).run();
-	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('retained', 'Note-1', 'hash', 1, 'replaced', 9999999999999)").run();
+	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, kept_at) VALUES ('retained', 'Note-1', 'hash', 1, 'replaced', 9999999999999)").run();
 	const objects = [{ path: 'Note-1', storageKey: 'key-1' }, { path: 'Note-1', storageKey: 'retained' }, { path: 'Note-1', storageKey: 'obsolete' }];
 	const meter = meterD1Usage(env.DB);
 	expect(await findReferencedStorageKeys(meter.db, objects)).toEqual(new Set(['key-1', 'retained']));

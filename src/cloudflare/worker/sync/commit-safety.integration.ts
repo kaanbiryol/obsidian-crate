@@ -15,7 +15,6 @@ import { writeCommittedMarkdownFile } from './markdown-files';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
 import { drainObjectCleanupQueue } from '../maintenance/object-cleanup';
 import { getStoredFileRow } from './storage';
-import { DAY_MS, DEFAULT_HISTORY_RETENTION_DAYS } from '../../../protocol/history-retention';
 import { retainReplacedVersionStatements } from './file-publication-statements';
 
 const { DB: db, BUCKET: bucket } = env;
@@ -118,14 +117,14 @@ describe('publication history and derived state', () => {
 			destination: { path: destinationPath, content: 'Updated destination', expectedHash: destination.hash },
 		});
 		const previous = kind === 'single' ? [source] : [source, destination];
-		const retained = (await db.prepare('SELECT storage_key, hash, size, reason, expires_at FROM file_versions').all<{
-			storage_key: string; hash: string; size: number; reason: string; expires_at: number;
+		const retained = (await db.prepare('SELECT storage_key, hash, size, reason, kept_at FROM file_versions').all<{
+			storage_key: string; hash: string; size: number; reason: string; kept_at: number;
 		}>()).results;
 		expect(retained).toHaveLength(previous.length);
 		for (const file of previous) {
 			const version = retained.find(row => row.storage_key === file.storageKey)!;
 			expect(version).toMatchObject({ hash: file.hash, size: file.size, reason: 'replaced' });
-			expect(version.expires_at).toBeGreaterThanOrEqual(started + DEFAULT_HISTORY_RETENTION_DAYS * DAY_MS);
+			expect(version.kept_at).toBeGreaterThanOrEqual(started);
 			expect(await bucket.get(version.storage_key)).not.toBeNull();
 		}
 		const changes = (await db.prepare('SELECT path, revision FROM changelog WHERE seq > ? ORDER BY seq').bind(seq)

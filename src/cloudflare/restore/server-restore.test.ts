@@ -34,7 +34,7 @@ async function fixture(extraRows = 0) {
 	const original = database(); original.exec(schema);
 	const bytes = new TextEncoder().encode("Private 'note';\n日本語"), oldBytes = new Uint8Array([0, 255, 12, 99]);
 	original.prepare('INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES (?,?,?,?,?)').run("Reminders/a's.md", "reminders/a's.md", await sha256Hex(bytes), bytes.length, 'live-object');
-	original.prepare('INSERT INTO file_versions(storage_key,path,hash,size,reason,expires_at) VALUES (?,?,?,?,?,?)').run('old-object', "Reminders/a's.md", await sha256Hex(oldBytes), oldBytes.length, 'replaced', 1);
+	original.prepare('INSERT INTO file_versions(storage_key,path,hash,size,reason,kept_at) VALUES (?,?,?,?,?,?)').run('old-object', "Reminders/a's.md", await sha256Hex(oldBytes), oldBytes.length, 'replaced', 1);
 	original.exec("INSERT INTO auth_tokens(id,token_hash) VALUES ('old-device','private-token'); INSERT INTO notification_policy(id,folder_path,timezone,revision) VALUES(1,'Reminders','Europe/Berlin','policy');");
 	original.prepare("INSERT INTO operations(kind,operation_id,request_hash,response_json) VALUES ('reminder',?,?,?)").run('op', 'request-hash', JSON.stringify({ text: "'hello'; 日本語\n\"world\"" }));
 	original.exec("INSERT INTO maintenance_state(key,value) VALUES ('retained','hello'),('reminder_source_scan_old','obsolete');");
@@ -109,7 +109,7 @@ it('restores launch-baseline checkpoints, keeps history and receipts, and requir
 	expect(restored.prepare('SELECT version,created_version FROM crate_schema').get()).toEqual({ version: SERVER_RELEASE.schemaVersion, created_version: SERVER_RELEASE.schemaVersion });
 	expect(restored.prepare('SELECT * FROM files').all()).toEqual(f.original.prepare('SELECT * FROM files').all());
 	expect(restored.prepare("SELECT * FROM operations WHERE kind = 'reminder'").all()).toEqual(f.original.prepare("SELECT * FROM operations WHERE kind = 'reminder'").all());
-	expect(restored.prepare('SELECT expires_at FROM file_versions').get()).toEqual({ expires_at: f.state.restoredAt + 2592000000 });
+	expect(restored.prepare('SELECT kept_at FROM file_versions').get()).toEqual({ kept_at: f.state.restoredAt });
 	expect(restored.prepare('SELECT * FROM auth_tokens').all()).toEqual([]);
 	expect(restored.prepare('SELECT changelog_floor, settings, settings_version FROM server_state').get()).toEqual({ changelog_floor: 90, settings: '{"setting":true}', settings_version: 'version' });
 	expect(restored.prepare('SELECT path,job_token FROM notification_projection_jobs').get()).toEqual({ path: "Reminders/a's.md", job_token: 'live-object' });

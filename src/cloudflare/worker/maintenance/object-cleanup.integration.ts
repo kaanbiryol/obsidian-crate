@@ -37,15 +37,15 @@ it('drains thousands of expired versions within bounded passes and keeps referen
 	const versions = Array.from({ length: 6000 }, (_, i) => ({ storageKey: `__crate__/files/hash/${i}`, path: `notes/${i}.md` }));
 	const restored = versions.filter((_, i) => i % 1000 === 0);
 	await env.DB.batch([
-		env.DB.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, expires_at)
+		env.DB.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, kept_at)
 			SELECT json_extract(value, '$.storageKey'), json_extract(value, '$.path'), 'hash', 1, 'replaced', 0 FROM json_each(?)`)
 			.bind(JSON.stringify(versions)),
 		// Restored versions are current again, and a stale intent targets an unexpired version.
 		env.DB.prepare(`INSERT INTO files (path, portable_path, storage_key)
 			SELECT json_extract(value, '$.path'), json_extract(value, '$.path'), json_extract(value, '$.storageKey') FROM json_each(?)`)
 			.bind(JSON.stringify(restored)),
-		env.DB.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, expires_at)
-			VALUES ('retained', 'notes/retained.md', 'hash', 1, 'replaced', ?)`).bind(Date.now() + 86_400_000),
+		env.DB.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, kept_at)
+			VALUES ('retained', 'notes/retained.md', 'hash', 1, 'replaced', ?)`).bind(Date.now()),
 		env.DB.prepare("INSERT INTO object_cleanup_queue (storage_key, file_path) VALUES ('retained', 'notes/retained.md')"),
 	]);
 	for (let i = 0; i < versions.length; i += 500) {

@@ -48,7 +48,7 @@ class DownloadCheckpointTests(unittest.TestCase):
         self.files = {'__crate__/files/' + digest(data) + '/' + name: data for name, data in (('live', b'live note'), ('old', b'old note\x00\xff'))}
         live, old = self.files
         db.execute('INSERT INTO files (path, portable_path, hash, size, storage_key) VALUES (?, ?, ?, ?, ?)', ('Note.md', 'note.md', digest(self.files[live]), len(self.files[live]), live))
-        db.execute('INSERT INTO file_versions (storage_key, path, hash, size, reason, expires_at) VALUES (?, ?, ?, ?, ?, ?)', (old, 'Note.md', digest(self.files[old]), len(self.files[old]), 'replaced', 1))
+        db.execute('INSERT INTO file_versions (storage_key, path, hash, size, reason, kept_at) VALUES (?, ?, ?, ?, ?, ?)', (old, 'Note.md', digest(self.files[old]), len(self.files[old]), 'replaced', 1))
         db.execute("INSERT INTO maintenance_state (key, value) VALUES ('crate_upgrade_backup', '{\"format\":1,\"phase\":\"dumping\"}')")
         db.commit()
         self.sql = '\n'.join(db.iterdump()).encode()

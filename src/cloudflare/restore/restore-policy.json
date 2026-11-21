@@ -8,6 +8,5 @@
   ],
   "resetColumns": { "reading_policy": ["index_scope", "index_cursor"] },
   "resetMaintenanceKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_upgrade_backup"],
-  "resetMaintenancePrefixes": ["crate_restore_", "reminder_source_scan"],
-  "fileVersionRetentionMs": 2592000000
+  "resetMaintenancePrefixes": ["crate_restore_", "reminder_source_scan"]
 }

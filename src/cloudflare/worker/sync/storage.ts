@@ -15,9 +15,16 @@ export {
 } from '../../../protocol/sync-limits';
 /** The server's history retention in milliseconds, read in the statement that uses it. */
 export const HISTORY_RETENTION_MS_SQL = `(COALESCE((SELECT history_retention_days FROM server_state WHERE id = 1), ${DEFAULT_HISTORY_RETENTION_DAYS}) * ${DAY_MS})`;
-/** A retained version's `expires_at`: its commit time plus the retention. Bind `Date.now()`;
- * the database clock, rounded up to the next second, wins when it is later. */
-export const FILE_VERSION_EXPIRES_AT_SQL = `(MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000) + ${HISTORY_RETENTION_MS_SQL})`;
+/** A retained version's `kept_at`, its commit time. Bind `Date.now()`; the database clock,
+ * rounded up to the next second, wins when it is later. */
+export const FILE_VERSION_KEPT_AT_SQL = `MAX(?, (CAST(strftime('%s', 'now') AS INTEGER) + 1) * 1000)`;
+/** `maintenance_state` key: the latest `kept_at` whose versions maintenance has started to
+ * remove. A longer retention never makes those visible again. */
+export const FILE_VERSION_FLOOR_KEY = 'file_version_floor';
+/** Versions kept at or before this are expired: `kept_at` plus the current retention, and
+ * never at or below the floor. Bind `Date.now()`. */
+export const FILE_VERSION_CUTOFF_SQL = `MAX(? - ${HISTORY_RETENTION_MS_SQL},
+	COALESCE((SELECT CAST(value AS INTEGER) FROM maintenance_state WHERE key = '${FILE_VERSION_FLOOR_KEY}'), 0))`;
 
 export interface FileStorageRow {
 	hash: string;

@@ -24,8 +24,8 @@ async function retain(path: string, content: Uint8Array<ArrayBuffer>) {
 	const hash = await sha256Hex(content);
 	const key = `__crate__/files/${hash}/retained`;
 	await bucket.put(key, content, { httpMetadata: { contentType: 'application/octet-stream' }, customMetadata: { hash } });
-	await db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, expires_at)
-		VALUES (?, ?, ?, ?, 'deleted', ?)`).bind(key, path, hash, content.byteLength, Date.now() + 60_000).run();
+	await db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, kept_at)
+		VALUES (?, ?, ?, ?, 'deleted', ?)`).bind(key, path, hash, content.byteLength, Date.now() + 60_000 - 30 * 86_400_000).run();
 	return { hash, key };
 }
 

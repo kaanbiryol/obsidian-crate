@@ -8,7 +8,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../../enc
 import {
 	storedObjectMatchesMetadata,
 } from '../storage';
-import { parseExpectedFileHash } from '../storage';
+import { FILE_VERSION_CUTOFF_SQL, parseExpectedFileHash } from '../storage';
 import { parseJsonObject, parseOptionalString, sanitizePath } from '../../http/request-validation';
 import { createManagedObjectKey } from '@/protocol/storage-keys';
 import { sha256Hex } from '@/platform/sha256';
@@ -47,7 +47,7 @@ export async function handleRestoreFileVersion(
 	if (operation instanceof Response) return operation;
 
 	const version = await db.prepare(`SELECT storage_key, path, hash, size
-		FROM file_versions WHERE storage_key = ? AND expires_at > ?`).bind(storageKey, Date.now()).first<FileVersionRow>();
+		FROM file_versions WHERE storage_key = ? AND kept_at > ${FILE_VERSION_CUTOFF_SQL}`).bind(storageKey, Date.now()).first<FileVersionRow>();
 	if (!version) return corsResponse({ error: 'File version not found or expired' }, 404);
 	if (version.path !== path) return corsResponse({ error: 'Retained version does not belong to the requested path' }, 409);
 

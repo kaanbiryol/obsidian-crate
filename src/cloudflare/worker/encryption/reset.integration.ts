@@ -70,7 +70,7 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES ('crate_deployment_fence', 'infrastructure'), ('reminder_source_scan_cursor', 'old')").run();
 	await env.DB.prepare("UPDATE server_state SET settings = 'private', settings_version = 'version' WHERE id = 1").run();
 	await env.DB.prepare("INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES ('remote-only.md', 'remote-only.md', 'hash', 1, 'current')").run();
-	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('old', 'remote-only.md', 'hash', 1, 'replaced', 9999999999999)").run();
+	await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, kept_at) VALUES ('old', 'remote-only.md', 'hash', 1, 'replaced', 9999999999999)").run();
 	await env.DB.prepare(`INSERT INTO grants VALUES ('web_enrollment', 'grant', '{"folderPath":"Reminders"}', 9999999999999)`).run();
 	await env.DB.prepare("INSERT INTO push_subscriptions(id, owner_token_id, endpoint, p256dh, auth) VALUES ('push', 'web', 'https://push.test', 'key', 'auth')").run();
 	await env.DB.prepare(`INSERT INTO upload_leases(id, keys, expires_at) VALUES ('late', '[{"storageKey":"late-object","path":"late.md"}]', 9999999999999)`).run();
@@ -166,7 +166,7 @@ describe('turning encryption on', () => {
 		await env.BUCKET.put('plain-old', 'old plaintext note');
 		await env.DB.prepare(`INSERT INTO server_state(id, settings, settings_version) VALUES (1, '{"ignorePatterns":["private/"]}', 'version')
       ON CONFLICT(id) DO UPDATE SET settings = excluded.settings, settings_version = excluded.settings_version`).run();
-		await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('plain-old', 'plain.md', 'hash', 18, 'replaced', 9999999999999)").run();
+		await env.DB.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, kept_at) VALUES ('plain-old', 'plain.md', 'hash', 18, 'replaced', 9999999999999)").run();
 		await env.DB.prepare("INSERT INTO changelog(path, action, revision, hash, size) VALUES ('plain.md', 'put', 'plain-current', 'hash', 14)").run();
 		await env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-generation','revision')").run();
 		await env.DB.prepare("INSERT INTO push_subscriptions(id, owner_token_id, endpoint, p256dh, auth) VALUES ('push', 'web', 'https://push.test', 'key', 'auth')").run();

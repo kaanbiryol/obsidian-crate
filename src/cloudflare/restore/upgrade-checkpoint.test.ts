@@ -28,7 +28,7 @@ async function harness() {
 	const db = database();
 	const live = new TextEncoder().encode('Existing note.'), history = new TextEncoder().encode('Earlier note.');
 	db.prepare('INSERT INTO files(path,portable_path,hash,size,storage_key) VALUES (?,?,?,?,?)').run('note.md', 'note.md', await sha256Hex(live), live.length, 'existing-object');
-	db.prepare('INSERT INTO file_versions(storage_key,path,hash,size,reason,expires_at) VALUES (?,?,?,?,?,?)').run('historical-object', 'note.md', await sha256Hex(history), history.length, 'replaced', 2_000_000_000);
+	db.prepare('INSERT INTO file_versions(storage_key,path,hash,size,reason,kept_at) VALUES (?,?,?,?,?,?)').run('historical-object', 'note.md', await sha256Hex(history), history.length, 'replaced', 2_000_000_000);
 	db.prepare('INSERT INTO auth_tokens(id,token_hash,scope) VALUES (?,?,?)').run('old-device', 'hashed-secret', 'vault');
 	const objects = new Map<string, Uint8Array>([['existing-object', live], ['historical-object', history]]);
 	const api = {

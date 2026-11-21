@@ -208,7 +208,7 @@ it('reapplying the baseline schema preserves existing vault rows', async () => {
 
 it('retains recent correlation and expires receipts with their retained version after 30 days', async () => {
 	const first = await upload(); await remove(first);
-	await env.DB.prepare('UPDATE file_versions SET expires_at = ?').bind(Date.now() - 1).run();
+	await env.DB.prepare('UPDATE file_versions SET kept_at = 0').run();
 	const second = await upload(); await remove(second);
 	await expireFileVersions(env.BUCKET, env.DB);
 	expect(await receipts()).toMatchObject([{ consumed_revision: second.revision }]);

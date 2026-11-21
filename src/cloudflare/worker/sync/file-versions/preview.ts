@@ -1,7 +1,7 @@
 import { corsHeaders, corsResponse } from '../../http/cors';
 import { sanitizePath } from '../../http/request-validation';
 import { isSyncRevision } from '../../../../protocol/sync-validation';
-import { storedObjectMatchesMetadata } from '../storage';
+import { FILE_VERSION_CUTOFF_SQL, storedObjectMatchesMetadata } from '../storage';
 import type { RemoteFileVersion } from '../../../../protocol/sync-types';
 import { ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES } from '../../../../encryption/file-format';
 import { MAX_PREVIEW_BYTES } from '../../../../protocol/sync-limits';
@@ -14,7 +14,7 @@ export async function handleFileVersionPreview(request: Request, bucket: R2Bucke
 	const key = params.get('storageKey');
 	const path = sanitizePath(params.get('path') ?? '');
 	if (!isSyncRevision(key) || !path) return corsResponse({ error: 'A retained version and path are required' }, 400);
-	const version = await db.prepare('SELECT hash, size FROM file_versions WHERE storage_key = ? AND path = ? AND expires_at > ?')
+	const version = await db.prepare(`SELECT hash, size FROM file_versions WHERE storage_key = ? AND path = ? AND kept_at > ${FILE_VERSION_CUTOFF_SQL}`)
 		.bind(key, path, Date.now()).first<Pick<RemoteFileVersion, 'hash' | 'size'>>();
 	if (!version) return corsResponse({ error: 'File version not found or expired' }, 404);
 	if (version.size > MAX_ENCRYPTED_FILE_BYTES) return corsResponse({ error: 'This file is too large to preview.' }, 413);

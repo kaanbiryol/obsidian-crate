@@ -122,7 +122,7 @@ it('restores the rest of a shared checkpoint and reports a file whose saved vers
 	const checkpoint = (await device.api.sharedHistory.save())!;
 	device.disk.write('edited.md', 'later edit'); device.disk.remove('deleted.md'); await sync(device);
 	// The saved version is no longer kept.
-	await env.DB.prepare("UPDATE file_versions SET expires_at = 0 WHERE path = 'edited.md'").run();
+	await env.DB.prepare("UPDATE file_versions SET kept_at = 0 WHERE path = 'edited.md'").run();
 	const runtime = historyRuntime(device, checkpoint.id);
 	const review = await runtime.createHistoryRestore(device.settings.syncHistory[0]!);
 	expect(review.items.map(item => item.path)).toEqual(['deleted.md', 'edited.md']);
@@ -244,8 +244,8 @@ it.each(['update', 'delete'])('retains checkpoint bytes for thirty days from com
 	vi.spyOn(Date, 'now').mockReturnValue(Date.now() - 5 * 60_000);
 	if (action === 'update') device.disk.write('note.md', 'new'); else device.disk.remove('note.md');
 	await sync(device);
-	const retained = await env.DB.prepare("SELECT expires_at FROM file_versions WHERE path='note.md'").first<{ expires_at: number }>();
-	expect(retained!.expires_at).toBeGreaterThanOrEqual(checkpoint.expiresAt);
+	const retained = await env.DB.prepare("SELECT kept_at FROM file_versions WHERE path='note.md'").first<{ kept_at: number }>();
+	expect(retained!.kept_at + 30 * 86_400_000).toBeGreaterThanOrEqual(checkpoint.expiresAt);
 });
 
 it('creates and streams a checkpoint above the former 20,000-file limit', async () => {

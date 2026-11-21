@@ -17,7 +17,7 @@ import { assertFileNamespaceAvailable, FileNamespaceConflictError, fileNamespace
 import { fileDeletionReceiptStatement, findFileDeletionReceipt, type FileDeletionReceipt } from './file-delete-audit';
 import type { MutationAuditContext } from '../http/request-diagnostics';
 import {
-	FILE_VERSION_EXPIRES_AT_SQL,
+	FILE_VERSION_KEPT_AT_SQL,
 	getStoredFileRow,
 	readVerifiedBytes,
 	type ExpectedFileHash,
@@ -90,8 +90,8 @@ export function uploadMutation(db: D1Database, input: UploadMutationInput): D1Pr
 function retainReplacedUpload(db: D1Database, input: UploadMutationInput, always: boolean): D1PreparedStatement[] {
 	if (input.expectedHash === null) return [];
 	const replaced = replacedRow({ ...input, expectedHash: input.expectedHash });
-	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, descriptor, expires_at)
-		SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_EXPIRES_AT_SQL}
+	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, descriptor, kept_at)
+		SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_KEPT_AT_SQL}
 		FROM files WHERE ${replaced.sql} AND storage_key != ?${always ? '' : ` AND ${keepReplacedVersionSql('files')}`}`)
 		.bind(Date.now(), ...replaced.args, input.objectKey),
 	...queueReplacedUploadCleanup(db, input)];

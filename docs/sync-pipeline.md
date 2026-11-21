@@ -617,12 +617,13 @@ Vault credentials read it with `GET /history-retention` and change it with
 `POST /history-retention { days }`; the plugin shows it under **Sync options** →
 **Keep history for** and confirms before shortening it. The Worker accepts only the
 offered periods, and the column allows 1 to 365 days, so offering another needs no
-migration. Statements that keep a version read
-the setting in the same statement, so a version is kept for the period in force when it
-was committed. Changing the period re-times kept versions to their commit time plus the
-new period in the same D1 batch: a shorter period lets maintenance remove older history,
-and a longer one extends only versions that have not expired yet, because an expired row
-may already have lost its object. Checkpoints keep the expiry they were saved with, which
+migration. Each version stores `kept_at`, its
+commit time, and expires once that is older than the current period, so a change writes
+only the setting and applies to all kept history: a shorter period lets maintenance remove
+older history, and a longer one extends versions maintenance has not started to remove.
+Before deleting a batch's objects, maintenance raises a floor in `maintenance_state` to the
+batch's latest `kept_at`, and versions at or below it stay expired whatever the period,
+because their objects may already be gone. Checkpoints keep the expiry they were saved with, which
 their stored metadata repeats, and are also hidden and pruned once they are older than
 the current period. Both use the same commit-time rule, so a checkpoint never outlives
 the versions it references.

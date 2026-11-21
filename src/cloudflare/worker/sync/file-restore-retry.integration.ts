@@ -28,7 +28,7 @@ async function retained(): Promise<RemoteFileVersion> {
 	const hash = await sha256Hex(bytes); const key = `__crate__/files/${hash}/${crypto.randomUUID()}`;
 	await env.BUCKET.put(key, bytes, { customMetadata: { hash } });
 	const version: RemoteFileVersion = { storage_key: key, path: 'note.md', hash, size: bytes.byteLength, reason: 'deleted', created_at: new Date().toISOString(), expires_at: Date.now() + 60_000 };
-	await env.DB.prepare("INSERT INTO file_versions (storage_key,path,hash,size,reason,expires_at) VALUES (?,?,?,?,'deleted',?)").bind(key,version.path,hash,version.size,version.expires_at).run();
+	await env.DB.prepare("INSERT INTO file_versions (storage_key,path,hash,size,reason,kept_at) VALUES (?,?,?,?,'deleted',?)").bind(key,version.path,hash,version.size,Date.now()).run();
 	return version;
 }
 const intent = (version: RemoteFileVersion): RestoreFileRequest => ({ path: version.path, storageKey: version.storage_key, expectedHash: null, expectedRevision: null, operationId: newId() });

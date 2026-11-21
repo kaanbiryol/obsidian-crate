@@ -3,8 +3,8 @@ INSERT INTO changelog(seq, path, action, revision, hash, size, created_at) VALUE
 INSERT INTO changelog(seq, path, action, revision, created_at) VALUES (8, 'Notes/Old.md', 'delete', 'rev-old', '2026-01-02 00:00:00');
 INSERT INTO files(path, portable_path, hash, size, modified, storage_key) VALUES ('Notes/A.md', 'notes/a.md', 'hash-a', 12, '2026-01-01 00:00:00', 'objects/a');
 INSERT INTO files(path, portable_path, hash, size, modified, storage_key, descriptor) VALUES ('Notes/Sealed.md', 'notes/sealed.md', 'hash-s', 99, '2026-01-01 00:00:00', 'objects/s', '{"v":1}');
-INSERT INTO file_versions(id, storage_key, path, hash, size, reason, created_at, expires_at) VALUES (1, 'versions/a-1', 'Notes/A.md', 'hash-a0', 10, 'replaced', '2025-12-31 00:00:00', 1790000000000);
-INSERT INTO file_versions(id, storage_key, path, hash, size, reason, deletion_revision, request_id, created_at, expires_at) VALUES (2, 'versions/old', 'Notes/Old.md', 'hash-old', 5, 'deleted', 'rev-old', 'request-1', '2026-01-02 00:00:00', 1790000000000);
+INSERT INTO file_versions(id, storage_key, path, hash, size, reason, created_at, kept_at) VALUES (1, 'versions/a-1', 'Notes/A.md', 'hash-a0', 10, 'replaced', '2025-12-31 00:00:00', 1790000000000);
+INSERT INTO file_versions(id, storage_key, path, hash, size, reason, deletion_revision, request_id, created_at, kept_at) VALUES (2, 'versions/old', 'Notes/Old.md', 'hash-old', 5, 'deleted', 'rev-old', 'request-1', '2026-01-02 00:00:00', 1790000000000);
 INSERT INTO auth_tokens(id, token_hash, device_id, device_name, platform, created_at, scope, expires_at) VALUES ('token-1', 'token-hash-1', 'device-1', 'Laptop', 'desktop', '2026-01-01 00:00:00', 'vault', NULL);
 INSERT INTO auth_tokens(id, token_hash, created_at, folder_path, scope, reading_generation) VALUES ('token-2', 'token-hash-2', '2026-01-01 00:00:00', 'Reading', 'reading_capture', 'generation-1');
 INSERT INTO grants(kind, key, payload, expires_at) VALUES ('device_pairing', 'pairing-1', '{"device":"Phone"}', 1790000000000);

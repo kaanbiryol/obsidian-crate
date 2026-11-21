@@ -1,5 +1,6 @@
 import { changedRows, queryRows } from '../d1/db';
 import { findReferencedStorageKeys, type ObjectReference } from '../d1/storage-references';
+import { FILE_VERSION_CUTOFF_SQL, FILE_VERSION_FLOOR_KEY } from '../sync/storage';
 
 // R2 deletes up to R2_KEYS_PER_CALL keys per call. 500 keeps the reference lookup's single
 // JSON parameter below D1's 2 MB value limit, even with 1,024-character paths.
@@ -49,16 +50,21 @@ const EXPIRED_VERSION_BATCH = CLEANUP_BATCH_LIMIT;
 
 /** Deletes the objects of the oldest expired versions, then their rows. The expired row
  * is the cleanup intent: every reader already hides it, and a pass interrupted after the
- * R2 delete repeats it. Keys are never reused, so only a live file can still need one.
- * Returns true when more may remain. */
+ * R2 delete repeats it. The floor rises first, so a longer retention set meanwhile cannot
+ * show a version whose object is gone. Keys are never reused, so only a live file can
+ * still need one. Returns true when more may remain. */
 export async function expireFileVersions(bucket: R2Bucket, db: D1Database, now = Date.now()): Promise<boolean> {
-	const rows = await queryRows<{ storage_key: string; path: string }>(db.prepare(`SELECT storage_key, path FROM file_versions
-    WHERE expires_at <= ? ORDER BY expires_at LIMIT ${EXPIRED_VERSION_BATCH}`).bind(now));
-	if (!rows.length) return false;
+	const rows = await queryRows<{ storage_key: string; path: string; kept_at: number }>(db.prepare(`SELECT storage_key, path, kept_at
+    FROM file_versions WHERE kept_at <= ${FILE_VERSION_CUTOFF_SQL} ORDER BY kept_at LIMIT ${EXPIRED_VERSION_BATCH}`).bind(now));
+	const last = rows.at(-1);
+	if (!last) return false;
+	await db.prepare(`INSERT INTO maintenance_state (key, value) VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = MAX(CAST(value AS INTEGER), CAST(excluded.value AS INTEGER))`)
+		.bind(FILE_VERSION_FLOOR_KEY, last.kept_at).run();
 	const live = await findReferencedStorageKeys(db, rows.map(row => ({ storageKey: row.storage_key, path: row.path })), { versions: false });
 	const unused = rows.map(row => row.storage_key).filter(key => !live.has(key));
 	if (unused.length) await bucket.delete(unused);
-	await db.prepare('DELETE FROM file_versions WHERE storage_key IN (SELECT value FROM json_each(?)) AND expires_at <= ?')
+	await db.prepare(`DELETE FROM file_versions WHERE storage_key IN (SELECT value FROM json_each(?)) AND kept_at <= ${FILE_VERSION_CUTOFF_SQL}`)
 		.bind(JSON.stringify(rows.map(row => row.storage_key)), now).run();
 	return rows.length === EXPIRED_VERSION_BATCH;
 }

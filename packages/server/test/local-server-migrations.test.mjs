@@ -26,7 +26,7 @@ INSERT INTO fixture_notes(id, body) VALUES ('seed', 'keeps; semicolons');
 async function seed(db) {
 	await issueLocalDevice(db, 'Upgrade test');
 	await db.prepare("INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES ('Note.md', 'note.md', 'hash', 5, 'current')").run();
-	await db.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) VALUES ('previous', 'Note.md', 'old', 3, 'replaced', ?)").bind(Date.now() + 60_000).run();
+	await db.prepare("INSERT INTO file_versions(storage_key, path, hash, size, reason, kept_at) VALUES ('previous', 'Note.md', 'old', 3, 'replaced', ?)").bind(Date.now()).run();
 	return counts(db);
 }
 

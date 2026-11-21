@@ -8,7 +8,7 @@ import { sha256Hex } from '../../../../platform/sha256';
 beforeEach(async () => {
  await applySchema(env.DB);
  const hash = await sha256Hex('saved');
- await env.DB.prepare("INSERT INTO file_versions (storage_key,path,hash,size,reason,expires_at) VALUES ('retained/key','note.md',?,5,'deleted',?)").bind(hash, Date.now() + 300_000).run();
+ await env.DB.prepare("INSERT INTO file_versions (storage_key,path,hash,size,reason,kept_at) VALUES ('retained/key','note.md',?,5,'deleted',?)").bind(hash, Date.now()).run();
  await env.BUCKET.put('retained/key', 'saved', { customMetadata: { hash } });
 });
 afterEach(async () => { await reset(); });
@@ -24,7 +24,7 @@ it('returns verified bytes without restoring or changing retained data', async (
 it('refuses expired versions, mismatched paths and unretained R2 keys', async () => {
  expect((await preview('other.md')).status).toBe(404);
  expect((await preview('note.md', 'arbitrary/key')).status).toBe(404);
- await env.DB.prepare('UPDATE file_versions SET expires_at = 0').run();
+ await env.DB.prepare('UPDATE file_versions SET kept_at = 0').run();
  expect((await preview()).status).toBe(404);
 });
 it('bounds reads and rejects corrupt stored bytes', async () => {

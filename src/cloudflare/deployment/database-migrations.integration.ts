@@ -175,7 +175,7 @@ async function seedLargeVault(db: D1Database) {
 	const rows = `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${LARGE_TABLE_ROWS})`;
 	const writes = await runScript(db, `
 		${rows} INSERT INTO files(path, portable_path, hash, size, storage_key) SELECT 'Notes/' || i || '.md', 'notes/' || i || '.md', 'hash-' || i, i, 'objects/' || i FROM n;
-		${rows} INSERT INTO file_versions(storage_key, path, hash, size, reason, expires_at) SELECT 'versions/' || i, 'Notes/' || i || '.md', 'old-' || i, i, 'replaced', 1790000000000 FROM n;
+		${rows} INSERT INTO file_versions(storage_key, path, hash, size, reason, kept_at) SELECT 'versions/' || i, 'Notes/' || i || '.md', 'old-' || i, i, 'replaced', 1790000000000 FROM n;
 		${rows} INSERT INTO changelog(seq, path, action, revision, hash, size) SELECT i, 'Notes/' || i || '.md', 'put', 'rev-' || i, 'hash-' || i, i FROM n;
 		${rows} INSERT INTO note_terms(term, saved_at, portable_path) SELECT 'term-' || (i % 1000), '2026-01-01T00:00:00Z', 'reading/' || i || '.md' FROM n;
 		${rows} INSERT INTO highlight_index(highlighted_at, portable_path, terms) SELECT '2026-01-01T00:00:00Z', 'reading/' || i || '.md', '[]' FROM n;`);

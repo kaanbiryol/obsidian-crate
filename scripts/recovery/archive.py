@@ -93,9 +93,9 @@ def prepare_restore_sql(directory, restored_at=None):
             db.execute(f'DELETE FROM "{table}"')
         for table, columns in RESTORE_POLICY['resetColumns'].items():
             db.execute(f'UPDATE "{table}" SET ' + ', '.join(f'"{column}" = NULL' for column in columns))
-        # Restored retained content gets a fresh recovery window before collection.
+        # Restored retained content gets a fresh retention period before collection.
         restored_at = int(time.time() * 1000) if restored_at is None else restored_at
-        db.execute('UPDATE file_versions SET expires_at = ?', (restored_at + RESTORE_POLICY['fileVersionRetentionMs'],))
+        db.execute('UPDATE file_versions SET kept_at = ?', (restored_at,))
         discarded_keys = [(key,) for key, in db.execute('SELECT key FROM maintenance_state')
                           if key in RESTORE_POLICY['resetMaintenanceKeys']
                           or any(key.startswith(prefix) for prefix in RESTORE_POLICY['resetMaintenancePrefixes'])]

@@ -11,6 +11,7 @@ import { commitNewFiles } from './staging/bulk-new-file-commit';
 import { handleUpload } from './file-handlers';
 import { handleBatchUpload } from './batch/upload';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
+import { FILE_VERSION_CUTOFF_SQL } from './storage';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { sha256Hex } from '@/platform/sha256';
 import { descriptorColumn } from '../encryption/state';
@@ -51,13 +52,13 @@ it('serves hot lookups from primary and unique keys', async () => {
 		.toContain('USING PRIMARY KEY (portable_path>?)');
 	expect(await plan('SELECT path FROM file_versions WHERE storage_key = ?', 'key')).toContain('USING INDEX sqlite_autoindex_file_versions_1 (storage_key=?)');
 	expect(await plan('SELECT card FROM reading_items WHERE portable_path = ?', 'reading/a.md')).toContain('USING INDEX sqlite_autoindex_reading_items_1 (portable_path=?)');
-	// The unfiltered version list pages by expiry and row ID through its index, so a page
-	// sorts nothing even when many versions share one expiry.
-	const versions = await plan(`SELECT id, storage_key, path, hash, size, reason, created_at, expires_at, descriptor FROM file_versions
-    WHERE expires_at > ? AND (expires_at, id) < (?, ?) ORDER BY expires_at DESC, id DESC LIMIT 101`, 0, 9, 5);
-	expect(versions).toContain('USING INDEX file_versions_expires_at_idx');
+	// The unfiltered version list pages by kept time and row ID through its index, so a page
+	// sorts nothing even when many versions were kept at once.
+	const versions = await plan(`SELECT id, storage_key, path, hash, size, reason, created_at, kept_at, descriptor FROM file_versions
+    WHERE kept_at > ${FILE_VERSION_CUTOFF_SQL} AND (kept_at, id) < (?, ?) ORDER BY kept_at DESC, id DESC LIMIT 101`, 0, 9, 5);
+	expect(versions).toContain('USING INDEX file_versions_kept_at_idx');
 	expect(versions).not.toContain('TEMP B-TREE');
-	const byPath = await plan(`SELECT storage_key FROM file_versions WHERE expires_at > ? AND path = ? ORDER BY created_at DESC, storage_key DESC LIMIT 101`, 0, 'a.md');
+	const byPath = await plan(`SELECT storage_key FROM file_versions WHERE kept_at > ${FILE_VERSION_CUTOFF_SQL} AND path = ? ORDER BY created_at DESC, storage_key DESC LIMIT 101`, 0, 'a.md');
 	expect(byPath).toContain('file_versions_path_created_key_idx');
 	expect(byPath).not.toContain('TEMP B-TREE');
 });

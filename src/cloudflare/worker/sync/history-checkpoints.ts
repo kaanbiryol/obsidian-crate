@@ -4,7 +4,7 @@ import type { FileEntry } from '../../../protocol/sync-types';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { corsHeaders, corsResponse } from '../http/cors';
 import { fileTransportLimit } from '../../../encryption/file-format';
-import { HISTORY_RETENTION_MS_SQL, LAST_SEQ_SQL, storedObjectMatchesMetadata } from './storage';
+import { FILE_VERSION_CUTOFF_SQL, HISTORY_RETENTION_MS_SQL, LAST_SEQ_SQL, storedObjectMatchesMetadata } from './storage';
 import { historyRetentionMs } from '../server/history-retention-handler';
 import { sanitizePath } from '../http/request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
@@ -148,7 +148,7 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
 	const checkpoint = index.checkpoints.find(entry => entry.id === id && live(entry, retention));
 	if (!checkpoint) return response({ error: 'This shared checkpoint expired or was replaced.' }, 410);
 	const file = await db.prepare(`SELECT hash, size FROM files WHERE portable_path = ? AND path = ? AND storage_key = ?
-        UNION ALL SELECT hash, size FROM file_versions WHERE storage_key = ? AND path = ? AND expires_at > ? LIMIT 1`)
+        UNION ALL SELECT hash, size FROM file_versions WHERE storage_key = ? AND path = ? AND kept_at > ${FILE_VERSION_CUTOFF_SQL} LIMIT 1`)
 		.bind(portablePathKey(path), path, revision, revision, path, Date.now()).first<{ hash: string; size: number }>();
 	if (!file) return response({ error: 'A file version required by this checkpoint is no longer available.', code: 'version_unavailable' }, 410);
 	const object = await bucket.get(revision);

@@ -1,5 +1,5 @@
 import { fileRevisionGuard, fileRevisionsGuard } from './file-identity';
-import { FILE_VERSION_EXPIRES_AT_SQL, LAST_SEQ_SQL, nextChangelogSeqSql, type FileStorageRow } from './storage';
+import { FILE_VERSION_KEPT_AT_SQL, LAST_SEQ_SQL, nextChangelogSeqSql, type FileStorageRow } from './storage';
 
 interface PublishedRevision {
 	path: string;
@@ -24,10 +24,10 @@ export function deletedFileStatements(db: D1Database, where: string, args: reado
 	return [
 		db.prepare(`INSERT INTO changelog (seq, path, action, hash, size, revision)
 			SELECT ${nextChangelogSeqSql('portable_path')}, path, 'delete', '', 0, ? FROM files WHERE ${where}`).bind(revision, ...args),
-		db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, deletion_revision, request_id, descriptor, expires_at)
-			SELECT storage_key, path, hash, size, 'deleted', ?, ?, descriptor, ${FILE_VERSION_EXPIRES_AT_SQL} FROM files WHERE ${where}
+		db.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, deletion_revision, request_id, descriptor, kept_at)
+			SELECT storage_key, path, hash, size, 'deleted', ?, ?, descriptor, ${FILE_VERSION_KEPT_AT_SQL} FROM files WHERE ${where}
 			ON CONFLICT(storage_key) DO UPDATE SET reason = 'deleted', deletion_revision = excluded.deletion_revision,
-				request_id = excluded.request_id, expires_at = excluded.expires_at`)
+				request_id = excluded.request_id, kept_at = excluded.kept_at`)
 			.bind(revision, requestId, Date.now(), ...args),
 	];
 }
@@ -62,8 +62,8 @@ export function retainReplacedVersionStatements(
 	const guard = fileRevisionsGuard(requiredRevisions.map(file => ({ path: file.path, storageKey: file.objectKey })));
 	return [
 		db.prepare(`INSERT OR IGNORE INTO file_versions
-			(storage_key, path, hash, size, reason, descriptor, expires_at)
-			SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_EXPIRES_AT_SQL}
+			(storage_key, path, hash, size, reason, descriptor, kept_at)
+			SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_KEPT_AT_SQL}
 			FROM (SELECT ? AS storage_key, ? AS path, ? AS hash, ? AS size, ? AS modified, ? AS descriptor) AS previous
 			WHERE ${guard.sql} AND ${keepReplacedVersionSql('previous')}`)
 			.bind(Date.now(), previous.storageKey, previous.path, previous.hash, previous.size,

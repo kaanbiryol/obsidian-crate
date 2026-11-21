@@ -34,9 +34,10 @@ export function prepareRows(rows: BackupRow[], manifest: UpgradeBackup, currentS
 	return rows.filter(row => !RESET.has(row.table) && !(row.table === 'maintenance_state' && discardMaintenanceKey(String(record(row).key)))).map(row => {
 		const copy = { ...row, values: [...row.values] };
 		if (row.table === 'file_versions') {
-			const index = row.columns.indexOf('expires_at');
-			if (index < 0) throw new Error('Backup version has no expiry');
-			copy.values[index] = restoredAt + policy.fileVersionRetentionMs;
+			// Restored retained content gets a fresh retention period before collection.
+			const index = row.columns.indexOf('kept_at');
+			if (index < 0) throw new Error('Backup version has no retention start');
+			copy.values[index] = restoredAt;
 		}
 		if (row.table === 'server_state') {
 			const { changelog_floor: seq } = record(row);

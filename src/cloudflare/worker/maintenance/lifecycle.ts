@@ -1,6 +1,7 @@
 import { runScheduledMaintenance } from './run';
 import type { Env } from '../types';
 import { markRole } from '../coordinator/role-flags';
+import { FILE_VERSION_CUTOFF_SQL } from '../sync/storage';
 
 /** Maintenance role storage flag, for runtimes without instance names: its alarm runs maintenance episodes. */
 export const MAINTENANCE_COORDINATOR_KEY = 'maintenanceCoordinator';
@@ -16,7 +17,7 @@ const MAX_DRAIN_PASSES = 200;
 async function position(db: D1Database) {
 	const [queued, expired, lease] = await Promise.all([
 		db.prepare('SELECT storage_key FROM object_cleanup_queue ORDER BY storage_key LIMIT 1').first<{ storage_key: string }>(),
-		db.prepare('SELECT storage_key FROM file_versions WHERE expires_at <= ? ORDER BY expires_at LIMIT 1').bind(Date.now()).first<{ storage_key: string }>(),
+		db.prepare(`SELECT storage_key FROM file_versions WHERE kept_at <= ${FILE_VERSION_CUTOFF_SQL} ORDER BY kept_at LIMIT 1`).bind(Date.now()).first<{ storage_key: string }>(),
 		db.prepare('SELECT id, expires_at FROM upload_leases WHERE expires_at IS NOT NULL ORDER BY expires_at, id LIMIT 1').first<{ id: string; expires_at: number }>(),
 	]);
 	return { queued: queued?.storage_key, expired: expired?.storage_key,

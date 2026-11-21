@@ -99,11 +99,13 @@ CREATE TABLE IF NOT EXISTS file_versions (
 	-- The descriptor JSON of an encrypted copy, taken from its `files` row.
 	descriptor TEXT,
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
-	expires_at INTEGER NOT NULL
+	-- When the retention period started, in milliseconds: the commit that kept the copy. It
+	-- expires once older than the current retention, so changing that rewrites no rows.
+	kept_at INTEGER NOT NULL
 );
 
 -- Also orders the unfiltered version list, newest first.
-CREATE INDEX IF NOT EXISTS file_versions_expires_at_idx ON file_versions(expires_at);
+CREATE INDEX IF NOT EXISTS file_versions_kept_at_idx ON file_versions(kept_at);
 CREATE INDEX IF NOT EXISTS file_versions_path_created_key_idx ON file_versions(path, created_at DESC, storage_key DESC);
 
 -- Small values only: fences, cursors, floors and folder labels.
