@@ -16,6 +16,7 @@ import { sealFile } from '../../../encryption/file-codec';
 import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { sha256Hex } from '../../../platform/sha256';
+import { UPGRADE_PROGRESS_KEY } from '../../../protocol/deployment-fence';
 
 const id = 'reset-operation', nextToken = 'b'.repeat(64);
 let state: EncryptionServerState;
@@ -53,6 +54,20 @@ it('requires vault authority, the current encryption identity and explicit destr
 	state = previous;
 	expect((await readEncryptionState(env.DB))?.mode).toBe('active');
 	expect((await request('/health', 'original')).status).toBe(200);
+});
+
+it('does not start while an upgrade backup is in progress', async () => {
+	const progress = (phase: string) => env.DB.prepare(`INSERT INTO maintenance_state(key, value) VALUES ('${UPGRADE_PROGRESS_KEY}', ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(JSON.stringify({ format: 1, phase, prefix: 'backup' })).run();
+	await progress('copying');
+	const response = await start();
+	expect(response.status).toBe(409);
+	expect(await response.json()).toMatchObject({ error: 'Finish the server update first, then try again.' });
+	expect((await readEncryptionState(env.DB))?.mode).toBe('active');
+	// A completed backup no longer needs the files.
+	await progress('complete');
+	expect((await start()).status).toBe(200);
+	await env.DB.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(UPGRADE_PROGRESS_KEY).run();
 });
 
 it('resumes bounded deletion, revokes old devices and grants, and never repeats a completed wipe', async () => {

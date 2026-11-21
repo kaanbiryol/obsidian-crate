@@ -4,7 +4,7 @@ import type { AuthPrincipal } from '../auth/authenticate';
 import { corsResponse } from '../http/cors';
 import { parseJsonObject } from '../http/request-validation';
 import { hasEncryptionAuthority, readEncryptionState, saveEncryptionState } from './state';
-import { DEPLOYMENT_FENCE_KEY } from '../../../protocol/deployment-fence';
+import { DEPLOYMENT_FENCE_KEY, UPGRADE_PROGRESS_KEY } from '../../../protocol/deployment-fence';
 import { isEncryptionId } from '../../../encryption/encoding';
 import { validateEncryptionState, type EncryptionServerState, type ResetReceipt } from '../../../encryption/server-state';
 import { isSha256Hex } from '../../../platform/validation';
@@ -22,6 +22,15 @@ const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValu
 /** Runs under the projection coordinator lock. The replacement credential and
  * reset receipt commit together, so a lost begin reply is safe to retry. The same
  * wipe turns encryption off (an active vault) or on (a plaintext vault given its new state). */
+/** An upgrade backup between starting and completing; a completed one is released with
+ * its write guards. */
+async function upgradeBackupInProgress(db: D1Database): Promise<boolean> {
+	const value = await readMaintenanceValue(db, UPGRADE_PROGRESS_KEY);
+	if (value === null) return false;
+	try { return (JSON.parse(value) as { phase?: unknown }).phase !== 'complete'; }
+	catch { return true; }
+}
+
 export async function handleEncryptionReset(request: Request, env: Env, principal: AuthPrincipal): Promise<Response> {
 	const id = new URL(request.url).searchParams.get('id');
 	if (!isEncryptionId(id)) return corsResponse({ error: 'Invalid reset ID' }, 400);
@@ -37,6 +46,9 @@ export async function handleEncryptionReset(request: Request, env: Env, principa
 	if (request.method !== 'POST') return corsResponse({ error: 'Method not allowed' }, 405);
 	const current = await readEncryptionState(env.DB);
 	if (current && current.mode !== 'active') return corsResponse({ error: 'Finish the current encryption reset first' }, 409);
+	// A reset deletes every R2 object, including the files an upgrade backup is copying,
+	// and the backup's write guards would then block the reset from finishing.
+	if (await upgradeBackupInProgress(env.DB)) return corsResponse({ error: 'Finish the server update first, then try again.' }, 409);
 	if (current && !hasEncryptionAuthority(request, current)) return corsResponse({ error: 'Unlock this vault before resetting it' }, 428);
 	const parsed = await parseJsonObject(request, 512 * 1024);
 	if (!parsed.ok) return parsed.response;

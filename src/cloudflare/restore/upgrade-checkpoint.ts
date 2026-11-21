@@ -188,6 +188,14 @@ async function dumpDatabase(context: BackupContext, saved: { raw: string; progre
  * database is exported and newer uploads are copied. Progress is saved in D1, so
  * recovery continues an interrupted backup instead of restarting it.
  */
+/** An encryption reset deletes every R2 object, the files a backup needs included, and
+ * the write guards a backup sets would block the reset from finishing. Refused before
+ * writes pause, so the fence is released and a later update starts over. */
+async function refuseDuringEncryptionReset(query: Query): Promise<void> {
+	const [row] = await query("SELECT json_extract(encryption, '$.mode') AS mode FROM server_state WHERE id = 1;");
+	if (row?.mode === 'resetting') throw new Error('An encryption reset is in progress. Finish it on the device that started it, then update the server.');
+}
+
 export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient; accountId: string; databaseId: string; bucketName: string; fence: DeploymentFence; onProgress?: (message: string) => void }): Promise<void> {
 	const { api, accountId, databaseId, bucketName, fence } = input;
 	const query: Query = (sql, params) => queryD1Rows(api, accountId, databaseId, sql, params);
@@ -195,6 +203,7 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
 	const tables = definitions.filter(row => row.type === 'table').map(row => String(row.name));
 	if (!tables.includes('files') || !tables.includes('crate_schema')) throw new Error('Cannot back up an unrecognized server database');
 	const context: BackupContext = { api, accountId, bucketName, query, definitions };
+	await refuseDuringEncryptionReset(query);
 	const guarded = guardedTables(tables);
 	const triggers = new Set((await query(UPGRADE_GUARD_TRIGGERS)).map(row => String(row.name)));
 	const paused = writesPaused(guarded, triggers);
@@ -215,6 +224,8 @@ export async function createUpgradeCheckpoint(input: { api: CloudflareApiClient;
 	}
 	if (progress.phase === 'copying') {
 		await copyFilesBeforePause(context, input.onProgress);
+		// A reset that started while files were copied would delete them after the pause.
+		await refuseDuringEncryptionReset(query);
 		input.onProgress?.('Backing up the server database. Large servers can take several minutes…');
 		const dumping: BackupProgress = { format: 1, phase: 'dumping', prefix: progress.prefix, createdAt: new Date().toISOString(), parts: [], table: 0, after: null };
 		const next = JSON.stringify(dumping);

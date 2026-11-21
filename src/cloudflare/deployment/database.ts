@@ -1,13 +1,13 @@
 import { canReplaceServerBuild, parseDevelopmentBuild } from '../../protocol/server-build';
 import { queryD1Rows, type CloudflareApiClient } from '../cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './artifacts';
-import { DEPLOYMENT_FENCE_KEY } from '../../protocol/deployment-fence';
+import { DEPLOYMENT_FENCE_KEY, UPGRADE_PROGRESS_KEY } from '../../protocol/deployment-fence';
 import { type DeploymentFence } from './fence';
 import { migrationTransaction, planDatabaseUpgrade, validateMigrationHistory, SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import { quoteName } from '../d1-sql';
 
 /** Saved in D1 so an interrupted upgrade backup resumes on any device instead of restarting. */
-export const UPGRADE_PROGRESS_KEY = 'crate_upgrade_backup';
+export { UPGRADE_PROGRESS_KEY };
 /** Names the verified backup of the upgrade in progress. */
 export const UPGRADE_CHECKPOINT_KEY = 'crate_upgrade_checkpoint';
 /** Lists the write-guard triggers an upgrade has created. */

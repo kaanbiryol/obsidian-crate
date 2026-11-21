@@ -135,6 +135,26 @@ ALTER TABLE request_rate_limits_next RENAME TO request_rate_limits;`;
 	expect(h.progress()).toBeNull();
 });
 
+it('refuses to back up while an encryption reset is running, before pausing writers', async () => {
+	const h = await harness();
+	h.db.prepare("INSERT INTO server_state(id, encryption) VALUES (1, json_object('mode', 'resetting'))").run();
+	await expect(h.run()).rejects.toThrow('An encryption reset is in progress');
+	expect(h.db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'crate_upgrade_%'").all()).toEqual([]);
+	expect(h.manifestKeys()).toEqual([]);
+});
+
+it('refuses to pause writers when a reset starts while files are copied', async () => {
+	const h = await harness();
+	const get = h.api.getRecoveryObject.getMockImplementation()!;
+	h.api.getRecoveryObject.mockImplementation(async (...args) => {
+		h.db.prepare("INSERT INTO server_state(id, encryption) VALUES (1, json_object('mode', 'resetting')) ON CONFLICT(id) DO UPDATE SET encryption = excluded.encryption").run();
+		return get(...args);
+	});
+	await expect(h.run()).rejects.toThrow('An encryption reset is in progress');
+	expect(h.db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'crate_upgrade_%'").all()).toEqual([]);
+	expect(h.progress()).toMatchObject({ phase: 'copying' });
+});
+
 it('stops an update whose migration leaves a new table writable', async () => {
 	const h = await harness();
 	await h.run();
