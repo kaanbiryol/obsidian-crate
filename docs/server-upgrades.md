@@ -42,6 +42,21 @@ A timed-out provider request remains uncertain. Do not infer completion from ela
 
 Add a reviewed SQL file under `src/cloudflare/migrations/` and a manifest entry with `id`, `from`, `to`, `file` and `checksum`. Each step advances one schema version. The fresh schema sets both `version` and `created_version` to its current version. Receipt validation starts at `created_version`, so a fresh install of a future schema does not pretend to have executed historical migrations. The SQL must not contain transaction control or modify `crate_schema`, `crate_migrations` or deployment ownership. The runner supplies a source-version precondition, completion receipt and final schema marker in the same D1 transaction. A failed transaction changes none of them. The [D1 query API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/) batches semicolon-separated statements; [D1 batch transactions](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch) roll back the sequence on failure. On retry, inspect the committed version and receipts and skip completed steps.
 
+Every server runs its migrations on its owner's own Cloudflare account, in one D1 transaction that cannot pause and resume. On the Free plan D1 allows 100,000 row writes per day, and a transaction that exceeds the limit fails on every retry. So a migration may only:
+
+- add tables, or add columns with `ALTER TABLE ... ADD COLUMN`, which rewrites no rows
+- add indexes on small tables
+- rebuild small tables (`server_state`, `auth_tokens`, `grants`) through a copy, drop and rename
+
+Data changes on large tables (`files`, `file_versions`, `changelog`, `note_terms`, `highlight_index`), including a new index on one, go through a resumable, batched Worker backfill instead, the way the encryption import resumes after the daily limit resets. Expand the schema in one release (a nullable column or a new table that current code tolerates), backfill in bounded batches with a cursor saved in D1 so an interrupted or rate-limited run continues where it stopped, and contract (drop the old column or table, add constraints) in a later release once every server has finished. A column added with `ALTER TABLE ... ADD COLUMN` is appended, so add it at the end of its table in `schema.sql` too.
+
+`src/cloudflare/deployment/database-migrations.integration.ts` (in `npm run test:worker-runtime`) enforces both rules through the provisioner's real runner:
+
+- It builds a database from the frozen schema of `minimumSchemaVersion` in `src/cloudflare/deployment/__fixtures__/schema-<version>.sql`, seeds the synthetic rows in `schema-<version>-rows.sql`, applies every registered migration and requires the same tables, columns, types, nullability, defaults, CHECKs, foreign keys and indexes as a fresh `schema.sql`, with every seeded row kept. A `schema.sql` change without a matching migration fails it.
+- It runs the same migrations against a synthetic vault of 100,000 rows in each large table and fails when all of them together write more than 10,000 rows.
+
+Never edit a frozen schema fixture to make the test pass. When you raise `minimumSchemaVersion`, freeze both fixture files for the new floor. Vitest caches transformed modules, including the migration file list, so run `npx vitest run --config vitest.cloudflare.config.ts --clearCache` after adding a migration file.
+
 The provisioner creates and verifies a paired D1/R2 checkpoint before applying a registered migration. Database write guards remain active until the new deployment is verified, and the original checkpoint is retained across retries.
 
 The checkpoint is built in three resumable phases. Progress is saved in `maintenance_state` as `crate_upgrade_backup` with compare-and-set writes, so an interrupted backup continues on any device instead of restarting:

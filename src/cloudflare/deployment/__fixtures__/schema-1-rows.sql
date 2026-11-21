@@ -1,0 +1,25 @@
+-- Synthetic rows in a schema 1 database. Every migration from schema 1 must keep them.
+INSERT INTO changelog(seq, path, action, revision, hash, size, created_at) VALUES (7, 'Notes/A.md', 'put', 'rev-a', 'hash-a', 12, '2026-01-01 00:00:00');
+INSERT INTO changelog(seq, path, action, revision, created_at) VALUES (8, 'Notes/Old.md', 'delete', 'rev-old', '2026-01-02 00:00:00');
+INSERT INTO files(path, portable_path, hash, size, modified, storage_key) VALUES ('Notes/A.md', 'notes/a.md', 'hash-a', 12, '2026-01-01 00:00:00', 'objects/a');
+INSERT INTO files(path, portable_path, hash, size, modified, storage_key, descriptor) VALUES ('Notes/Sealed.md', 'notes/sealed.md', 'hash-s', 99, '2026-01-01 00:00:00', 'objects/s', '{"v":1}');
+INSERT INTO file_versions(id, storage_key, path, hash, size, reason, created_at, expires_at) VALUES (1, 'versions/a-1', 'Notes/A.md', 'hash-a0', 10, 'replaced', '2025-12-31 00:00:00', 1790000000000);
+INSERT INTO file_versions(id, storage_key, path, hash, size, reason, deletion_revision, request_id, created_at, expires_at) VALUES (2, 'versions/old', 'Notes/Old.md', 'hash-old', 5, 'deleted', 'rev-old', 'request-1', '2026-01-02 00:00:00', 1790000000000);
+INSERT INTO auth_tokens(id, token_hash, device_id, device_name, platform, created_at, scope, expires_at) VALUES ('token-1', 'token-hash-1', 'device-1', 'Laptop', 'desktop', '2026-01-01 00:00:00', 'vault', NULL);
+INSERT INTO auth_tokens(id, token_hash, created_at, folder_path, scope, reading_generation) VALUES ('token-2', 'token-hash-2', '2026-01-01 00:00:00', 'Reading', 'reading_capture', 'generation-1');
+INSERT INTO grants(kind, key, payload, expires_at) VALUES ('device_pairing', 'pairing-1', '{"device":"Phone"}', 1790000000000);
+INSERT INTO server_state(id, features, changelog_floor, import_state, import_generation, import_snapshot_seq, settings, settings_version, history_retention_days) VALUES (1, '{"reading":true}', 3, 'complete', 2, 7, '{"theme":"dark"}', 'settings-1', 60);
+INSERT INTO maintenance_state(key, value) VALUES ('example_cursor', '42');
+INSERT INTO object_cleanup_queue(storage_key, file_path) VALUES ('objects/stale', 'Notes/Stale.md');
+INSERT INTO operations(kind, operation_id, request_hash, response_json) VALUES ('upload', '20260101-operation-1', 'request-hash-1', '{"ok":true}');
+INSERT INTO operation_chunks(kind, operation_id, idx, body) VALUES ('upload', '20260101-operation-1', 0, 'chunk-0');
+INSERT INTO upload_leases(id, keys, expires_at) VALUES ('lease-1', '[{"storageKey":"objects/a","path":"Notes/A.md"}]', 1790000000000);
+INSERT INTO notification_policy(id, enabled, folder_path, timezone, revision) VALUES (1, 1, 'Reminders', 'Europe/Istanbul', 'policy-1');
+INSERT INTO reminder_projections(reminder_id, file_path, due_datetime, content, due_at, attempts) VALUES ('reminder-1', 'Reminders/Today.md', '2026-01-03T09:00', 'Call the plumber', 1767430800000, 0);
+INSERT INTO reminder_sources(file_path, reminder_id, due_key, occurrences) VALUES ('Reminders/Today.md', 'reminder-1', '2026-01-03T09:00', 1);
+INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified) VALUES ('Reminders/Today.md', 'rev-r', 3, 1);
+INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, 1, 'Reading', 'generation-1', 'reading-1');
+INSERT INTO reading_items(id, portable_path, path, storage_key, hash, size, item_id, saved_at, status, favorite, highlighted_at) VALUES (1, 'reading/article.md', 'Reading/Article.md', 'objects/r', 'hash-r', 2048, 'item-1', '2026-01-01T10:00:00Z', 'unread', 1, '2026-01-02T10:00:00Z');
+INSERT INTO note_terms(term, saved_at, portable_path) VALUES ('plumbing', '2026-01-01T10:00:00Z', 'reading/article.md');
+INSERT INTO highlight_index(highlighted_at, portable_path, terms, words) VALUES ('2026-01-02T10:00:00Z', 'reading/article.md', '["pipes"]', 'pipes');
+INSERT INTO reading_captures(id, generation, url_identity, note, available_at) VALUES ('capture-1', 'generation-1', 'https://example.com/a', 'Read later', 0);
