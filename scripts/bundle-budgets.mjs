@@ -11,10 +11,10 @@ export const bundleBudgets = {
 	},
 	{
 		path: 'dist/styles.css',
-		// The pending sync button's progress and stop marker measure
-		// 393.2 KB raw / 48.8 KB gzip across the plugin and shared PWA surfaces.
-		maxBytes: 393500,
-		maxGzipBytes: 48800,
+		// The Recently deleted list and its History action measure
+		// 393.7 KB raw / 48.8 KB gzip across the plugin and shared PWA surfaces.
+		maxBytes: 394000,
+		maxGzipBytes: 48900,
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
