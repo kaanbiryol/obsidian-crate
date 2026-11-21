@@ -8,6 +8,7 @@ import { getPluginLifecycleSignal, startupSyncSettled } from '../plugin/lifecycl
 import { Notice, Platform } from 'obsidian';
 import { validateReadingFolder } from '../reading/settings';
 import { createReminderMoveJournal } from './data/reminder-move-journal';
+import { archiveCompletedReminders, type ReminderArchiveSummary } from './data/reminder-archive-runner';
 import { createReminderScanGate } from './scan-gate';
 import { createReminderEditorWriter } from './data/editor-normalization';
 import { startLocalReminderNotifications, type LocalNotification } from './local-notifications';
@@ -26,6 +27,8 @@ export interface ReminderBackend {
 	canAssignEditorIds(filePath: string): boolean;
 	/** Desktop notifications shown by Obsidian; refresh after their settings change. */
 	notifications: { refresh: () => void };
+	/** Moves completed reminders from these project notes to their archive notes. */
+	archiveCompleted(notePaths: readonly string[]): Promise<ReminderArchiveSummary>;
 }
 
 const remindersLogger = createLogger('Reminders');
@@ -185,6 +188,8 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 		watcher: new VaultWatcher(plugin.app.vault, index),
 		canAssignEditorIds: filePath => index.isReminderFile(filePath) && !gate.shouldDeferWrites(filePath),
 		notifications,
+		archiveCompleted: notePaths => archiveCompletedReminders(
+			{ app: plugin.app, index, journal, isWritingVault: () => plugin.syncRuntime.isWritingVault() }, notePaths),
 	};
 	plugin.reminders = backend;
 	backend.watcher.register();

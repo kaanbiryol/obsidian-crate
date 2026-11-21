@@ -12,6 +12,7 @@ import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { changedPathsSince, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../sync/change-token';
 import { sha256Hex } from '../../../../platform/sha256';
+import { isReminderNotePath } from '../../../../protocol/reminder-archive-path';
 
 export async function handleListReminders(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
@@ -45,7 +46,8 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	const since = parseDeltaBase(url.searchParams.get('since'));
 	const sinceSeq = since && since.scope === base.slice(base.indexOf('.') + 1) ? since.seq : null;
 	// The change state already read the changelog bounds, so this is one more query.
-	const changedPaths = sinceSeq === null ? null : await changedPathsSince(env.DB, folderPath, sinceSeq, state.bounds);
+	const changedPaths = sinceSeq === null ? null
+		: (await changedPathsSince(env.DB, folderPath, sinceSeq, state.bounds))?.filter(path => isReminderNotePath(path, folderPath)) ?? null;
 	// Other vault writes changed the token. An ETag issued at the client's delta
 	// base still holds when no folder path changed since, so skip the listing.
 	if (sinceSeq !== null) {
@@ -61,7 +63,8 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	// Their failures are handled where they are awaited.
 	changedCache?.catch(() => undefined);
 	folderCache?.catch(() => undefined);
-	const metadata = await listStoredMarkdownFileMetadataByPrefix(env.DB, folderPath);
+	// Archived reminders are kept out of the index, its cache and the revision.
+	const metadata = (await listStoredMarkdownFileMetadataByPrefix(env.DB, folderPath)).filter(file => isReminderNotePath(file.path, folderPath));
 	const revision = (await sha256Hex([
 		`parser:${REMINDER_CACHE_PARSER_VERSION}`,
 		...metadata.map((file) => `${file.path}\0${file.hash}\0${file.size}`),

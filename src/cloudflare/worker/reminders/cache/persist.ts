@@ -78,7 +78,7 @@ export async function writeReminderFileCacheEntries(
 		} else {
 			oversizedPaths.push(entry.filePath);
 			entry.reminders = [];
-			entry.issue = 'Split this note into smaller files to index its reminders. The vault file remains synced.';
+			entry.issue = 'Archive completed reminders or split this note into smaller files to index its reminders. The vault file remains synced.';
 			serializedEntries.push({ entry, remindersJson: JSON.stringify({ issue: entry.issue }) });
 		}
 	}

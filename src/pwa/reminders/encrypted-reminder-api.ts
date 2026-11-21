@@ -2,6 +2,7 @@ import { sealFile } from '../../encryption/file-codec';
 import { decryptJson, encryptJson } from '../../encryption/envelope';
 import { createReminderProjection } from '../../reminders/core/encrypted-schedule-projection';
 import { scanReminderMarkdownContent, getProjectFromPath } from '../../reminders/core/markdownScan';
+import { reminderArchiveFolder } from '../../protocol/reminder-archive-path';
 import { decodeMarkdownBytes } from '../../reminders/core/markdownEncoding';
 import { buildReminderList } from '../../reminders/core/reminder-list';
 import { applyReminderFileCommand, reminderCommandPayload, ReminderCommandError } from '../../reminders/core/reminderFileCommand';
@@ -228,9 +229,11 @@ export class EncryptedReminderApi {
 				const nextCache = new Map(this.cached);
 				const sources: Array<{ path: string; project: string; reminders: ReminderPayload[]; issue?: string }> = [];
 				const nextScanned = new Map<string, ScannedNote>();
+				// The server sees only tags, so the app skips archive notes before downloading them.
+				const archive = `${await this.keys.paths.wire(reminderArchiveFolder(this.keys.folderPath))}/`;
 				// Each note is checked against its listed revision, and the listing is one server
 				// snapshot, so the result needs no second inventory read.
-				const loaded = await this.scan(inventory.files, nextCache);
+				const loaded = await this.scan(inventory.files.filter(file => !file.path.startsWith(archive)), nextCache);
 				for (const entry of loaded) {
 					const { file } = entry;
 					// A note that could not even be opened is reported by its server path.

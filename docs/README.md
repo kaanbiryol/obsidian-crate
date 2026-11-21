@@ -28,6 +28,7 @@ Maintainer and contributor documentation for the plugin, Worker and PWA. User-fa
 - [Reminder clock](reminder-clock.md) - the shared clock that keeps Today, Upcoming and overdue views current.
 - [Reminder retention](reminder-retention.md) - the retry window and retention policy for web reminder commands.
 - [Reminder source recovery](reminder-source-recovery.md) - recovering reminder notes that cannot be read safely.
+- [Reminder archive](reminder-archive.md) - moving completed reminders out of project notes, and how the archive stays unindexed.
 - [Notification processing](notification-processing.md) - how committed changes become scheduled notifications, and the database reads involved.
 
 ## Reading

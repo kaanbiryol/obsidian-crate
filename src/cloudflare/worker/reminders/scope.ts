@@ -1,8 +1,8 @@
 import { getNotificationPolicy } from '../notifications/policy';
-import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
+import { isReminderNotePath } from '../../../protocol/reminder-archive-path';
 
 export function isReminderPath(path: string, folder: string | null): boolean {
-	return folder !== null && isMarkdownNoteInFolder(path, folder);
+	return folder !== null && isReminderNotePath(path, folder);
 }
 
 export async function getReminderFolder(db: D1Database): Promise<string | null> {

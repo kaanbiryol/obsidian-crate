@@ -23,6 +23,7 @@ import { addReminderIdentityOwners, releaseReminderIdentityOwners, resolveRemind
 import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from '@/reminders/data/vault-markdown';
 import { reminderSourceDiagnostic, type ReminderSourceIssue } from './reminder-source-issues';
 import { isConflictFile } from '@/sync/conflict/conflict';
+import { isReminderArchivePath } from '@/protocol/reminder-archive-path';
 import type { ReminderEditorWriter } from './editor-normalization';
 
 const log = createLogger('VaultScanner');
@@ -61,6 +62,7 @@ export function isInRemindersFolder(filePath: string, remindersFolderPath: strin
 	const normalizedFile = normalizePath(filePath);
 	if (isConflictFile(normalizedFile)) return false;
 	const normalizedFolder = normalizePath(remindersFolderPath);
+	if (isReminderArchivePath(normalizedFile, normalizedFolder)) return false;
 	return normalizedFile.startsWith(normalizedFolder + "/") || normalizedFile === normalizedFolder;
 }
 
@@ -86,6 +88,7 @@ function collectMarkdownFilesInFolder(app: App, remindersFolderPath: string): TF
 		const current = stack.pop();
 		if (!current) continue;
 		if (current instanceof TFolder) {
+			if (normalizedFolderPath && isReminderArchivePath(`${current.path}/`, normalizedFolderPath)) continue;
 			for (const child of current.children) {
 				stack.push(child);
 			}

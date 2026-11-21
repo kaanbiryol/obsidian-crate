@@ -1,5 +1,6 @@
 import { containsControlCharacters } from '../../platform/validation';
 import { DEFAULT_PROJECT } from './constants';
+import { isReminderArchiveProject } from '@/protocol/reminder-archive-path';
 
 const MAX_PROJECT_PATH_LENGTH = 256;
 
@@ -28,7 +29,8 @@ export function normalizeReminderProjectPath(value: unknown): string | null {
 		return null;
 	}
 
-	return segments.join('/');
+	const project = segments.join('/');
+	return isReminderArchiveProject(project) ? null : project;
 }
 
 export function requireReminderProjectPath(value: unknown): string {

@@ -2,7 +2,7 @@ import { normalizeReminderProjectPath } from '@/reminders/core/reminderProjectPa
 import { corsResponse } from '../http/cors';
 import { parseOptionalString, sanitizePath } from '../http/request-validation';
 import type { ReminderMutationWorkspace } from './types';
-import { isMarkdownNoteInFolder } from '../../../protocol/note-paths';
+import { isReminderNotePath } from '../../../protocol/reminder-archive-path';
 
 export function parseFolderPath(value: unknown): string | null {
 	const parsed = parseOptionalString(value, 512);
@@ -18,7 +18,7 @@ export function parseReminderSourceFilePath(value: unknown, folderPath: string):
 	const parsed = parseOptionalString(value, 512);
 	if (!parsed) return null;
 	const sanitized = sanitizePath(parsed);
-	return sanitized && isMarkdownNoteInFolder(sanitized, folderPath) ? sanitized : null;
+	return sanitized && isReminderNotePath(sanitized, folderPath) ? sanitized : null;
 }
 
 export function hasNonEmptyStringValue(value: unknown): boolean {

@@ -56,13 +56,30 @@ Crate adds small hidden comments to each checkbox line so it can recognize the s
 
 When the note is open, Crate adds these comments and turns words like "tomorrow" into a date through the editor, so your cursor and unsaved typing stay put. It leaves the line you're typing until you move off it.
 
-Crate picks up every checkbox in the reminders folder. Use a dedicated folder so checkboxes in your other notes don't become reminders.
+Crate picks up every checkbox in the reminders folder except its **Archive** subfolder. Use a dedicated folder so checkboxes in your other notes don't become reminders.
 
 <details>
 <summary>Good to know</summary>
 
 - Checkboxes inside code blocks are ignored.
 - For nested tasks or tasks with paragraphs under them, reorder, move, or delete them in the Markdown editor so children move with their parent. The reminder list limits these edits to protect the note.
+
+</details>
+
+## Archive completed reminders
+
+Completed reminders stay in their project until you archive them. In a project you use every day, such as **Inbox**, they add up and make the note slower to sync and edit. Very large projects stop appearing in the web app until they get smaller.
+
+Run **Crate: Archive completed reminders**, then select **All projects** or one project. Crate moves each completed reminder to a matching note in the **Archive** folder inside your reminders folder. For example, `Reminders/Inbox.md` goes to `Reminders/Archive/Inbox.md`. Open reminders stay where they are, and each run adds to the same archive notes.
+
+Archived reminders sync like any other note and stay searchable in Obsidian. They don't appear in reminder lists, the web app or notifications. To bring one back, move its line into a project note.
+
+<details>
+<summary>Good to know</summary>
+
+- Nested reminders and reminders with subtasks or paragraphs under them stay in place. The notice says how many.
+- If sync is changing your notes, Crate asks you to wait and archive again.
+- You can't create a project inside **Archive**. A project named **Archive** is still fine.
 
 </details>
 

@@ -26,7 +26,7 @@ export async function getFile(app: App, filePath: string): Promise<TFile | null>
 	return null;
 }
 
-async function ensureFolderPath(app: App, folderPath: string): Promise<void> {
+export async function ensureFolderPath(app: App, folderPath: string): Promise<void> {
 	const segments = folderPath.split("/").filter(Boolean);
 	let currentPath = "";
 	for (const segment of segments) {

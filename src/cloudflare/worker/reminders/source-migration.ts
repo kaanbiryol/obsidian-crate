@@ -1,4 +1,5 @@
 import { portablePathKey } from '../../../protocol/portable-path';
+import { isReminderNotePath } from '../../../protocol/reminder-archive-path';
 import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { loadStoredFileRows } from '../sync/storage';
 import { recordFileFailure } from '../notifications/file-retries';
@@ -41,7 +42,7 @@ async function seedSourceStates(db: D1Database, folder: string): Promise<boolean
       SELECT path, storage_key, 0, 0 FROM files WHERE portable_path IN (SELECT value FROM json_each(?))
       ON CONFLICT(file_path) DO UPDATE SET file_revision = excluded.file_revision,
         parser_version = 0, verified = 0, sources_digest = NULL
-      WHERE reminder_source_state.file_revision != excluded.file_revision`).bind(JSON.stringify(files.map(file => portablePathKey(file.path)))),
+      WHERE reminder_source_state.file_revision != excluded.file_revision`).bind(JSON.stringify(files.filter(file => isReminderNotePath(file.path, folder)).map(file => portablePathKey(file.path)))),
 		db.prepare(`INSERT INTO maintenance_state (key, value) VALUES (?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(scanKey, next),
 	]);

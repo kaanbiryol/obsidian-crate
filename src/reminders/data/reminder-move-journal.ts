@@ -2,7 +2,8 @@ import { TFile, type App } from 'obsidian';
 import { extractReminderId } from '../core/reminderIdentity';
 import { buildDescriptionBlock, readDescriptionBlock } from '../core/reminderDescription';
 import { hasAttachedMarkdownContent, markdownTaskContexts } from '../core/markdownTaskContext';
-import { createReminderMoveStorage, type ReminderMoveRecord } from './reminder-move-storage';
+import { createReminderMoveStorage, type ReminderArchiveRecord, type ReminderJournalRecord, type ReminderMoveRecord } from './reminder-move-storage';
+import { appendArchivedBlocks, hasArchivedBlock, planReminderArchive, removeArchivedBlocks, type ArchivedReminderBlock } from '../core/reminder-archive';
 import { portablePathKey } from '@/protocol/portable-path';
 import { readVaultMarkdown, processVaultMarkdown } from '@/reminders/data/vault-markdown';
 
@@ -21,6 +22,11 @@ function observeContent(content: string, side: MoveSide, id: string): Omit<Obser
 	return { state: block === side.block ? 'exact' : 'changed', lineNumber, block };
 }
 
+interface ReminderArchiveResult {
+	archived: number;
+	skipped: number;
+}
+
 export interface ReminderMoveJournal {
 	recover(): Promise<string[]>;
 	hasPending(): boolean;
@@ -28,11 +34,13 @@ export interface ReminderMoveJournal {
 	assertWritable(paths: string[]): void;
 	assertActive(): void;
 	execute(source: { filePath: string; rawLine: string; description?: string; id: string }, destination: { filePath: string; rawLine: string; description?: string }, mutation: () => Promise<void>): Promise<void>;
+	/** Moves the note's completed reminders to the end of its archive note, created on demand. */
+	archive(sourcePath: string, destinationPath: string, createDestination: () => Promise<TFile>): Promise<ReminderArchiveResult>;
 }
 
 export function createReminderMoveJournal(app: App, directory: string, folderPath: string, signal?: AbortSignal): ReminderMoveJournal {
 	const storage = createReminderMoveStorage(app.vault.adapter, directory);
-	let pending: ReminderMoveRecord[] = [];
+	let pending: ReminderJournalRecord[] = [];
 	let unknown = true;
 	let queue: Promise<unknown> = Promise.resolve();
 	const enqueue = <T>(work: () => Promise<T>): Promise<T> => {
@@ -42,9 +50,11 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 	};
 	const assertActive = () => signal?.throwIfAborted();
 	const samePath = (left: string, right: string) => portablePathKey(left) === portablePathKey(right);
-	const affectsScope = (record: ReminderMoveRecord) => samePath(record.folderPath, folderPath)
+	const affectsScope = (record: ReminderJournalRecord) => samePath(record.folderPath, folderPath)
 		|| [record.source.filePath, record.destination.filePath].some(path => portablePathKey(path).startsWith(`${portablePathKey(folderPath)}/`));
-	const issue = (record: ReminderMoveRecord) => `An interrupted reminder move needs review: ${record.source.filePath} and ${record.destination.filePath}. Keep or merge the wanted text in one note and remove the duplicate from the other. Crate retries recovery after the next sync or reload. Recovery records are kept in ${directory}.`;
+	const issue = (record: ReminderJournalRecord) => record.kind === 'archive'
+		? `An interrupted reminder archive needs review: ${record.source.filePath} and ${record.destination.filePath}. Crate retries recovery after the next sync or reload. Recovery records are kept in ${directory}.`
+		: `An interrupted reminder move needs review: ${record.source.filePath} and ${record.destination.filePath}. Keep or merge the wanted text in one note and remove the duplicate from the other. Crate retries recovery after the next sync or reload. Recovery records are kept in ${directory}.`;
 	const getFile = (path: string): TFile | null => {
 		const file = app.vault.getAbstractFileByPath(path);
 		return file instanceof TFile ? file : null;
@@ -74,10 +84,33 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 			return lines.join('\n');
 		});
 	};
-	const clear = async (record: ReminderMoveRecord) => {
+	const clear = async (record: ReminderJournalRecord) => {
 		assertActive();
 		await storage.remove(record);
 		pending = pending.filter(entry => entry.operationId !== record.operationId);
+	};
+	const requireIndexed = async (path: string) => {
+		if (!getFile(path) && await app.vault.adapter.exists(path)) throw new Error(`The existing note ${path} is not indexed yet. Wait for Obsidian to finish loading, then retry recovery.`);
+	};
+	/** Finishes removal for every reminder the archive holds. One it never received stays in
+	 * its project, so recovery leaves at worst an extra archived copy, never a lost reminder. */
+	const recoverArchive = async (record: ReminderArchiveRecord) => {
+		assertActive();
+		await requireIndexed(record.source.filePath);
+		await requireIndexed(record.destination.filePath);
+		const destination = getFile(record.destination.filePath);
+		const version = fileVersion(destination);
+		const archived = destination ? await readVaultMarkdown(app.vault, destination) : '';
+		const moved = record.blocks.filter(block => hasArchivedBlock(archived, block));
+		const source = getFile(record.source.filePath);
+		if (source && moved.length) {
+			await processVaultMarkdown(app.vault, source, content => {
+				assertActive();
+				if (fileVersion(getFile(record.destination.filePath)) !== version) throw new Error('Archive note changed during recovery');
+				return removeArchivedBlocks(content, moved).content;
+			});
+		}
+		await clear(record);
 	};
 	const isResolved = async (record: ReminderMoveRecord): Promise<boolean> => {
 		const source = await observe(record.source, record.id);
@@ -103,6 +136,11 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 			for (const record of [...pending]) {
 				if (!samePath(record.folderPath, folderPath)) {
 					issues.push(`${issue(record)} Switch the reminder folder back to ${record.folderPath} before retrying recovery.`);
+					continue;
+				}
+				if (record.kind === 'archive') {
+					try { await recoverArchive(record); }
+					catch (error) { assertActive(); issues.push(`${issue(record)} ${error instanceof Error ? error.message : 'Recovery failed'}`); }
 					continue;
 				}
 				try {
@@ -156,6 +194,61 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 			const savedDestination = await observe(record.destination, record.id);
 			if (remainingSource.state !== 'absent' || savedDestination.state !== 'exact') throw new Error(issue(record));
 			await clear(record);
+		}),
+		archive: (sourcePath, destinationPath, createDestination) => enqueue(async () => {
+			journal.assertWritable([sourcePath, destinationPath]);
+			const source = getFile(sourcePath);
+			if (!source) throw new Error(`Reminder note not found: ${sourcePath}`);
+			const plan = planReminderArchive(await readVaultMarkdown(app.vault, source));
+			assertActive();
+			if (!plan.blocks.length) return { archived: 0, skipped: plan.skipped };
+			const destination = getFile(destinationPath) ?? await createDestination();
+			const prepared = appendArchivedBlocks(await readVaultMarkdown(app.vault, destination), plan.blocks);
+			const skipped = plan.skipped + plan.blocks.length - prepared.appended.length;
+			if (!prepared.appended.length) return { archived: 0, skipped };
+			const record: ReminderArchiveRecord = {
+				version: 1, kind: 'archive', operationId: crypto.randomUUID(), folderPath,
+				source: { filePath: sourcePath }, destination: { filePath: destinationPath }, blocks: prepared.appended,
+			};
+			// Track before awaiting publication, as moves do: an uncertain write must
+			// hold both notes until recovery can reconcile them.
+			pending.push(record);
+			await storage.write(record);
+			try {
+				assertActive();
+				// Archive first: a reminder is removed from its project only once the archive holds it.
+				let replaced: ArchivedReminderBlock[] = [];
+				await processVaultMarkdown(app.vault, destination, content => {
+					assertActive();
+					const next = appendArchivedBlocks(content, record.blocks);
+					if (next.appended.length !== record.blocks.length) throw new Error('The archive note changed. Nothing was archived.');
+					replaced = next.replaced;
+					return next.content;
+				});
+				let removed = new Set<string>();
+				await processVaultMarkdown(app.vault, source, content => {
+					assertActive();
+					const result = removeArchivedBlocks(content, record.blocks);
+					removed = new Set(result.removed);
+					return result.content;
+				});
+				// A reminder edited meanwhile stays in its project without a second, stale copy,
+				// and an archived copy this run replaced comes back.
+				const kept = record.blocks.filter(block => !removed.has(block.id));
+				if (kept.length) {
+					const restored = replaced.filter(old => !removed.has(old.id));
+					await processVaultMarkdown(app.vault, destination, content =>
+						appendArchivedBlocks(removeArchivedBlocks(content, kept).content, restored).content);
+				}
+				await clear(record);
+				return { archived: removed.size, skipped: skipped + kept.length };
+			} catch (error) {
+				if (!signal?.aborted) {
+					try { await recoverArchive(record); }
+					catch { /* Retain the record whenever the notes cannot be reconciled now. */ }
+				}
+				throw error;
+			}
 		}),
 	};
 	return journal;

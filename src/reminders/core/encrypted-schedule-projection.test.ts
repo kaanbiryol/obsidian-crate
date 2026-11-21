@@ -80,6 +80,14 @@ it('schedules only notes inside a reminders folder', async () => {
 	expect((await createReminderProjection(keys, ['Work', 'Reminders'], 'Reminders/Inbox.md', bytes))!.reminders).toHaveLength(1);
 });
 
+it('publishes no schedules for archive notes, so the server still sees them as scheduled', async () => {
+	const { keys } = await notificationKeys();
+	const bytes = new TextEncoder().encode('- [ ] Task @2099-01-02 <!-- crate-id:r1 -->').buffer;
+	const projection = await createReminderProjection(keys, folders, 'Reminders/archive/Work/Q1.md', bytes);
+	expect(projection).toEqual({ version: 1, reminders: [] });
+	expect(() => validateEncryptedSchedules(projection)).not.toThrow();
+});
+
 it.each([3000, 10001])('keeps a %i-reminder note convertible when notification metadata exceeds its budget', async count => {
 	const { bundle, keys } = await notificationKeys();
 	const path = 'Reminders/Inbox.md';

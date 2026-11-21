@@ -22,6 +22,8 @@ const notes: Record<string, string> = {
 	'apple.md': '# Apple\n',
 	'work.md': '- [ ] Copy <!-- crate-id:shared -->\n- [ ] Work task <!-- crate-id:work -->\n',
 	'Été.md': '- [ ] Summer task <!-- crate-id:summer -->\n',
+	// Neither list reads the archive: its reminders, project and repeated identity stay out.
+	'Archive/Inbox.md': '- [x] Archived <!-- crate-id:archived -->\n- [x] First again <!-- crate-id:first -->\n',
 };
 
 beforeEach(async () => { await applySchema(env.DB); });
