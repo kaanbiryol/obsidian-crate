@@ -188,6 +188,26 @@ test('ignores draft release tags when selecting the published baseline', () => {
 });
 
 
+test('ignores pre-release tags, so beta releases leave the pre-launch baseline in place', () => {
+  const h = fixture();
+  h.git('tag', '0.1.0');
+  h.release({ revision: 2 }); h.commit(); h.git('tag', '0.2.0');
+  assert.equal(revisionBase(h.root, { CRATE_PUBLISHED_RELEASES: JSON.stringify([
+    { tagName: '0.1.0', isDraft: false }, { tagName: '0.2.0', isDraft: false, isPrerelease: true },
+  ]) }), h.base);
+});
+
+test('refuses edits to a schema fixture a published release froze', () => {
+  const h = fixture();
+  h.write('src/cloudflare/deployment/__fixtures__/schema-1.sql', 'CREATE TABLE example(id TEXT);');
+  const base = h.commit();
+  h.write('src/cloudflare/deployment/__fixtures__/schema-1.sql', 'CREATE TABLE example(id TEXT, name TEXT);');
+  assert.throws(() => checkServerRevision(h.root, base, h.inputs), /schema-1\.sql is frozen/);
+  h.write('src/cloudflare/deployment/__fixtures__/schema-1.sql', 'CREATE TABLE example(id TEXT);');
+  h.write('src/cloudflare/deployment/__fixtures__/schema-2.sql', 'CREATE TABLE example(id TEXT, name TEXT);');
+  assert.doesNotThrow(() => checkServerRevision(h.root, base, h.inputs));
+});
+
 test('pins an explicit post-reset baseline until a new release is published', () => {
   const h = fixture();
   h.git('tag', '0.1.0');

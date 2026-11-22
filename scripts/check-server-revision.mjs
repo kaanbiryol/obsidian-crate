@@ -8,7 +8,9 @@ const schemaPath = 'src/cloudflare/schema.sql';
 const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trimEnd();
 const commit = (root, ref) => git(root, 'rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`);
 
-/** Published releases, rather than development commits, define the revision baseline. */
+/** Published stable releases, rather than development commits, define the revision baseline.
+ * Pre-releases are beta builds: until the first stable release the pinned pre-launch baseline
+ * stays the baseline, so the server is still revision and schema 1. */
 export function revisionBase(root, env = process.env, explicit) {
   if (explicit) return commit(root, explicit);
   const event = env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8')) : {};
@@ -22,8 +24,8 @@ export function revisionBase(root, env = process.env, explicit) {
     if (git(root, 'merge-base', head, baseline) !== baseline) throw new Error('Server release baseline is not an ancestor of HEAD');
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const releases = env.CRATE_PUBLISHED_RELEASES !== undefined ? JSON.parse(env.CRATE_PUBLISHED_RELEASES)
-    : JSON.parse(execFileSync('gh', ['release', 'list', '--limit', '1000', '--json', 'tagName,isDraft'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
-  const published = new Set(releases.filter(release => !release.isDraft).map(release => release.tagName));
+    : JSON.parse(execFileSync('gh', ['release', 'list', '--limit', '1000', '--json', 'tagName,isDraft,isPrerelease'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+  const published = new Set(releases.filter(release => !release.isDraft && !release.isPrerelease).map(release => release.tagName));
   const tags = git(root, 'tag', '--merged', 'HEAD', '--sort=-version:refname').split('\n').filter(tag => published.has(tag) && (!baseline || commit(root, tag) !== baseline && git(root, 'merge-base', baseline, commit(root, tag)) === baseline));
   const previous = tags.find(tag => /^\d+\.\d+\.\d+$/.test(tag) && (!releaseRun || commit(root, tag) !== head));
   if (previous) return commit(root, previous);
@@ -95,6 +97,12 @@ export function checkServerRevision(root, base, inputs) {
 	};
 	if (initialRevision === undefined && changed(schemaPath) && current.schemaVersion <= before.schemaVersion) {
 		throw new Error('schema.sql changed without a schemaVersion increase and migration plan.');
+	}
+	// A release freezes the schema fixtures it shipped; a new schema version adds its own.
+	for (const path of initialRevision === undefined ? previousFiles.keys() : []) {
+		if (/^src\/cloudflare\/deployment\/__fixtures__\/schema-\d+(-rows)?\.sql$/.test(path) && existsSync(resolve(root, path)) && changed(path)) {
+			throw new Error(`${path} is frozen by a published release; add a fixture for a new schema version instead.`);
+		}
 	}
 	for (const migration of initialRevision === undefined ? before.migrations : []) {
 		const sqlPath = `src/cloudflare/migrations/${migration.file}`;

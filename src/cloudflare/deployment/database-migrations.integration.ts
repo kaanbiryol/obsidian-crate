@@ -12,7 +12,9 @@ import { sha256Hex } from '../../platform/sha256';
 // `__fixtures__/schema-<n>.sql` freezes the schema a server created at version n has, and
 // `schema-<n>-rows.sql` synthetic rows in it. Raising `minimumSchemaVersion` needs both files
 // for the new floor. Never edit a frozen schema to make these tests pass: a mismatch means a
-// server created at that version would not end up with `schema.sql`.
+// server created at that version would not end up with `schema.sql`. Schema 1 freezes with the
+// first stable release; before it, beta schema changes update `schema-1*.sql` with them (see
+// docs/server-upgrades.md). `check:server-revision` refuses edits to a released fixture.
 
 /** D1 Free plan row writes per day. One update runs every pending migration on the same day. */
 const FREE_PLAN_DAILY_ROW_WRITES = 100_000;
