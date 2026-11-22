@@ -7,6 +7,6 @@
     "reading_items", "reading_jobs"
   ],
   "resetColumns": { "reading_policy": ["index_scope", "index_cursor"] },
-  "resetMaintenanceKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_upgrade_backup"],
+  "resetMaintenanceKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_upgrade_backup", "storage_id"],
   "resetMaintenancePrefixes": ["crate_restore_", "reminder_source_scan"]
 }

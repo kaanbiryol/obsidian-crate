@@ -11,3 +11,4 @@ INSERT INTO "operations" ("kind","operation_id","request_hash","response_json","
 INSERT INTO "auth_tokens" ("id","token_hash") VALUES ('fixture-device','fixture-token');
 INSERT INTO "reading_jobs" ("path","item_id","generation","source_revision","block_hash","url","available_at") VALUES ('Reading/fixture.md','fixture-item','generation','source','block','https://example.com/article',123);
 INSERT INTO "grants" ("kind","key","payload","expires_at") VALUES ('reading_enrollment','fixture-enrollment','{"generation":"generation","scope":"library"}',123);
+INSERT INTO "maintenance_state" ("key","value") VALUES ('storage_id','backed-up identity');
