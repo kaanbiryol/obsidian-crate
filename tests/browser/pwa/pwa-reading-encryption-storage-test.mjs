@@ -88,10 +88,6 @@ for (const engine of [chromium, webkit]) {
       let refusedReplacement = false;
       try { await t.cacheReadingArticle(session, item, 'Replacement'); } catch { refusedReplacement = true; }
       const preservedReplacement = JSON.stringify(await db.get('values', articleKey)) === JSON.stringify(future);
-      // An earlier version's library cache is dead data once the library stays on the server.
-      await db.put('values', damaged, 'list:reader');
-      await t.loadReading(session);
-      const removedList = await db.get('values', 'list:reader') === undefined;
 
       // Re-enrollment with a damaged native key retains the same local data key.
       await t.rememberVaultKeys(bundle);
@@ -101,9 +97,8 @@ for (const engine of [chromium, webkit]) {
 
       // A transaction failure may not leave a half-migrated plaintext session.
       t.resetReadingEncryption();
-      // Migration writes keys in order, so the queue fails after the draft was rewritten and the
-      // retired list was deleted; both must roll back.
-      await db.put('values', { items: [], issues: [], savedAt: 1 }, 'list:reader');
+      // Migration writes keys in order, so the queue fails after the draft was rewritten, which
+      // must roll back.
       await db.put('values', original, 'draft:reader');
       await db.put('values', [{ originalBody: 'private queued edit' }], 'pending:reader');
       const put = IDBObjectStore.prototype.put;
@@ -115,7 +110,6 @@ for (const engine of [chromium, webkit]) {
       try { await t.prepareReadingEncryption(session); } catch { migrationFailed = true; }
       finally { IDBObjectStore.prototype.put = put; }
       const rolledBack = await db.get('values', 'draft:reader');
-      const listRolledBack = !!await db.get('values', 'list:reader');
       await t.prepareReadingEncryption(session);
       const ciphertext = await db.get('values', 'draft:reader');
       const oldSession = localStorage.getItem(t.READING_SESSION_KEY);
@@ -128,8 +122,8 @@ for (const engine of [chromium, webkit]) {
       t.resetReadingEncryption();
       let locked = false;
       try { await t.readReadingDraft(session); } catch { locked = true; }
-      return { migrated: migrated.encryptedReading, opened, unrelated, recovered, migrationFailed, rolledBack, listRolledBack,
-        healthyArticle: healthyArticle.markdown, preservedArticles, refusedReplacement, preservedReplacement, removedList,
+      return { migrated: migrated.encryptedReading, opened, unrelated, recovered, migrationFailed, rolledBack,
+        healthyArticle: healthyArticle.markdown, preservedArticles, refusedReplacement, preservedReplacement,
         preservedNewSession: JSON.stringify(survived) === JSON.stringify(ciphertext), staleRejected, locked };
     });
     assert.equal(result.migrated, 1);
@@ -138,13 +132,11 @@ for (const engine of [chromium, webkit]) {
     assert.deepEqual(result.unrelated, { preserve: 'another session' });
     assert.equal(result.migrationFailed, true);
     assert.deepEqual(result.rolledBack, result.opened);
-    // The failed migration also rolls back the removal of the retired library cache.
-    assert.equal(result.listRolledBack, true);
     assert.equal(result.preservedNewSession, true);
     assert.equal(result.staleRejected, true);
     assert.equal(result.locked, true);
     assert.equal(result.healthyArticle, 'Healthy offline article');
-    for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement', 'removedList']) assert.equal(result[key], true, key);
+    for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement']) assert.equal(result[key], true, key);
     console.log(`Reading encryption migration, damaged-cache isolation, key recovery and stale-session fencing passed (${engine.name()})`);
     for (const kind of ['empty', 'pending', 'damaged']) {
       const startup = await browser.newPage();

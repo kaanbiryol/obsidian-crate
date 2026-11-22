@@ -10,7 +10,7 @@ import { abortTransaction } from '../../storage/abort-transaction';
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from '../storage/private-storage';
 import { assertReadingSession, isReadingSessionCurrent, type ReadingSession } from './session';
 import { readingDatabase } from '../storage/database';
-import { isRetiredReadingCacheKey, isSessionReadingKey } from '@/pwa/reading/storage/storage-keys';
+import { isSessionReadingKey } from '@/pwa/reading/storage/storage-keys';
 import { rememberRecoveryKey } from '../../encryption/web-app-unlock';
 
 let pending: { identity: string; promise: Promise<FeatureKeys | null> } | undefined;
@@ -47,14 +47,12 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 		if (!current()) { local.destroy(); throw new Error('Reading sign-in changed.'); }
 		unlockReadingStorage(local);
 		// All this session's plaintext records migrate atomically before hydration. Never
-		// reinterpret another session's unreadable records or silently discard them; the library
-		// caches earlier versions stored are only dead data, so none stays readable.
+		// reinterpret another session's unreadable records or silently discard them.
 		const db = await readingDatabase();
 		if (!current()) throw new Error('Reading sign-in changed.');
 		const tx = db.transaction('values', 'readwrite');
 		try {
-			for (const key of await tx.store.getAllKeys()) if (isRetiredReadingCacheKey(key)) await tx.store.delete(key);
-			else if (isSessionReadingKey(key, session.id)) {
+			for (const key of await tx.store.getAllKeys()) if (isSessionReadingKey(key, session.id)) {
 				const value = await tx.store.get(key);
 				if (!(value && typeof value === 'object' && 'encryptedReading' in value)) await tx.store.put(encodeReadingValue(key, value), key);
 			}

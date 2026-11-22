@@ -25,12 +25,12 @@ export function filterReadingItems(items: ReadingItem[], section: ReadingSection
 	return filtered.every((item, index) => index === 0 || newestFirst(filtered[index - 1]!, item) <= 0) ? filtered : filtered.sort(newestFirst);
 }
 
-/** A tag in the filter, with how many of the section's notes have it when that is known. */
-export interface ReadingTag { name: string; count?: number }
+/** A tag in the filter, with how many of the section's notes have it. */
+export interface ReadingTag { name: string; count: number }
 
-/** Most used first; tags without counts keep their names' order. */
+/** Most used first, then by name. */
 function rankReadingTags(tags: ReadingTag[]): ReadingTag[] {
-	return [...tags].sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name));
+	return [...tags].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 /** The tags of a section's notes, counted from a library held in memory. */

@@ -2,7 +2,7 @@ import { reportExpiredConnection, SESSION_RECOVERY_MESSAGE } from '../connection
 import { onReadingEncryptionReset } from './session/encryption-lifecycle';
 import { prepareReadingEncryption, readingEncryptionHeaders, readingNoteFolder } from './session/encryption-session';
 import { readReadingAttempt, writeReadingAttempt } from './storage/storage';
-import { cacheReadingArticle, readReadingArticle, removeRetiredReadingRecords, type ReadingCache } from './storage/storage';
+import { cacheReadingArticle, readReadingArticle, removeEarlierSessionCopies, type ReadingCache } from './storage/storage';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
 import type { ReadingItem } from '@/reading/core/model';
@@ -92,18 +92,17 @@ export interface ReadingItemsPage { items: ReadingItem[]; issues: Array<{ path: 
 export async function queryReadingItems(session: ReadingSession, query: ReadingItemsQuery): Promise<ReadingItemsPage> {
 	const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== ''));
 	const page = parseReadingListPage(await readingRequest<unknown>(`/reading/items?${params}`, session), readingNoteFolder(session));
-	if (!page || page.issues.length > MAX_READING_LIST_ISSUES || page.changedPaths) throw new Error('Reading library response is unreadable.');
+	if (!page || page.issues.length > MAX_READING_LIST_ISSUES) throw new Error('Reading library response is unreadable.');
 	return { items: page.items, issues: page.issues, cursor: page.cursor };
 }
 
-/** The tags of one section's notes, most used first with their counts. A server from before
- * section counts answers every tag in the library, without counts. */
+/** The tags of one section's notes, most used first with their counts. */
 export async function queryReadingTags(session: ReadingSession, section: ReadingSection): Promise<ReadingTag[]> {
 	const value = await readingRequest<unknown>(`/reading/tags?section=${section}`, session);
 	const { tags, counts } = (value ?? {}) as { tags?: unknown; counts?: unknown };
-	if (!Array.isArray(tags) || !tags.every(tag => typeof tag === 'string')) throw new Error('Reading tags response is unreadable.');
-	const counted = Array.isArray(counts) && counts.length === tags.length && counts.every(count => Number.isSafeInteger(count) && count >= 0) ? counts as number[] : null;
-	return tags.map((name, index) => counted ? { name, count: counted[index]! } : { name });
+	if (!Array.isArray(tags) || !tags.every(tag => typeof tag === 'string') || !Array.isArray(counts) || counts.length !== tags.length
+		|| !counts.every(count => Number.isSafeInteger(count) && count >= 0)) throw new Error('Reading tags response is unreadable.');
+	return tags.map((name, index) => ({ name, count: counts[index] as number }));
 }
 
 /** The library's first inbox page and its issues, kept in memory. The library stays on the
@@ -112,7 +111,7 @@ export async function queryReadingTags(session: ReadingSession, section: Reading
 export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
 	const page = await queryReadingItems(session, { section: 'inbox' });
 	if (new Set(page.items.map(item => item.crate_reading_id)).size !== page.items.length) throw new Error('Reading library response is unreadable.');
-	await removeRetiredReadingRecords(session);
+	await removeEarlierSessionCopies(session);
 	return { items: page.items, issues: page.issues, savedAt: Date.now(), cursor: page.cursor };
 }
 

@@ -95,10 +95,9 @@ the retained data before changing browser storage; reload after repairing storag
 preservation. `tests/browser/reading/reading-optimistic-test.mjs` also verifies native
 IndexedDB preservation through reload and retry in Chromium and WebKit.
 
-After a confirmed library load, one IndexedDB transaction removes the library caches earlier
-versions stored, the readable offline copies saved under earlier sign-ins (whose session IDs
-change with the credential and folder generation), and this session's copies an earlier version
-stored without being asked. Copies the user saved are never evicted. Pending changes, drafts,
+After a confirmed library load, one IndexedDB transaction removes the readable offline copies
+saved under earlier sign-ins (whose session IDs change with the credential and folder
+generation). This session's saved copies are never evicted. Pending changes, drafts,
 saved request attempts and unreadable records stay for review and export, except captures
 an earlier sign-in to the same Reading folder never sent: hydration moves those into
 the current queue under the queue lock, in one transaction. They have no operation ID
@@ -111,12 +110,10 @@ does not prove it was deleted. Unknown article records remain available for expo
 An offline copy also stores the vault images its note links to, one record per image
 (`article-image:<session>:<reading id>:<path>`), sealed like the copy. Refreshing the copy
 downloads only images it does not hold and drops ones it no longer links to; removing the
-copy, or the retirement pass removing it, removes its images. Images are left out of the
+copy, or the earlier sign-in pass removing it, removes its images. Images are left out of the
 recovery export, since the vault keeps them.
 HTTP failures and rejected pages leave stored copies, pending changes and drafts
-unchanged. A confirmed load deletes the library caches earlier versions stored, and
-unlocking an encrypted session deletes them in the same transaction that seals this
-session's records, so a plaintext library never outlives the switch to encryption.
+unchanged.
 `tests/browser/reading/reading-cache-recovery-test.mjs` and
 `tests/browser/pwa/pwa-reading-encryption-storage-test.mjs` test these boundaries in native
 Chromium and WebKit storage.

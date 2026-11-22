@@ -14,14 +14,11 @@ export function isReadingSession(value: unknown): value is ReadingSession {
 		&& nonEmptyString(value.folderPath) && nonEmptyString(value.generation) && nonNegativeNumber(value.expiresAt);
 }
 
-/** `offline` marks a copy the user saved for offline reading. Copies without it were
- * stored automatically by earlier versions (`prefetched` ones in the background) and are
- * removed. `etag` is the server revision it came from, absent on copies saved before it was kept. */
-export interface ReadingArticleCache extends ReadingArticle { usedAt: number; offline?: true; prefetched?: true; etag?: string }
+/** A copy the user saved for offline reading. `etag` is the server revision it came from,
+ * absent when the server sent none. */
+export interface ReadingArticleCache extends ReadingArticle { usedAt: number; etag?: string }
 export function isReadingArticleCache(value: unknown, folder: string): value is ReadingArticleCache {
 	return isReadingArticle(value, folder) && 'usedAt' in value && nonNegativeNumber(value.usedAt)
-		&& (!('offline' in value) || value.offline === true)
-		&& (!('prefetched' in value) || value.prefetched === true)
 		&& (!('etag' in value) || typeof value.etag === 'string' && value.etag.length <= 128);
 }
 

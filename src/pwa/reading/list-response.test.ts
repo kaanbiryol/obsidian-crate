@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { loadReading, queryReadingItems } from './api';
-import { removeRetiredReadingRecords } from './storage/storage';
+import { removeEarlierSessionCopies } from './storage/storage';
 import { type ReadingSession } from './session/session';
 
 vi.mock('./session/encryption-session', () => ({
@@ -12,7 +12,7 @@ vi.mock('./session/encryption-session', () => ({
 }));
 vi.mock('./session/session', async importOriginal => ({ ...await importOriginal<typeof import('./session/session')>(), assertReadingSession: vi.fn() }));
 vi.mock('./storage/storage', () => ({
-	removeRetiredReadingRecords: vi.fn(async () => {}),
+	removeEarlierSessionCopies: vi.fn(async () => {}),
 }));
 
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
@@ -49,7 +49,7 @@ it.each([
 	respond(page);
 	await expect(loadReading(session)).rejects.toThrow('Reading library response is unreadable.');
 	expect(network).toHaveBeenCalledOnce();
-	expect(removeRetiredReadingRecords).not.toHaveBeenCalled();
+	expect(removeEarlierSessionCopies).not.toHaveBeenCalled();
 });
 
 it('saves the first inbox page and its issues, and rejects repeated Reading IDs', async () => {

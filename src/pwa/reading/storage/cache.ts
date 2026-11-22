@@ -7,7 +7,7 @@ import { readingDatabase, readReadingValue } from './database';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
 import { isReadingArticleCache, type ReadingArticleCache } from './storage-validation';
-import { isArticleImageReadingKey, isArticleReadingKey, isRetiredReadingCacheKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
+import { isArticleImageReadingKey, isArticleReadingKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { readingNoteFolder } from '../session/encryption-session';
 
 /** The library's first inbox page and its issues, kept in memory only. The library stays on
@@ -39,8 +39,7 @@ export async function readReadingArticle(session: ReadingSession, id: string) {
 	const value = await readReadingValue(`${readingKeys.articlePrefix(session.id)}${id}`);
 	if (value === undefined) return undefined;
 	if (!isReadingArticleCache(value, readingNoteFolder(session)) || value.item.crate_reading_id !== id) throw new Error('The saved article could not be read. Open it again when connected.');
-	// Copies an earlier version stored without being asked are not offline copies.
-	return value.offline ? value : undefined;
+	return value;
 }
 
 /** The readable record at `key`, or undefined; unknown or undecodable records stay exportable. */
@@ -54,22 +53,20 @@ function readableCopy(key: string, raw: unknown): Record<string, unknown> | unde
 	return isRecord(value) && isRecord(value.item) && typeof value.markdown === 'string' ? value : undefined;
 }
 
-/** Once this session is confirmed, removes the library caches earlier versions stored, readable
- * offline copies an earlier sign-in saved (session IDs change with the token and the folder
- * generation), and this session's copies an earlier version stored without being asked.
- * Queues, drafts and attempts are not copies. */
-export async function removeRetiredReadingRecords(session: ReadingSession): Promise<void> {
+/** Once this session is confirmed, removes readable offline copies an earlier sign-in saved
+ * (session IDs change with the token and the folder generation) and images whose copy is
+ * gone. Queues, drafts and attempts are not copies. */
+export async function removeEarlierSessionCopies(session: ReadingSession): Promise<void> {
 	const db = await readingDatabase(); assertReadingSession(session);
 	const tx = db.transaction('values', 'readwrite'), mine = readingKeys.articlePrefix(session.id);
 	try {
 		// `<session>:<id>` of each copy kept, and image keys, which go with their copy.
 		const copies: string[] = [], images: string[] = [];
 		for (const key of await tx.store.getAllKeys()) {
-			if (isRetiredReadingCacheKey(key)) { await tx.store.delete(key); continue; }
 			if (isArticleImageReadingKey(key)) { images.push(key.slice('article-image:'.length)); continue; }
 			if (!isArticleReadingKey(key)) continue;
 			const copy = readableCopy(key, await tx.store.get(key));
-			if (copy && (!key.startsWith(mine) || copy.offline !== true)) await tx.store.delete(key);
+			if (copy && !key.startsWith(mine)) await tx.store.delete(key);
 			else copies.push(key.slice('article:'.length));
 		}
 		for (const image of images) if (!copies.some(copy => image.startsWith(`${copy}:`))) await tx.store.delete(`article-image:${image}`);
@@ -89,7 +86,7 @@ export async function readOfflineReadingItems(session: ReadingSession): Promise<
 		if (!key.startsWith(prefix)) continue;
 		let article: unknown;
 		try { article = decodeReadingValue(key, await tx.store.get(key)); } catch { continue; }
-		if (isReadingArticleCache(article, readingNoteFolder(session)) && article.offline) items.push(article.item);
+		if (isReadingArticleCache(article, readingNoteFolder(session))) items.push(article.item);
 	}
 	await tx.done; assertReadingSession(session);
 	return items.sort((a, b) => b.saved_at.localeCompare(a.saved_at));
@@ -113,10 +110,10 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
 		if (previous !== undefined && !isReadingArticleCache(saved, readingNoteFolder(session))) {
 			throw new Error('The saved article needs recovery before replacing its offline copy.');
 		}
-		const copy = saved as ReadingArticleCache | undefined, replaced = copy?.offline ? copy : undefined;
+		const replaced = saved as ReadingArticleCache | undefined;
 		if (refresh && !replaced) { await tx.done; return false; }
 		const usedAt = replaced?.usedAt ?? Date.now();
-		await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt, offline: true, ...etag ? { etag } : {} }), key);
+		await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt, ...etag ? { etag } : {} }), key);
 		if (images) {
 			const prefix = imagePrefix(session, item.crate_reading_id);
 			for (const stored of await tx.store.getAllKeys()) if (stored.startsWith(prefix) && !images.keep.has(stored.slice(prefix.length))) await tx.store.delete(stored);

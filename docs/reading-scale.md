@@ -183,8 +183,6 @@ Both stopped:
 - A saved copy is checked when it is opened, with one conditional request, never in the
   background. It downloads again only when its note changed.
 - Removed: background prefetch (`src/pwa/reading/prefetch.ts`) and storing articles on open.
-  Copies an older version stored automatically, and its library caches, are deleted after the
-  next confirmed library load (`removeRetiredReadingRecords`); saved copies carry `offline: true`.
 - Unchanged: the pending-change queue, which keeps edits safe across reloads.
 
 This also removes the article reads and D1 rows each prefetch cost.

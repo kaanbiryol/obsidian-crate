@@ -54,7 +54,7 @@ function ReadingTagList({ tags, selected, onChange }: ReadingTagFilterProps) {
 				{matched.map(tag => <li key={tag.name}>
 					<Button className="crate-reading-tag-list__item" aria-pressed={tag.name === selected} onClick={() => onChange(tag.name === selected ? null : tag.name)}>
 						<span className="crate-reading-tag-list__name">#{tag.name}</span>
-						{tag.count !== undefined && <span className="crate-reading-tag-list__count" aria-label={`${tag.count} ${tag.count === 1 ? 'note' : 'notes'}`}>{tag.count}</span>}
+						<span className="crate-reading-tag-list__count" aria-label={`${tag.count} ${tag.count === 1 ? 'note' : 'notes'}`}>{tag.count}</span>
 						{tag.name === selected && <ThemeIcon id="check" size="s" aria-hidden="true" />}
 					</Button>
 				</li>)}
