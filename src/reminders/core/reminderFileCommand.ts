@@ -114,10 +114,9 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		if (action === 'delete') changes.set(path, deleteReminderBlockFromContent(content, current).content);
 		else if (action === 'set-completed') {
 			if (typeof body.completed !== 'boolean') throw new ReminderCommandError('Choose a completion state', 400, 'invalid_reminder_input');
-			// The client picks the time, so a resent request writes the same bytes. Completions
-			// queued before completion times existed carry none and are saved without one.
-			if (body.completed && body.completedAt !== undefined && !isCompletionInstant(body.completedAt)) throw new ReminderCommandError('Choose a valid completion time', 400, 'invalid_reminder_input');
-			changes.set(path, current.completed === body.completed ? content : setReminderCompletionInContent(content, current, body.completed, undefined, body.completed ? body.completedAt as string | undefined : undefined).content);
+			// The client picks the time, so a resent request writes the same bytes.
+			if (body.completed && !isCompletionInstant(body.completedAt)) throw new ReminderCommandError('Choose a valid completion time', 400, 'invalid_reminder_input');
+			changes.set(path, current.completed === body.completed ? content : setReminderCompletionInContent(content, current, body.completed, undefined, body.completed ? body.completedAt as string : undefined).content);
 		} else if (action === 'update') {
 			const update = buildReminderUpdate(parseReminderUpdateParams(body));
 			if (update.project && update.project !== current.project) {
