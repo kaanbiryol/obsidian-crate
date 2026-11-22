@@ -63,11 +63,13 @@ export function isQueueTerminalFailure(status: number | undefined, code?: string
 }
 
 /** Upload and restore journals: the server refused the conditional write, or the operation is
- * older than its retry window, so it can never commit under this ID and its journal entry is
- * settled. The baseline is unchanged: the next sync compares the local file with the server. */
+ * older than its retry window, or the file is now over the server's limit, so it can never commit
+ * under this ID and its journal entry is settled. The baseline is unchanged: the next sync
+ * compares the local file with the server, or reports it as too large. */
 export function isRefusedWrite(status: number | undefined, code?: string): boolean {
 	return status === 409 && (code === 'version_conflict' || code === 'namespace_conflict')
-		|| status === 410 && code === 'operation_expired';
+		|| status === 410 && code === 'operation_expired'
+		|| status === 413 && code === 'file_too_large';
 }
 
 /** Upload preparation: only a stale precondition lets one undispatched file reconcile apart

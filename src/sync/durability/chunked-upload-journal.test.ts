@@ -4,6 +4,7 @@ import { LocalManifest } from '../manifest/manifest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/test/factories/sync-vault';
 import { sha256Hex } from '@/platform/sha256';
 import type { UploadResult } from '@/protocol/sync-types';
+import { HttpError } from '../worker-api/http';
 
 const directory = `${TEST_PLUGIN_DIR}/pending-uploads`;
 const bytes = new TextEncoder().encode('large attachment bytes').buffer;
@@ -83,4 +84,28 @@ it('retries an unconfirmed chunked upload from its saved bytes under the same op
 	expect(manifest.uploadJournal.pending()).toEqual([]);
 	expect(manifest.getEntry(file.path)).toMatchObject({ hash: file.hash, revision: `__crate__/files/${file.hash}/00000000-0000-4000-8000-000000000000` });
 	expect(transport.uploadFile).not.toHaveBeenCalled();
+});
+
+it('settles a pending chunked upload once the server refuses the file as too large', async () => {
+	const { create, file } = await fixture();
+	const manifest = create();
+	await manifest.load();
+	let refuse = false;
+	const transport = {
+		assertPreparedUpload: async () => {},
+		getServerInfo: async () => ({ reminderOperationDay: 20000 }),
+		batchUpload: vi.fn(),
+		uploadFile: vi.fn(),
+		uploadChunked: vi.fn(async (): Promise<UploadResult> => {
+			// The server's limit was lowered after the first attempt.
+			if (refuse) throw new HttpError('File exceeds the server file limit', 413, null, 'file_too_large');
+			throw new Error('Connection lost');
+		}),
+	};
+	const uploads = new DurableUploads(manifest, transport, { putBase: vi.fn(), readBase: vi.fn() } as never, '33333333-3333-4333-8333-333333333333');
+	await expect(uploads.chunked(file, bytes)).rejects.toThrow('Connection lost');
+	refuse = true;
+	await uploads.recover();
+	expect(manifest.uploadJournal.pending()).toEqual([]);
+	expect(manifest.getEntry(file.path)).toBeUndefined();
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileFailure, isQueueTerminalFailure, isVersionConflict, isVersionConflictError, refusedUploadResult, uploadResultError } from './failures';
+import { fileFailure, isQueueTerminalFailure, isRefusedWrite, isVersionConflict, isVersionConflictError, refusedUploadResult, uploadResultError } from './failures';
 import { HttpError } from './worker-api/http';
 
 describe('sync failure classification', () => {
@@ -58,5 +58,11 @@ describe('sync failure classification', () => {
 		expect(error).toMatchObject({ message: 'Taken', status: 409, code: 'namespace_conflict' });
 		// A receipt without a status is treated as a transient server failure.
 		expect(uploadResultError({ success: false, path: 'a.md' })).toMatchObject({ message: 'Upload failed', status: 503 });
+	});
+	it('settles journal entries for writes that can never commit under their ID', () => {
+		expect(isRefusedWrite(413, 'file_too_large')).toBe(true);
+		expect(isRefusedWrite(410, 'operation_expired')).toBe(true);
+		expect(isRefusedWrite(413, undefined)).toBe(false);
+		expect(isRefusedWrite(503, undefined)).toBe(false);
 	});
 });
