@@ -57,6 +57,23 @@ test('reinstalls the previous release when the new one rejects the data', async 
 	assert.deepEqual(calls, ['stop', 'backup /backups/before-update-1.1.0-20261121T100000Z', 'install 1.1.0', 'install 1.0.0', 'start']);
 });
 
+test('restarts the service and names the backup when reinstalling the previous release fails', async () => {
+	const { calls, fake } = steps({ install: async version => { calls.push(`install ${version}`); throw new Error('npm ERR! network ETIMEDOUT'); } });
+	await assert.rejects(updateGlobalInstall(options, fake), /could not be reinstalled[^]*backup is at \/backups\/before-update-1.1.0-20261121T100000Z/);
+	assert.deepEqual(calls.slice(-3), ['install 1.1.0', 'install 1.0.0', 'start']);
+});
+
+test('keeps the new release when a migration fails after it started', async () => {
+	const { calls, fake } = steps({ crate: async args => {
+		calls.push(args.slice(0, 2).join(' '));
+		if (args[0] === 'upgrade') throw new Error('Migration step failed');
+		return JSON.stringify({ requiresMigration: true });
+	} });
+	await assert.rejects(updateGlobalInstall(options, fake), /could not finish migrating[^]*upgrade --output[^]*restore \/backups\/before-update/);
+	assert.ok(!calls.includes('install 1.0.0'));
+	assert.ok(!calls.includes('start'));
+});
+
 test('leaves the server as it was when the backup fails', async () => {
 	const { calls, fake } = steps({ backup: async () => { throw new Error('Not enough space'); } });
 	await assert.rejects(updateGlobalInstall(options, fake), /nothing changed: Not enough space/);

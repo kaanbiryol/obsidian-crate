@@ -68,14 +68,22 @@ export async function updateGlobalInstall({ dataDir, current, backupRoot, now = 
 		const check = JSON.parse(await steps.crate(['check-upgrade', '--json', '--data-dir', dataDir]));
 		if (check.requiresMigration) {
 			steps.log('Migrating the database; the upgrade makes its own verified backup first.');
-			await steps.crate(['upgrade', '--output', join(backupRoot, `before-migration-${latest}-${stamp}`), '--data-dir', dataDir]);
+			// Once the migration starts, the data may already be past what the old release reads.
 			migrated = true;
+			await steps.crate(['upgrade', '--output', join(backupRoot, `before-migration-${latest}-${stamp}`), '--data-dir', dataDir]);
 		}
 	} catch (error) {
+		if (migrated) throw new Error(`Crate ${latest} could not finish migrating your data: ${error.message}\nRun crate-server upgrade --output <new backup directory> to resume with Crate ${latest}, or restore ${backup} into an empty directory with the restore command of Crate ${current}.`);
 		steps.log(`Update failed: ${error.message}\nReinstalling Crate ${current}.`);
-		await steps.install(current);
-		if (wasRunning) await steps.start();
-		throw new Error(`Crate stayed at ${current} and your data is unchanged. The backup is at ${backup}.`);
+		const reinstalled = await steps.install(current).then(() => true, reinstallError => {
+			steps.log(`Could not reinstall Crate ${current}: ${reinstallError.message}`);
+			return false;
+		});
+		// npm keeps the previous install when an install fails, so the service can still start.
+		if (wasRunning) await steps.start().catch(startError => steps.log(`Could not restart Crate: ${startError.message}`));
+		throw new Error(reinstalled
+			? `Crate stayed at ${current} and your data is unchanged. The backup is at ${backup}.`
+			: `Your data is unchanged, but Crate ${current} could not be reinstalled. Run npm install -g ${PACKAGE_NAME}@${current}. The backup is at ${backup}.`);
 	}
 	if (!wasRunning) { steps.log(`Crate ${latest} is installed. Start it with crate-server start.`); return 'updated'; }
 	await steps.start();
