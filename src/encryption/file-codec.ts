@@ -20,10 +20,6 @@ export interface FileEncryptionAuthority {
 	key: EncryptionKey;
 }
 
-async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-	return sha256Hex(bytes);
-}
-
 function context(descriptor: EncryptedFileDescriptor, purpose: EncryptionContext['purpose']): EncryptionContext {
 	return { vaultId: descriptor.vaultId, scopeId: descriptor.scopeId, objectId: descriptor.objectId, purpose };
 }
@@ -56,15 +52,15 @@ type SealedFile = { bytes: Uint8Array<ArrayBuffer>; descriptor: EncryptedFileDes
 /** Persist these exact returned bytes before dispatching a mutating request. */
 export async function sealFile(input: FileInput, authority: FileEncryptionAuthority): Promise<SealedFile> {
 	const key = authority.key, publicData = input.publicData ?? null;
-	const metadata: PrivateFileMetadata = { version: 1, path: input.path, hash: await digest(input.content),
-		size: input.content.byteLength, publicDataHash: await digest(new TextEncoder().encode(JSON.stringify(publicData))) };
+	const metadata: PrivateFileMetadata = { version: 1, path: input.path, hash: await sha256Hex(input.content),
+		size: input.content.byteLength, publicDataHash: await sha256Hex(new TextEncoder().encode(JSON.stringify(publicData))) };
 	validateMetadata(metadata);
 	const descriptor: EncryptedFileDescriptor = { version: 1, vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: crypto.randomUUID(), keyId: key.id, metadata: '' };
 	descriptor.metadata = await sealFileMetadata(metadata, key, descriptor);
 	// Callers apply the server's and the device's limit before sealing.
 	const ciphertext = await encryptBytes(input.content, key, context(descriptor, 'file'), MAX_BUFFERED_FILE_BYTES);
 	const bytes = encodeEncryptedFile({ descriptor, ciphertext, publicData }, MAX_BUFFERED_ENCRYPTED_FILE_BYTES);
-	return { bytes, descriptor, metadata, hash: await digest(bytes) };
+	return { bytes, descriptor, metadata, hash: await sha256Hex(bytes) };
 }
 
 /** The returned metadata carries the plaintext path the binding accepted. */
@@ -89,10 +85,10 @@ export async function openFile(bytes: Uint8Array<ArrayBuffer>, binding: PathBind
 }> {
 	const packet = parseEncryptedFile(bytes, MAX_BUFFERED_ENCRYPTED_FILE_BYTES);
 	const { metadata, key } = await openMetadataWithKey(packet.descriptor, binding, authority);
-	if (await digest(new TextEncoder().encode(JSON.stringify(packet.publicData))) !== metadata.publicDataHash) {
+	if (await sha256Hex(new TextEncoder().encode(JSON.stringify(packet.publicData))) !== metadata.publicDataHash) {
 		throw new Error('Encrypted file scheduling metadata failed authentication');
 	}
 	const content = await decryptBytes(packet.ciphertext, key, context(packet.descriptor, 'file'), MAX_BUFFERED_FILE_BYTES);
-	if (content.byteLength !== metadata.size || await digest(content) !== metadata.hash) throw new Error('Encrypted file failed content verification');
+	if (content.byteLength !== metadata.size || await sha256Hex(content) !== metadata.hash) throw new Error('Encrypted file failed content verification');
 	return { content, metadata, publicData: packet.publicData };
 }
