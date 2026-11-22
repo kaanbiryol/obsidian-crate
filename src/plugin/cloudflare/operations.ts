@@ -18,6 +18,7 @@ import { offerFeatureChoice } from '../feature-settings';
 import { ensureServerSetup } from '../server-setup';
 import { startVaultReplacement } from '../sync-integration';
 import { readServerEncryption } from '../../sync/encryption/server-encryption';
+import { DeviceKeyPairingModal } from '../../ui/settings/device-key-pairing-modal';
 import { WorkerApiHttpClient } from '../../sync/worker-api/http';
 import { generateSecureToken, hashToken } from '../device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../device-identity';
@@ -237,7 +238,7 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 	const { plugin, signal, isReconnect, originalWorkerUrl, originalToken, presentation } = operation;
 	presentation.connecting();
 	let connection: ConnectionTestResult;
-	let replacing = false;
+	let replacing = false, locked = false;
 	try {
 		assertDeviceConnectionUnchanged(operation);
 		const token = deviceToken ?? existingToken;
@@ -260,7 +261,8 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 		} else {
 			connection = await configureCloudflareAuthorizedDevice(plugin, workerUrl, token);
 		}
-		replacing = connection.success && !isReconnect && plugin.settings.replaceVault && !await isEncryptedServer(workerUrl, token, signal);
+		locked = connection.success && !isReconnect && await isEncryptedServer(workerUrl, token, signal);
+		replacing = connection.success && !isReconnect && plugin.settings.replaceVault && !locked;
 	} catch (error) {
 		if (signal.aborted) return;
 		plugin.refreshSettingsTab();
@@ -270,8 +272,12 @@ async function connectDevice(operation: CloudflareOperation, workerUrl: string, 
 	if (signal.aborted) return;
 
 	plugin.refreshSettingsTab();
-	presentation.connected(connection, replacing);
-	if (connection.success && !isReconnect) {
+	presentation.connected(connection, replacing, locked);
+	if (locked) {
+		// Like a pairing link: the key approval offers the feature choice once this device is unlocked.
+		new DeviceKeyPairingModal(plugin).open();
+		void ensureServerSetup(plugin);
+	} else if (connection.success && !isReconnect) {
 		// Choose features first, so the replacement syncs the chosen folders.
 		// The server side of setup runs even when every feature was already confirmed here.
 		void offerFeatureChoice(plugin).finally(() => {

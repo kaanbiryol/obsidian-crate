@@ -16,6 +16,7 @@ const offerFeatureChoice = vi.fn(async () => {});
 const ensureServerSetup = vi.fn(async () => []);
 const startVaultReplacement = vi.fn(() => true);
 const readServerEncryption = vi.fn(async (): Promise<unknown> => null);
+const keyPairingOpen = vi.fn();
 
 const progress = {
 	dismiss: vi.fn(),
@@ -35,6 +36,7 @@ async function loadPluginIntegration() {
 	vi.doMock('../server-setup', () => ({ ensureServerSetup }));
 	vi.doMock('../sync-integration', () => ({ startVaultReplacement }));
 	vi.doMock('../../sync/encryption/server-encryption', () => ({ readServerEncryption }));
+	vi.doMock('../../ui/settings/device-key-pairing-modal', () => ({ DeviceKeyPairingModal: class { open = keyPairingOpen; } }));
 	vi.doMock('../device-token', () => ({ generateSecureToken, hashToken }));
 	vi.doMock('../device-identity', () => ({
 		getCurrentDeviceName: vi.fn(() => 'Test device'),
@@ -142,26 +144,32 @@ describe('handleCloudflareOAuthProtocol', () => {
 		await vi.waitFor(() => expect(ensureServerSetup).toHaveBeenCalledExactlyOnceWith(plugin));
 	});
 
-	it.each([
-		['starts a confirmed replacement after the feature choice', null, true],
-		['waits for keys before replacing an encrypted vault', { mode: 'active' }, false],
-	] as const)('%s', async (_label, encryption, starts) => {
+	it('starts a confirmed replacement after the feature choice', async () => {
 		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
-		readServerEncryption.mockResolvedValueOnce(encryption);
+		readServerEncryption.mockResolvedValueOnce(null);
 		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
 		const plugin = createPlugin();
 		Object.assign(plugin.settings, { replaceVault: true });
 		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
 		await vi.waitFor(() => expect(offerFeatureChoice).toHaveBeenCalledOnce());
 		await Promise.resolve();
-		if (starts) {
-			expect(startVaultReplacement).toHaveBeenCalledExactlyOnceWith(plugin);
-			expect(offerFeatureChoice.mock.invocationCallOrder[0]).toBeLessThan(startVaultReplacement.mock.invocationCallOrder[0]!);
-			expect(progress.succeed).toHaveBeenCalledWith('Crate is connected', expect.stringContaining('replacing this vault'));
-		} else {
-			expect(startVaultReplacement).not.toHaveBeenCalled();
-			expect(progress.succeed).toHaveBeenCalledWith('Crate is connected', expect.stringContaining('Sync now'));
-		}
+		expect(startVaultReplacement).toHaveBeenCalledExactlyOnceWith(plugin);
+		expect(offerFeatureChoice.mock.invocationCallOrder[0]).toBeLessThan(startVaultReplacement.mock.invocationCallOrder[0]!);
+		expect(progress.succeed).toHaveBeenCalledWith('Crate is connected', expect.stringContaining('replacing this vault'));
+	});
+
+	it.each([true, false])('asks for keys instead of syncing an encrypted vault (replace %s)', async replaceVault => {
+		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
+		readServerEncryption.mockResolvedValueOnce({ mode: 'active' });
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const plugin = createPlugin();
+		Object.assign(plugin.settings, { replaceVault });
+		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		await vi.waitFor(() => expect(keyPairingOpen).toHaveBeenCalledOnce());
+		expect(startVaultReplacement).not.toHaveBeenCalled();
+		// The key approval offers the feature choice after unlocking.
+		expect(offerFeatureChoice).not.toHaveBeenCalled();
+		expect(progress.succeed).toHaveBeenCalledWith('Crate is connected', expect.stringContaining('unlock it on this device'));
 	});
 
 	it('passes the settings document to the OAuth dialog without waiting for animation frames', async () => {
