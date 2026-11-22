@@ -112,3 +112,24 @@ it('pauses the bulk source scan until the next UTC day once today\'s write budge
 	await runBoundedNotificationCoordinator(state, {} as never);
 	expect(vi.mocked(runNotificationCoordinator).mock.calls[1]![2]).toEqual({ sourceScanPausedUntil: undefined });
 });
+
+it('keeps resuming a source scan that needs several daily write budgets', async () => {
+	const flags = globalThis as { __CRATE_SELF_HOSTED__?: boolean };
+	flags.__CRATE_SELF_HOSTED__ = false;
+	vi.useFakeTimers({ now: Date.UTC(2026, 10, 10, 10) });
+	onTestFinished(() => { flags.__CRATE_SELF_HOSTED__ = true; vi.useRealTimers(); });
+	const { state, values, storage } = fixture();
+	await armNotificationCoordinator(state);
+	const spendToday = () => values.set('notificationDailyWrites', { day: Math.floor(Date.now() / 86_400_000), rowsWritten: SOURCE_SCAN_DAILY_WRITE_BUDGET });
+	spendToday();
+	await runBoundedNotificationCoordinator(state, {} as never);
+	vi.setSystemTime(Date.UTC(2026, 10, 11, 0, 5));
+	spendToday();
+	await runBoundedNotificationCoordinator(state, {} as never);
+	// Two days into the scan, the next day's pass still runs instead of ending the episode.
+	vi.setSystemTime(Date.UTC(2026, 10, 12, 0, 5));
+	await runBoundedNotificationCoordinator(state, {} as never);
+	expect(runNotificationCoordinator).toHaveBeenCalledTimes(3);
+	expect(vi.mocked(runNotificationCoordinator).mock.calls[2]![2]).toEqual({ sourceScanPausedUntil: undefined });
+	expect(storage.deleteAlarm).not.toHaveBeenCalled();
+});

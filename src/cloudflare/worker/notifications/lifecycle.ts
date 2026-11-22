@@ -73,6 +73,13 @@ export async function runBoundedNotificationCoordinator(state: DurableObjectStat
 	const spent = await state.storage.get<{ day: number; rowsWritten: number }>(DAILY_WRITES_KEY);
 	const written = spent?.day === day ? spent.rowsWritten : 0;
 	const sourceScanPausedUntil = !__CRATE_SELF_HOSTED__ && written >= SOURCE_SCAN_DAILY_WRITE_BUDGET ? nextD1DailyReset() : undefined;
+	if (sourceScanPausedUntil !== undefined && episode.stored.startedAt < sourceScanPausedUntil) {
+		// Waiting for tomorrow's budget is not processing time: like the D1 daily limit, the
+		// episode restarts at the reset, so a scan that needs several days is never abandoned.
+		episode.stored = { startedAt: sourceScanPausedUntil, passes: 0, failures: 0 };
+		episode.passes = 0;
+		await state.storage.put<NotificationRun>(RUN_KEY, episode.stored);
+	}
 	const meter = meterD1Usage(env.DB);
 	try {
 		const scheduled = await runNotificationCoordinator(state, { ...env, DB: meter.db }, { sourceScanPausedUntil });
