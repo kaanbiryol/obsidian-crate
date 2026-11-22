@@ -15,7 +15,7 @@ describe('authoritative read contracts', () => {
 		expect(() => parseManifestPage({ ...page, files })).toThrow();
 		expect(() => parseFileMetadata({ files }, ['good.md', 'bad.md'])).toThrow();
 	});
-	it.each([{ version: 2 }, { lastSeq: -1 }, { snapshotSeq: 2 }, { hasMore: true }, { truncated: true }, { nextCursor: 'note.md' }])('rejects incompatible or incomplete manifest framing %j', patch => {
+	it.each([{ version: 2 }, { lastSeq: -1 }, { snapshotSeq: 2 }, { hasMore: true }, { nextCursor: 'note.md' }])('rejects incompatible or incomplete manifest framing %j', patch => {
 		expect(() => parseManifestPage({ ...page, ...patch })).toThrow();
 	});
 	it('accepts a valid empty manifest and refuses unsolicited targeted records', () => {

@@ -17,9 +17,7 @@ export class ServerBehindError extends Error {
 
 export function parseManifestPage(value: unknown): FileManifest & { lastSeq: number; snapshotSeq: number; hasMore: boolean } {
 	if (!isRecord(value) || value.version !== 1 || !isSyncSequence(value.lastSeq) || !isSyncSequence(value.snapshotSeq)
-		|| typeof value.hasMore !== 'boolean' || !optionalBoolean(value.truncated)
-		|| value.snapshotSeq > value.lastSeq) return invalid();
-	if (value.truncated) throw new Error('Remote manifest is too large to sync safely');
+		|| typeof value.hasMore !== 'boolean' || value.snapshotSeq > value.lastSeq) return invalid();
 	const files = parseSyncFiles(value.files);
 	if (value.hasMore && (!isSyncPath(value.nextCursor) || !Object.prototype.hasOwnProperty.call(files, value.nextCursor))) return invalid();
 	if (!value.hasMore && value.nextCursor !== undefined) return invalid();

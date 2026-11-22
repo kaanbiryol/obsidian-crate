@@ -2,7 +2,6 @@ export interface FileManifest {
 	version: number;
 	files: Record<string, FileEntry>;
 	lastSeq?: number;
-	truncated?: boolean;
 	hasMore?: boolean;
 	nextCursor?: string;
 	snapshotSeq?: number;

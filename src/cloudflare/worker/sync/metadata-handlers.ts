@@ -83,7 +83,6 @@ export async function handleGetManifest(request: Request, db: D1Database): Promi
 	const lastSeq = seqRows[0]?.lastSeq ?? 0;
 	const snapshotSeq = requestedSnapshotSeq ?? lastSeq;
 	const nextCursor = hasMore ? rows.at(-1)?.path : undefined;
-	const paginatedRequest = url.searchParams.has('limit') || url.searchParams.has('after');
 
 	return corsResponse({
 		version: 1,
@@ -92,7 +91,6 @@ export async function handleGetManifest(request: Request, db: D1Database): Promi
 		snapshotSeq,
 		hasMore,
 		...(nextCursor && { nextCursor }),
-		...(!paginatedRequest && hasMore && { truncated: true }),
 	});
 }
 

@@ -342,10 +342,6 @@ describe('worker entrypoint', () => {
 			new Request('https://worker.test/notifications/app.js?v=stale'),
 			createEnv(),
 		);
-		const versionedIconResponse = await worker.fetch(
-			new Request(`https://worker.test/notifications/icon.svg?v=${PWA_ASSET_VERSION}`),
-			createEnv(),
-		);
 		const versionedCrateIconResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/crate-icon-512.png?v=${PWA_ASSET_VERSION}`),
 			createEnv(),
@@ -358,7 +354,6 @@ describe('worker entrypoint', () => {
 		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(unversionedAppResponse.headers.get('Cache-Control')).toBe('no-store');
 		expect(staleVersionAppResponse.headers.get('Cache-Control')).toBe('no-store');
-		expect(versionedIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedCrateIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedCrateIconResponse.headers.get('Content-Type')).toBe('image/png');
 		expect(versionedTouchIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
@@ -369,7 +364,7 @@ describe('worker entrypoint', () => {
 		// A service worker install verifies this, since a server still on the previous
 		// version answers any `?v=` while a deploy propagates.
 		const paths = ['/notifications', '/notifications/app.js?v=older', '/notifications/manifest.json?v=older',
-			'/notifications/crate-icon-192.png?v=older', '/notifications/icon.svg?v=older'];
+			'/notifications/crate-icon-192.png?v=older'];
 		for (const path of paths) {
 			const response = await worker.fetch(new Request(`https://worker.test${path}`), createEnv());
 			expect(response.headers.get(PWA_ASSET_VERSION_HEADER), path).toBe(PWA_ASSET_VERSION);

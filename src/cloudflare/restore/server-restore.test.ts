@@ -287,7 +287,7 @@ it('rejects oversized rows before creating resources and does not round unsafe i
 });
 
 
-it('preserves queued schema-2 captures and their policy across a restore', async () => {
+it('preserves queued captures and their policy across a restore', async () => {
 	const f = await fixture();
 	await f.rewriteSQL(sql => sql + `INSERT INTO "reading_captures" ("id","generation","url_identity","note","attempts","available_at") VALUES ('pending','generation','https://example.com/article','queued note',2,123456789);`);
 	await f.run();

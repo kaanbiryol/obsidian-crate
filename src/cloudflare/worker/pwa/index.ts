@@ -2,7 +2,6 @@ import { PWA_CLIENT_ASSETS, PWA_CLIENT_JS } from './client-bundle';
 import { PWA_ASSET_VERSION } from '../../../pwa/shell/version';
 
 export { createPwaHtml } from './html';
-export { ICON_SVG } from './icons';
 export {
 	APPLE_TOUCH_ICON_180_PNG,
 	CRATE_ICON_192_PNG,

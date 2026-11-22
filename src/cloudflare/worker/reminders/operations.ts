@@ -13,9 +13,9 @@ function expiredReminderOperation(): Response {
 export interface ReminderOperation { id: string; requestHash: string; day: number }
 /** `arm` runs once the request is known to be a new command, before it can commit. */
 export async function beginReminderOperation(db: D1Database, body: Record<string, unknown>, action: string, arm?: () => Promise<void>): Promise<ReminderOperation | Response> {
-	if (!isReminderOperationId(body.operationId)) return corsResponse({ error: 'A stable operationId is required. Reload Crate before saving.' }, 428);
+	const day = isReminderOperationId(body.operationId) ? reminderOperationDay(body.operationId) : null;
+	if (!isReminderOperationId(body.operationId) || day === null) return corsResponse({ error: 'A stable operationId is required. Reload Crate before saving.' }, 428);
 	const requestHash = await reminderRequestHash(action, body);
-	const day = reminderOperationDay(body.operationId);
 	// One read: a saved receipt is replayed even after its day leaves the retry window.
 	const row = await db.prepare(`SELECT r.request_hash, r.response_json, (SELECT 1 WHERE ${OPERATION_VALID}) AS retryable
     FROM (SELECT 1) LEFT JOIN operations r ON r.kind = 'reminder' AND r.operation_id = ?`).bind(day, day, body.operationId)
@@ -26,7 +26,7 @@ export async function beginReminderOperation(db: D1Database, body: Record<string
 		}
 		return corsResponse(await readEncryptedReceipt(db, 'reminder', body.operationId, row.response_json));
 	}
-	if (day === null || !row?.retryable) return expiredReminderOperation();
+	if (!row?.retryable) return expiredReminderOperation();
 	await arm?.();
 	return { id: body.operationId, requestHash, day };
 }

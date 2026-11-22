@@ -4,7 +4,6 @@ import {
 	CRATE_ICON_192_PNG,
 	CRATE_ICON_512_PNG,
 	CRATE_MARK_256_PNG,
-	ICON_SVG,
 	OPEN_OBSIDIAN_HTML,
 	OPEN_OBSIDIAN_JS,
 	PAIR_DEVICE_HTML,
@@ -153,16 +152,6 @@ export function handlePairDevice(): Response {
 
 export function handlePairDeviceScript(request: Request): Response {
 	return javascriptAssetResponse(request, PAIR_DEVICE_JS);
-}
-
-export function handleIcon(request: Request): Response {
-	return new Response(ICON_SVG, {
-		headers: {
-			'Content-Type': 'image/svg+xml',
-			...versionedAssetHeaders(request),
-			...corsHeaders(),
-		},
-	});
 }
 
 function pngAssetResponse(request: Request, asset: Uint8Array<ArrayBuffer>): Response {

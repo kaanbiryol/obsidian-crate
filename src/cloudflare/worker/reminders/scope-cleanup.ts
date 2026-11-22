@@ -1,4 +1,5 @@
-/** Retire legacy whole-vault indexes without reading any note content. */
+/** Retire source rows outside the reminders folder, as after a folder change or with no
+ * folder, without reading any note content. */
 export async function retireOutOfScopeSources(db: D1Database, folder: string | null): Promise<boolean> {
 	const predicate = (column: string) => folder === null ? '1' : `${column} < ? OR ${column} >= ?`;
 	const rows = await db.prepare(`SELECT DISTINCT file_path FROM (

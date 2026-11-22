@@ -29,8 +29,7 @@ export function parseCheckpoint(value: unknown): ManifestCheckpoint {
 		throw new Error('Unsupported manifest checkpoint. Preserve this vault and its metadata; use a compatible Crate version.');
 	}
 	if (!isSyncSequence(value.generation) || (value.lastSeq !== undefined && !isSyncSequence(value.lastSeq))
-		|| (value.authority !== undefined && (typeof value.authority !== 'string' || !value.authority))
-		|| (value.truncated !== undefined && value.truncated !== false)) throw new Error('Invalid manifest checkpoint. Preserve this vault and its metadata before recovering sync.');
+		|| (value.authority !== undefined && (typeof value.authority !== 'string' || !value.authority))) throw new Error('Invalid manifest checkpoint. Preserve this vault and its metadata before recovering sync.');
 	const settled = value.settledUploads ?? [];
 	if (!Array.isArray(settled) || !settled.every((id: unknown): id is string => typeof id === 'string' && reminderOperationDay(id) !== null)
 		|| new Set(settled).size !== settled.length) throw new Error('Invalid upload receipt checkpoint');
@@ -74,8 +73,7 @@ export function sameCheckpointRecoveryState(left: ManifestCheckpoint, right: Man
 
 function parseLocalManifest(value: unknown): FileManifest {
 	if (!isRecord(value) || value.version !== CHECKPOINT_VERSION
-		|| (value.lastSeq !== undefined && !isSyncSequence(value.lastSeq))
-		|| (value.truncated !== undefined && value.truncated !== false)) throw new Error('Invalid manifest checkpoint');
+		|| (value.lastSeq !== undefined && !isSyncSequence(value.lastSeq))) throw new Error('Invalid manifest checkpoint');
 	return { version: 1, files: parseSyncFiles(value.files, true),
 		...(value.lastSeq === undefined ? {} : { lastSeq: value.lastSeq }) };
 }

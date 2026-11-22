@@ -62,11 +62,11 @@ it('reports a reminder failure without acknowledging setup or deleting uploaded 
 	expect(await env.DB.prepare("SELECT 1 FROM files WHERE portable_path = 'reminders/duplicate.md'").first()).not.toBeNull();
 });
 
-it.each(['old 100% details', 'line one\nline two %20 café 😀'])('completes initial sync with legacy description metadata: %s', async description => {
+it.each(['old 100% details', 'line one\nline two %20 café 😀'])('completes initial sync with literal description metadata: %s', async description => {
 	vi.spyOn(console, 'info').mockImplementation(() => {});
-	const device = new SyncTestDevice('legacy-description-import', env); clients.push(device);
+	const device = new SyncTestDevice('literal-description-import', env); clients.push(device);
 	await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
-	const path = 'Reminders/legacy.md';
+	const path = 'Reminders/literal.md';
 	const content = `${note('2099-01-01T12:00:00.000Z')}\n<!-- crate-desc:${description} -->\n`;
 	device.disk.write(path, content);
 	device.disk.write('note.md', 'ordinary note');

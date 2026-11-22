@@ -442,7 +442,7 @@ The plugin stores these local values through `SecretStorageService` (`sync/secre
 | `crate-encryption-reset` | Progress of an unfinished encryption reset | Yes |
 | `crate-encryption-recovery` | This device's copy of the recovery key, which settings can copy again | Yes |
 | `crate-device-id` | Local device identity, kept out of vault-synced settings | No |
-| `crate-usage-oauth-<account>` | Saved Cloudflare login for one account (`cloudflare/oauth/saved-login.ts`) | No |
+| `crate-cloudflare-login-<account>` | Saved Cloudflare login for one account (`cloudflare/oauth/saved-login.ts`) | No |
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes an empty string to delete a value and treats empty strings as null on read.
 

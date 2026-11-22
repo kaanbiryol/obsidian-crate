@@ -41,7 +41,7 @@ async function deliver() {
 	await env.DB.prepare('UPDATE reminder_projections SET due_at = ? WHERE due_at IS NOT NULL').bind(Date.now()).run();
 	await deliverDueReminders(env);
 }
-async function legacy(content?: (valid: string) => string) {
+async function olderParser(content?: (valid: string) => string) {
 	const due = new Date(Date.now() + 60_000).toISOString();
 	const valid = note(due);
 	const published = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, valid, null);
@@ -61,8 +61,8 @@ async function legacy(content?: (valid: string) => string) {
 }
 
 it('blocks old queued and installed ghost schedules, then conclusively cancels them without changing bytes', async () => {
-	const h = await legacy(text => `\`\`\`markdown\n${text}\n\`\`\``);
-	await env.DB.prepare('DELETE FROM reminder_source_state').run(); // Schema-3 deployments have no authority rows.
+	const h = await olderParser(text => `\`\`\`markdown\n${text}\n\`\`\``);
+	await env.DB.prepare('DELETE FROM reminder_source_state').run(); // A source without its state row has no delivery authority.
 	await deliver();
 	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
 	expect(await revalidateReminderSources(env, 3)).toBe(false);
@@ -77,7 +77,7 @@ it('blocks old queued and installed ghost schedules, then conclusively cancels t
 });
 
 it('preserves first observation and resumes a genuine occurrence delayed across its deadline', async () => {
-	const h = await legacy();
+	const h = await olderParser();
 	const observed = await env.DB.prepare('SELECT first_seen_at FROM reminder_occurrences').first();
 	vi.spyOn(Date, 'now').mockReturnValue(Date.parse(h.due) + 60_000);
 	await deliver();
@@ -91,7 +91,7 @@ it('preserves first observation and resumes a genuine occurrence delayed across 
 });
 
 it('rediscovers CRLF tasks omitted by the previous parser without rewriting their source', async () => {
-	const h = await legacy(text => `${text}\r\n`);
+	const h = await olderParser(text => `${text}\r\n`);
 	await env.DB.prepare('DELETE FROM reminder_sources').run();
 	await revalidateReminderSources(env, 3);
 	await drainNotificationProjections(env);
@@ -102,9 +102,9 @@ it('rediscovers CRLF tasks omitted by the previous parser without rewriting thei
 	expect(await command()).toMatchObject(scheduled);
 });
 
-it('revalidates previously quarantined legacy descriptions without reuploading or changing file bytes', async () => {
+it('revalidates previously quarantined literal descriptions without reuploading or changing file bytes', async () => {
 	const description = '100% complete\nkeep %20 literally';
-	const h = await legacy(text => `${text}\n<!-- crate-desc:${description} -->\n`);
+	const h = await olderParser(text => `${text}\n<!-- crate-desc:${description} -->\n`);
 	await env.DB.batch([
 		env.DB.prepare('UPDATE reminder_source_state SET verified = 0'),
 		env.DB.prepare("UPDATE notification_projection_jobs SET last_error = 'Unsupported reminder description encoding'"),
@@ -124,8 +124,8 @@ it('revalidates previously quarantined legacy descriptions without reuploading o
 	expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(1);
 });
 
-it('quarantines uncertain legacy metadata and permits repair without deriving cancellations', async () => {
-	const h = await legacy(text => `${text}\n<!-- crate-desc:v1:%invalid -->`);
+it('quarantines uncertain description metadata and permits repair without deriving cancellations', async () => {
+	const h = await olderParser(text => `${text}\n<!-- crate-desc:v1:%invalid -->`);
 	const prior = await command();
 	await revalidateReminderSources(env, 3);
 	await drainNotificationProjections(env);
@@ -158,7 +158,7 @@ it('bounds R2 reparsing to 2 MiB and resumes source migration in later invocatio
 });
 
 it('does not publish a parsed older revision over a concurrent new file commit', async () => {
-	const h = await legacy();
+	const h = await olderParser();
 	const get = env.BUCKET.get.bind(env.BUCKET);
 	const replacement = h.valid.replace('Scheduled', 'Edited while migrating');
 	vi.spyOn(env.BUCKET, 'get').mockImplementationOnce(async (...args) => {
@@ -199,7 +199,7 @@ it('initializes source verification and waits for a selected folder before disco
 });
 
 it('retains genuine duplicate quarantine while an older parser source is revalidated', async () => {
-	const h = await legacy();
+	const h = await olderParser();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Copy.md', h.valid, null);
 	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0').run();
 	await revalidateReminderSources(env, 3);
@@ -267,7 +267,7 @@ it('bounds each migration, projection and dispatch invocation and resumes every 
 });
 
 it('quarantines previously indexed invalid UTF-8 without changing source bytes or sending its old alarm', async () => {
-	const h = await legacy();
+	const h = await olderParser();
 	const encoded = new TextEncoder().encode(h.valid);
 	const bytes = new Uint8Array([...encoded, 0xff]);
 	await env.BUCKET.put(h.file.storageKey, bytes);

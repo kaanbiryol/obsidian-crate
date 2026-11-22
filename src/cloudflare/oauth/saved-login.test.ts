@@ -38,7 +38,7 @@ it('renews only on refresh and persists a rotated refresh token', async () => {
 	h.transport.mockResolvedValueOnce({ status: 200, text: '{"access_token":"renewed","refresh_token":"rotated","expires_in":3600}' });
 	await h.connection.fetchUsage();
 	expect(h.transport.mock.calls[0]?.[1]?.body).toContain('grant_type=refresh_token');
-	expect(h.values.get('crate-usage-oauth-account-a')).toContain('rotated');
+	expect(h.values.get('crate-cloudflare-login-account-a')).toContain('rotated');
 });
 
 it('uses setup credentials without a second authorization and renews them on demand', async () => {
@@ -57,7 +57,7 @@ it('revokes both saved tokens and disconnects when the login is forgotten', asyn
 	await h.connection.forget('account-a');
 	expect(h.transport.mock.calls.map(([url, request]) => [new URL(url).pathname, new URLSearchParams(request?.body as string).get('token')]))
 		.toEqual([['/oauth2/revoke', 'saved-access'], ['/oauth2/revoke', 'saved-refresh']]);
-	expect(h.values.get('crate-usage-oauth-account-a')).toBe('');
+	expect(h.values.get('crate-cloudflare-login-account-a')).toBe('');
 	expect(h.connection.connected).toBe(false);
 });
 

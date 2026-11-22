@@ -229,7 +229,7 @@ describe('CloudflareDeploymentService', () => {
 			modified_on: '2026-08-23T09:00:00.000Z',
 		}];
 		apiMocks.workerSettings.set('crate-fedcba9876543210', {
-			annotations: { 'workers/message': 'Crate 9.0.0' },
+			annotations: { 'workers/message': `Crate 9.0.0 ${'a'.repeat(64)}` },
 			bindings: [
 				{ type: 'd1', name: 'DB', id: 'existing-database-id' },
 				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-fedcba9876543210' },
@@ -473,7 +473,7 @@ describe('server selection', () => {
 		h.settings.cloudflareDeployment = saved;
 		apiMocks.workers = [{ id: saved.workerName }];
 		apiMocks.workerSettings.set(saved.workerName, {
-			annotations: { 'workers/message': 'Crate 0.1.0' },
+			annotations: { 'workers/message': `Crate 0.1.0 ${'a'.repeat(64)}` },
 			bindings: [{ type: 'd1', name: 'DB', id: saved.d1DatabaseId },
 				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: saved.r2BucketName },
 				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' }],
@@ -496,7 +496,7 @@ describe('server selection', () => {
 		const existing = savedServer();
 		apiMocks.workers = [{ id: existing.workerName }];
 		apiMocks.workerSettings.set(existing.workerName, {
-			annotations: { 'workers/message': 'Crate 0.1.0' },
+			annotations: { 'workers/message': `Crate 0.1.0 ${'a'.repeat(64)}` },
 			bindings: [{ type: 'd1', name: 'DB', id: existing.d1DatabaseId },
 				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: existing.r2BucketName },
 				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' }],
@@ -683,7 +683,7 @@ describe('mobile server changes', () => {
 		h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment, device);
 	const existingServer = () => {
 		apiMocks.workers = [{ id: 'crate-fedcba9876543210' }];
-		apiMocks.workerSettings.set('crate-fedcba9876543210', { annotations: { 'workers/message': 'Crate 9.0.0' }, bindings: [
+		apiMocks.workerSettings.set('crate-fedcba9876543210', { annotations: { 'workers/message': `Crate 9.0.0 ${'a'.repeat(64)}` }, bindings: [
 			{ type: 'd1', name: 'DB', id: 'existing-database-id' },
 			{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-fedcba9876543210' },
 			{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },

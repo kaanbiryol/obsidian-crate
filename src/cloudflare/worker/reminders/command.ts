@@ -23,8 +23,8 @@ type ReminderAction = 'create' | 'update' | 'set-completed' | 'delete' | 'reorde
 
 const REMINDER_EXISTS = 'This reminder already exists. Reload to see its committed state.';
 
-/** Plaintext routes keep the failure responses released before they shared the
- * Markdown command. `request` is the body as received. */
+/** The failure response a plaintext route sends for a command error. `request` is the
+ * body as received. */
 export function plaintextFailureResponse(error: unknown, request: Record<string, unknown>): Response {
 	if (error instanceof ReminderInputError && error.field === 'recurrence') return corsResponse({ error: error.message }, 400);
 	if (error instanceof ReminderReorderConflictError) return corsResponse({ error: error.message, code: 'reminder_order_conflict' }, 409);

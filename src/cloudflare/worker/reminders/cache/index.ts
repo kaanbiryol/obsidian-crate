@@ -32,7 +32,7 @@ export async function loadIncrementalReminderIndex(
 	try {
 		({ entries: cachedFiles, rowPaths: cachedPaths } = await (preloaded ?? loadReminderFileCache(env.DB, folderPath)));
 	} catch {
-		// A missing cache table or transient D1 error falls back to reading R2.
+		// A transient D1 error falls back to reading R2.
 	}
 
 	const resolvedFiles = new Map<string, ReminderFileCacheEntry>();

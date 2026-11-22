@@ -13,7 +13,6 @@ beforeEach(async () => {
 	await applySchema(env.DB);
 	await env.DB.prepare("INSERT INTO auth_tokens(id, token_hash, scope) VALUES ('device', ?, 'vault')")
 		.bind(await sha256Hex('event-token')).run();
-	// Ordinary scheduling tests start after the one-time legacy storage migration.
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 

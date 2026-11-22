@@ -87,10 +87,6 @@ it('resumes the local journal after restart without refreshing its original abse
 	await client.engine.restoreFileVersion(version); expect(await live()).toBeNull();
 	await client.engine.finishRestore(version.storage_key); expect(client.engine.getPendingRestores()).toHaveLength(0);
 });
-it('fences legacy restore calls while preserving read access', async () => {
-	expect((await request('/sync/restore-version',{ storageKey:'old',expectedHash:null })).status).toBe(428);
-	expect(await live()).toBeNull();
-});
 
 it('never dispatches restore before its local checkpoint is durable and retries the saved intent', async () => {
  const client = new SyncTestDevice('restore-disk-failure', env); clients.push(client); await client.authorize(); await client.open();

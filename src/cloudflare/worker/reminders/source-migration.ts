@@ -16,7 +16,7 @@ import { readEncryptionState } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
 
 /** Prefix of `reminderSourceScanKey`, for SQL that joins it with a folder. */
-export const SCAN_KEY = `reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}`;
+export const SCAN_KEY = `reminder_source_scan_v${REMINDER_CACHE_PARSER_VERSION}`;
 /** Hash-verified bytes of one committed revision; a storage key names exactly one revision. */
 export interface VerifiedSourceBytes { storageKey: string; content: ArrayBuffer }
 /** The `maintenance_state` key whose empty value marks a folder's completed source scan. */

@@ -24,7 +24,7 @@ function harness() {
 		},
 	};
 	const worker: CloudflareWorkerSettings = {
-		annotations: { 'workers/message': 'Crate 0.1.0' },
+		annotations: { 'workers/message': `Crate 0.1.0 ${'a'.repeat(64)}` },
 		bindings: [
 			{ type: 'd1', name: 'DB', id: databaseId },
 			{ type: 'r2_bucket', name: 'BUCKET', bucket_name: name },

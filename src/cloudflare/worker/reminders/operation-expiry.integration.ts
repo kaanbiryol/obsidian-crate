@@ -28,7 +28,7 @@ async function setFloor(floor: number) {
 	await db.prepare("INSERT OR REPLACE INTO maintenance_state (key, value) VALUES ('reminder_operation_floor', ?)").bind(String(floor)).run();
 }
 
-it('accepts the last valid day and refuses expired, future and missing legacy commands before touching R2', async () => {
+it('accepts the last valid day and refuses expired, future and undated commands before touching R2', async () => {
 	const validDay = day - REMINDER_RETRY_DAYS + 1;
 	const id = createReminderOperationId(validDay);
 	await payload(await handleCreateReminder(request({ id, operationId: id, content: 'Boundary task' }), env));
@@ -36,11 +36,13 @@ it('accepts the last valid day and refuses expired, future and missing legacy co
 	await pruneOperationReceipts(db);
 	expect(await db.prepare("SELECT operation_id FROM operations WHERE kind = 'reminder'").first()).toEqual({ operation_id: id });
 	const put = vi.spyOn(bucket, 'put');
-	for (const expiredId of [createReminderOperationId(validDay - 1), createReminderOperationId(day + 1), crypto.randomUUID()]) {
+	for (const expiredId of [createReminderOperationId(validDay - 1), createReminderOperationId(day + 1)]) {
 		const response = await handleCreateReminder(request({ id: expiredId, operationId: expiredId, content: 'Never append' }), env);
 		expect(response.status).toBe(410);
 		expect(await response.json()).toMatchObject({ code: 'operation_expired' });
 	}
+	const undated = crypto.randomUUID();
+	expect((await handleCreateReminder(request({ id: undated, operationId: undated, content: 'Never append' }), env)).status).toBe(428);
 	expect(put).not.toHaveBeenCalled();
 });
 

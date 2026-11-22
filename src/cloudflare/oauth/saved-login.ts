@@ -120,8 +120,7 @@ export class CloudflareSavedLogin {
 		});
 	}
 
-	// The key predates server operations reusing this login; renaming it would drop saved logins.
-	private key(account: string): SecretKey { return `crate-usage-oauth-${account}`; }
+	private key(account: string): SecretKey { return `crate-cloudflare-login-${account}`; }
 	private read(account: string): Credentials | undefined {
 		try {
 			const value = JSON.parse(this.options.secrets.get(this.key(account)) ?? 'null') as Credentials | null;

@@ -19,7 +19,7 @@ export async function extractForEncryptedReading(request: Request, env: Env, sav
 	try {
 		const fetchPublic = env.READING_FETCH ? (request: Request) => env.READING_FETCH!.fetch(request) : fetch;
 		const { article, requests } = await fetchReadingCapture(url, fetchPublic, env.CRATE_PUBLIC_ORIGIN);
-		// Images are optional; older web apps ignore them, and a retry asks for none.
+		// Images are optional, and a retry asks for none.
 		const images = saveImages && parsed.value.images !== false ? await (await import('./extraction/images')).downloadImagesForEncryptedReading(article, fetchPublic, env.CRATE_PUBLIC_ORIGIN, requests,
 			AbortSignal.timeout(Math.max(0, started + IMAGE_DEADLINE_MS - Date.now()))) : [];
 		return readingResponse({ article, ...(images.length ? { images } : {}) });

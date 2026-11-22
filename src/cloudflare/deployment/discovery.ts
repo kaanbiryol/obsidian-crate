@@ -43,21 +43,14 @@ export function workerStorageBindings(settings: CloudflareWorkerSettings): { dat
 	return databaseId && bucketName ? { databaseId, bucketName } : null;
 }
 
+/** What the live Worker's release message names; nulls when it has none, as after an edit
+ * outside Crate. */
 export function deployedArtifact(settings: CloudflareWorkerSettings): {
 	version: string | null;
 	fingerprint: string | null;
 } {
-	const message = settings.annotations?.['workers/message']?.trim() ?? '';
-	if (message.startsWith('Crate ')) {
-		const [version, fingerprint] = message.slice('Crate '.length).trim().split(/\s+/, 2);
-		return {
-			version: version || null,
-			fingerprint: fingerprint && /^[a-f0-9]{64}$/i.test(fingerprint)
-				? fingerprint.toLowerCase()
-				: null,
-		};
-	}
-	return { version: null, fingerprint: null };
+	const build = parseReleaseWorkerMessage(settings.annotations?.['workers/message']?.trim() ?? '');
+	return { version: build?.version ?? null, fingerprint: build?.fingerprint ?? null };
 }
 
 function toDeployment(

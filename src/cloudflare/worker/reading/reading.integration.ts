@@ -100,7 +100,7 @@ it('projects folder imports without extraction and syncs their reading metadata'
 	expect(await env.DB.prepare('SELECT 1 FROM reading_jobs').first()).toBeNull();
 });
 async function capture() {
-	// Legacy files and explicit retries retain their original path during extraction.
+	// Existing files and explicit retries retain their original path during extraction.
 	const note = createReadingNote({ id: crypto.randomUUID(), url: 'https://example.com/article', savedAt: new Date().toISOString() });
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Existing.md', note, null);
 	await buildIndex();
@@ -397,7 +397,7 @@ it('rebuilds the index from native markers and observes subsequent vault edits',
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	await buildIndex();
 	await env.DB.prepare("UPDATE reading_items SET metadata_json=json_remove(metadata_json, '$.highlights') WHERE path=?").bind(path).run();
-	// Rows from an older format were recorded under a different index scope.
+	// Rows recorded under a different index scope are rebuilt.
 	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
 	const list = () => handleReadingRoute(new Request('https://test/reading/items?section=inbox'), env, principal);
 	const projected = await (await list()).json() as { items: { highlights: { text: string }[] }[] };

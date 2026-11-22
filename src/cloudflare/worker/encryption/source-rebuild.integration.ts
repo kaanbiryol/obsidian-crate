@@ -50,7 +50,7 @@ async function fixture(padding: number, count = 1) {
 
 it.each(['quarantined', 'missing'])('repairs already-active vaults with %s source verification', async failure => {
 	const { path, folder } = await fixture(800_000);
-	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES (?, '')").bind(`reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION - 1}:${folder}`).run();
+	await env.DB.prepare("INSERT INTO maintenance_state(key, value) VALUES (?, '')").bind(`reminder_source_scan_v${REMINDER_CACHE_PARSER_VERSION - 1}:${folder}`).run();
 	if (failure === 'quarantined') await env.DB.prepare('UPDATE reminder_source_state SET parser_version = ?, verified = 0').bind(REMINDER_CACHE_PARSER_VERSION - 1).run();
 	else await env.DB.prepare('DELETE FROM reminder_source_state').run();
 	await env.DB.prepare("INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES (?, 1, -1, 'old size limit')").bind(path).run();

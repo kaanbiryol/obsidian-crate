@@ -12,10 +12,10 @@ export interface ReadingOperation { id: string; principal: string; generation: s
 export interface ReadingReceiptRow { principal_id: string | null; generation: string | null; request_hash: string | null; response_json: string | null; retryable: number | null; reminder_folder: string | null }
 
 /** One read: a saved receipt is replayed even after its day leaves the retry window. Null
- * when the body has no operation ID, which `beginOperation` refuses. */
+ * when the body has no dated operation ID, which `beginOperation` refuses. */
 export function operationReceiptStatement(db: D1Database, body: Record<string, unknown>): D1PreparedStatement | null {
-	if (typeof body.operationId !== 'string') return null;
-	const day = reminderOperationDay(body.operationId);
+	const day = typeof body.operationId === 'string' ? reminderOperationDay(body.operationId) : null;
+	if (day === null) return null;
 	return db.prepare(`SELECT r.principal_id, r.generation, r.request_hash, r.response_json,
     (SELECT 1 WHERE ${OPERATION_VALID}) AS retryable, (SELECT folder_path FROM notification_policy WHERE id = 1) AS reminder_folder
     FROM (SELECT 1) LEFT JOIN operations r ON r.kind = 'reading' AND r.operation_id = ?`).bind(day, day, body.operationId);
@@ -24,15 +24,15 @@ export function operationReceiptStatement(db: D1Database, body: Record<string, u
 /** `loaded` is the `operationReceiptStatement` row when the caller already read it in a batch. */
 export async function beginOperation(db: D1Database, principal: AuthPrincipal, current: ReadingPolicy, body: Record<string, unknown>, action: string, loaded?: ReadingReceiptRow | null) {
 	const statement = operationReceiptStatement(db, body);
-	if (typeof body.operationId !== 'string' || !statement) throw new ReadingError('A saved operation ID is required.', 428);
-	const day = reminderOperationDay(body.operationId);
+	const day = typeof body.operationId === 'string' ? reminderOperationDay(body.operationId) : null;
+	if (typeof body.operationId !== 'string' || !statement || day === null) throw new ReadingError('A saved operation ID is required.', 428);
 	const hash = await sha256Hex(JSON.stringify({ action, body }));
 	const saved = loaded !== undefined ? loaded : await statement.first<ReadingReceiptRow>();
 	if (saved?.response_json != null) {
 		if (saved.principal_id !== principal.tokenId || saved.generation !== current.generation || saved.request_hash !== hash) throw new ReadingError('This operation ID belongs to a different save.', 409, 'operation_mismatch');
 		return readingResponse(JSON.parse(saved.response_json));
 	}
-	if (day === null || !saved?.retryable) {
+	if (!saved?.retryable) {
 		throw new ReadingError('This change is too old to retry safely. Compare your library before saving it again.', 410, 'operation_expired');
 	}
 	return { id: body.operationId, principal: principal.tokenId, generation: current.generation, hash, day, reminderFolder: saved.reminder_folder };

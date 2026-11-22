@@ -11,7 +11,6 @@ import {
 	handleCrateIcon192,
 	handleCrateIcon512,
 	handleCrateMark256,
-	handleIcon,
 	handleManifest,
 	handleNotificationsPage,
 	handleOpenObsidian,
@@ -51,7 +50,6 @@ export async function handlePublicRoute(
 	if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 	if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);
 	if (path === '/notifications/version.json' && method === 'GET') return handlePwaVersion();
-	if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon(request);
 	if (path === '/notifications/crate-icon-192.png' && method === 'GET') return handleCrateIcon192(request);
 	if (path === '/notifications/crate-icon-512.png' && method === 'GET') return handleCrateIcon512(request);
 	if (path === '/notifications/crate-mark-256.png' && method === 'GET') return handleCrateMark256(request);

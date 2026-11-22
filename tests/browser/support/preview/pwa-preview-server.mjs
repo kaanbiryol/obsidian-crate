@@ -36,7 +36,6 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 		OPEN_OBSIDIAN_HTML,
 		OPEN_OBSIDIAN_JS,
 		SERVICE_WORKER_JS,
-		ICON_SVG,
 		createManifestJson,
 		createPwaHtml,
 		createPwaVersionJson,
@@ -144,10 +143,6 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 			return;
 		}
 
-		if (method === 'GET' && path === '/notifications/icon.svg') {
-			sendText(res, 200, ICON_SVG, 'image/svg+xml; charset=utf-8');
-			return;
-		}
 
 		if (method === 'GET' && path === '/notifications/apple-touch-icon-180.png') {
 			send(res, 200, APPLE_TOUCH_ICON_180_PNG, { 'Content-Type': 'image/png' });

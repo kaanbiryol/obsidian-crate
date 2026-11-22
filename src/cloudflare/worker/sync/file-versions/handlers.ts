@@ -33,12 +33,9 @@ export async function handleRestoreFileVersion(
 	const path = sanitizePath(typeof parsedBody.value.path === 'string' ? parsedBody.value.path : '');
 	const rawRevision = parsedBody.value.expectedRevision;
 	const expectedRevision = rawRevision === null ? null : isSyncRevision(rawRevision) ? rawRevision : undefined;
-	if (!parsedBody.value.operationId) {
-		return corsResponse({ error: 'Update Crate before restoring a file. A durable restore operation is required.', code: 'protocol_incompatible' }, 428);
-	}
-	if (!isSyncRevision(storageKey) || !path || expectedHash === undefined
+	if (!parsedBody.value.operationId || !isSyncRevision(storageKey) || !path || expectedHash === undefined
 		|| expectedRevision === undefined || (expectedHash === null ? expectedRevision !== null : expectedRevision === null)) {
-		return corsResponse({ error: 'A retained version, path and current file precondition are required' }, 400);
+		return corsResponse({ error: 'A restore operation, retained version, path and current file precondition are required' }, 400);
 	}
 	// Resolve receipts before reading retained bytes: the original version may
 	// expire after commitment, and later edits/deletes must never be replayed over.

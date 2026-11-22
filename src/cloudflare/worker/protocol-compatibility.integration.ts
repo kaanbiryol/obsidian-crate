@@ -55,7 +55,7 @@ describe('old and future clients against the current Worker', () => {
 	});
 });
 
-it('accepts launch protocol receipts while fencing restores without durable operations', async () => {
+it('replays protocol 1 upload and reminder receipts', async () => {
  const body = 'Created by a protocol 1 plugin';
  const upload = request('/sync/upload?path=previous.md', '1', 'PUT', body);
  upload.headers.set('X-Crate-Expected-Hash', 'absent');
@@ -68,9 +68,6 @@ it('accepts launch protocol receipts while fencing restores without durable oper
  const created = await worker.fetch(request('/reminders/create', '1', 'POST', reminder), env);
  expect(created.status, await created.clone().text()).toBe(200);
  expect(await (await worker.fetch(request('/reminders/create', '1', 'POST', reminder), env)).json()).toEqual(await created.json());
- const before = (await env.DB.prepare('SELECT * FROM files ORDER BY path').all()).results;
- expect((await worker.fetch(request('/sync/restore-version', '1', 'POST', JSON.stringify({ storageKey: 'legacy', expectedHash: null })), env)).status).toBe(428);
- expect((await env.DB.prepare('SELECT * FROM files ORDER BY path').all()).results).toEqual(before);
 });
 
 it('reports server elapsed time for successful and rejected requests', async () => {

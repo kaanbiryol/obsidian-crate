@@ -12,7 +12,7 @@ function fixture() {
 }
 it.each([
 	{ version: 99 }, { version: '1' }, { files: null }, { generation: -1 }, { lastSeq: '10' },
-	{ authority: 'foreign' }, { truncated: true }, { settledUploads: ['unknown'] },
+	{ authority: 'foreign' }, { settledUploads: ['unknown'] },
 	{ files: { ...good.files, 'bad.md': { ...good.files['note.md'], size: 'damaged' } } },
 ])('preserves both generations when the newer JSON checkpoint is semantically invalid: %j', async patch => {
 	const { disk, manifest } = fixture();

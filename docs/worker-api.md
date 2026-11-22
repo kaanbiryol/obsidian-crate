@@ -186,7 +186,6 @@ These routes are answered by `routes/public.ts` before authentication.
 | `GET` | `/notifications/sw.js` | Serves the PWA service worker |
 | `GET` | `/notifications/manifest.json` | Serves the PWA manifest |
 | `GET` | `/notifications/version.json` | Returns the current PWA asset version |
-| `GET` | `/notifications/icon.svg` | Serves the PWA icon |
 | `GET` | `/notifications/crate-icon-192.png`, `/notifications/crate-icon-512.png`, `/notifications/crate-mark-256.png`, `/notifications/apple-touch-icon-180.png` | Serve the app icons and brand mark |
 | `GET` | `/notifications/open-obsidian`, `/notifications/open-obsidian.js` | Serve the browser handoff page for opening Obsidian and its script |
 | `GET` | `/notifications/pair`, `/notifications/pair.js` | Serve the device pairing page, which hands the code in its fragment to Obsidian, and its script |
@@ -510,7 +509,7 @@ Serves the reminders PWA HTML page. The plugin generates short-lived links with 
 
 The `token` query parameter is a web enrollment token, not a sync bearer token.
 
-### GET /notifications/app.js, /sw.js, /manifest.json, /version.json, /icon.svg, /open-obsidian (public)
+### GET /notifications/app.js, /sw.js, /manifest.json, /version.json, /open-obsidian (public)
 
 Serve the PWA client bundle, service worker, manifest, version metadata, icon, and Obsidian handoff page. Versioned static assets use long-lived cache headers when a `v` query param is present.
 

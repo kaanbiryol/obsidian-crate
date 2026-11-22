@@ -110,7 +110,7 @@ describe('provisionCloudflareDeployment', () => {
 	});
 	it('rejects a newer remote Worker before changing schema or uploading code', async () => {
 		const api = createApi();
-		api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': 'Crate 9.0.0' }, bindings: [] });
+		api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': `Crate 9.0.0 ${'a'.repeat(64)}` }, bindings: [] });
 		const metadata = createMetadata();
 		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
 			.rejects.toThrow('downgrades are not supported');
@@ -170,7 +170,7 @@ describe('provisionCloudflareDeployment', () => {
 	});
 
 
-	it('rejects a retired development schema baseline before upload', async () => {
+	it('rejects a schema marker from an unknown creation version before upload', async () => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
 		api.queryD1.mockResolvedValueOnce([{ results: [{ version: SERVER_RELEASE.schemaVersion, created_version: 0 }] }]);
