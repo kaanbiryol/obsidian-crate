@@ -258,8 +258,8 @@ try {
           await expect(page.locator('.crate-feature-panel[data-active="true"] .pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'synced');
           await context.route('**/reading/encryption', route => route.fulfill({ status: 503, json: { error: 'Temporarily unavailable' } }));
           await page.reload();
-          // An unanswered check is a connection problem, not a locked vault.
-          await expect(page.getByRole('heading', { name: 'Unable to connect', exact: true })).toBeVisible();
+          // A failed check is a server problem, not a locked vault.
+          await expect(page.getByRole('heading', { name: 'Crate couldn’t load', exact: true })).toBeVisible();
           await page.getByRole('button', { name: 'Open Reminders', exact: true }).click();
           await expect(panel('reminders')).toBeVisible();
           await expect(page.locator('.crate-encryption-unlock')).toHaveCount(0);

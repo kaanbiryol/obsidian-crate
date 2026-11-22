@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { ErrorState } from './AuthStates';
 import type { ConnectionIssueKind } from '../connection/issues';
 
-function render(message: string, kind: ConnectionIssueKind = 'unavailable'): string {
+function render(message: string, kind: ConnectionIssueKind = 'unavailable', network = kind === 'unavailable'): string {
 	return renderToStaticMarkup(React.createElement(ErrorState, {
-		issue: { kind, message }, onRetry: vi.fn(),
+		issue: { kind, message, network }, onRetry: vi.fn(),
 	}));
 }
 
@@ -49,6 +49,14 @@ describe('signed-out recovery instructions', () => {
 		expect(markup).toContain('Unable to connect');
 		expect(markup).toContain('Network unavailable &lt;script&gt;');
 		expect(markup).not.toContain('<script>');
+		expect(markup).toContain('Try again');
+	});
+
+	it('does not blame the connection when the server answered with a problem', () => {
+		const markup = render('Update the Crate server before making changes.', 'unavailable', false);
+		expect(markup).toContain('Crate couldn’t load');
+		expect(markup).toContain('The server reported a problem');
+		expect(markup).not.toContain('Check your internet connection');
 		expect(markup).toContain('Try again');
 	});
 });

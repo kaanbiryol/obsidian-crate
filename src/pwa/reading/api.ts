@@ -19,6 +19,7 @@ import type { FeatureKeys } from '../encryption/encryption-keys';
 import { checkEncryptionSignals, retryAfterEncryptionChange } from '../encryption/encryption-retry';
 import { responseError } from '../connection/response-error';
 import { crateProtocol, crateRequestHeaders, forgetRefusedProtocol } from '../connection/request-headers';
+import { rethrowUnreachable } from '../connection/issues';
 
 const ENCRYPTED_READING_PATH = new RegExp(`^/reading/(?:${ENCRYPTED_READING_ACTIONS.join('|')})(?:\\?|$)`);
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
@@ -37,7 +38,7 @@ async function rawReadingRequest(path: string, session: ReadingSession | null, b
 	const protocolHeaders = crateRequestHeaders(session?.token, await crateProtocol(path, method));
 	if (session) assertReadingSession(session);
 	const response = await fetch(path, { method, cache: 'no-store', signal: AbortSignal.timeout(readingRequestTimeout(path, body)),
-		headers: { ...protocolHeaders, ...session ? readingEncryptionHeaders() : {}, 'Content-Type': 'application/json', ...extraHeaders }, body });
+		headers: { ...protocolHeaders, ...session ? readingEncryptionHeaders() : {}, 'Content-Type': 'application/json', ...extraHeaders }, body }).catch(rethrowUnreachable);
 	if (session) assertReadingSession(session);
 	await forgetRefusedProtocol(response);
 	if (session && response.status === 401) {

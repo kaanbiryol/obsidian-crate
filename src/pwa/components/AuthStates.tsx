@@ -65,19 +65,23 @@ export function EmptyAuthState(reset: SessionResetProps) {
 export function ErrorState({ issue, onRetry, ...reset }: { issue: ConnectionIssue; onRetry: () => void } & SessionResetProps) {
 	const needsCleanup = issue.kind === 'cleanup';
 	const needsLink = issue.kind === 'reconnect';
+	// The server answered, so the problem is on its side, not the connection.
+	const serverProblem = !needsCleanup && !needsLink && !issue.network;
 	return (
 		<AuthLayout
-			title={needsCleanup ? 'Cleanup needs attention' : needsLink ? 'Reconnect to Crate' : 'Unable to connect'}
+			title={needsCleanup ? 'Cleanup needs attention' : needsLink ? 'Reconnect to Crate' : serverProblem ? 'Crate couldn’t load' : 'Unable to connect'}
 			description={needsCleanup
 				? 'Some data or session access could not be removed. Follow the steps below to finish cleanup.'
 				: needsLink
 				? 'Open Crate in Obsidian and send a new app link to reconnect.'
+				: serverProblem
+				? 'Your Crate server answered with a problem. Try again, or check the server if this continues.'
 				: 'Check your internet connection and try again.'}
 			notice={
 				<div className="auth-card__notice" role="alert">
-					{needsCleanup ? <TriangleAlert size={20} aria-hidden="true" /> : needsLink ? <Link2Off size={20} aria-hidden="true" /> : <WifiOff size={20} aria-hidden="true" />}
+					{needsCleanup || serverProblem ? <TriangleAlert size={20} aria-hidden="true" /> : needsLink ? <Link2Off size={20} aria-hidden="true" /> : <WifiOff size={20} aria-hidden="true" />}
 					<div>
-						<strong>{needsCleanup ? 'Cleanup is incomplete' : needsLink ? 'A new app link is needed' : 'Crate couldn’t be reached'}</strong>
+						<strong>{needsCleanup ? 'Cleanup is incomplete' : needsLink ? 'A new app link is needed' : serverProblem ? 'The server reported a problem' : 'Crate couldn’t be reached'}</strong>
 						<p>{issue.message}</p>
 					</div>
 				</div>

@@ -1,6 +1,6 @@
 import { CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol/server-info';
 import { capturePwaSession } from './session-generation';
-import { ConnectionError } from './issues';
+import { ConnectionError, rethrowUnreachable } from './issues';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { CLIENT_SESSION_HEADER, OPERATION_ID_HEADER } from '@/protocol/http-headers';
 import { detectWebSessionName } from './session-label';
@@ -53,7 +53,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
 
 		const dispatched = encryptionOffDispatch();
-		const response = await fetch(path, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(30_000) });
+		const response = await fetch(path, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(30_000) }).catch(rethrowUnreachable);
 		if (!sessionCurrent() && !revokingSession) {
 			throw new ConnectionError('reconnect', 'Session changed. Open a fresh link from Crate.');
 		}
