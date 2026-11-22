@@ -548,6 +548,8 @@ export class SyncEngine {
 	 * unchecked in Sync activity, are left alone in both directions and stay pending. */
 	async sync(progressCallback?: (current: number, total: number) => void, options: { held?: readonly string[] } = {}): Promise<SyncResult> {
 		const held = new Set((options.held ?? []).map(key => decodePendingChange(key).path));
+		// A rename's old name is deleted only after its new name uploads, so it waits with it.
+		for (const [source, destination] of Object.entries(this.localManifest.getRenameDependencies())) if (held.has(destination)) held.add(source);
 		const result = await this.runTrackedWorkflow(() => this.contexts.runStandardSync(held, progressCallback));
 		// The cursor may now be past a remote change to a held file. If that file's local change
 		// is later discarded, only a full comparison with the server finds the change again.

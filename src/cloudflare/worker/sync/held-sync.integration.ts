@@ -126,3 +126,21 @@ it('tells the device that owns an unfinished first upload to sync again', async 
 	expect((await first.engine.sync()).errors).toEqual([]);
 	expect(await serverPaths()).toEqual(['a.md']);
 });
+
+it('holds a renamed file\'s old name with its unchecked new name and still deletes other files', async () => {
+	const client = await device('held-rename');
+	client.disk.write('old.md', 'renamed');
+	client.disk.write('other.md', 'other');
+	expect((await client.engine.sync()).errors).toEqual([]);
+
+	client.disk.rename('old.md', 'new.md');
+	client.engine.onFileRename(vaultEntry(client.disk.vault.getAbstractFileByPath('new.md')!), 'old.md');
+	client.disk.remove('other.md');
+	client.engine.onFileDelete({ path: 'other.md' } as never);
+
+	expect(await client.engine.sync(undefined, { held: ['new.md'] })).toMatchObject({ success: true, errors: [] });
+	// The old name waits for its new name, so the server keeps a copy of the file.
+	expect(await serverPaths()).toEqual(['old.md']);
+	expect((await client.engine.sync()).errors).toEqual([]);
+	expect(await serverPaths()).toEqual(['new.md']);
+});
