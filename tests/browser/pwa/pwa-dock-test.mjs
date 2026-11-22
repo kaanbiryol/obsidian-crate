@@ -420,14 +420,16 @@ async function checkLocalFades({ page, dock, closed, active, openViews, direct }
     while (performance.now() - start < 3000) {
       await new Promise(requestAnimationFrame);
       const visible = [...container.querySelectorAll(':scope > .pwa-tab-panel')].filter(layer => Number(getComputedStyle(layer).opacity) > 0);
-      frames.push({ titles: visible.map(layer => layer.querySelector('.view-header-title').textContent), blank: visible.some(layer => !layer.querySelector('.crate-reading__item, .crate-reading__empty')) });
+      frames.push({ titles: visible.map(layer => layer.querySelector('.view-header-title').textContent), blank: visible.some(layer => !layer.querySelector('.crate-reading__item, .crate-reading__empty')), at: performance.now() - start });
       if (!container.querySelector(':scope > .pwa-tab-panel[data-leaving]') && frames.at(-1).titles.join() === 'Archive') break;
     }
     return frames;
   });
   assert.deepEqual(frames[0].titles, ['Reading'], JSON.stringify(frames));
   assert.deepEqual(frames.at(-1).titles, ['Archive'], JSON.stringify(frames));
-  assert.ok(frames.every(frame => !frame.blank), 'A quick first page never shows a screen without its list: ' + JSON.stringify(frames));
+  // A first page slower than SLOW_LIBRARY_QUERY_MS (useLibraryPages.ts) shows its loading screen
+  // instead, which a loaded test runner can reach; before then no frame is blank.
+  assert.ok(frames.every(frame => !frame.blank || frame.at >= 250), 'A quick first page never shows a screen without its list: ' + JSON.stringify(frames));
   await closed(); await active('Archive');
   // A section read before dissolves at once.
   await openViews();
