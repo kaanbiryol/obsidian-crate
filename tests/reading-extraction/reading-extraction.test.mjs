@@ -31,13 +31,15 @@ test('desktop extraction uses an inert parser in Chromium and WebKit', { timeout
 				return window.ReadingExtraction.extractDocument(`<html><head><title>Desktop article</title></head><body><article>
 					<h1>Desktop article</h1><p>A useful article with enough context to save and read without a server connection.</p>
 					<p>Read <a href="/next">the next article</a> for more details.</p>
-					<img src="https://tracking.example.org/pixel"><iframe src="https://tracking.example.org/frame"></iframe>
+					<img src="https://images.example.org/photo.jpg"><iframe src="https://tracking.example.org/frame"></iframe>
 					<script>fetch('https://tracking.example.org/script')</script>
 					</article></body></html>`, 'https://example.com/story');
 			});
 			assert.equal(article.title, 'Desktop article');
 			assert.match(article.markdown, /\[the next article\]\(https:\/\/example.com\/next\)/);
 			assert.doesNotMatch(article.markdown, /tracking.example.org/);
+			// Reading keeps article images; the vault copy is saved separately.
+			assert.match(article.markdown, /!\[\]\(https:\/\/images.example.org\/photo.jpg\)/);
 			assert.deepEqual(requests, []);
 			assert.deepEqual(logs, []);
 		} finally { await browser.close(); }
@@ -114,14 +116,15 @@ test('Defuddle extracts documents in the deployed workerd runtime without networ
                 <p>Read <a href="/next">
                     this <strong>useful</strong> article
                 </a> today.</p>
-                <a href="/avatar"><img src="https://tracking.test/pixel" /></a>
+                <a href="/avatar"><img src="https://images.test/avatar.png" /></a>
                 <div><div> </div></div>
                 <a href="/card"><div><h3>Linked heading</h3><p>Card description.</p></div></a>
                 <p>After the card.</p>
             </section>`, undefined, true);
 			assert.equal(converted.status, 200);
 			assert.match(converted.result.markdown, /Read \[this \*\*useful\*\* article\]\(https:\/\/example.com\/next\) today\./);
-			assert.doesNotMatch(converted.result.markdown, /\[\]\(|tracking.test|\n[ \t]+\n[ \t]+\n/);
+			assert.doesNotMatch(converted.result.markdown, /(?<!!)\[\]\(|\n[ \t]+\n[ \t]+\n/);
+			assert.match(converted.result.markdown, /\[!\[\]\(https:\/\/images.test\/avatar.png\)\]\(https:\/\/example.com\/avatar\)/);
 			const list = await extract('<ul><li><h3>First</h3><p>Some detail.</p></li><li><h3>Second</h3><p>More detail.</p></li></ul>', undefined, true);
 			assert.match(list.result.markdown, /- ### First/);
 			assert.match(list.result.markdown, /- ### Second/);
