@@ -1,5 +1,5 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-import { armNotificationCoordinator, runBoundedNotificationCoordinator } from './lifecycle';
+import { beforeEach, expect, it, onTestFinished, vi } from 'vitest';
+import { armNotificationCoordinator, runBoundedNotificationCoordinator, SOURCE_SCAN_DAILY_WRITE_BUDGET } from './lifecycle';
 import { runNotificationCoordinator } from './coordinator';
 vi.mock('./coordinator', () => ({ runNotificationCoordinator: vi.fn() }));
 
@@ -93,4 +93,22 @@ it('wakes the dispatcher after a pass that failed once it may have committed a s
 	// The retry finds no job for the committed file, so it writes nothing, but reports the due time.
 	vi.mocked(runNotificationCoordinator).mockResolvedValueOnce({ wrote: false, dispatchAt: 1_000 });
 	expect(await runBoundedNotificationCoordinator(state, {} as never)).toMatchObject({ dispatchAt: 1_000 });
+});
+
+it('pauses the bulk source scan until the next UTC day once today\'s write budget is spent', async () => {
+	// The Free plan's daily quota applies to Cloudflare builds only.
+	const flags = globalThis as { __CRATE_SELF_HOSTED__?: boolean };
+	flags.__CRATE_SELF_HOSTED__ = false;
+	onTestFinished(() => { flags.__CRATE_SELF_HOSTED__ = true; });
+	const { state, values } = fixture();
+	await armNotificationCoordinator(state);
+	const today = Math.floor(Date.now() / 86_400_000);
+	values.set('notificationDailyWrites', { day: today, rowsWritten: SOURCE_SCAN_DAILY_WRITE_BUDGET });
+	await runBoundedNotificationCoordinator(state, {} as never);
+	const paused = vi.mocked(runNotificationCoordinator).mock.calls[0]![2]!.sourceScanPausedUntil!;
+	expect(paused).toBeGreaterThanOrEqual((today + 1) * 86_400_000);
+	// A count from an earlier day does not hold the scan back.
+	values.set('notificationDailyWrites', { day: today - 1, rowsWritten: SOURCE_SCAN_DAILY_WRITE_BUDGET });
+	await runBoundedNotificationCoordinator(state, {} as never);
+	expect(vi.mocked(runNotificationCoordinator).mock.calls[1]![2]).toEqual({ sourceScanPausedUntil: undefined });
 });

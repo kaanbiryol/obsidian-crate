@@ -64,7 +64,10 @@ interface PassProbe extends NotificationPolicyRow {
 	ready: number; retry_at: number | null; dispatch_at: number | null; source_work: number;
 }
 
-export async function runNotificationCoordinator(state: DurableObjectState, env: Env): Promise<NotificationPassResult> {
+/** `sourceScanPausedUntil`: the bulk source scan waits until then, while projection of
+ * already queued jobs, such as edited notes, continues. */
+export async function runNotificationCoordinator(state: DurableObjectState, env: Env,
+	{ sourceScanPausedUntil }: { sourceScanPausedUntil?: number } = {}): Promise<NotificationPassResult> {
 	// One read decides whether the pass has work and loads what each sub-step would otherwise reload.
 	const loaded = await env.DB.prepare(PASS_PROBE_SQL).bind(SCAN_KEY, REMINDER_CACHE_PARSER_VERSION).first<PassProbe>();
 	const encryption = parseEncryptionState(loaded?.encryption ?? null);
@@ -101,7 +104,7 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
 		// invocation on the dispatcher, so a reminder backlog does not compete with source scans.
 		hasPolicy = Boolean(policy);
 		const verified = new Map<string, VerifiedSourceBytes>();
-		if (!sourcesIdle) sourceWork = await revalidateReminderSources(env, FILES_PER_PASS, { folder: policy?.folderPath ?? null, encryption }, verified);
+		if (!sourcesIdle && sourceScanPausedUntil === undefined) sourceWork = await revalidateReminderSources(env, FILES_PER_PASS, { folder: policy?.folderPath ?? null, encryption }, verified);
 		if (hasPolicy) {
 			wrote = await drainNotificationProjections(env, FILES_PER_PASS, { features, policy, encryption, verified });
 			pending = await nextNotificationWork(env.DB);
@@ -115,7 +118,7 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
 			if (pending === undefined) pending = hasPolicy ? await nextNotificationWork(env.DB) : null;
 			// Due reminders wake the dispatcher, not the coordinator.
 			const deadlines = [readingAt, source?.retryAt, pending?.projectionRetry,
-				...(pending?.ready ? [0] : [])].filter((value): value is number => typeof value === 'number');
+				...(pending?.ready ? [0] : []), ...(!sourcesIdle ? [sourceScanPausedUntil] : [])].filter((value): value is number => typeof value === 'number');
 			// Continue ready work immediately in a fresh invocation with its own budget.
 			// Idle coordinators leave no alarm behind; failed jobs sleep until due.
 			if (deadlines.length) await state.storage.setAlarm(Math.max(Date.now() + 1, Math.min(...deadlines)));

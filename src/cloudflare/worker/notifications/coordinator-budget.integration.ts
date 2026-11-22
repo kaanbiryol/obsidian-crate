@@ -178,3 +178,23 @@ it('counts a failed dispatch against its episode unless a change started a new o
 	expect(coordinator.alarm()).toBeLessThanOrEqual(Date.now() + 1);
 	logged.mockRestore();
 });
+
+it('holds back the bulk source scan while paused, but still projects an edited note', async () => {
+	const task = () => `- [ ] Task 2099-01-01T12:00:00.000Z <!-- crate-id:${crypto.randomUUID()} -->`;
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Old.md', task(), null);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Edited.md', task(), null);
+	// Old.md needs the setup scan; Edited.md has the projection job an edit queues.
+	await env.DB.batch([
+		env.DB.prepare("UPDATE reminder_source_state SET parser_version = 0, verified = 0 WHERE file_path = 'Reminders/Old.md'"),
+		env.DB.prepare("DELETE FROM notification_projection_jobs WHERE path = 'Reminders/Old.md'"),
+	]);
+	const resume = Date.now() + 3_600_000;
+	const setAlarm = vi.fn(async (_time: number) => {});
+	const state = { storage: { setAlarm } } as unknown as DurableObjectState;
+	await runNotificationCoordinator(state, env, { sourceScanPausedUntil: resume });
+	expect(await env.DB.prepare('SELECT DISTINCT file_path FROM reminder_projections').all()).toMatchObject({ results: [{ file_path: 'Reminders/Edited.md' }] });
+	expect(await env.DB.prepare("SELECT verified FROM reminder_source_state WHERE file_path = 'Reminders/Old.md'").first()).toEqual({ verified: 0 });
+	expect(setAlarm).toHaveBeenLastCalledWith(resume);
+	await runNotificationCoordinator(state, env);
+	expect(await env.DB.prepare("SELECT verified FROM reminder_source_state WHERE file_path = 'Reminders/Old.md'").first()).toEqual({ verified: 1 });
+});

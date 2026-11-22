@@ -1,6 +1,6 @@
 import { runNotificationCoordinator } from './coordinator';
 import type { Env } from '../types';
-import { isD1DailyLimitError, nextD1DailyReset } from '../d1/d1-usage';
+import { isD1DailyLimitError, meterD1Usage, nextD1DailyReset } from '../d1/d1-usage';
 import { markRole } from '../coordinator/role-flags';
 
 /** Coordinator storage flag, for runtimes without instance names: its alarm runs notification projection. */
@@ -15,6 +15,14 @@ const MAX_RUN_PASSES = 10_000;
 /** Passes are stored this often, so an evicted object keeps counting toward the limit. */
 const STORED_PASS_INTERVAL = 500;
 const MAX_FAILURES = 8;
+/** Coordinator storage: `{ day, rowsWritten }`, the D1 rows notification passes wrote this UTC day. */
+const DAILY_WRITES_KEY = 'notificationDailyWrites';
+/** D1 rows notification passes may write per UTC day before the bulk source scan waits for the
+ * next day: setting up a large vault's reminders writes about eight rows per reminder, so a
+ * first sync plus that scan would otherwise exceed the Free plan's 100,000. Edited notes keep
+ * projecting past it. A self-hosted server has no daily quota. */
+export const SOURCE_SCAN_DAILY_WRITE_BUDGET = 40_000;
+const utcDay = (now: number) => Math.floor(now / 86_400_000);
 /** An arm within this long of a stored fresh episode keeps its start instead of storing a new one. */
 const EPISODE_REUSE_MS = 60 * 60 * 1000;
 interface NotificationRun { startedAt: number; passes: number; failures: number }
@@ -61,8 +69,14 @@ export async function runBoundedNotificationCoordinator(state: DurableObjectStat
 		episode.stored = { ...stored, passes: episode.passes };
 		await state.storage.put<NotificationRun>(RUN_KEY, episode.stored);
 	}
+	const day = utcDay(Date.now());
+	const spent = await state.storage.get<{ day: number; rowsWritten: number }>(DAILY_WRITES_KEY);
+	const written = spent?.day === day ? spent.rowsWritten : 0;
+	const sourceScanPausedUntil = !__CRATE_SELF_HOSTED__ && written >= SOURCE_SCAN_DAILY_WRITE_BUDGET ? nextD1DailyReset() : undefined;
+	const meter = meterD1Usage(env.DB);
 	try {
-		const scheduled = await runNotificationCoordinator(state, env);
+		const scheduled = await runNotificationCoordinator(state, { ...env, DB: meter.db }, { sourceScanPausedUntil });
+		if (meter.usage.rowsWritten) await state.storage.put(DAILY_WRITES_KEY, { day, rowsWritten: written + meter.usage.rowsWritten });
 		if (scheduled.wrote) await state.storage.put(DISPATCH_PENDING_KEY, true);
 		if (!await state.storage.get<boolean>(DISPATCH_PENDING_KEY)) return null;
 		if (scheduled.dispatchAt === undefined) return null;

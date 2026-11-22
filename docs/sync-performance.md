@@ -66,6 +66,13 @@ and uploads no R2 objects. The same statements serve an encrypted import.
 | Session and completion | 7 | Open the import and publish its sync baseline |
 | Total | 10,946 | No per-note history, upload receipts or reminder indexing |
 
+Setting up reminder schedules after the import writes about 8 rows per scheduled reminder
+(projection, source and occurrence rows with their indexes). On a Cloudflare server the
+coordinator pauses that bulk source scan once notification passes have written 40,000 rows
+in a UTC day (`SOURCE_SCAN_DAILY_WRITE_BUDGET`) and resumes after 00:00 UTC, so a large
+first sync and its schedules do not exhaust the day's allowance. Projection of edited notes
+continues past the budget, so edits keep notifying.
+
 ### Whole first sync, reads and writes
 
 A first sync through the production sync engine and the local Worker, summing each
