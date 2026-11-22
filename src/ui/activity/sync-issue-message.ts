@@ -34,7 +34,7 @@ const FILE_TOO_LARGE: IssueExplanation = {
 };
 const VAULT_SCAN_INCOMPLETE: IssueExplanation = {
 	summary: 'Crate could not finish reading the vault.',
-	recovery: 'Check that the listed file or folder is available on this device and Obsidian has permission to read it. Then select Sync vault.',
+	recovery: 'Check that the listed file or folder is available on this device and Obsidian has permission to read it. Then select Sync now.',
 };
 const INCOMPATIBLE_PATH: IssueExplanation = {
 	summary: 'This file’s name or location is not compatible with sync on this device.',
@@ -85,10 +85,10 @@ const MESSAGE_RULES: Array<[RegExp, IssueExplanation]> = [
 		recovery: 'Check this device’s connection in Crate settings → Account and devices. Reconnect with a vault device credential, then sync again.' }],
 	[/\b429\b|too many requests|rate.limit/i, {
 		summary: 'The server is temporarily limiting requests.',
-		recovery: 'Wait a minute, then select Sync vault. Your pending changes will be retried.' }],
+		recovery: 'Wait a minute, then select Sync now. Your pending changes will be retried.' }],
 	[/\bENOSPC\b|disk.*full|no space left/i, {
 		summary: 'This device has run out of storage space.',
-		recovery: 'Free space on the device, then select Sync vault to resume.' }],
+		recovery: 'Free space on the device, then select Sync now to resume.' }],
 	[/free daily database limit/i, {
 		summary: 'Cloudflare’s free daily database limit stopped this sync.',
 		recovery: 'Your changes stay on this device. Sync again after the limit resets at 00:00 UTC. Cloudflare usage in Crate settings shows today’s totals; a Workers Paid plan removes the daily limit.' }],
@@ -106,7 +106,7 @@ const MESSAGE_RULES: Array<[RegExp, IssueExplanation]> = [
 	[/hash mismatch|size mismatch|invalid.*(?:upload|download|receipt|sync response)|response.*(?:paths|match)|missing.*(?:response|hash|version)|hash missing/i, TRANSFER_UNVERIFIED],
 	[/file.*changed|changed.*(?:file|upload|download)|disappeared|\bENOENT\b|did not converge|version.conflict/i, {
 		summary: 'A file changed or moved while sync was running.',
-		recovery: 'Finish editing or moving the file, then select Sync vault. Review the Conflicts tab if Crate reports competing edits.' }],
+		recovery: 'Finish editing or moving the file, then select Sync now. Review the Conflicts tab if Crate reports competing edits.' }],
 	[/delet(?:ion|ing).*deferred|stopped before deleting/i, {
 		summary: 'A deletion is waiting for other changes to finish syncing.',
 		recovery: 'Resolve the other listed errors, then sync again. Crate has kept the server copy until those changes are safe.' }],
@@ -115,10 +115,10 @@ const MESSAGE_RULES: Array<[RegExp, IssueExplanation]> = [
 		recovery: 'Update both the Crate plugin and server, then sync again.' }],
 	[/connection changed|fetch failed|failed to fetch|network|offline|\b5\d\d\b|internal server error/i, {
 		summary: 'The sync server could not complete this request.',
-		recovery: 'Check your connection and that the server is running, then select Sync vault. If it repeats, run sync diagnostics in Crate settings.' }],
+		recovery: 'Check your connection and that the server is running, then select Sync now. If it repeats, run sync diagnostics in Crate settings.' }],
 	[/^Not configured$/i, {
 		summary: 'Sync is not connected to a server.',
-		recovery: 'Connect a server in Crate settings, then select Sync vault.' }],
+		recovery: 'Connect a server in Crate settings, then select Sync now.' }],
 ];
 
 const atLine = ({ summary, recovery }: IssueExplanation, line: string | number | undefined): IssueExplanation =>
@@ -136,6 +136,6 @@ export function explainSyncIssue(issue: SyncIssue, serverUrl = ''): IssueExplana
 	}
 	return {
 		summary: issue.scope === 'reminders' ? 'Reminder setup needs attention.' : issue.path ? 'This file could not finish syncing.' : 'Sync could not finish.',
-		recovery: 'Review the details below, then select Sync vault to retry. If this repeats, run sync diagnostics in Crate settings and copy the error details.',
+		recovery: 'Review the details below, then select Sync now to retry. If this repeats, run sync diagnostics in Crate settings and copy the error details.',
 	};
 }
