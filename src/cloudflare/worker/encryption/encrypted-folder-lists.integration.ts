@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { installStorageCostMeter } from '../test-support/storage-cost-test-harness';
+import { installStorageCostMeter, type StorageCostMeter } from '../test-support/storage-cost-test-harness';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import worker from '../index';
 import { handleEncryptedFolderFiles } from './encrypted-folder-files';
@@ -22,8 +22,11 @@ import { derivePathTagKey, PathTags } from '@/encryption/path-tags';
 import { EncryptedReminderApi } from '@/pwa/reminders/encrypted-reminder-api';
 
 // Rows, queries and requests of encrypted folder lists, through the real Worker, D1 and R2.
-beforeEach(async () => { await applySchema(env.DB); });
-afterEach(async () => { await reset(); });
+// One meter for the whole test holds every alarm setup arms, so no notification or Reading
+// work runs inside a measurement.
+let meter: StorageCostMeter;
+beforeEach(async () => { await applySchema(env.DB); meter = await installStorageCostMeter(); });
+afterEach(async () => { await meter.restore(); await reset(); });
 
 const op = () => createReminderOperationId(Math.floor(Date.now() / 86_400_000));
 const b64 = (bytes: Uint8Array) => { let text = ''; for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192)); return btoa(text); };
@@ -92,9 +95,8 @@ async function setup() {
 const page = async (response: Response) => response.json() as Promise<{ files: Array<{ path: string; hash: string; revision: string }>; removed?: string[]; delta?: true;
 	nextCursor?: string | null; changeToken: string; deltaBase: string }>;
 
-async function measure<T>(action: () => Promise<T>) {
-	const meter = await installStorageCostMeter();
-	try { return await meter.measure(action, { alarms: false }); } finally { await meter.restore(); }
+function measure<T>(action: () => Promise<T>) {
+	return meter.measure(action, { alarms: false });
 }
 
 it.each([100, 1000])('answers an unchanged poll of %i notes with a 304 that reads no folder rows', async count => {
