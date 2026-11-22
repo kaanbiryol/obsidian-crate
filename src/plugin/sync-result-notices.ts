@@ -11,17 +11,17 @@ interface NoticeHost {
 	isMobile: boolean;
 	register(cleanup: () => void): void;
 	showSyncError(message: string): void;
+	/** A persistent notice with a link to review the conflicts. */
+	showConflicts(message: string): void;
 }
 
 export const RESTART_NOTICE = 'Obsidian settings changed on another device. Restart Obsidian to apply them.';
 
-/** A persistent notice (duration 0) summarizing the conflicts one sync created. */
-function notifyConflicts(conflictPaths: string[]): void {
-	if (conflictPaths.length === 0) return;
-	const message = conflictPaths.length === 1
+/** Summarizes the conflicts one sync created. */
+function conflictMessage(conflictPaths: string[]): string {
+	return conflictPaths.length === 1
 		? `Sync conflict: ${conflictPaths[0]}\nReview the affected file; a local version may have been saved as a conflict copy.`
 		: `${conflictPaths.length} sync conflicts detected.\nReview the affected files and any conflict copies.`;
-	new Notice(message, 0);
 }
 
 /**
@@ -34,7 +34,7 @@ export function registerSyncResultNotices(host: NoticeHost, runtime: NoticeRunti
 	let failing = false, restartShown = false;
 	const configPrefix = `${host.configDir}/`;
 	const listener = (result: SyncResult) => {
-		notifyConflicts(result.conflicts);
+		if (result.conflicts.length) host.showConflicts(conflictMessage(result.conflicts));
 		// A Crate update shows its own notice once it is installed.
 		const changedConfig = [...result.downloadedPaths, ...result.mergedPaths]
 			.some(path => path.startsWith(configPrefix) && !isCrateUpdatePath(path, host.configDir));

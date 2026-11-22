@@ -105,11 +105,20 @@ it('stops from sync activity as the Stop sync command does, so settings show aut
 
 it('syncs from sync activity as Sync now does, reporting failures instead of rejecting', async () => {
  const sync = vi.fn(async () => { throw new Error('Offline'); });
- const plugin = { app: {}, settings: {}, syncRuntime: { sync } } as unknown as CratePlugin;
+ const plugin = { app: {}, settings: {}, syncRuntime: { sync, isConfigured: () => true } } as unknown as CratePlugin;
  openSyncActivity(plugin);
  await expect(activity.actions[0]!.sync()).resolves.toBeUndefined();
  expect(sync).toHaveBeenCalledOnce();
  expect(Notice.messages).toEqual(['Sync failed: Offline']);
+});
+
+it('asks to connect a server when sync activity syncs before setup', async () => {
+ const sync = vi.fn();
+ const plugin = { app: {}, settings: {}, syncRuntime: { sync, isConfigured: () => false } } as unknown as CratePlugin;
+ openSyncActivity(plugin);
+ await activity.actions[0]!.sync();
+ expect(sync).not.toHaveBeenCalled();
+ expect(Notice.messages).toEqual(['Connect a server in Crate settings before syncing.']);
 });
 
 it('opens activity and syncs only when a confirmed replacement is pending', async () => {

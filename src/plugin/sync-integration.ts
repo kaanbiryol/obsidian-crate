@@ -1,7 +1,7 @@
 import { registerSyncStatus } from './sync-status';
 import { registerSyncResultNotices } from './sync-result-notices';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
-import { showSyncErrorNotice } from '../ui/sync-error-notice';
+import { showConflictNotice, showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, Platform, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { SyncRuntime } from '../sync/runtime/runtime';
@@ -35,6 +35,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		isMobile: Platform.isMobile,
 		register: cleanup => plugin.register(cleanup),
 		showSyncError: message => showSyncError(plugin, message),
+		showConflicts: message => showConflictNotice(message, () => openSyncActivity(plugin, 'conflicts')),
 	}, plugin.syncRuntime);
 	let serverUnavailable = false;
 	plugin.syncRuntime.addStateChangeListener(state => {
@@ -145,6 +146,8 @@ export async function runSyncNow(plugin: CratePlugin, held?: readonly string[]):
 		// Startup initialization runs after the workspace is ready.
 		await waitForSyncReady(plugin);
 		if (signal.aborted) return;
+		// Sync activity opens without a server; its Sync button then needs one.
+		if (!plugin.syncRuntime.isConfigured()) { new Notice('Connect a server in Crate settings before syncing.'); return; }
 		const result = await plugin.syncRuntime.sync(undefined, { held });
 		if (result.outcome === 'cancelled') return;
 		if (!result.success) {

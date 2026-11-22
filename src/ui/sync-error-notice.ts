@@ -18,3 +18,18 @@ export function showSyncErrorNotice(message: string, viewErrors: () => void): vo
 		viewErrors();
 	});
 }
+
+/** A persistent conflict notice whose link opens conflict review. */
+export function showConflictNotice(message: string, review: () => void): void {
+	const content = createFragment();
+	content.append(`${message} `);
+	const link = createEl('a', { text: 'Review conflicts', href: '#', cls: 'crate-sync-error-link' });
+	content.append(link);
+	const notice = new Notice(content, 0);
+	link.addEventListener('click', (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+		notice.hide();
+		review();
+	});
+}

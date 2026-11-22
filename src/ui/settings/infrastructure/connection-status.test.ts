@@ -16,7 +16,7 @@ describe('connection status', () => {
 		const cleanup = renderConnectionStatus({ containerEl: new FakeElement('div') as never, plugin: {
 			syncRuntime: {
 				getState: () => ({ status: 'idle', lastSync: null }),
-				sync, addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+				sync, isConfigured: () => true, addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
 			},
 		} as never });
 		const button = MockSetting.instances[0]!.buttons.find(button => button.buttonEl.textContent === 'Sync now')!;

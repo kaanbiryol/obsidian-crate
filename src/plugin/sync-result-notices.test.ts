@@ -13,12 +13,13 @@ function setup(isMobile = true) {
 	let state: SyncState = { status: 'error', lastSync: null, lastError: 'Upload failed', pendingChanges: 0, conflictCount: 0 };
 	const cleanups: Array<() => void> = [];
 	const showSyncError = vi.fn();
+	const showConflicts = vi.fn((message: string) => { notices.push(message); });
 	const runtime = {
 		getState: () => state,
 		addSyncResultListener: vi.fn((added: typeof listener) => { listener = added; }),
 		removeSyncResultListener: vi.fn(),
 	};
-	registerSyncResultNotices({ configDir: '.obsidian', isMobile, register: cleanup => cleanups.push(cleanup), showSyncError }, runtime);
+	registerSyncResultNotices({ configDir: '.obsidian', isMobile, register: cleanup => cleanups.push(cleanup), showSyncError, showConflicts }, runtime);
 	return {
 		runtime, showSyncError,
 		emit: (result: Partial<SyncResult>) => listener({ ...createEmptySyncResult(), ...result }),
