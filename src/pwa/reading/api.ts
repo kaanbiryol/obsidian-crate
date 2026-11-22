@@ -23,12 +23,20 @@ import { crateProtocol, crateRequestHeaders, forgetRefusedProtocol } from '../co
 const ENCRYPTED_READING_PATH = new RegExp(`^/reading/(?:${ENCRYPTED_READING_ACTIONS.join('|')})(?:\\?|$)`);
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
 onReadingEncryptionReset(() => { encryptedClient = undefined; });
+
+/** The server answers within 20 seconds; larger bodies also need time to travel. An encrypted
+ * capture uploads its images, and an encrypted extract downloads them. */
+export function readingRequestTimeout(path: string, body?: string): number {
+	const upload = Math.ceil((body?.length ?? 0) / (256 * 1024)) * 1000;
+	return 20_000 + upload + (path === '/reading/encrypted-extract' ? 40_000 : 0);
+}
+
 async function rawReadingRequest(path: string, session: ReadingSession | null, body?: string, extraHeaders: Record<string, string> = {}): Promise<Response> {
 	if (session) assertReadingSession(session);
 	const method = body === undefined ? 'GET' : 'POST';
 	const protocolHeaders = crateRequestHeaders(session?.token, await crateProtocol(path, method));
 	if (session) assertReadingSession(session);
-	const response = await fetch(path, { method, cache: 'no-store', signal: AbortSignal.timeout(20_000),
+	const response = await fetch(path, { method, cache: 'no-store', signal: AbortSignal.timeout(readingRequestTimeout(path, body)),
 		headers: { ...protocolHeaders, ...session ? readingEncryptionHeaders() : {}, 'Content-Type': 'application/json', ...extraHeaders }, body });
 	if (session) assertReadingSession(session);
 	await forgetRefusedProtocol(response);
