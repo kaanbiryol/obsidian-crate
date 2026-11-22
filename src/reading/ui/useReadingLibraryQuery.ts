@@ -26,7 +26,7 @@ interface ReadingLibraryQuery {
  * library keeps listing the previous search or tag until the new one answers, then changes the
  * list, count and tags together. With `holdPrevious`, another section keeps the previous section listed the
  * same way, so a switch changes screens once its list is ready; otherwise, and when slow, it shows a loading state.
- * The previous list is `pending` while it waits, and a visible spinner stays at least MIN_LOADING_MS. */
+ * The previous list is `pending`, and stays as it was, while it waits, and a visible spinner stays at least MIN_LOADING_MS. */
 export function useReadingLibraryQuery({ snapshot, source, section, query, tag, holdPrevious = false }: ReadingLibraryQuery) {
 	// Filter on a deferred query so typing never waits for the list to re-render.
 	const deferredQuery = useDeferredValue(query);
@@ -54,7 +54,7 @@ export function useReadingLibraryQuery({ snapshot, source, section, query, tag, 
 	const snapshotItems = snapshot.items;
 	const localTags = useMemo(() => source ? [] : countReadingTags(snapshotItems, section), [source, snapshotItems, section]);
 	const tags = source ? (otherSection ? [] : pages.tags) : localTags;
-	// A loading state that replaced a slow request's dimmed list already waited, so its spinner shows at once.
+	// A loading state that replaced a slow request's held list already waited, so its spinner shows at once.
 	const shownLoading = useMinimumLoading(source ? !pages.answered || otherSection || pages.slow : snapshot.loading,
 		source && pages.slow ? 0 : LOADING_INDICATOR_DELAY_MS, MIN_LOADING_MS);
 	const loading = shownLoading.loading, immediateLoading = shownLoading.appearDelayMs === 0;

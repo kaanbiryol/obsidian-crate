@@ -54,7 +54,7 @@ it('keeps the previous tag\'s list and count until the new tag answers, then sho
 		// The previous list shows pending at once, so the tap reads as taken.
 		await act(async () => { await vi.advanceTimersByTimeAsync(100); });
 		expect(hook.current).toMatchObject({ count: 2, loading: false, pending: true });
-		// The dimmed list already waited, so the spinner shows at once.
+		// The held list already waited, so the spinner shows at once.
 		await act(async () => { await vi.advanceTimersByTimeAsync(150); });
 		expect(hook.current).toMatchObject({ loading: true, immediateLoading: true, pending: false });
 		// Once shown, the spinner stays 300ms even though the tag answers sooner.

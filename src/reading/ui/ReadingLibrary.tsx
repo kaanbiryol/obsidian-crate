@@ -127,7 +127,7 @@ export function ReadingLibraryPanel({
 	// A tag swaps the list in place. With the shared fade, a copy of the departing rows
 	// fades out over the new list once the tag's results show, so rows both tags list stay
 	// steady. Sections and loading states have their own transitions.
-	const prepareTagCrossfade = useTagCrossfade(lists, shownSection, shownTag, loading, waiting);
+	const prepareTagCrossfade = useTagCrossfade(lists, shownSection, shownTag, loading);
 	// Removing a local library's last use of the selected tag clears the filter.
 	const snapshotItems = snapshot.items;
 	useEffect(() => {
@@ -192,7 +192,7 @@ export function ReadingLibraryPanel({
 				<ReadingTagFilter tags={tags} selected={shownSection === section ? tag : shownTag} onChange={selectTag} />
 				{beforeListContent}
 				<div className="crate-reading__list-scroll" ref={setListRef} tabIndex={-1} onScroll={loadNearEnd}
-					data-pending={waiting || undefined} aria-busy={waiting || undefined}>
+					aria-busy={waiting || undefined}>
 					{notice}
 					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, shownSection))}
 						onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />

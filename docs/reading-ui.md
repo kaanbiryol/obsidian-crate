@@ -416,9 +416,10 @@ Its header submit action targets the form; there are no footer actions.
 Reading sections keep their pages through a sync while they reload. Switching
 sections on a visible Reading screen to one the PWA has not read yet keeps the
 current screen, with the dock already on the new tab, until its first page
-answers, then dissolves once. A section, tag or search the PWA has not read dims
-the current list to 45% at once, with the 120ms feedback curve, so the tap reads
-as taken; only a request slower than 250ms (counted after a search's typing
+answers, then dissolves once. A section, tag or search the PWA has not read keeps
+the current list as it is, since the dock, chip or search field already shows the
+tap was taken; dimming it first made the dissolve read as a fade-out and a pop.
+Only a request slower than 250ms (counted after a search's typing
 delay) replaces it with a loading state, whose spinner shows at once rather than
 after the usual 250ms spinner delay. A spinner that became visible stays at least
 300ms so a quick answer never flickers it; a load that answers before its spinner

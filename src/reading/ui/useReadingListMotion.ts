@@ -46,12 +46,10 @@ export function useCollapseDepartedRows(lists: SectionLists, section: ReadingSec
 /** Crossfades a tag change in place. Call the returned function as a tag is selected, after the
  * list scrolls to the top: once that tag's results show, a copy of the departing rows fades out
  * over the new list, so rows both tags list stay steady. */
-export function useTagCrossfade(lists: SectionLists, section: ReadingSection, tag: string | null, loading: boolean, waiting: boolean): (next: string | null) => void {
+export function useTagCrossfade(lists: SectionLists, section: ReadingSection, tag: string | null, loading: boolean): (next: string | null) => void {
 	const reduceMotion = useReducedMotion();
 	const shownFilter = useRef<{ section: ReadingSection; tag: string | null } | null>(null);
 	const departingList = useRef<{ tag: string | null; node: HTMLElement } | null>(null);
-	// Whether the last painted list was dimmed, read below before the next effect updates it.
-	const wasWaiting = useRef(false);
 	useLayoutEffect(() => {
 		const previous = shownFilter.current, departing = departingList.current, list = lists.current.get(section);
 		shownFilter.current = loading ? null : { section, tag };
@@ -65,14 +63,11 @@ export function useTagCrossfade(lists: SectionLists, section: ReadingSection, ta
 			position: 'absolute', top: `${list.offsetTop}px`, left: `${list.offsetLeft}px`, width: `${list.offsetWidth}px`, height: `${list.offsetHeight}px`,
 			boxSizing: 'border-box', pointerEvents: 'none', background: opaqueBackground(list, owner),
 		});
-		// Rows dimmed while the tag loaded leave from where they were.
-		if (wasWaiting.current) node.dataset.pending = 'true';
 		list.after(node);
 		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || PWA_FADE_TIMING.easing });
 		animation.onfinish = () => node.remove();
 		return () => { animation.cancel(); node.remove(); };
 	}, [lists, loading, section, tag]);
-	useLayoutEffect(() => { wasWaiting.current = waiting; }, [waiting]);
 	return useCallback((next: string | null) => {
 		// Copy the rows as they now show, scrolled to the top like the incoming list.
 		const list = lists.current.get(section);
