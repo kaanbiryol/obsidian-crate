@@ -2,7 +2,7 @@
 // compatibility check and any migration, restart, and rollback when a step fails before
 // data changed. Other installs print their own steps.
 import { execFile } from 'node:child_process';
-import { realpath } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, relative, isAbsolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -37,6 +37,7 @@ export function compareVersions(left, right) {
  * @property {(version: string) => Promise<void>} install
  * @property {(args: string[]) => Promise<string>} crate Runs the installed Crate CLI.
  * @property {() => Promise<boolean>} waitRunning
+ * @property {() => Promise<string | null>} metadata The data directory's `server.json`, which a starting release rewrites with its revision.
  * @property {(message: string) => void} log
  */
 
@@ -62,6 +63,7 @@ export async function updateGlobalInstall({ dataDir, current, backupRoot, now = 
 		throw new Error(`Could not back up before updating, so nothing changed: ${error.message}`);
 	}
 	steps.log(`Backup verified: ${backup}`);
+	const metadataBefore = await steps.metadata();
 	let migrated = false;
 	try {
 		await steps.install(latest);
@@ -89,8 +91,10 @@ export async function updateGlobalInstall({ dataDir, current, backupRoot, now = 
 	await steps.start();
 	if (await steps.waitRunning()) { steps.log(`Crate ${latest} is running.`); return 'updated'; }
 	if (migrated) throw new Error(`Crate ${latest} migrated your data but did not start. Check its log. To go back, stop the service, restore ${backup} into an empty directory with the restore command of Crate ${current}, and start that.`);
-	steps.log(`Crate ${latest} did not start. Reinstalling Crate ${current}.`);
 	await steps.stop();
+	// A start that got far enough records its newer revision, which the previous release refuses.
+	if (await steps.metadata() !== metadataBefore) throw new Error(`Crate ${latest} opened your data but did not start, so it stays installed and stopped. Check its log and run crate-server start. To go back, restore ${backup} into an empty directory with the restore command of Crate ${current}, and start that.`);
+	steps.log(`Crate ${latest} did not start. Reinstalling Crate ${current}.`);
 	await steps.install(current);
 	await steps.start();
 	throw new Error(`Crate stayed at ${current} and your data is unchanged. The backup is at ${backup}.`);
@@ -119,6 +123,7 @@ export async function update({ dataDir, signal }) {
 		backup: output => backupLocalServer(dataDir, output),
 		install: version => runProcess('npm', ['install', '-g', `${PACKAGE_NAME}@${version}`], { signal }),
 		crate: async args => (await execFileAsync(process.execPath, [script, ...args])).stdout,
+		metadata: () => readFile(join(dataDir, 'server.json'), 'utf8').catch(() => null),
 		waitRunning: async () => {
 			for (let attempt = 0; attempt < 60; attempt++) {
 				if (await running(dataDir)) return true;

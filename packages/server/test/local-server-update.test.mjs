@@ -17,6 +17,7 @@ function steps({ check = { requiresMigration: false }, ...overrides } = {}) {
 		install: async version => { calls.push(`install ${version}`); },
 		crate: async args => { calls.push(args.slice(0, 2).join(' ')); return JSON.stringify(check); },
 		waitRunning: async () => true,
+		metadata: async () => '{"serverRevision":1}',
 		log: () => {},
 		...overrides,
 	};
@@ -87,6 +88,14 @@ test('rolls back a release that does not start, unless it already migrated the d
 	const migrated = steps({ waitRunning: async () => false, check: { requiresMigration: true } });
 	await assert.rejects(updateGlobalInstall(options, migrated.fake), /migrated your data but did not start/);
 	assert.equal(migrated.calls.filter(call => call === 'install 1.0.0').length, 0);
+});
+
+test('keeps a release that recorded its revision before failing to start, since the previous one refuses that data', async () => {
+	let metadata = '{"serverRevision":1}';
+	const opened = steps({ waitRunning: async () => false, start: async () => { metadata = '{"serverRevision":2}'; }, metadata: async () => metadata });
+	await assert.rejects(updateGlobalInstall(options, opened.fake), /opened your data but did not start, so it stays installed and stopped/);
+	assert.equal(opened.calls.filter(call => call === 'install 1.0.0').length, 0);
+	assert.equal(opened.calls.at(-1), 'stop');
 });
 
 test('a stopped server is updated but not started', async () => {

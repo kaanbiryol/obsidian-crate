@@ -799,8 +799,10 @@ With a global npm install, `crate-server update` does every step:
 4. Starts the service again and waits for it to answer.
 
 If installing, the check, or the first start fails before data changed, it
-reinstalls the previous release and starts that. After a migration it cannot go
-back automatically; it prints the backup to restore with the previous release.
+reinstalls the previous release and starts that. After a migration, or a first
+start that already recorded the new release in `server.json`, it cannot go back
+automatically: it leaves the new release installed and stopped, and prints the
+backup to restore with the previous release.
 With npx, stop Crate and run `npx @kaanbiryol/crate-server@latest`; startup
 refuses data it cannot read.
 
