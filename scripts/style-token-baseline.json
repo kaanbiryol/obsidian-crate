@@ -101,7 +101,7 @@
 		"src/reading/ui/styles/_video.scss": 1,
 		"src/reminders/ui/plugin/_reminder-source-notice.scss": 2,
 		"src/reminders/ui/shared/styles/_date-picker.scss": 3,
-		"src/reminders/ui/shared/styles/_editor-actions.scss": 1,
+		"src/reminders/ui/shared/styles/_editor-actions.scss": 2,
 		"src/reminders/ui/shared/styles/_editor-fields.scss": 1,
 		"src/reminders/ui/shared/styles/_picker-fields.scss": 1,
 		"src/reminders/ui/shared/styles/_primary-screen.scss": 1,
