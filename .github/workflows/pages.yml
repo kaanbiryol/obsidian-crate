@@ -87,6 +87,9 @@ jobs:
         run: |
           npm ci
           npm --prefix docs-site ci
+      # Mermaid diagrams render to static SVG when the docs are checked and built in headless Chromium.
+      - name: Install the diagram browser
+        run: npm --prefix docs-site exec -- playwright install --with-deps chromium
       - name: Check documentation
         run: npm run check:docs
       - name: Verify shortcut template and website downloads
@@ -103,9 +106,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node scripts/build-changelog.mjs site/changelog
-      # Mermaid diagrams render to static SVG at build time in headless Chromium.
-      - name: Install the diagram browser
-        run: npm --prefix docs-site exec -- playwright install --with-deps chromium
       # Documentation links include the generated shortcut installation page.
       - name: Build static site and documentation
         run: npm run build:site
