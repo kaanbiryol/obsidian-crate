@@ -4,8 +4,7 @@ import type { FileEntry } from '../../../protocol/sync-types';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { corsHeaders, corsResponse } from '../http/cors';
 import { fileTransportLimit } from '../../../encryption/file-format';
-import { FILE_VERSION_CUTOFF_SQL, HISTORY_RETENTION_MS_SQL, LAST_SEQ_SQL, storedObjectMatchesMetadata } from './storage';
-import { historyRetentionMs } from '../server/history-retention-handler';
+import { FILE_VERSION_CUTOFF_SQL, FILE_VERSION_FLOOR_SQL, HISTORY_RETENTION_MS_SQL, LAST_SEQ_SQL, storedObjectMatchesMetadata } from './storage';
 import { sanitizePath } from '../http/request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
@@ -30,16 +29,26 @@ async function readIndex(bucket: R2Bucket) {
 	return { checkpoints: parseSharedCheckpointList(JSON.parse(await object.text())), etag: object.etag };
 }
 
+interface HistoryLimits { retention: number; floor: number }
+
 /** Whether a checkpoint is still kept: before its own expiry, and within the current
- * retention, which may have been shortened since it was saved. */
-const live = (entry: SharedCheckpoint, retention: number, now = Date.now()) =>
-	entry.expiresAt > now && Date.parse(entry.timestamp) + retention > now;
+ * retention, which may have been shortened since it was saved. Files it lists were
+ * replaced after it was saved, so once maintenance started removing versions kept
+ * after it (the floor), a longer retention cannot bring it back. */
+const live = (entry: SharedCheckpoint, { retention, floor }: HistoryLimits, now = Date.now()) =>
+	entry.expiresAt > now && Date.parse(entry.timestamp) + retention > now && Date.parse(entry.timestamp) >= floor;
+
+async function historyLimits(db: D1Database): Promise<HistoryLimits> {
+	const row = await db.prepare(`SELECT ${HISTORY_RETENTION_MS_SQL} AS retention, ${FILE_VERSION_FLOOR_SQL} AS floor`).first<HistoryLimits>();
+	if (!row) throw new Error('Could not read history retention');
+	return row;
+}
 
 async function generation(db: D1Database) {
 	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS sequence,
         COALESCE((SELECT import_state FROM server_state WHERE id = 1), 'complete') AS state,
-        CAST(strftime('%s', 'now') AS INTEGER) * 1000 AS now, ${HISTORY_RETENTION_MS_SQL} AS retention`)
-		.first<{ sequence: number; state: string; now: number; retention: number }>();
+        CAST(strftime('%s', 'now') AS INTEGER) * 1000 AS now, ${HISTORY_RETENTION_MS_SQL} AS retention, ${FILE_VERSION_FLOOR_SQL} AS floor`)
+		.first<{ sequence: number; state: string; now: number } & HistoryLimits>();
 	if (!row) throw new Error('Could not read checkpoint generation');
 	return row;
 }
@@ -48,7 +57,7 @@ async function generation(db: D1Database) {
 export async function createSharedCheckpoint(bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const start = await generation(db);
 	if (start.state !== 'complete') return response({ error: 'Finish the initial sync before creating a checkpoint.' }, 409);
-	const existing = (await readIndex(bucket)).checkpoints.find(entry => entry.sequence === start.sequence && live(entry, start.retention, start.now));
+	const existing = (await readIndex(bucket)).checkpoints.find(entry => entry.sequence === start.sequence && live(entry, start, start.now));
 	if (existing) return response({ checkpoint: existing });
 	// Every copy live now is kept when replaced (`keepReplacedVersionSql`); a write
 	// since `start` changes the sequence, so this inventory is rejected below.
@@ -84,7 +93,7 @@ export async function createSharedCheckpoint(bucket: R2Bucket, db: D1Database): 
 	// Each conditional write that did not apply leaves it unpublished.
 	for (let attempt = 0; attempt < 5; attempt++) {
 		const index = await readIndex(bucket);
-		const current = index.checkpoints.filter(entry => live(entry, start.retention));
+		const current = index.checkpoints.filter(entry => live(entry, start));
 		const duplicate = current.find(entry => entry.sequence === checkpoint.sequence);
 		if (duplicate) return deleteCheckpointObjects(bucket, [checkpoint], response({ checkpoint: duplicate }));
 		const checkpoints = [...current, checkpoint].sort((a, b) => b.sequence - a.sequence || b.timestamp.localeCompare(a.timestamp)).slice(0, MAX_SHARED_CHECKPOINTS);
@@ -108,8 +117,8 @@ async function deleteCheckpointObjects(bucket: R2Bucket, checkpoints: SharedChec
 }
 
 export async function listSharedCheckpoints(bucket: R2Bucket, db: D1Database): Promise<Response> {
-	const [index, retention] = await Promise.all([readIndex(bucket), historyRetentionMs(db)]);
-	return response({ version: 1, checkpoints: index.checkpoints.filter(entry => live(entry, retention)) });
+	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
+	return response({ version: 1, checkpoints: index.checkpoints.filter(entry => live(entry, limits)) });
 }
 
 const replaced = () => response({ error: 'This shared checkpoint expired or was replaced by a newer checkpoint.' }, 410);
@@ -118,8 +127,8 @@ const replaced = () => response({ error: 'This shared checkpoint expired or was 
 export async function getSharedCheckpoint(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const id = new URL(request.url).searchParams.get('id');
 	if (!isCheckpointId(id)) return response({ error: 'Invalid checkpoint ID' }, 400);
-	const [index, retention] = await Promise.all([readIndex(bucket), historyRetentionMs(db)]);
-	const entry = index.checkpoints.find(entry => entry.id === id && live(entry, retention));
+	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
+	const entry = index.checkpoints.find(entry => entry.id === id && live(entry, limits));
 	if (!entry) return replaced();
 	return streamCheckpointObject(bucket, keyFor(id), JSON.stringify(entry));
 }
@@ -144,8 +153,8 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
 	const params = new URL(request.url).searchParams;
 	const id = params.get('id'), path = sanitizePath(params.get('path') ?? ''), revision = params.get('revision');
 	if (!isCheckpointId(id) || !path || !isSyncRevision(revision)) return response({ error: 'A checkpoint and file path are required' }, 400);
-	const [index, retention] = await Promise.all([readIndex(bucket), historyRetentionMs(db)]);
-	const checkpoint = index.checkpoints.find(entry => entry.id === id && live(entry, retention));
+	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
+	const checkpoint = index.checkpoints.find(entry => entry.id === id && live(entry, limits));
 	if (!checkpoint) return response({ error: 'This shared checkpoint expired or was replaced.' }, 410);
 	const file = await db.prepare(`SELECT hash, size FROM files WHERE portable_path = ? AND path = ? AND storage_key = ?
         UNION ALL SELECT hash, size FROM file_versions WHERE storage_key = ? AND path = ? AND kept_at > ${FILE_VERSION_CUTOFF_SQL} LIMIT 1`)
@@ -164,8 +173,8 @@ export async function pruneSharedCheckpoints(bucket: R2Bucket, db: D1Database): 
 	const cursor = await readMaintenanceValue(db, cursorKey);
 	// One R2 list and delete call each handle up to R2_KEYS_PER_CALL keys.
 	const listing = await bucket.list({ prefix: PREFIX, limit: R2_KEYS_PER_CALL, ...(cursor ? { cursor } : {}) });
-	const [index, retention] = await Promise.all([readIndex(bucket), historyRetentionMs(db)]);
-	const retained = new Set(index.checkpoints.filter(entry => live(entry, retention)).map(entry => keyFor(entry.id)));
+	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
+	const retained = new Set(index.checkpoints.filter(entry => live(entry, limits)).map(entry => keyFor(entry.id)));
 	const garbage = listing.objects.filter(object => object.uploaded.getTime() < Date.now() - 86_400_000 && !retained.has(object.key));
 	if (garbage.length) await bucket.delete(garbage.map(object => object.key));
 	if (listing.truncated) await putMaintenanceValue(db, cursorKey, listing.cursor!).run();

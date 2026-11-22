@@ -23,8 +23,8 @@ export const FILE_VERSION_KEPT_AT_SQL = `MAX(?, (CAST(strftime('%s', 'now') AS I
 export const FILE_VERSION_FLOOR_KEY = 'file_version_floor';
 /** Versions kept at or before this are expired: `kept_at` plus the current retention, and
  * never at or below the floor. Bind `Date.now()`. */
-export const FILE_VERSION_CUTOFF_SQL = `MAX(? - ${HISTORY_RETENTION_MS_SQL},
-	COALESCE((SELECT CAST(value AS INTEGER) FROM maintenance_state WHERE key = '${FILE_VERSION_FLOOR_KEY}'), 0))`;
+export const FILE_VERSION_FLOOR_SQL = `COALESCE((SELECT CAST(value AS INTEGER) FROM maintenance_state WHERE key = '${FILE_VERSION_FLOOR_KEY}'), 0)`;
+export const FILE_VERSION_CUTOFF_SQL = `MAX(? - ${HISTORY_RETENTION_MS_SQL}, ${FILE_VERSION_FLOOR_SQL})`;
 
 export interface FileStorageRow {
 	hash: string;

@@ -129,3 +129,24 @@ it('saves checkpoints for the chosen period and hides older ones after shortenin
 	expect(next.checkpoint.expiresAt - Date.parse(next.checkpoint.timestamp)).toBe(7 * DAY_MS);
 	expect((await listed()).map(entry => entry.id)).toEqual([next.checkpoint.id]);
 });
+
+it('keeps checkpoints hidden after a longer period once maintenance removed versions they need', async () => {
+	await env.DB.prepare("INSERT INTO changelog(path, action, hash, size) VALUES ('a.md', 'delete', '', 0)").run();
+	const created = await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: SharedCheckpoint };
+	const old = { ...created.checkpoint, timestamp: new Date(Date.now() - 10 * DAY_MS).toISOString(), expiresAt: Date.now() + 20 * DAY_MS };
+	await env.BUCKET.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints: [old] }));
+	const listed = async () => (await (await listSharedCheckpoints(env.BUCKET, env.DB)).json() as { checkpoints: SharedCheckpoint[] }).checkpoints;
+	// A file the checkpoint saw was replaced nine days ago.
+	await deleteFile('replaced.md');
+	await backdate('replaced.md', 9);
+
+	await setRetention(7);
+	expect(await expireFileVersions(env.BUCKET, env.DB)).toBe(false);
+	expect(await versionRows()).toEqual([]);
+	await setRetention(30);
+	expect(await listed()).toEqual([]);
+	// The vault is unchanged, so a new checkpoint is saved instead of returning the broken one.
+	const next = await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: SharedCheckpoint };
+	expect(next.checkpoint.id).not.toBe(old.id);
+	expect((await listed()).map(entry => entry.id)).toEqual([next.checkpoint.id]);
+});

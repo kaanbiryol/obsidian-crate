@@ -667,5 +667,6 @@ Before deleting a batch's objects, maintenance raises a floor in `maintenance_st
 batch's latest `kept_at`, and versions at or below it stay expired whatever the period,
 because their objects may already be gone. Checkpoints keep the expiry they were saved with, which
 their stored metadata repeats, and are also hidden and pruned once they are older than
-the current period. Both use the same commit-time rule, so a checkpoint never outlives
-the versions it references.
+the current period. Both use the same commit-time rule, and a checkpoint saved before the
+floor stays hidden after a longer period is set, so a checkpoint never outlives the
+versions it references.

@@ -4,7 +4,7 @@ import { HISTORY_RETENTION_MS_SQL } from '../sync/storage';
 import { DAY_MS, isHistoryRetentionDays } from '../../../protocol/history-retention';
 
 /** The retention in milliseconds, as statements that keep history read it. */
-export async function historyRetentionMs(db: D1Database): Promise<number> {
+async function historyRetentionMs(db: D1Database): Promise<number> {
 	const row = await db.prepare(`SELECT ${HISTORY_RETENTION_MS_SQL} AS ms`).first<{ ms: number }>();
 	if (!row) throw new Error('Could not read history retention');
 	return row.ms;
