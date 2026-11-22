@@ -113,8 +113,9 @@ export class CloudflareOperationPresentation {
 		if (!connection.success) {
 			if (connection.code === 'incompatible_protocol') {
 				this.progress.fail('Crate server is incompatible', `Sync is unavailable: ${connection.error}.`, [
-					'Reconnecting keeps the existing server version. To keep its remote data, use a matching plugin build and its recovery instructions.',
-					'For a fresh start, open Crate settings → Advanced server actions → Delete server and all data. After deletion, select Connect with Cloudflare and create a new server. Your local vault files are kept.',
+					'If the server is older than this plugin, select Update server in Crate settings on a desktop. Updating keeps its remote data.',
+					'If the server is newer, update Crate in Obsidian → Community plugins.',
+					'Only as a last resort, open Crate settings → Advanced server actions → Delete server and all data, which erases remote data, then select Connect with Cloudflare and create a new server. Your local vault files are kept.',
 				], { action: { label: 'Open settings', onClick: openSettings } });
 			} else {
 				this.progress.fail('Crate is connected with a warning', `The connection test failed: ${connection.error ?? 'Unknown error'}`,
