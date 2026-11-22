@@ -8,9 +8,9 @@ export const bundleBudgets = {
 		// and gist saving, Vault history's Deleted files view and chunked transfers for
 		// self-hosted servers, plus readable connection and pairing errors, conflict review
 		// links, the recovery key option when requesting keys and revoking replaced Cloudflare
-		// logins, measure 5.017 MB raw / 2.318 MB gzip.
+		// logins, with checkpoints saved as change numbers, measure 5.017 MB raw / 2.3182 MB gzip.
 		maxBytes: 5017000,
-		maxGzipBytes: 2318000,
+		maxGzipBytes: 2318300,
 	},
 	{
 		path: 'dist/styles.css',
