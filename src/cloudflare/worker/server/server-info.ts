@@ -10,8 +10,6 @@ import { BULK_NEW_UPLOAD_CAPABILITY, CHUNKED_UPLOAD_CAPABILITY, MAX_FILE_SIZE_BY
 import {
 	CRATE_PLUGIN_PROTOCOL,
 	CRATE_SERVICE_ID,
-	HOSTED_SERVER_PROTOCOL,
-	serverProtocolRange,
 	type CrateServerInfo,
 } from '../../../protocol/server-info';
 import { corsResponse } from '../http/cors';
@@ -59,12 +57,12 @@ export const CRATE_SERVER_INFO: Omit<CrateServerInfo, 'serverRevision' | 'remind
 /** Reads no database, so installation can probe the build before creating its schema. */
 export async function handleServerInfo(env: Env): Promise<Response> {
 	const limit = maxFileBytes(env);
-	// A Cloudflare server never raises its limit, so it advertises protocol 1 and no limits,
-	// exactly as before. Only a raised limit allows files that travel in parts.
+	// A Cloudflare server never raises its limit, so it advertises no limits. Only a raised
+	// limit allows files that travel in parts.
 	const selfHosted = __CRATE_SELF_HOSTED__ ? {
-		protocol: serverProtocolRange(limit), limits: { maxFileBytes: limit, batch: BATCH_LIMITS },
+		limits: { maxFileBytes: limit, batch: BATCH_LIMITS },
 		capabilities: limit > MAX_FILE_SIZE_BYTES ? [...CRATE_SERVER_INFO.capabilities, CHUNKED_UPLOAD_CAPABILITY] : CRATE_SERVER_INFO.capabilities,
-	} : { protocol: HOSTED_SERVER_PROTOCOL };
+	} : {};
 	return corsResponse({ ...CRATE_SERVER_INFO, ...selfHosted,
 		shortcut: { version: READING_SHORTCUT_CONTRACT.version, revision: READING_SHORTCUT_CONTRACT.revision, minimumRevision: READING_SHORTCUT_CONTRACT.minimumRevision }, serverRevision: release.revision, ...(DEVELOPMENT_BUILD ? { developmentBuild: DEVELOPMENT_BUILD } : {}), schemaVersion: release.schemaVersion, deploymentFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT,
 		reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });

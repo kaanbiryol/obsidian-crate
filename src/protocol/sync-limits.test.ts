@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { deviceFileLimit, formatFileLimit, MAX_BUFFERED_FILE_BYTES, MAX_CONFIGURABLE_FILE_BYTES, MAX_FILE_SIZE_BYTES, parseMaxFileBytes, usesChunkedTransfer } from './sync-limits';
-import { serverMaxFileBytes, serverProtocolRange, CRATE_PLUGIN_PROTOCOL } from './server-info';
+import { serverMaxFileBytes } from './server-info';
 import { encryptedFileLimit, fileTransportLimit, ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES } from '../encryption/file-format';
 
 const MB = 1024 * 1024;
@@ -23,9 +23,7 @@ it('keeps mobile devices at the default limit', () => {
 	expect(formatFileLimit(MAX_FILE_SIZE_BYTES)).toBe('25MB');
 });
 
-it('narrows the protocol range only when a server raises its limit', () => {
-	expect(serverProtocolRange(MAX_FILE_SIZE_BYTES)).toBe(CRATE_PLUGIN_PROTOCOL);
-	expect(serverProtocolRange(30 * MB)).toEqual({ current: CRATE_PLUGIN_PROTOCOL.current, oldestCompatible: 2 });
+it('reads the file limit a server advertises', () => {
 	expect(serverMaxFileBytes({})).toBe(MAX_FILE_SIZE_BYTES);
 	expect(serverMaxFileBytes({ limits: { maxFileBytes: 30 * MB } })).toBe(30 * MB);
 });

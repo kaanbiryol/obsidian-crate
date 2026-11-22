@@ -1,4 +1,3 @@
-import { ADVERTISED_FILE_LIMIT_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
 import { MAX_CHECKPOINT_BYTES, MAX_CHECKPOINT_FILES, MAX_ENCRYPTED_CHECKPOINT_BYTES, MAX_SHARED_CHECKPOINTS, SELF_HOSTED_SHARED_CHECKPOINTS, isCheckpointId,
 	parseSharedCheckpointList, type SharedCheckpoint } from '../../../protocol/history-checkpoints';
 import type { FileEntry } from '../../../protocol/sync-types';
@@ -124,9 +123,7 @@ async function deleteCheckpointObjects(bucket: R2Bucket, checkpoints: SharedChec
 export async function listSharedCheckpoints(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
 	const checkpoints = index.checkpoints.filter(entry => live(entry, limits));
-	// Plugins before protocol 2 refuse a list longer than 20; give them the newest 20.
-	const older = Number(request.headers.get(CRATE_PROTOCOL_HEADER)) < ADVERTISED_FILE_LIMIT_PROTOCOL;
-	return response({ version: 1, checkpoints: __CRATE_SELF_HOSTED__ && older ? checkpoints.slice(0, MAX_SHARED_CHECKPOINTS) : checkpoints });
+	return response({ version: 1, checkpoints });
 }
 
 const replaced = () => response({ error: 'This shared checkpoint expired or was replaced by a newer checkpoint.' }, 410);

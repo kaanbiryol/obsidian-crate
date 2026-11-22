@@ -18,7 +18,7 @@ export interface CrateServerInfo {
 	readonly developmentBuild?: DevelopmentBuild;
 	readonly pwaAssetVersion?: string;
 	readonly deploymentFingerprint?: string;
-	/** Absent on servers older than protocol 2 and on Cloudflare, which allow the defaults. */
+	/** Absent on Cloudflare, which allows the defaults. */
 	readonly limits?: { readonly maxFileBytes: number; readonly batch?: BatchLimits };
 }
 
@@ -27,23 +27,9 @@ export interface CrateServerInfo {
  * when support for an older protocol is intentionally removed.
  */
 export const CRATE_PLUGIN_PROTOCOL: CrateProtocolRange = Object.freeze({
-	current: 2,
+	current: 1,
 	oldestCompatible: 1,
 });
-
-/** What a Cloudflare server advertises: it never raises its file limit, so it offers protocol 1
- * as before. It still accepts protocol 2 from current clients. */
-export const HOSTED_SERVER_PROTOCOL: CrateProtocolRange = Object.freeze({ current: 1, oldestCompatible: 1 });
-
-/** Protocol 2 clients honor the file limit a server advertises in `limits`. */
-export const ADVERTISED_FILE_LIMIT_PROTOCOL = 2;
-
-/** A server that allows larger files refuses older clients, which cannot read those files. */
-export function serverProtocolRange(maxFileBytes: number): CrateProtocolRange {
-	return maxFileBytes > MAX_FILE_SIZE_BYTES
-		? Object.freeze({ current: CRATE_PLUGIN_PROTOCOL.current, oldestCompatible: ADVERTISED_FILE_LIMIT_PROTOCOL })
-		: CRATE_PLUGIN_PROTOCOL;
-}
 
 /** The batch sizes the server accepts. */
 export function serverBatchLimits(info: Pick<CrateServerInfo, 'limits'>): BatchLimits {

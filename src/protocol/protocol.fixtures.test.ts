@@ -40,15 +40,15 @@ describe('frozen protocol fixtures', () => {
 			},
 		},
 		{
-			// A self-hosted server that allows larger files and so refuses protocol 1 clients.
-			file: 'server-info.v2.json',
+			// A self-hosted server that allows larger files.
+			file: 'server-info-self-hosted.v1.json',
 			stored: () => ({
 				service: 'crate', serverVersion: '1.0.0', pwaAssetVersion: 'fixture-pwa-2',
-				protocol: { current: 2, oldestCompatible: 2 },
+				protocol: { current: 1, oldestCompatible: 1 },
 				capabilities: ['web-pairing-v1', 'e2ee-v1', 'sync-v1', 'conditional-file-mutations'],
 				limits: { maxFileBytes: 100 * 1024 * 1024 },
 				shortcut: { version: 1, revision: 1, minimumRevision: 1 },
-				serverRevision: 2, schemaVersion: 1, deploymentFingerprint: hash('e'), reminderOperationDay: 20779,
+				serverRevision: 1, schemaVersion: 1, deploymentFingerprint: hash('e'), reminderOperationDay: 20779,
 			}),
 			decode: (stored: unknown) => {
 				const info = parseCrateServerInfo(stored);

@@ -7,7 +7,6 @@ import { sha256Hex } from '@/platform/sha256';
 
 export const UPLOAD_JOURNAL_VERSION = 1;
 /** Records of chunked uploads, whose bytes are in a `<operation>.bin` file beside them. */
-const CHUNKED_UPLOAD_JOURNAL_VERSION = 2;
 
 /** A record whose write never reached its final name. Its request was never dispatched. */
 export const isUnfinishedUploadRecord = (path: string): boolean => path.endsWith('.json.tmp');
@@ -51,8 +50,8 @@ export class UploadJournal {
 			try { raw = JSON.parse(await this.adapter.read(path)); } catch { throw new Error('Unreadable upload journal. Preserve the vault and its sync metadata before resetting.'); }
 			if (!isRecord(raw) || raw.authority !== this.authority || !isRecord(raw.file)) throw new Error('Upload journal belongs to another server or is damaged. Preserve it before resetting sync.');
 			const file = raw.file;
-			const chunked = raw.version === CHUNKED_UPLOAD_JOURNAL_VERSION && file.contentFile !== undefined;
-			if (raw.version !== UPLOAD_JOURNAL_VERSION && !chunked) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing.');
+			const chunked = file.contentFile !== undefined;
+			if (raw.version !== UPLOAD_JOURNAL_VERSION) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing.');
 			if (chunked && !present.has(`${this.directory}/${String(file.contentFile)}`)) throw new Error('A pending upload lost its saved bytes. Preserve the vault and compare local and remote files before resetting sync.');
 			if (typeof raw.sequence !== 'number' || !Number.isSafeInteger(raw.sequence) || raw.sequence < 1) throw new Error('Invalid upload journal sequence');
 			this.sequence = Math.max(this.sequence, raw.sequence);
@@ -126,7 +125,7 @@ export class UploadJournal {
 				if (await this.adapter.exists(path)) throw new Error('Invalid or reused upload operation identity');
 				// The bytes land before the record, so a record never names missing bytes.
 				if (contentPath && bytes) await this.adapter.writeBinary(contentPath, bytes);
-				await this.adapter.write(temporary, JSON.stringify({ version: contentPath ? CHUNKED_UPLOAD_JOURNAL_VERSION : UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
+				await this.adapter.write(temporary, JSON.stringify({ version: UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
 				await this.adapter.rename(temporary, path);
 			} catch (error) {
 				this.directoryReady = false;

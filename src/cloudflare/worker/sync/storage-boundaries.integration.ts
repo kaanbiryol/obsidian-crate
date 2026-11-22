@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
-import { ADVERTISED_FILE_LIMIT_PROTOCOL, CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
+import { CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
 import { formatFileLimit, MAX_FILE_SIZE_BYTES, SELF_HOSTED_BATCH_LIMITS } from '../../../protocol/sync-limits';
 import { sha256Hex } from '@/platform/sha256';
 
@@ -89,14 +89,11 @@ describe('a self-hosted server with a raised file limit', () => {
 	const upload = (body: BodyInit, headers: Record<string, string>, protocol?: number) => send('/sync/upload?path=attachment.bin', { method: 'PUT', body,
 		headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', ...headers } }, protocol);
 
-	it('advertises its limit and refuses clients that predate it', async () => {
+	it('advertises its limit', async () => {
 		const info = await (await send('/.well-known/crate')).json() as { limits: unknown; protocol: unknown; capabilities: string[] };
 		expect(info.limits).toEqual({ maxFileBytes: limit, batch: SELF_HOSTED_BATCH_LIMITS });
 		expect(info.capabilities).toContain('chunked-uploads-v1');
-		expect(info.protocol).toEqual({ current: CRATE_PLUGIN_PROTOCOL.current, oldestCompatible: ADVERTISED_FILE_LIMIT_PROTOCOL });
-		const old = await upload('old client', {}, 1);
-		expect(old.status).toBe(428);
-		expect(await liveFile()).toBeNull();
+		expect(info.protocol).toEqual(CRATE_PLUGIN_PROTOCOL);
 	});
 
 	it('round-trips a file above the default limit and refuses one byte over its own', { timeout: 120_000 }, async () => {

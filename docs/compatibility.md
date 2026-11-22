@@ -72,16 +72,9 @@ The parser also recognizes task lines ending in CRLF. The plugin validates raw M
 
 ## Protocol baseline
 
-Wire protocol 2 is the current contract, with oldest compatible version 1. Server revision and database schema are listed in the [current contract](current-contract.md).
+Wire protocol 1 is the current contract, with oldest compatible version 1. Server revision and database schema are listed in the [current contract](current-contract.md).
 
-Protocol 2 adds `limits.maxFileBytes` to `/.well-known/crate`: the largest file the server accepts. Protocol 2 clients read it before each sync and send the highest protocol both sides speak, including on encrypted-vault reads. In both directions:
-
-- **New client, older server:** the server advertises protocol 1 and no `limits`, so the client sends protocol 1 and keeps the 25 MB default.
-- **Older client, server at the default limit:** the server still accepts protocol 1. Nothing changes.
-- **Older client, self-hosted server with a raised limit:** the server advertises an oldest compatible protocol of 2. Released plugins stop before changes with "Update the Crate server before making changes" (their connection test reports "Incompatible Crate server protocol 2"), and the server refuses their encrypted-vault reads with "Update Crate before accessing this encrypted vault". Both mean that plugin needs updating. Without this fence, a protocol 1 client would fail to list an encrypted vault containing a file over 25 MB.
-- **Any client on mobile:** the client limit stays 25 MB, so larger server files are reported as skipped, as before.
-
-A Cloudflare server is built without self-hosted features and answers `/.well-known/crate` exactly as before: protocol `{ current: 1, oldestCompatible: 1 }` and no `limits`, so clients keep the 25 MB default and send protocol 1 for changes. It still accepts protocol 2 headers, which the same-build PWA sends on reads. A self-hosted server also advertises larger batch sizes in `limits.batch`, which older clients ignore and keep their smaller batches; it keeps up to 100 shared checkpoints but lists only the newest 20 to a request with protocol 1, which older parsers require; and it may keep history for 180 or 365 days, which older plugins cannot read and report as **Could not read the history period**. Capability `chunked-uploads-v1`, advertised only by a self-hosted server with a raised limit, adds `/sync/upload-session` and `Range` on `/sync/download`. Clients send attachments over 25 MB in parts only to a server that advertises it, and the raised limit that makes those files possible already refuses protocol 1 clients. Native Shortcuts use an independent capture contract. Use matching plugin, Worker and PWA builds when recreating a development deployment.
+A self-hosted server adds `limits` to `/.well-known/crate`: `maxFileBytes`, the largest file it accepts, and `batch`, its batch sizes. Clients read it before each sync. A Cloudflare server is built without self-hosted features and sends no `limits`, so clients keep the 25 MB default. On mobile the client limit stays 25 MB, so larger server files are reported as skipped. A self-hosted server keeps up to 100 shared checkpoints and may keep history for 180 or 365 days. Capability `chunked-uploads-v1`, advertised only by a self-hosted server with a raised limit, adds `/sync/upload-session` and `Range` on `/sync/download`; clients send attachments over 25 MB in parts only to a server that advertises it. Native Shortcuts use an independent capture contract. Use matching plugin, Worker and PWA builds.
 
 `protocol/rolling-upgrade.test.ts` exercises plugin writes against frozen
 protocol-1 metadata and preserves saved operation bodies. The PWA is served by

@@ -9,7 +9,7 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 | Server candidate revision | 1 |
 | Fresh database schema | 1 |
 | Oldest supported database schema | 1 |
-| Wire protocol | 2 |
+| Wire protocol | 1 |
 | Oldest compatible wire protocol | 1 |
 | Shortcut capture contract | 1 |
 | Shortcut template revision | 1 |

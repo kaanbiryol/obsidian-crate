@@ -1,0 +1,25 @@
+{
+	"stored": "{\"version\":1,\"authority\":\"https://crate.example.test\",\"sequence\":1,\"file\":{\"operationId\":\"e1_00020757_44444444-1111-4111-8111-111111111111\",\"path\":\"Media/video.bin\",\"hash\":\"2bc00c3a529e70e287789d155b26967249874de8a4f370d09d7864bf4948473d\",\"size\":34,\"contentType\":\"application/octet-stream\",\"expectedHash\":null,\"content\":\"\",\"intent\":{\"kind\":\"local\"},\"origin\":{\"clientSession\":\"33333333-3333-4333-8333-333333333333\",\"at\":\"2026-11-22T14:10:08.541Z\"},\"contentFile\":\"e1_00020757_44444444-1111-4111-8111-111111111111.bin\"}}",
+	"decoded": [
+		{
+			"entry": {
+				"operationId": "e1_00020757_44444444-1111-4111-8111-111111111111",
+				"path": "Media/video.bin",
+				"hash": "2bc00c3a529e70e287789d155b26967249874de8a4f370d09d7864bf4948473d",
+				"size": 34,
+				"contentType": "application/octet-stream",
+				"expectedHash": null,
+				"content": "",
+				"intent": {
+					"kind": "local"
+				},
+				"origin": {
+					"clientSession": "33333333-3333-4333-8333-333333333333",
+					"at": "2026-11-22T14:10:08.541Z"
+				},
+				"contentFile": "e1_00020757_44444444-1111-4111-8111-111111111111.bin"
+			},
+			"content": "Saved beside its record, not in it"
+		}
+	]
+}

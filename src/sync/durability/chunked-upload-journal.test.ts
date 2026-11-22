@@ -20,7 +20,7 @@ it('saves a chunked upload\'s bytes beside its record, never as base64 in it, an
 	const manifest = create();
 	const upload = await manifest.uploadJournal.prepareChunked(file, bytes, 20000);
 	const record = JSON.parse(disk.text(`${directory}/${upload.operationId}.json`)) as { version: number; file: { content: string; contentFile: string } };
-	expect(record).toMatchObject({ version: 2, file: { content: '', contentFile: `${upload.operationId}.bin` } });
+	expect(record).toMatchObject({ version: 1, file: { content: '', contentFile: `${upload.operationId}.bin` } });
 	expect(new TextDecoder().decode(disk.read(`${directory}/${upload.operationId}.bin`))).toBe('large attachment bytes');
 	await manifest.close();
 

@@ -86,7 +86,7 @@ describe('frozen upload journal records', () => {
 		},
 		{
 			// A chunked upload of a large attachment: its bytes are a file beside the record.
-			file: 'upload-journal-chunked.v2.json',
+			file: 'upload-journal-chunked.v1.json',
 			stored: () => recordChunked('e1_00020757_44444444-1111-4111-8111-111111111111'),
 			decode: loadChunked,
 		},

@@ -50,7 +50,7 @@ it('negotiates the protocol of encrypted reads and learns the server file limit'
 		service: 'crate', serverVersion: 'test', protocol, capabilities: ['sync-v1'], serverRevision: 1, reminderOperationDay: 20_000, ...limits ? { limits } : {} });
 	for (const [info, expected, limit] of [
 		[server({ current: 1, oldestCompatible: 1 }), '1', 25 * 1024 * 1024],
-		[server({ current: 2, oldestCompatible: 2 }, { maxFileBytes: 100 * 1024 * 1024 }), '2', 100 * 1024 * 1024],
+		[server({ current: 1, oldestCompatible: 1 }, { maxFileBytes: 100 * 1024 * 1024 }), '1', 100 * 1024 * 1024],
 	] as const) {
 		const sent: Array<string | undefined> = [];
 		const transport = vi.fn(async (request: { url: string; headers?: Record<string, string> }) => {
