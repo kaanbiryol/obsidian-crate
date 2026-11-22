@@ -26,8 +26,11 @@ function harness(files: Record<string, string> = {}) {
 	};
 	const plugin = {
 		app: { vault: { adapter } }, manifest: { dir },
-		// Obsidian parses data.json without catching, so a torn file throws a SyntaxError.
-		loadData: vi.fn(async (): Promise<unknown> => disk.has(`${dir}/data.json`) ? JSON.parse(disk.get(`${dir}/data.json`)!) : null),
+		// Like Obsidian, damage and read failures both load as no data, so Crate must not rely on it.
+		loadData: vi.fn(async (): Promise<unknown> => {
+			try { return disk.has(`${dir}/data.json`) ? JSON.parse(disk.get(`${dir}/data.json`)!) : null; }
+			catch { return undefined; }
+		}),
 		saveData: vi.fn(async (data: unknown) => { disk.set(`${dir}/data.json`, JSON.stringify(data)); }),
 	};
 	const file = (name: string) => disk.get(`${dir}/${name}`);
@@ -77,7 +80,9 @@ it('restores the complete copy an interrupted swap left behind', async () => {
 
 it('stops without touching data.json when it cannot be read', async () => {
 	const h = harness({ 'data.json': '{}', 'data.last-good.json': '{"workerUrl":"https://crate.example"}' });
-	h.plugin.loadData.mockRejectedValueOnce(new Error('Input/output error'));
+	// Obsidian loads a file it cannot read as no data.
+	h.plugin.loadData.mockResolvedValueOnce(undefined);
+	h.adapter.read.mockRejectedValueOnce(new Error('Input/output error'));
 	await expect(loadPluginData(h.asPlugin)).rejects.toThrow('Input/output error');
 	expect(h.names()).toEqual(['data.json', 'data.last-good.json']);
 	expect(h.plugin.saveData).not.toHaveBeenCalled();

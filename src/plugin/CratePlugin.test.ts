@@ -383,7 +383,10 @@ describe('CratePlugin settings persistence', () => {
 					remove: async (path: string) => { disk.delete(path); },
 					rename: async (from: string, to: string) => { disk.set(to, disk.get(from)!); disk.delete(from); },
 				} } },
-				loadData: async (): Promise<unknown> => disk.has(`${dir}/data.json`) ? JSON.parse(disk.get(`${dir}/data.json`)!) : null,
+				// Like Obsidian, a damaged file loads as no data.
+				loadData: async (): Promise<unknown> => {
+					try { return disk.has(`${dir}/data.json`) ? JSON.parse(disk.get(`${dir}/data.json`)!) : null; } catch { return undefined; }
+				},
 				saveData: async (data: unknown) => { disk.set(`${dir}/data.json`, JSON.stringify(data)); },
 			});
 			return { plugin, file: (name: string) => disk.get(`${dir}/${name}`), names: () => [...disk.keys()] };

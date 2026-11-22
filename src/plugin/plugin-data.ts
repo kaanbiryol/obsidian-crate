@@ -50,17 +50,22 @@ export async function keepLastGoodPluginData(plugin: Plugin, data: Record<string
 /** Loads `data.json`, or null when there is none. Obsidian replaces it in place, so an app
  * closed mid-save can leave it torn. Damaged data is moved aside, never overwritten, and
  * settings come from the last good copy or, without one, from defaults (null). A read
- * failure is not damage: it stops startup with the file untouched. */
+ * failure is not damage: it stops startup with the file untouched. Obsidian's `loadData`
+ * answers both damage and read failures with no data, so the file is read here. */
 export async function loadPluginData(plugin: Plugin): Promise<Record<string, unknown> | null> {
-	let data: unknown;
+	const loaded: unknown = await plugin.loadData();
+	if (loaded === null || isRecord(loaded)) return loaded;
+	const dir = plugin.manifest.dir;
+	const { adapter } = plugin.app.vault;
+	let data: unknown = null;
 	try {
-		data = await plugin.loadData() ?? null;
+		if (await adapter.exists(`${dir}/data.json`)) data = JSON.parse(await adapter.read(`${dir}/data.json`));
 	} catch (error) {
 		if (!(error instanceof SyntaxError)) throw error;
+		data = undefined;
 	}
 	if (data === null || isRecord(data)) return data;
 
-	const dir = plugin.manifest.dir;
 	const damaged = `data.json.corrupt-${Date.now()}`;
 	await plugin.app.vault.adapter.rename(`${dir}/data.json`, `${dir}/${damaged}`);
 	const copy = await readLastGood(plugin.app.vault.adapter, `${dir}/${LAST_GOOD}`);
