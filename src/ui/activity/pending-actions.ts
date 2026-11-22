@@ -43,7 +43,6 @@ export function createPendingActions(
 	sidebar: HTMLElement, heading: HTMLElement, items: PendingItem[], excluded: Set<string>, actions: PendingActions, rows: PendingRowSelection,
 ) {
 	const checkable = !actions.automaticSync;
-	const keys = items.flatMap(item => item.keys);
 	const byKey = new Map(items.map(item => [item.key, item]));
 	// Rows count as files until a plugin row, including Crate's own update, stands for a plugin.
 	const noun = items.every(item => !item.plugin && !item.crateUpdate) ? 'file' : 'item';
@@ -103,7 +102,8 @@ export function createPendingActions(
 		update();
 	});
 	sync.addEventListener('click', () => {
-		if (!sync.disabled) actions.sync.run(checkable ? keys.filter(key => excluded.has(key)) : []);
+		// A row shows unchecked while any of its keys is held, so all of them are held.
+		if (!sync.disabled) actions.sync.run(checkable ? items.filter(item => !included(item)).flatMap(item => item.keys) : []);
 	});
 	const contextMenu = (key: string) => {
 		const targets = rows.contextTargets(key).map(target => byKey.get(target)!);

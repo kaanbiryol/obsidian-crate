@@ -99,6 +99,17 @@ describe('pending change actions', () => {
 		expect(run).toHaveBeenCalledWith([]);
 	});
 
+	it('holds back every file of a plugin row left unchecked when another of its files becomes pending', () => {
+		const main = '.obsidian/plugins/dataview/main.js', styles = '.obsidian/plugins/dataview/styles.css';
+		// The row was unchecked while only main.js was pending; the list then rebuilt with styles.css.
+		const items = groupPendingItems([main, styles, 'Notes/Today.md'], '.obsidian');
+		const sidebar = new FakeElement('div');
+		const actions = { sync: { describe: () => ({ label: 'Sync', disabled: false, idle: true }), run: vi.fn() }, discard: vi.fn() };
+		createPendingActions(sidebar as never, new FakeElement('div') as never, items, new Set([main]), actions, { contextTargets: () => [] } as never);
+		sidebar.querySelector('.crate-browser-sync')!.dispatchEvent(new Event('click'));
+		expect(actions.sync.run).toHaveBeenCalledWith([main, styles]);
+	});
+
 	it('checks, counts and holds back a plugin row as one item covering all of its code files', () => {
 		const plugin = ['.obsidian/plugins/dataview/main.js', '.obsidian/plugins/dataview/manifest.json', pendingChangeKey('delete', '.obsidian/plugins/dataview/styles.css')];
 		const items = groupPendingItems([...plugin, 'Notes/Today.md'], '.obsidian');
