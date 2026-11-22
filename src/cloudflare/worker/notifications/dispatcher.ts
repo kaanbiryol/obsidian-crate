@@ -10,6 +10,7 @@ import { isD1DailyLimitError, nextD1DailyReset } from '../d1/d1-usage';
 import { armReminderDispatcher } from '../coordinator/coordinator';
 import type { StateLock } from '../coordinator/coordinator-requests';
 import { markRole } from '../coordinator/role-flags';
+import { SUBREQUESTS_PER_INVOCATION } from '../d1/platform-limits';
 
 /** Dispatcher role storage flag, for runtimes without instance names: its alarm delivers due reminders. */
 export const DISPATCHER_KEY = 'reminderDispatcher';
@@ -20,6 +21,13 @@ const MAX_DELIVERY_ATTEMPTS = 10;
  * push subscription (20 at most) when it prunes or quarantines it, and one outcome batch:
  * at most 28 queries, within D1_QUERIES_PER_INVOCATION. More due reminders chain another pass. */
 export const DISPATCH_BATCH_SIZE = 20;
+/** Queries a pass makes besides one write per subscription. */
+const PASS_QUERIES = 8;
+
+/** Reminders one pass can send to `recipients` subscriptions: each push is a fetch, which
+ * counts toward the same subrequest limit as the pass's queries. */
+const remindersPerPass = (recipients: number) => recipients ? Math.max(1, Math.min(DISPATCH_BATCH_SIZE,
+	Math.floor((SUBREQUESTS_PER_INVOCATION - PASS_QUERIES - recipients) / recipients))) : DISPATCH_BATCH_SIZE;
 
 const NEXT_DUE_SQL = 'SELECT due_at AS dueAt FROM reminder_projections WHERE due_at IS NOT NULL ORDER BY due_at LIMIT 1';
 
@@ -90,12 +98,14 @@ export async function deliverDueReminders(env: Env): Promise<number | null> {
 	const db = env.DB;
 	if (!await featureEnabled(db, 'reminders')) return null;
 	const now = Date.now();
-	const rows = await queryRows<DueReminder>(db.prepare(`SELECT reminder_id AS id, notification_token AS token, file_path AS filePath,
+	const due = await queryRows<DueReminder>(db.prepare(`SELECT reminder_id AS id, notification_token AS token, file_path AS filePath,
     due_datetime AS due, content, project, due_at AS dueAt, attempts, pending_subscriptions AS pending
     FROM reminder_projections WHERE due_at IS NOT NULL AND due_at <= ? ORDER BY due_at LIMIT ?`).bind(now, DISPATCH_BATCH_SIZE));
-	if (!rows.length) return (await db.prepare(NEXT_DUE_SQL).first<{ dueAt: number }>())?.dueAt ?? null;
+	if (!due.length) return (await db.prepare(NEXT_DUE_SQL).first<{ dueAt: number }>())?.dueAt ?? null;
+	let subscriptions: PushSubscriptionRow[] = await listPushSubscriptions(db);
+	// Reminders left out stay due, so the earliest due time read below chains the next pass at once.
+	const rows = due.slice(0, remindersPerPass(subscriptions.length));
 	const authorized = await notificationAuthority(db, rows.flatMap(row => row.token && row.filePath ? [{ id: row.id, token: row.token, filePath: row.filePath }] : []));
-	let subscriptions: PushSubscriptionRow[] | undefined;
 	let keys: Promise<CryptoKeyPair> | undefined;
 	const outcomes: D1PreparedStatement[] = [];
 	for (const row of rows) {
@@ -118,7 +128,6 @@ export async function deliverDueReminders(env: Env): Promise<number | null> {
 		// whose source has changed while projection is still catching up.
 		if (!authorized.has(row.id)) { outcomes.push(retry(row.pending)); continue; }
 		try {
-			subscriptions ??= await listPushSubscriptions(db);
 			const delivery = await sendToAllSubscriptions(db, {
 				title: row.content,
 				body: row.project || '',

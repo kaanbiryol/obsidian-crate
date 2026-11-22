@@ -22,3 +22,6 @@ export const R2_KEYS_PER_CALL = 1000;
 
 /** Outgoing connections one invocation may have waiting for response headers. */
 export const SIMULTANEOUS_OPEN_CONNECTIONS = 6;
+
+/** Subrequests per Worker or Durable Object invocation: fetches, and D1 and R2 calls, all count. */
+export const SUBREQUESTS_PER_INVOCATION = 50;
