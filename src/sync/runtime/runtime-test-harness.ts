@@ -28,9 +28,7 @@ export function expectFileEventsAccepted(runtime: SyncRuntime, accepted: boolean
 /** Construct a real runtime session while substituting only the engine's I/O. */
 export async function initializeRuntime(runtime: SyncRuntime, overrides: Partial<SyncEngine> = {}): Promise<void> {
 	const initialize = vi.spyOn(SyncEngine.prototype, 'initialize').mockImplementationOnce(async function (this: SyncEngine) {
-		Object.assign(this, {
-			saveSharedHistoryCheckpoint: vi.fn(async () => undefined),
-		}, overrides);
+		Object.assign(this, overrides);
 	});
 	try { await runtime.initialize({ skipStartupSync: true }); }
 	finally { initialize.mockRestore(); }

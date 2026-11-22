@@ -1,5 +1,5 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
-import { publishedChangelogStatement, retainReplacedVersionStatements } from './file-publication-statements';
+import { checkpointStatement, fileCountStatement, publishedChangelogStatement, retainReplacedVersionStatements } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { descriptorColumn, encryptionWriteGuard, prepareEncryptedFileCommit } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
@@ -15,12 +15,13 @@ import { FileVersionConflictError } from './markdown-files';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import {
 	getStoredFileRow,
+	NEXT_SEQ_SQL,
 	type FileStorageRow,
 } from './storage';
 
-/** The replaced row, including when it became live for version coalescing. */
-function getReplacedFileRow(db: D1Database, path: string): Promise<(FileStorageRow & { path: string; modified: string; descriptor: string | null }) | null> {
-	return db.prepare(`SELECT path, hash, size, storage_key AS storageKey, modified, descriptor FROM files WHERE ${FILE_PATH_MATCH}`)
+/** The replaced row, including the change that made it current. */
+function getReplacedFileRow(db: D1Database, path: string): Promise<(FileStorageRow & { path: string; descriptor: string | null; liveFromSeq: number }) | null> {
+	return db.prepare(`SELECT path, hash, size, storage_key AS storageKey, descriptor, live_from_seq AS liveFromSeq FROM files WHERE ${FILE_PATH_MATCH}`)
 		.bind(...filePathArgs(path)).first();
 }
 
@@ -46,8 +47,8 @@ function destinationMutation(
 	}
 	if (destination.expectedHash === null) {
 		return db.prepare(`/* atomic-destination-insert */
-			INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor)
-			SELECT ?, ?, ?, ?, datetime('now'), ?, ?
+			INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor, live_from_seq)
+			SELECT ?, ?, ?, ?, datetime('now'), ?, ?, ${NEXT_SEQ_SQL}
 			WHERE NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})
 			AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
 			AND ${namespaceGuard}
@@ -67,7 +68,7 @@ function destinationMutation(
 	}
 
 	return db.prepare(`/* atomic-destination-update */
-		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
+		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?, live_from_seq = ${NEXT_SEQ_SQL}
 		WHERE ${FILE_PATH_MATCH} AND hash = ?
 		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
 		AND ${namespaceGuard}`)
@@ -91,7 +92,7 @@ function sourceMutation(
 ): D1PreparedStatement {
 	const destinationRevision = fileRevisionGuard(destination.path, destination.objectKey);
 	return db.prepare(`/* atomic-source-update */
-		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
+		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?, live_from_seq = ${NEXT_SEQ_SQL}
 		WHERE ${FILE_PATH_MATCH} AND hash = ?
 		AND ${destinationRevision.sql}`)
 		.bind(
@@ -148,7 +149,8 @@ export async function writeCommittedMarkdownFilePair(
 
 	// An exception may follow a committed transaction. Never reclaim those keys
 	// here; the orphan sweep checks references after the uncertainty window.
-	const results: unknown[] = await db.batch([
+	const results: unknown[] = (await db.batch([
+			checkpointStatement(db),
 			destinationMutation(db, destination, source, sourceEncryption.state),
 			sourceMutation(db, source, destination),
 			publishedChangelogStatement(db, destination),
@@ -161,8 +163,9 @@ export async function writeCommittedMarkdownFilePair(
 				{ path: destination.path, storageKey: destination.objectKey, hash: destination.hash, size: destination.size, content: params.destination.content },
 			], { policy: context?.readingPolicy, encrypted: Boolean(sourceEncryption.state || destinationEncryption.state) }),
 			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),
+			...fileCountStatement(db, destination.expectedHash === null ? [destination] : [], []),
 			...finishUploadLeases(db, [source, destination]),
-	]);
+	])).slice(1);
 
 	const destinationCommitted = changedRows(results[0]) === 1;
 	const sourceCommitted = changedRows(results[1]) === 1;

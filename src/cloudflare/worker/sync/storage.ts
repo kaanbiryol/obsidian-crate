@@ -111,6 +111,12 @@ export async function loadStoredFileRows(db: D1Database, paths: string[]): Promi
 export const LAST_SEQ_SQL = `MAX(COALESCE((SELECT MAX(seq) FROM changelog), 0),
   COALESCE((SELECT MAX(COALESCE(changelog_floor, 0), import_snapshot_seq) FROM server_state WHERE id = 1), 0))`;
 
+/** The sequence of the changelog row a statement precedes in its batch. A row written
+ * before its changelog entry takes this as its `live_from_seq` or `live_until_seq`; one
+ * written after takes `LAST_SEQ_SQL`. Checkpoints fall between transactions, so any
+ * sequence within its batch's range is exact for every checkpoint. */
+export const NEXT_SEQ_SQL = `(${LAST_SEQ_SQL} + 1)`;
+
 /** The `seq` of each changelog row an INSERT ... SELECT writes, numbered in `order`. The
  * subquery does not depend on the row, so SQLite evaluates it once per statement. */
 export const nextChangelogSeqSql = (order: string) => `(SELECT ${LAST_SEQ_SQL}) + ROW_NUMBER() OVER (ORDER BY ${order})`;

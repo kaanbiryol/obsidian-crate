@@ -18,7 +18,6 @@ interface EngineHistoryContext {
 	shouldIgnore: (path: string) => boolean;
 	signal: AbortSignal;
 	hasPendingMutations(): boolean;
-	canCheckpoint(): boolean;
 	runExclusive<T>(operation: () => Promise<T>): Promise<T>;
 	applied: (path: string, removed: boolean) => void;
 }
@@ -26,10 +25,6 @@ interface EngineHistoryContext {
 /** Checkpoint and restore policy; the engine retains operation/lifecycle authority. */
 export function createEngineHistory(context: EngineHistoryContext) {
 	return {
-		async saveShared() {
-			if (!context.canCheckpoint() || context.hasPendingMutations()) return undefined;
-			return context.api.sharedHistory.save();
-		},
 		async compare(checkpoint: string): Promise<HistoryComparison> {
 			const scope = JSON.stringify(context.getSettings().ignorePatterns);
 			const verify = () => {

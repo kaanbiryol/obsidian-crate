@@ -27,8 +27,8 @@ it.each([true, false])('tracks the current revision when another same-content sa
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, 'Old', first.hash);
 	const current = await getStoredFileRow(env.DB, path);
 	expect(current!.storageKey).not.toBe(staleSnapshot!.storageKey);
-	// A copy live for the whole coalescing window is kept; a newer one is queued for cleanup.
-	if (kept) await env.DB.prepare("UPDATE files SET modified = datetime('now', '-11 minutes')").run();
+	// Ten minutes after the latest checkpoint, the commit saves one and keeps the copy; within them it is queued for cleanup.
+	if (kept) await env.DB.prepare('UPDATE history_checkpoints SET created_at = created_at - 660000').run();
 	const hash = await sha256Hex('New');
 	const objectKey = createManagedObjectKey(hash);
 	const { id: leaseId } = await trackUploadLease(env.DB, [{ storageKey: objectKey, path }]);

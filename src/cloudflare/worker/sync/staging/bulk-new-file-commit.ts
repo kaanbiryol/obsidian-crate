@@ -1,5 +1,6 @@
 import { portablePathKey } from '../../../../protocol/portable-path';
 import { uploadMutation } from '../mutations';
+import { checkpointStatement, fileCountStatement } from '../file-publication-statements';
 import { bulkFileProjection } from './bulk-file-projection';
 import { readingIndexStatements, type ReadingIndexPolicy } from '../../reading/library-index';
 import { decodeReceipt, recordUploadReceipt, type UploadOperation } from '../upload-operations';
@@ -37,6 +38,7 @@ export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: Ne
 	const encrypted = Boolean(files[0]!.encryptionState);
 	const json = JSON.stringify(files.map(file => ({ path: file.path, portable: portablePathKey(file.path), hash: file.hash, size: file.size, key: file.objectKey })));
 	const published = [
+		checkpointStatement(db),
 		...files.map(file => uploadMutation(db, {
 			path: file.path, hash: file.hash, size: file.size, objectKey: file.objectKey,
 			expectedHash: null, operation: file.operation, leaseId: file.leaseId,
@@ -51,6 +53,7 @@ export async function commitNewFiles(bucket: R2Bucket, db: D1Database, files: Ne
 	const batch: unknown[] = await db.batch([
 		...published,
 		...files.map(file => recordUploadReceipt(db, file.operation, file)),
+		...fileCountStatement(db, files, []),
 		...finishUploadLeases(db, files),
 	]);
 	// Each receipt this commit wrote comes back with it. A concurrent replay wrote its

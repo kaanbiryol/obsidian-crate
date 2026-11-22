@@ -32,8 +32,8 @@ export async function handleSyncRoute(
 	const audit = mutationAuditContext(request, principal, requestId);
 	const db = env.DB;
 	const bucket = env.BUCKET;
-		if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(request, bucket, db);
-		if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(bucket, db);
+		if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(request, db);
+		if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(db);
 		if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpoint);
 		if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpointFile);
 	if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, encryption ?? null, async () => {

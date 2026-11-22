@@ -29,7 +29,7 @@ Files that only ever lived on one device may have no server history.
 
 ## Put your whole vault back the way it was
 
-Crate saves recent snapshots of your synced vault, called checkpoints.
+Your server saves the state of your synced vault about every 10 minutes while files change. These saved states are called checkpoints.
 
 1. Before you start, back up your current vault and let any unsent web app edits finish.
 2. Turn off automatic sync on your other devices while you work.
@@ -42,11 +42,11 @@ Crate saves recent snapshots of your synced vault, called checkpoints.
 <details>
 <summary>Good to know</summary>
 
-- Crate keeps a [limited number of checkpoints](/docs/getting-started/limits/#history), and all your connected devices can see them.
+- Older checkpoints are thinned to one per hour, then one per day (see [limits](/docs/getting-started/limits/#history)). All your connected devices can see them.
 - Restoring keeps local recovery copies of what it replaces.
 - If a file was saved in the middle of an editing session, its exact version at that point may no longer be kept. Crate restores everything else, leaves that file as it is now, and lists it when the restore finishes.
 - Files you've excluded on the restoring device aren't touched.
-- If no checkpoints show up, [update your server](/docs/troubleshooting/updates/) and complete a successful sync.
+- If no checkpoints show up, [update your server](/docs/troubleshooting/updates/) and change a file. The first change after an update saves one.
 
 </details>
 

@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SyncResult } from '../types';
 import { cancelSyncResult, createEmptySyncResult } from '../sync-result';
-import { buildPersistedCrateSettings, normalizeCrateSettings } from '../../plugin/settings';
-import { recordSyncHistory } from './sync-activity';
+import { normalizeCrateSettings } from '../../plugin/settings';
 import { SyncRuntime } from './runtime';
 import { formatSyncProgress } from '../../ui/activity/progress-label';
 import {
@@ -14,17 +13,15 @@ import {
 import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../settings';
 
 describe('SyncRuntime operation wrappers', () => {
-	it.each(['manual', 'automatic'] as const)('does not record %s cancellation as sync history or checkpoint progress', async mode => {
+	it.each(['manual', 'automatic'] as const)('does not record %s cancellation as sync history', async mode => {
 		const { runtime, persistSettings, settings, engineHooks } = createRuntimeHarness();
 		const result = cancelSyncResult({ ...createEmptySyncResult(), uploaded: 1, uploadedPaths: ['saved.md'] });
-		const saveSharedHistoryCheckpoint = vi.fn(async () => undefined);
-		await initializeRuntime(runtime, { sync: vi.fn(async () => result), saveSharedHistoryCheckpoint });
+		await initializeRuntime(runtime, { sync: vi.fn(async () => result) });
 		const automatic = engineHooks().onAutomaticSyncResult!;
 		if (mode === 'manual') expect(await runtime.sync()).toBe(result);
 		else await automatic(result);
 		expect(settings.syncHistory).toEqual([]);
 		expect(settings.lastSync).toBeNull();
-		expect(saveSharedHistoryCheckpoint).not.toHaveBeenCalled();
 		expect(persistSettings).not.toHaveBeenCalled();
 		expect(runtime.getActivityProgress()).toBeNull();
 	});
@@ -32,7 +29,7 @@ describe('SyncRuntime operation wrappers', () => {
 	it('announces each recorded manual and automatic result, but not cancellations', async () => {
 		const { runtime, engineHooks } = createRuntimeHarness();
 		const result = { ...createEmptySyncResult(), downloadedPaths: ['.obsidian/app.json'] };
-		await initializeRuntime(runtime, { sync: vi.fn(async () => result), saveSharedHistoryCheckpoint: vi.fn(async () => undefined) });
+		await initializeRuntime(runtime, { sync: vi.fn(async () => result) });
 		const automatic = engineHooks().onAutomaticSyncResult!;
 		const listener = vi.fn();
 		runtime.addSyncResultListener(listener);
@@ -45,109 +42,12 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(listener).toHaveBeenCalledTimes(2);
 	});
 
-	it('spaces ordinary sync checkpoints by vault size but always saves one for full syncs', async () => {
-		vi.useFakeTimers({ now: Date.parse('2026-10-17T10:00:00Z') });
-		try {
-			const { runtime } = createRuntimeHarness();
-			const saveSharedHistoryCheckpoint = vi.fn(async () => ({ id: crypto.randomUUID() }));
-			await initializeRuntime(runtime, {
-				sync: vi.fn(async () => createEmptySyncResult()), forceFullSync: vi.fn(async () => createEmptySyncResult()),
-				saveSharedHistoryCheckpoint, trackedFileCount: () => 10_000,
-			} as never);
-			await runtime.sync();
-			await runtime.sync();
-			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce();
-			await runtime.forceFullSync();
-			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledTimes(2);
-			// 10,000 tracked files space ordinary checkpoints one hour apart.
-			vi.setSystemTime(Date.parse('2026-10-17T11:00:01Z'));
-			await runtime.sync();
-			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledTimes(3);
-		} finally { vi.useRealTimers(); }
-	});
-
-	it('spaces a failed checkpoint save like a saved one instead of retrying after every sync', async () => {
-		vi.useFakeTimers({ now: Date.parse('2026-10-17T10:00:00Z') });
-		try {
-			const { runtime, engineHooks } = createRuntimeHarness();
-			const saveSharedHistoryCheckpoint = vi.fn(async () => { throw new Error('Vault too large for a shared checkpoint'); });
-			await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveSharedHistoryCheckpoint, trackedFileCount: () => 100_001 });
-			const automatic = engineHooks().onAutomaticSyncResult!;
-			await automatic(createEmptySyncResult());
-			await automatic(createEmptySyncResult());
-			expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce();
-		} finally { vi.useRealTimers(); }
-	});
-
-	it('attaches a completed checkpoint without changing older snapshots or replacing newer history', async () => {
-		const { runtime, persistSettings, settings } = createRuntimeHarness();
-		const checkpoint = createDeferred<{ id: string }>();
-		const saveSharedHistoryCheckpoint = vi.fn(() => checkpoint.promise);
-		await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveSharedHistoryCheckpoint } as never);
-		const operation = runtime.sync();
-		await vi.waitFor(() => expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
-		const previousSnapshot = buildPersistedCrateSettings(settings);
-		const original = previousSnapshot.syncHistory[0]!;
-		const newer = recordSyncHistory(settings, 'initial', createEmptySyncResult());
-		persistSettings.mockImplementation(async () => {
-			expect(settings.syncHistory[1]?.sharedCheckpoint).toBe('shared-1');
-		});
-		checkpoint.resolve({ id: 'shared-1' });
-		await operation;
-		expect(settings.syncHistory[0]).toBe(newer);
-		expect(settings.syncHistory[1]).toEqual({ ...original, sharedCheckpoint: 'shared-1' });
-		expect(previousSnapshot.syncHistory).toEqual([original]);
-		expect(original).not.toHaveProperty('sharedCheckpoint');
-		expect(persistSettings).toHaveBeenCalledOnce();
-	});
-
-	it.each(['manual', 'automatic'] as const)('does not publish %s completion after its engine is replaced during checkpointing', async mode => {
-		const { runtime, persistSettings, settings, engineHooks } = createRuntimeHarness();
-		const checkpoint = createDeferred<{ id: string }>();
-		const saveSharedHistoryCheckpoint = vi.fn(() => checkpoint.promise);
-		await initializeRuntime(runtime, {
-			sync: vi.fn(async () => createEmptySyncResult()),
-			saveSharedHistoryCheckpoint,
-		} as never);
-		const automatic = engineHooks().onAutomaticSyncResult!;
-		const operation = mode === 'manual' ? runtime.sync() : automatic(createEmptySyncResult());
-		await vi.waitFor(() => expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
-		await initializeRuntime(runtime);
-		const entry = settings.syncHistory[0]!;
-		const stateChanged = vi.fn();
-		runtime.addStateChangeListener(stateChanged);
-		checkpoint.resolve({ id: 'old-checkpoint' });
-		await operation;
-		expect(entry).not.toHaveProperty('sharedCheckpoint');
-		expect(persistSettings).not.toHaveBeenCalled();
-		expect(stateChanged).not.toHaveBeenCalled();
-	});
-
-	it('does not attach a checkpoint or persist after destruction during its save', async () => {
-		const { runtime, persistSettings, settings } = createRuntimeHarness();
-		const checkpoint = createDeferred<{ id: string }>();
-		const saveSharedHistoryCheckpoint = vi.fn(() => checkpoint.promise);
-		await initializeRuntime(runtime, { sync: vi.fn(async () => createEmptySyncResult()), saveSharedHistoryCheckpoint } as never);
-		const operation = runtime.sync();
-		await vi.waitFor(() => expect(saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
-		const entry = settings.syncHistory[0]!;
-		runtime.destroy();
-		checkpoint.resolve({ id: 'obsolete-checkpoint' });
-		await operation;
-		expect(entry).not.toHaveProperty('sharedCheckpoint');
-		expect(persistSettings).not.toHaveBeenCalled();
-	});
-
 	it.each(['sync', 'forceFullSync'] as const)('shows saving progress until %s history and settings are persisted', async method => {
 		const { runtime, persistSettings } = createRuntimeHarness();
-		const checkpoint = createDeferred<undefined>();
 		const persistence = createDeferred<void>();
 		const state = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 } as const;
 		const sync = vi.fn(async () => createEmptySyncResult());
-		const engine = {
-			getState: () => state, sync, forceFullSync: sync,
-			saveSharedHistoryCheckpoint: vi.fn(() => checkpoint.promise),
-		};
+		const engine = { getState: () => state, sync, forceFullSync: sync };
 		await initializeRuntime(runtime, engine);
 		persistSettings.mockImplementation(() => persistence.promise);
 		const labels: string[] = [];
@@ -156,12 +56,8 @@ describe('SyncRuntime operation wrappers', () => {
 		});
 
 		const operation = runtime[method]();
-		await vi.waitFor(() => expect(engine.saveSharedHistoryCheckpoint).toHaveBeenCalledOnce());
-		expect(labels.at(-1)).toBe('Saving sync progress…');
-		expect(formatSyncProgress(runtime.getActivityProgress(), runtime.getState().work)).toBe('Saving sync progress…');
-
-		checkpoint.resolve(undefined);
 		await vi.waitFor(() => expect(persistSettings).toHaveBeenCalledOnce());
+		expect(labels.at(-1)).toBe('Saving sync progress…');
 		expect(formatSyncProgress(runtime.getActivityProgress(), runtime.getState().work)).toBe('Saving sync progress…');
 		persistence.resolve();
 		await operation;

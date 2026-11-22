@@ -364,14 +364,11 @@ export class SyncEngine {
 			signal: this.lifecycle.abortSignal,
 			hasPendingMutations: () => Boolean(this.getActiveConflicts().length
 				|| this.localManifest.uploadJournal.pending().length || this.files.getPendingRestores().length),
-			canCheckpoint: () => !this.lifecycle.abortSignal.aborted && this.state.status !== 'syncing',
 			runExclusive: operation => this.runExclusiveOperation(operation),
 			applied: (path, removed) => this.queueController.restorePendingKeys([pendingChangeKey(removed ? 'delete' : 'upload', path)]),
 		});
 	}
 
-	async saveSharedHistoryCheckpoint() { return this.trackWork(() => this.history().saveShared()); }
-	trackedFileCount(): number { return this.localManifest.getAllPaths().length; }
 	trackedPaths(): string[] { return this.localManifest.getAllPaths(); }
 	/** Server files outside this device's exclusions that it does not hold at their server
 	 * version, such as one awaiting review, over the size limit or with a name it cannot store. */

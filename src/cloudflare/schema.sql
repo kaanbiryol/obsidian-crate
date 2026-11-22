@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS files (
 	modified TEXT NOT NULL DEFAULT (datetime('now')),
 	storage_key TEXT NOT NULL,
 	-- The descriptor JSON of an encrypted file, written with the row. NULL in a plaintext vault.
-	descriptor TEXT
+	descriptor TEXT,
+	-- The changelog sequence that made this copy current, written by the same transaction.
+	live_from_seq INTEGER NOT NULL DEFAULT 0
 ) WITHOUT ROWID;
 
 
@@ -101,7 +103,11 @@ CREATE TABLE IF NOT EXISTS file_versions (
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	-- When the retention period started, in milliseconds: the commit that kept the copy. It
 	-- expires once older than the current retention, so changing that rewrites no rows.
-	kept_at INTEGER NOT NULL
+	kept_at INTEGER NOT NULL,
+	-- The changelog sequences that made the copy current and that replaced or deleted it:
+	-- it is the copy in the vault at every checkpoint S with live_from_seq <= S < live_until_seq.
+	live_from_seq INTEGER NOT NULL DEFAULT 0,
+	live_until_seq INTEGER
 );
 
 -- Also orders the unfiltered version list, newest first.
@@ -133,7 +139,18 @@ CREATE TABLE IF NOT EXISTS server_state (
 	settings_version TEXT,
 	-- Days replaced and deleted versions and shared checkpoints are kept. NULL means 30.
 	-- The Worker limits the choices, so offering another needs no migration.
-	history_retention_days INTEGER CHECK (history_retention_days BETWEEN 1 AND 365)
+	history_retention_days INTEGER CHECK (history_retention_days BETWEEN 1 AND 365),
+	-- The number of `files` rows, kept by the transactions that add or remove them.
+	file_count INTEGER NOT NULL DEFAULT 0
+);
+
+-- Shared restore points: the vault as of changelog sequence `seq`, rebuilt from `files`
+-- and `file_versions`. A commit adds one when the latest is ten minutes old.
+CREATE TABLE IF NOT EXISTS history_checkpoints (
+	seq INTEGER PRIMARY KEY,
+	-- Milliseconds, from the database clock. Copies it needs were kept after it.
+	created_at INTEGER NOT NULL,
+	file_count INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS reminder_file_cache (

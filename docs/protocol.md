@@ -119,17 +119,17 @@ wait or the three-hour foreground wait bound leaves all progress intact.
 
 ## Shared history checkpoints
 
-Protocol 1 includes `shared-history-checkpoints-v1`. Server-authored inventories are stored in R2 with a conditional shared
-index, capped at 20 states and the server's history period (at most 90 days; 100 states and 365 days on a self-hosted server). Creation rejects a changing inventory;
-publication retries deduplicate by monotonic server generation. No database schema
-change or duplicate file-content storage is introduced. Retained-version expiry is
-computed no earlier than the history period after the D1 commit, preventing an older request
-start time from expiring bytes before a checkpoint. Replaced copies are coalesced, but
-creation records its start time in `maintenance_state`, and a copy that was live at the
-latest checkpoint is always kept when replaced. This costs at most one extra copy per file
-per checkpoint, only for replacements within the coalescing window. If a checkpoint
-references a revision that is no longer kept, its file download returns
-410 with `code: "version_unavailable"`, and restore leaves that file unchanged and reports it.
+Protocol 1 includes `shared-history-checkpoints-v1`. A checkpoint is a changelog sequence
+in D1 (`history_checkpoints`), rebuilt from `files` and `file_versions` by the sequences
+each copy was current between; no inventory or file contents are stored. Commits save one
+before their changes once the latest is ten minutes old, and maintenance thins them to
+every one of the last day, one per hour for a week and one per day for the history period.
+Checkpoint IDs name their sequence. `GET /sync/checkpoints?all=1` lists every kept
+checkpoint (at most 1,000); without `all` the list stops at the newest 100. The checkpoint document format is unchanged. A replaced copy
+is kept when it was current at the latest checkpoint, so every listed checkpoint can be
+rebuilt, or when its path has no copy kept since that checkpoint. If a checkpoint references a revision that is no longer kept, its file download
+returns 410 with `code: "version_unavailable"`, and restore leaves that file unchanged and
+reports it.
 
 ## End-to-end encryption
 

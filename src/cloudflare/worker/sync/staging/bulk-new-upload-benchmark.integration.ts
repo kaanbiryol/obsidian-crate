@@ -60,5 +60,6 @@ it('compares 8000 new Markdown files at four concurrent requests', { timeout: 90
 	expect(measurements[1]!.transactions).toBe(8000 / BATCH_UPLOAD_MAX_FILES);
 	// Leave at least 20% of the free daily allowance for setup and other activity.
 	expect(measurements[1]!.writes).toBeLessThanOrEqual(80_000);
-	expect(measurements[1]!.writes).toBe(40_500);
+	// Each of the 250 batches also updates the file count.
+	expect(measurements[1]!.writes).toBe(40_750);
 });

@@ -111,6 +111,8 @@ describe('publication history and derived state', () => {
 		const destination = (await getStoredFileRow(db, destinationPath))!;
 		const started = Date.now();
 		const seq = (await db.prepare('SELECT MAX(seq) AS seq FROM changelog').first<{ seq: number }>())!.seq;
+		// Ten minutes after the latest checkpoint, the commit saves one that names both copies.
+		await db.prepare('UPDATE history_checkpoints SET created_at = created_at - 3600000').run();
 		if (kind === 'single') await writeCommittedMarkdownFile(bucket, db, sourcePath, 'Updated source', source.hash);
 		else await writeCommittedMarkdownFilePair(bucket, db, {
 			source: { path: sourcePath, content: 'Updated source', expectedHash: source.hash },
@@ -153,7 +155,9 @@ describe('publication history and derived state', () => {
 	it.each([sourcePath, destinationPath])('requires every published move revision before retaining history (stale: %s)', async stalePath => {
 		const source = (await getStoredFileRow(db, sourcePath))!;
 		const destination = (await getStoredFileRow(db, destinationPath))!;
-		await db.batch(retainReplacedVersionStatements(db, { ...source, path: sourcePath, modified: '2000-01-01 00:00:00' }, [
+		// A checkpoint names the copy, so only the publication guard can skip it.
+		await db.prepare('INSERT INTO history_checkpoints (seq, created_at, file_count) VALUES (1000000, 0, 1)').run();
+		await db.batch(retainReplacedVersionStatements(db, { ...source, path: sourcePath, liveFromSeq: 0 }, [
 			{ path: sourcePath, objectKey: stalePath === sourcePath ? 'unpublished-source' : source.storageKey },
 			{ path: destinationPath, objectKey: stalePath === destinationPath ? 'unpublished-destination' : destination.storageKey },
 		]));
@@ -175,8 +179,8 @@ describe('replaced version retention', () => {
 		expect((await absent('first')).status).toBe(200);
 		const recreated = (await getStoredFileRow(db, path))!;
 		expect(recreated.storageKey).not.toBe(snapshot.storageKey);
-		// A copy live for the whole coalescing window is kept; a newer one is queued for cleanup.
-		if (kept) await db.prepare("UPDATE files SET modified = datetime('now', '-11 minutes')").run();
+		// Ten minutes after the latest checkpoint, the commit saves one and keeps the copy; within them it is queued for cleanup.
+		if (kept) await db.prepare('UPDATE history_checkpoints SET created_at = created_at - 660000').run();
 
 		const content = new TextEncoder().encode('second').buffer;
 		const hash = await sha256Hex(content);

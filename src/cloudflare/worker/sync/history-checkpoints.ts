@@ -1,166 +1,143 @@
-import { MAX_CHECKPOINT_BYTES, MAX_CHECKPOINT_FILES, MAX_ENCRYPTED_CHECKPOINT_BYTES, MAX_SHARED_CHECKPOINTS, SELF_HOSTED_SHARED_CHECKPOINTS, isCheckpointId,
-	parseSharedCheckpointList, type SharedCheckpoint } from '../../../protocol/history-checkpoints';
-import type { FileEntry } from '../../../protocol/sync-types';
+import { MAX_LISTED_CHECKPOINTS, SELF_HOSTED_SHARED_CHECKPOINTS, isCheckpointId, type SharedCheckpoint } from '../../../protocol/history-checkpoints';
 import { portablePathKey } from '../../../protocol/portable-path';
 import { corsHeaders, corsResponse } from '../http/cors';
 import { fileTransportLimit } from '../../../encryption/file-format';
 import { MAX_CONFIGURABLE_FILE_BYTES } from '../../../protocol/sync-limits';
+import { DAY_MS } from '../../../protocol/history-retention';
 import { FILE_VERSION_CUTOFF_SQL, FILE_VERSION_FLOOR_SQL, HISTORY_RETENTION_MS_SQL, LAST_SEQ_SQL, storedObjectMatchesMetadata } from './storage';
 import { sanitizePath } from '../http/request-validation';
 import { isSyncRevision } from '../../../protocol/sync-validation';
-import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
-import { putMaintenanceValue, readMaintenanceValue } from '../d1/db';
 import { FILE_HASH_HEADER } from '../../../protocol/http-headers';
-import { SHARED_CHECKPOINT_AT_KEY } from './file-publication-statements';
-import { R2_KEYS_PER_CALL } from '../d1/platform-limits';
 
-const PREFIX = HISTORY_CHECKPOINT_PREFIX;
-// Ten pages, plus one empty read at exactly the file limit, cover the largest
-// checkpoint within the Free plan's query budget.
+// Ten pages, plus one empty read, rebuild a 100,000-file checkpoint within the Free
+// plan's query budget.
 export const CHECKPOINT_PAGE_SIZE = 10_000;
-const MAX_STORED_CHECKPOINT_BYTES = MAX_ENCRYPTED_CHECKPOINT_BYTES + 4096;
-const keyFor = (id: string) => `${PREFIX}${id}.json`;
+const HOUR_MS = 60 * 60 * 1000;
 const headers = { 'Cache-Control': 'private, no-store' };
 const response = (value: unknown, status = 200) => corsResponse(value, status, headers);
 
-async function readIndex(bucket: R2Bucket) {
-	const object = await bucket.get(HISTORY_INDEX_KEY);
-	if (!object) return { checkpoints: [] as SharedCheckpoint[], etag: undefined };
-	if (object.size > 32_768) throw new Error('Invalid checkpoint index');
-	return { checkpoints: parseSharedCheckpointList(JSON.parse(await object.text())), etag: object.etag };
+/** A checkpoint's ID names its sequence, so it needs no stored identifier or index. */
+const ID_PREFIX = '00000000-0000-4000-8000-';
+export const checkpointId = (seq: number) => `${ID_PREFIX}${seq.toString(16).padStart(12, '0')}`;
+function checkpointSeq(id: string | null): number | null {
+	if (!isCheckpointId(id) || !id.startsWith(ID_PREFIX)) return null;
+	const seq = parseInt(id.slice(ID_PREFIX.length), 16);
+	return Number.isSafeInteger(seq) && seq > 0 ? seq : null;
 }
 
-interface HistoryLimits { retention: number; floor: number }
+interface CheckpointRow { seq: number; created_at: number; file_count: number; retention: number }
 
-/** Whether a checkpoint is still kept: before its own expiry, and within the current
- * retention, which may have been shortened since it was saved. Files it lists were
- * replaced after it was saved, so once maintenance started removing versions kept
- * after it (the floor), a longer retention cannot bring it back. */
-const live = (entry: SharedCheckpoint, { retention, floor }: HistoryLimits, now = Date.now()) =>
-	entry.expiresAt > now && Date.parse(entry.timestamp) + retention > now && Date.parse(entry.timestamp) >= floor;
+/** Checkpoints still kept: within the current retention, which may have been shortened
+ * since one was saved, and not before the floor. The copies a checkpoint needs were kept
+ * after it, so once maintenance started removing versions kept after it (the floor), a
+ * longer retention cannot bring it back. */
+const visibleSql = (row = 'history_checkpoints') => `${row}.created_at + ${HISTORY_RETENTION_MS_SQL} > ? AND ${row}.created_at >= ${FILE_VERSION_FLOOR_SQL}`;
+const CHECKPOINT_COLUMNS = `seq, created_at, file_count, ${HISTORY_RETENTION_MS_SQL} AS retention`;
 
-async function historyLimits(db: D1Database): Promise<HistoryLimits> {
-	const row = await db.prepare(`SELECT ${HISTORY_RETENTION_MS_SQL} AS retention, ${FILE_VERSION_FLOOR_SQL} AS floor`).first<HistoryLimits>();
-	if (!row) throw new Error('Could not read history retention');
-	return row;
+const toCheckpoint = (row: CheckpointRow, fileCount = row.file_count): SharedCheckpoint => ({
+	id: checkpointId(row.seq), sequence: row.seq, timestamp: new Date(row.created_at).toISOString(),
+	expiresAt: row.created_at + row.retention, fileCount,
+});
+
+function readCheckpoint(db: D1Database, id: string | null): Promise<CheckpointRow | null> {
+	const seq = checkpointSeq(id);
+	if (seq === null) return Promise.resolve(null);
+	return db.prepare(`SELECT ${CHECKPOINT_COLUMNS} FROM history_checkpoints WHERE seq = ? AND ${visibleSql()}`).bind(seq, Date.now()).first<CheckpointRow>();
 }
 
-async function generation(db: D1Database) {
-	const row = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS sequence,
-        COALESCE((SELECT import_state FROM server_state WHERE id = 1), 'complete') AS state,
-        CAST(strftime('%s', 'now') AS INTEGER) * 1000 AS now, ${HISTORY_RETENTION_MS_SQL} AS retention, ${FILE_VERSION_FLOOR_SQL} AS floor`)
-		.first<{ sequence: number; state: string; now: number } & HistoryLimits>();
-	if (!row) throw new Error('Could not read checkpoint generation');
-	return row;
+/** For clients that save checkpoints themselves: saves the vault as it is now, or returns
+ * the checkpoint that already names this state. Commits save them on their own. */
+export async function createSharedCheckpoint(db: D1Database): Promise<Response> {
+	const state = await db.prepare(`SELECT ${LAST_SEQ_SQL} AS seq,
+		COALESCE((SELECT import_state FROM server_state WHERE id = 1), 'complete') AS state,
+		COALESCE((SELECT file_count FROM server_state WHERE id = 1), 0) AS files`).first<{ seq: number; state: string; files: number }>();
+	if (!state || state.state !== 'complete') return response({ error: 'Finish the initial sync before creating a checkpoint.' }, 409);
+	if (!state.seq || !state.files) return response({ error: 'The vault has no files to save in a checkpoint.' }, 409);
+	// Nothing changed since the checkpoint at this sequence, so the current files are all
+	// it needs: one hidden by retention starts again from now.
+	await db.prepare(`INSERT INTO history_checkpoints (seq, created_at, file_count)
+		SELECT ?, CAST(strftime('%s', 'now') AS INTEGER) * 1000, ? WHERE ? = ${LAST_SEQ_SQL}
+		ON CONFLICT(seq) DO UPDATE SET created_at = excluded.created_at, file_count = excluded.file_count
+			WHERE NOT (${visibleSql()})`)
+		.bind(state.seq, state.files, state.seq, Date.now()).run();
+	const row = await readCheckpoint(db, checkpointId(state.seq));
+	if (!row) return response({ error: 'The vault changed while saving its checkpoint. Sync again to retry.' }, 409);
+	return response({ checkpoint: toCheckpoint(row) });
 }
 
-/** Snapshot authoritative metadata only. Every page must belong to one generation. */
-/** Checkpoints the index keeps; a self-hosted server's storage is its own disk. */
-export const SHARED_CHECKPOINT_LIMIT = __CRATE_SELF_HOSTED__ ? SELF_HOSTED_SHARED_CHECKPOINTS : MAX_SHARED_CHECKPOINTS;
-
-export async function createSharedCheckpoint(bucket: R2Bucket, db: D1Database): Promise<Response> {
-	const start = await generation(db);
-	if (start.state !== 'complete') return response({ error: 'Finish the initial sync before creating a checkpoint.' }, 409);
-	const existing = (await readIndex(bucket)).checkpoints.find(entry => entry.sequence === start.sequence && live(entry, start, start.now));
-	if (existing) return response({ checkpoint: existing });
-	// Every copy live now is kept when replaced (`keepReplacedVersionSql`); a write
-	// since `start` changes the sequence, so this inventory is rejected below.
-	await db.prepare(`INSERT INTO maintenance_state (key, value) VALUES (?, datetime('now'))
-		ON CONFLICT(key) DO UPDATE SET value = excluded.value`).bind(SHARED_CHECKPOINT_AT_KEY).run();
-	// Encode rows as they are read: the inventory is never held as both objects
-	// and a serialized document, keeping a 100k-file checkpoint within memory.
-	const encoder = new TextEncoder();
-	const parts: Uint8Array<ArrayBuffer>[] = [];
-	let after = '', size = 0, fileCount = 0;
-	while (true) {
-		const page = await db.prepare(`SELECT path, hash, size, modified, storage_key AS revision FROM files
-            WHERE portable_path > ? ORDER BY portable_path LIMIT ?`).bind(after, CHECKPOINT_PAGE_SIZE).all<FileEntry & { path: string }>();
-		for (const { path, hash, size: bytes, modified, revision } of page.results) {
-			const part = encoder.encode(`${fileCount ? ',' : ''}${JSON.stringify(path)}:${JSON.stringify({ hash, size: bytes, modified, revision })}`);
-			parts.push(part);
-			size += part.byteLength;
-			fileCount++;
-		}
-		if (fileCount > MAX_CHECKPOINT_FILES || size > MAX_CHECKPOINT_BYTES - 4096) return response({ error: 'This vault exceeds the shared checkpoint limit (100,000 files or 32 MiB of metadata).' }, 413);
-		if (page.results.length < CHECKPOINT_PAGE_SIZE) break;
-		after = portablePathKey(page.results.at(-1)!.path);
-	}
-	const end = await generation(db);
-	if (end.sequence !== start.sequence || end.state !== start.state) return response({ error: 'The vault changed while saving its checkpoint. Sync again to retry.' }, 409);
-	const checkpoint: SharedCheckpoint = { id: crypto.randomUUID(), sequence: start.sequence, timestamp: new Date(start.now).toISOString(),
-		expiresAt: start.now + start.retention, fileCount };
-	// Index metadata travels with the object, so reads can verify it without parsing.
-	await bucket.put(keyFor(checkpoint.id), new Blob([`{"version":1,"checkpoint":${JSON.stringify(checkpoint)},"files":{`, ...parts, '}}']), {
-		httpMetadata: { contentType: 'application/json' }, customMetadata: { checkpoint: JSON.stringify(checkpoint) } });
-	// Publish only after the complete inventory exists. Failed/uncertain index
-	// writes leave the object for delayed collection, never delete a possible commit.
-	// Each conditional write that did not apply leaves it unpublished.
-	for (let attempt = 0; attempt < 5; attempt++) {
-		const index = await readIndex(bucket);
-		const current = index.checkpoints.filter(entry => live(entry, start));
-		const duplicate = current.find(entry => entry.sequence === checkpoint.sequence);
-		if (duplicate) return deleteCheckpointObjects(bucket, [checkpoint], response({ checkpoint: duplicate }));
-		const checkpoints = [...current, checkpoint].sort((a, b) => b.sequence - a.sequence || b.timestamp.localeCompare(a.timestamp)).slice(0, SHARED_CHECKPOINT_LIMIT);
-		if (!checkpoints.some(entry => entry.id === checkpoint.id)) return deleteCheckpointObjects(bucket, [checkpoint], response({ error: 'Newer checkpoints replaced this state. Sync again.' }, 409));
-		const written = await bucket.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints }), {
-			onlyIf: index.etag ? { etagMatches: index.etag } : { etagDoesNotMatch: '*' },
-			httpMetadata: { contentType: 'application/json' },
-		});
-		// The conditional write replaced exactly the index read above, and later writers
-		// start from this one, so entries it dropped (evicted or expired) never return.
-		if (written) return deleteCheckpointObjects(bucket, index.checkpoints.filter(entry => !checkpoints.some(kept => kept.id === entry.id)), response({ checkpoint }));
-	}
-	return deleteCheckpointObjects(bucket, [checkpoint], response({ error: 'Checkpoint history is busy. Sync again to retry.' }, 409));
-}
-
-/** Deletes inventories no index can reference. Failures leave them to maintenance. */
-async function deleteCheckpointObjects(bucket: R2Bucket, checkpoints: SharedCheckpoint[], result: Response): Promise<Response> {
-	try { if (checkpoints.length) await bucket.delete(checkpoints.map(entry => keyFor(entry.id))); }
-	catch { /* The maintenance sweep collects them. */ }
-	return result;
-}
-
-export async function listSharedCheckpoints(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
-	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
-	const checkpoints = index.checkpoints.filter(entry => live(entry, limits));
-	return response({ version: 1, checkpoints });
+export async function listSharedCheckpoints(request: Request, db: D1Database): Promise<Response> {
+	const rows = await db.prepare(`SELECT ${CHECKPOINT_COLUMNS} FROM history_checkpoints WHERE ${visibleSql()} ORDER BY seq DESC LIMIT ?`)
+		.bind(Date.now(), MAX_LISTED_CHECKPOINTS).all<CheckpointRow>();
+	const checkpoints = rows.results.map(row => toCheckpoint(row));
+	// Clients that do not ask for the whole list refuse one longer than 100; give them the newest.
+	const limit = new URL(request.url).searchParams.get('all') === '1' ? MAX_LISTED_CHECKPOINTS : SELF_HOSTED_SHARED_CHECKPOINTS;
+	return response({ version: 1, checkpoints: checkpoints.slice(0, limit) });
 }
 
 const replaced = () => response({ error: 'This shared checkpoint expired or was replaced by a newer checkpoint.' }, 410);
 
-/** Streams the stored document after matching its metadata to the live index entry. */
-export async function getSharedCheckpoint(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
-	const id = new URL(request.url).searchParams.get('id');
-	if (!isCheckpointId(id)) return response({ error: 'Invalid checkpoint ID' }, 400);
-	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
-	const entry = index.checkpoints.find(entry => entry.id === id && live(entry, limits));
-	if (!entry) return replaced();
-	return streamCheckpointObject(bucket, keyFor(id), JSON.stringify(entry));
+interface RebuiltFile { path: string; hash: string; size: number; modified: string; revision: string }
+
+/** The vault at checkpoint `seq`: the current files that were already current then, and
+ * the kept copies that were. Every copy it needs was kept after the checkpoint, so the
+ * `kept_at` index reads only versions kept since. Pages run as the response is read, so
+ * the document is never held whole. Files come first, so the checkpoint names its exact
+ * count after them. */
+function rebuiltDocument(db: D1Database, row: CheckpointRow): ReadableStream<Uint8Array> {
+	const encoder = new TextEncoder();
+	const seen = new Set<string>();
+	let stage: 'files' | 'versions' | 'done' = 'files';
+	let afterPath = '', afterKept = row.created_at, afterId = 0, count = 0, started = false;
+	const encode = (file: RebuiltFile) => {
+		if (seen.has(file.path)) return '';
+		seen.add(file.path);
+		return `${count++ ? ',' : ''}${JSON.stringify(file.path)}:${JSON.stringify({ hash: file.hash, size: file.size, modified: file.modified, revision: file.revision })}`;
+	};
+	return new ReadableStream<Uint8Array>({
+		async pull(controller) {
+			let text = started ? '' : '{"version":1,"files":{';
+			started = true;
+			if (stage === 'files') {
+				const page = await db.prepare(`SELECT path, portable_path, hash, size, modified, storage_key AS revision FROM files
+					WHERE portable_path > ? AND live_from_seq <= ? ORDER BY portable_path LIMIT ?`)
+					.bind(afterPath, row.seq, CHECKPOINT_PAGE_SIZE).all<RebuiltFile & { portable_path: string }>();
+				for (const file of page.results) text += encode(file);
+				if (page.results.length < CHECKPOINT_PAGE_SIZE) stage = 'versions';
+				else afterPath = page.results.at(-1)!.portable_path;
+			} else if (stage === 'versions') {
+				const page = await db.prepare(`SELECT id, kept_at, path, hash, size, created_at AS modified, storage_key AS revision FROM file_versions
+					WHERE (kept_at, id) > (?, ?) AND live_from_seq <= ? AND live_until_seq > ? ORDER BY kept_at, id LIMIT ?`)
+					.bind(afterKept, afterId, row.seq, row.seq, CHECKPOINT_PAGE_SIZE).all<RebuiltFile & { id: number; kept_at: number }>();
+				for (const file of page.results) text += encode(file);
+				if (page.results.length < CHECKPOINT_PAGE_SIZE) stage = 'done';
+				else ({ kept_at: afterKept, id: afterId } = page.results.at(-1)!);
+			}
+			if (stage === 'done') {
+				text += `},"checkpoint":${JSON.stringify(toCheckpoint(row, count))}}`;
+				controller.enqueue(encoder.encode(text));
+				controller.close();
+				return;
+			}
+			controller.enqueue(encoder.encode(text));
+		},
+	});
 }
 
-async function streamCheckpointObject(bucket: R2Bucket, key: string, expected?: string): Promise<Response> {
-	const object = await bucket.get(key);
-	// An index write deletes the inventories it drops, possibly after this read of the index.
-	if (!object) return replaced();
-	if (object.size > MAX_STORED_CHECKPOINT_BYTES) throw new Error('Shared checkpoint is unavailable');
-	const metadata = object.customMetadata?.checkpoint;
-	if (!metadata || (expected !== undefined && metadata !== expected)) {
-		await object.body?.cancel();
-		throw new Error('Checkpoint metadata does not match its index');
-	}
-	return new Response(object.body, { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/json', 'Content-Length': String(object.size) } });
+export async function getSharedCheckpoint(request: Request, db: D1Database): Promise<Response> {
+	const id = new URL(request.url).searchParams.get('id');
+	if (!isCheckpointId(id)) return response({ error: 'Invalid checkpoint ID' }, 400);
+	const row = await readCheckpoint(db, id);
+	if (!row) return replaced();
+	return new Response(rebuiltDocument(db, row), { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/json' } });
 }
 
 /** Vault-scoped immutable reads; validate the live checkpoint and D1 ownership.
- * The client checks the returned bytes against its verified checkpoint inventory.
- * Avoid reading the entire inventory once per restored file. */
+ * The client checks the returned bytes against its verified checkpoint inventory. */
 export async function downloadCheckpointFile(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const params = new URL(request.url).searchParams;
 	const id = params.get('id'), path = sanitizePath(params.get('path') ?? ''), revision = params.get('revision');
 	if (!isCheckpointId(id) || !path || !isSyncRevision(revision)) return response({ error: 'A checkpoint and file path are required' }, 400);
-	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
-	const checkpoint = index.checkpoints.find(entry => entry.id === id && live(entry, limits));
-	if (!checkpoint) return response({ error: 'This shared checkpoint expired or was replaced.' }, 410);
+	if (!await readCheckpoint(db, id)) return response({ error: 'This shared checkpoint expired or was replaced.' }, 410);
 	const file = await db.prepare(`SELECT hash, size FROM files WHERE portable_path = ? AND path = ? AND storage_key = ?
         UNION ALL SELECT hash, size FROM file_versions WHERE storage_key = ? AND path = ? AND kept_at > ${FILE_VERSION_CUTOFF_SQL} LIMIT 1`)
 		.bind(portablePathKey(path), path, revision, revision, path, Date.now()).first<{ hash: string; size: number }>();
@@ -170,19 +147,16 @@ export async function downloadCheckpointFile(request: Request, bucket: R2Bucket,
 	return new Response(object.body, { headers: { ...corsHeaders(), ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(object.size), [FILE_HASH_HEADER]: file.hash } });
 }
 
-/** Bounded fallback sweep for expired checkpoints and inventories whose deletion or
- * publication did not finish. Objects younger than a day may still be publishing
- * their index. Returns true while a listing page found garbage and more objects remain. */
-export async function pruneSharedCheckpoints(bucket: R2Bucket, db: D1Database): Promise<boolean> {
-	const cursorKey = 'shared_checkpoint_cleanup_cursor';
-	const cursor = await readMaintenanceValue(db, cursorKey);
-	// One R2 list and delete call each handle up to R2_KEYS_PER_CALL keys.
-	const listing = await bucket.list({ prefix: PREFIX, limit: R2_KEYS_PER_CALL, ...(cursor ? { cursor } : {}) });
-	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
-	const retained = new Set(index.checkpoints.filter(entry => live(entry, limits)).map(entry => keyFor(entry.id)));
-	const garbage = listing.objects.filter(object => object.uploaded.getTime() < Date.now() - 86_400_000 && !retained.has(object.key));
-	if (garbage.length) await bucket.delete(garbage.map(object => object.key));
-	if (listing.truncated) await putMaintenanceValue(db, cursorKey, listing.cursor!).run();
-	else await db.prepare('DELETE FROM maintenance_state WHERE key = ?').bind(cursorKey).run();
-	return listing.truncated && garbage.length > 0;
+/** Thins checkpoints like a backup history: every one from the last day, the first of
+ * each hour for a week, then the first of each day, and none past the retention or the
+ * floor. A survivor stays the first of its hour or day as it ages, so thinning never
+ * needs one it removed. Returns false: one statement removes them all. */
+export async function pruneSharedCheckpoints(db: D1Database, now = Date.now()): Promise<boolean> {
+	await db.prepare(`DELETE FROM history_checkpoints WHERE NOT (${visibleSql()}) OR seq IN (
+		SELECT seq FROM (SELECT seq, ROW_NUMBER() OVER (
+			PARTITION BY CASE WHEN created_at <= ?2 THEN 'd' || (created_at / ${DAY_MS}) ELSE 'h' || (created_at / ${HOUR_MS}) END
+			ORDER BY seq) AS rank
+		FROM history_checkpoints WHERE created_at <= ?3) WHERE rank > 1)`)
+		.bind(now, now - 7 * DAY_MS, now - DAY_MS).run();
+	return false;
 }

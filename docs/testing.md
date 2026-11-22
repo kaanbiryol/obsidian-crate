@@ -500,9 +500,9 @@ wakes and projection initialization. Worker `commit-safety.integration.ts` check
 single-file and atomic-move changelog/history publication against real D1, including
 rejected revisions that must leave derived state unchanged. Worker
 `sync/version-coalescing.integration.ts` checks which replaced copies single, batch,
-Worker-side Markdown and atomic two-file writes keep, the 60-minute window for large
-files, R2 removal of copies that are not kept, file history restore, keeping a checkpoint's
-copy replaced within the window, and the checkpoint download code for a revision that is
+Worker-side Markdown and atomic two-file writes keep at commit-saved checkpoints, R2
+removal of copies that are not kept, file history restore, keeping a checkpoint's
+copy replaced within ten minutes, and the checkpoint download code for a revision that is
 no longer kept. Retain the move,
 upload-publication, topology and protocol integration tests when changing these
 boundaries.
@@ -553,9 +553,12 @@ post-commit cleanup from scheduled failure reporting. The corresponding
 to retain failed cleanup and its diagnostic until a successful retry. It also
 drains 6,000 expired versions in 12 maintenance passes, each within the Free D1
 query limit, without sorting the queue, while referenced objects survive.
-`sync/checkpoint-cleanup.integration.ts` checks that index rewrites delete evicted,
-expired and unpublished checkpoint inventories, including with a concurrent index
-writer, and that the maintenance sweep continues across passes while a backlog remains.
+`sync/history-state-restore.integration.ts` restores checkpoints through real sync and
+rebuilds every surviving checkpoint of seeded random edits, across thinning and expiry,
+against the state replayed from the changelog, downloading each file. It also checks
+thinning buckets, list limits and the file counter. `sync/checkpoint-cost.integration.ts`
+checks that saving a checkpoint reads about ten rows and that a rebuild reads the files and
+only the versions kept since.
 
 ### Sync outcomes and reader action lifetimes
 

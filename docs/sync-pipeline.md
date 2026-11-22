@@ -546,7 +546,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Revoked access:** a 401 shows the reconnect message in the status bar and Activity on every sync path. Full, incremental and forced syncs, queue flushes and queue reconciliation treat a 401 reported for one downloaded, uploaded or deleted file the same way. Its notice appears once until a sync succeeds or the connection changes, so background flushes that keep failing do not repeat it
 - **Queue retry:** retryable flush failures are re-added to `pendingKeys`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
 - **Large files:** local files over the file limit (25 MB unless a self-hosted server advertises more; see [self-hosting](self-hosting.md#sync-larger-files)) are reported as skipped issues, not failures. They never become pending changes or local deletes, settle in the queue without failing their batch, and do not hold back the changelog cursor or an initial import. If a file grows past the limit while initial import or force full sync reads it, that run stops with an error. A remote change to such a path still fails until the local file is reduced. A remote file over 25 MB is likewise reported as a skipped issue: it is not downloaded, the path keeps its existing baseline, and the changelog cursor still advances past it
-- **Remote recovery:** replaced and deleted R2 objects are retained for the server's history period (see [history retention](#history-retention)), integrity-checked, and restorable with an expected-hash compare-and-swap. Deleted copies are always kept. Replaced copies are coalesced so that frequent saves do not keep a full copy each: a replaced copy is kept if it was the live version for at least 10 minutes, if it was live when the latest shared checkpoint was created, or if its path has no version kept in the last 10 minutes (60 minutes for files of 1 MiB or more). This always keeps the state from before an editing session and about one version per window while editing; a drawing saved every 30 seconds keeps about 6 copies an hour instead of 120. A version restored from file history always keeps the copy it replaces. Copies that are not kept go to the reference-aware cleanup queue in the same D1 transaction. Intermediate saves within a window are therefore not recoverable, and an uncached merge base or pending-change preview for such a save is unavailable
+- **Remote recovery:** replaced and deleted R2 objects are retained for the server's history period (see [history retention](#history-retention)), integrity-checked, and restorable with an expected-hash compare-and-swap. Deleted copies are always kept. Replaced copies are coalesced so that frequent saves do not keep a full copy each: a replaced copy is kept if it was the live version at the latest shared checkpoint, or if its path has no copy kept since that checkpoint. A commit saves a checkpoint before its own changes once the latest is ten minutes old, so this always keeps the state from before an editing session, the first version of a file created since, and at most one copy per file every ten minutes while editing; a drawing saved every 30 seconds keeps about 6 copies an hour instead of 120. Large files follow the same rule. A version restored from file history always keeps the copy it replaces. Copies that are not kept go to the reference-aware cleanup queue in the same D1 transaction. Intermediate saves within a window are therefore not recoverable, and an uncached merge base or pending-change preview for such a save is unavailable
 - **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action
 
 ## Pending change previews
@@ -580,39 +580,38 @@ newer server changes are still discovered by the next normal sync.
 
 ## Returning to a history checkpoint
 
-Successful syncs without unresolved conflicts or pending restore/upload intents ask
-the server (`shared-history-checkpoints-v1`) to save a complete server file
-inventory. R2 holds the inventories and an ETag-protected index; no file contents
-are duplicated. Checkpoints are visible on
-all connected devices, including devices without local activity history. The index
-keeps the newest 20 distinct server generations for at most the history period. Repeated or
-concurrent saves of the same generation resolve to the same checkpoint. Initial and
-full syncs always save one; ordinary syncs wait 360 ms per tracked file since the
-last checkpoint (one hour at 10,000 files, ten hours at 100,000), keeping inventory
-reads near 2.4 per day on the Cloudflare Free plan.
+A shared checkpoint (`shared-history-checkpoints-v1`) is a position in the server's
+change history: a `history_checkpoints` row with the changelog sequence, its time and the
+file count, about one D1 row. No inventory or file contents are copied. Every `files`
+row records the sequence that made it current (`live_from_seq`), and every kept version
+also records the sequence that replaced or deleted it (`live_until_seq`), each written in
+the transaction of that change. The vault at checkpoint S is the current files with
+`live_from_seq <= S` plus the kept versions with `live_from_seq <= S < live_until_seq`.
+Checkpoints fall between transactions, so any sequence inside a change's own batch is
+exact for every checkpoint.
 
-The server reads the inventory in bounded pages and verifies the monotonic changelog
-generation before and after capture. An incomplete initial import or concurrent
-mutation rejects capture. Current limits are 100,000 files and 32 MiB of metadata;
-exceeding them never publishes a partial inventory, and vaults above these limits
-get no checkpoints. The small shared index is
-published conditionally only after its immutable inventory exists. A successful
-conditional index write deletes the inventories of the entries it dropped (evicted
-beyond 20 or expired); later writers start from that index, so those entries never
-return. A save whose inventory was never published (a same-generation duplicate, a newer
-state that displaced it, or a busy index) deletes its own inventory. Uncertain writes
-retain their possible committed objects. A cursor-based maintenance sweep removes the
-remaining unreferenced inventories after a one-day grace period, 1,000 objects per pass,
-and requests further passes while a page finds some and more remain.
+The server saves checkpoints itself: the first statement of every commit batch saves the
+vault as it is before that commit once the latest checkpoint is ten minutes old. An empty
+vault or an unfinished initial import gets none. `POST /sync/checkpoints` saves the
+current state for clients that ask; an unchanged state reuses its checkpoint. Checkpoints
+are visible on all connected devices. Maintenance thins them: every checkpoint of the
+last day, the first of each clock hour for a week, then the first of each UTC day for the
+history period, about 400 at most at 90 days. The file count is
+`server_state.file_count`, which each commit that adds or removes files updates in the
+same transaction.
 
-Expiry uses server time. Kept replaced/deleted versions retain at least the history period from the
-D1 commit time, so a checkpoint expires no later than those retained bytes. Coalescing
-keeps every copy that was live at the latest checkpoint. A checkpoint file download for a
-revision that is no longer kept returns 410 with `code: "version_unavailable"`.
-The server rejects expired or evicted checkpoint reads. Checkpoint file downloads
-check the live index and exact current/retained D1 path and revision ownership; the
-client verifies size and SHA-256 against the checkpoint before staging. Unlike text
-previews, these reads support the full 25 MiB sync-file limit.
+Expiry uses server time. A checkpoint is listed while its time is within the history
+period and not before the version floor (see [history retention](#history-retention)).
+Every version it needs was kept after it, at least the history period from its D1 commit,
+so its bytes outlive it. Rebuilding reads every `files` row and, through the `kept_at`
+index, only the versions kept since the checkpoint, in pages of 10,000 as the response
+streams; the document lists files before the checkpoint metadata, which carries the exact
+count. The plugin reuses the document it loaded for **Compare** when restoring the same
+checkpoint. A checkpoint file download for a revision that is no longer kept returns 410
+with `code: "version_unavailable"`. The server rejects expired checkpoint reads.
+Checkpoint file downloads check the checkpoint and exact current/retained D1 path and
+revision ownership; the client verifies size and SHA-256 against the checkpoint before
+staging. Unlike text previews, these reads support the full sync-file limit.
 
 Shared checkpoints
 contain the full remote inventory; each restoring device preserves its current

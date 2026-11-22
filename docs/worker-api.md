@@ -91,9 +91,9 @@ All sync routes require `vault`.
 | `POST` | `/sync/import/prune` | Remove up to 50 imported files that were deleted locally while the import was paused |
 | `POST` | `/sync/import/complete` | Verify the imported inventory page by page and seal it on the final page |
 | `POST` | `/sync/import/readiness` | Poll and acknowledge reminder setup after the initial import |
-| `GET` | `/sync/checkpoints` | List up to 20 unexpired shared checkpoints |
-| `POST` | `/sync/checkpoints` | Capture the authoritative server inventory; unchanged generations reuse their checkpoint |
-| `GET` | `/sync/checkpoint?id=<id>` | Read the complete inventory of a live shared checkpoint |
+| `GET` | `/sync/checkpoints?all=1` | List unexpired shared checkpoints, newest first (100 without `all`) |
+| `POST` | `/sync/checkpoints` | Save the current server state as a checkpoint; an unchanged state reuses its checkpoint |
+| `GET` | `/sync/checkpoint?id=<id>` | Rebuild and stream the complete inventory of a live shared checkpoint |
 | `GET` | `/sync/checkpoint-file?id=<id>&path=<path>&revision=<revision>` | Stream an exact current/retained file revision while the checkpoint remains live. Replacing a revision that was live at the latest checkpoint always keeps it; a revision that is no longer kept returns 410 with `code: "version_unavailable"` |
 | `GET` | `/sync/versions?path=<path>&search=<text>&cursor=<cursor>` | Page through unexpired recoverable file versions (100 per page) |
 | `GET` | `/sync/version-preview?path=<path>&storageKey=<key>` | Read one retained version for preview |
@@ -341,16 +341,15 @@ The **History** view groups retained update/deletion versions by day, rather tha
 
 ### Shared history checkpoints
 
-The server advertises `shared-history-checkpoints-v1`. Checkpoints store metadata in R2, not extra copies of vault
-files. Creation snapshots the complete server inventory, not a client-supplied list.
-The 20-entry index uses conditional ETags, and stale inventory captures receive 409.
-Expired or evicted IDs receive 410, and an index write deletes the inventories it drops. A read that found an inventory in the index just before it was dropped also receives 410. Captures are bounded to 100,000 files and 32 MiB of
-metadata (413 beyond that limit), and in-progress initial imports receive 409. The Worker
-encodes inventory pages as it reads them and streams stored documents after matching the
-object's metadata to the index, so neither path parses the whole inventory.
-All routes require vault credentials and return private, non-cacheable responses.
-See [the sync pipeline](sync-pipeline.md#returning-to-a-history-checkpoint) for
-retention, cleanup, and restore validation.
+The server advertises `shared-history-checkpoints-v1`. A checkpoint is one D1 row naming a
+changelog sequence; commits save one before their changes once the latest is ten minutes
+old, and `POST /sync/checkpoints` saves the current state. Reads rebuild the inventory
+from `files` and the versions kept since the checkpoint, streaming pages of 10,000 rows,
+so the Worker never holds the whole document. Expired IDs receive 410, and an unfinished
+initial import or empty vault receives 409 from `POST`. All routes require vault
+credentials and return private, non-cacheable responses. See
+[the sync pipeline](sync-pipeline.md#returning-to-a-history-checkpoint) for retention,
+thinning and restore validation.
 
 ### Changelog pruning
 

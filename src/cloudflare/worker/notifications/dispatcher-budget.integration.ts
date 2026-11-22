@@ -55,7 +55,8 @@ it('moves a schedule with one dispatcher request and no outbox queries or rows',
 	expect(edit.result.status, await edit.result.clone().text()).toBe(200);
 	// Was 36 queries, 23 rows, 4 Durable Object requests and 2 alarms, then 21 queries and 20 rows
 	// before the projection snapshot, which adds one written row and skips the idle pass steps.
-	expect(edit.cost).toMatchObject({ queries: 13, rowsWritten: 21, durableObjectRequests: 3, alarms: 1 });
+	// It is the first commit after the note was created, so it also saves a checkpoint row.
+	expect(edit.cost).toMatchObject({ queries: 13, rowsWritten: 22, durableObjectRequests: 3, alarms: 1 });
 	// The schedule rides in the projection row the commit already writes; delivery opens no
 	// per-reminder object.
 	const opened = names.mock.calls.map(([name]) => name);

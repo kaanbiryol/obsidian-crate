@@ -55,12 +55,15 @@ export async function finishInitialImport(request: Request, db: D1Database): Pro
 	const { after, final } = parsed.value;
 	const entries = parseInventoryEntries(parsed.value.entries);
 	if (typeof after !== 'string' || typeof final !== 'boolean' || !entries || (!final && !entries.length)) return corsResponse({ error: 'Invalid initial import inventory' }, 400);
+	// The files verified on earlier pages; the final page makes them the file count.
+	let verified = 0;
 	if (after) {
 		const stored = await readMaintenanceValue(db, IMPORT_VERIFICATION_KEY);
-		const progress = stored !== null ? JSON.parse(stored) as { token?: string; generation?: number; cursor?: string } : null;
-		if (progress?.token !== current.token || progress.generation !== current.generation || progress.cursor !== after) {
+		const progress = stored !== null ? JSON.parse(stored) as { token?: string; generation?: number; cursor?: string; verified?: number } : null;
+		if (progress?.token !== current.token || progress.generation !== current.generation || progress.cursor !== after || !Number.isSafeInteger(progress.verified)) {
 			return corsResponse({ error: 'Initial upload changed. Sync again to resume.' }, 409);
 		}
+		verified = progress.verified!;
 	}
 	const rows = await queryRows<{ path: string; portable_path: string; hash: string; size: number }>(db.prepare(
 		'SELECT path, portable_path, hash, size FROM files WHERE portable_path > ? ORDER BY portable_path LIMIT ?').bind(after, entries.length + (final ? 1 : 0)));
@@ -73,13 +76,14 @@ export async function finishInitialImport(request: Request, db: D1Database): Pro
 	if (!final) {
 		const cursor = rows.at(-1)!.portable_path;
 		await db.prepare('INSERT INTO maintenance_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
-			.bind(IMPORT_VERIFICATION_KEY, JSON.stringify({ token: current.token, generation: current.generation, cursor })).run();
+			.bind(IMPORT_VERIFICATION_KEY, JSON.stringify({ token: current.token, generation: current.generation, cursor, verified: verified + rows.length })).run();
 		return corsResponse({ cursor });
 	}
 	await db.batch([
-		// Later changelog entries number from the snapshot (see LAST_SEQ_SQL).
-		db.prepare(`UPDATE server_state SET import_state = 'complete', import_snapshot_seq = MAX(1, ${LAST_SEQ_SQL} + 1)
-      WHERE id = 1 AND import_token = ? AND import_state = 'importing' AND import_generation = ?`).bind(current.token, current.generation),
+		// Later changelog entries number from the snapshot (see LAST_SEQ_SQL). Imports keep no
+		// file count, so the verified inventory sets it; commits keep it from then on.
+		db.prepare(`UPDATE server_state SET import_state = 'complete', import_snapshot_seq = MAX(1, ${LAST_SEQ_SQL} + 1), file_count = ?
+      WHERE id = 1 AND import_token = ? AND import_state = 'importing' AND import_generation = ?`).bind(verified + rows.length, current.token, current.generation),
 		// Folder setup can finish an empty reminder scan before the first upload starts.
 		db.prepare(`DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'
       AND EXISTS (SELECT 1 FROM server_state WHERE id = 1 AND import_state = 'complete')`),

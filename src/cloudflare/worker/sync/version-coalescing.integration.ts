@@ -12,7 +12,6 @@ import { drainObjectCleanupQueue } from '../maintenance/object-cleanup';
 import { writeCommittedMarkdownFile } from './markdown-files';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
 import { createSharedCheckpoint } from './history-checkpoints';
-import { SHARED_CHECKPOINT_AT_KEY } from './file-publication-statements';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -25,9 +24,8 @@ const headers = (extra: Record<string, string> = {}) => ({ Authorization: 'Beare
 const live = (path: string) => env.DB.prepare('SELECT hash, storage_key FROM files WHERE path = ?').bind(path).first<{ hash: string; storage_key: string }>();
 const keys = async (table: 'file_versions' | 'object_cleanup_queue') =>
 	(await env.DB.prepare(`SELECT storage_key FROM ${table} ORDER BY storage_key`).all<{ storage_key: string }>()).results.map(row => row.storage_key).sort();
-/** Simulates elapsed time: the live copy became current, or each retained version was kept, `minutes` ago. */
-const liveFor = (path: string, minutes: number) => env.DB.prepare("UPDATE files SET modified = datetime('now', ?) WHERE path = ?").bind(`-${minutes} minutes`, path).run();
-const retainedAgo = (minutes: number) => env.DB.prepare("UPDATE file_versions SET created_at = datetime('now', ?)").bind(`-${minutes} minutes`).run();
+/** Simulates elapsed time: every checkpoint was saved `minutes` ago. */
+const checkpointsAgo = (minutes: number) => env.DB.prepare('UPDATE history_checkpoints SET created_at = created_at - ?').bind(minutes * 60_000).run();
 
 /** Saves `content` over the current file through a real upload route and returns the new revision. */
 async function save(kind: 'single' | 'batch', path: string, content: string | Uint8Array<ArrayBuffer>): Promise<string> {
@@ -43,18 +41,19 @@ async function save(kind: 'single' | 'batch', path: string, content: string | Ui
 }
 
 it.each([
-	['single', 'drawing.excalidraw'], ['batch', 'drawing.excalidraw'], ['single', 'note.md'], ['batch', 'note.md'],
-] as const)('keeps one replaced version per window during rapid %s saves of %s and removes the others from R2', async (kind, path) => {
-	const before = await save(kind, path, 'before the session');
-	await liveFor(path, 24 * 60);
-	const first = await save(kind, path, 'save 1');
-	const second = await save(kind, path, 'save 2');
-	const third = await save(kind, path, 'save 3');
-	// The pre-session copy is kept; copies live for seconds while a version is recent are not.
+	['single', 'drawing.excalidraw'], ['batch', 'drawing.excalidraw'], ['single', 'note.md'], ['batch', 'note.md'], ['single', 'video.bin'],
+] as const)('keeps one replaced version per checkpoint during rapid %s saves of %s and removes the others from R2', async (kind, path) => {
+	const content = (text: string) => path.endsWith('.bin') ? new Uint8Array(1024 * 1024).fill(text.length) : text;
+	const before = await save(kind, path, content('before the session'));
+	// The first commit of a session saves a checkpoint, which keeps the copy before it.
+	const first = await save(kind, path, content('save 1'));
+	const second = await save(kind, path, content('save 2 .'));
+	const third = await save(kind, path, content('save 3 ..'));
+	// Copies live for seconds after the checkpoint are not.
 	expect(await keys('file_versions')).toEqual([before]);
 	expect(await keys('object_cleanup_queue')).toEqual([first, second].sort());
-	await retainedAgo(11);
-	await save(kind, path, 'save 4');
+	await checkpointsAgo(11);
+	await save(kind, path, content('save 4 ...'));
 	expect(await keys('file_versions')).toEqual([before, third].sort());
 
 	expect(await drainObjectCleanupQueue(env.BUCKET, env.DB)).toBe(2);
@@ -63,33 +62,26 @@ it.each([
 	for (const key of [before, third, (await live(path))!.storage_key]) expect(await env.BUCKET.get(key)).not.toBeNull();
 });
 
-it('keeps a copy that was live for the whole window even when a version was just retained', async () => {
-	const first = await save('single', 'notes.txt', 'first');
-	const second = await save('single', 'notes.txt', 'second');
-	expect(await keys('file_versions')).toEqual([first]);
-	await liveFor('notes.txt', 11);
-	await save('single', 'notes.txt', 'third');
-	expect(await keys('file_versions')).toEqual([first, second].sort());
-	expect(await keys('object_cleanup_queue')).toEqual([]);
+it('keeps the first version of a file created since the latest checkpoint, and one copy per checkpoint after', async () => {
+	await save('single', 'other.md', 'other');
+	await save('single', 'other.md', 'other edited');
+	// A checkpoint exists; this file is created after it.
+	const created = await save('single', 'new.md', 'first version');
+	const second = await save('single', 'new.md', 'second version');
+	await save('single', 'new.md', 'third version');
+	expect(await keys('file_versions')).toContain(created);
+	expect(await keys('file_versions')).not.toContain(second);
+	expect(await keys('object_cleanup_queue')).toContain(second);
 });
 
-it('uses a sixty-minute window for files of 1 MiB or more', async () => {
-	const large = (fill: number) => new Uint8Array(1024 * 1024).fill(fill);
-	const first = await save('single', 'video.bin', large(1));
-	await save('single', 'video.bin', large(2));
-	expect(await keys('file_versions')).toEqual([first]);
-	await liveFor('video.bin', 11); await retainedAgo(11);
-	const dropped = (await live('video.bin'))!.storage_key;
-	await save('single', 'video.bin', large(3));
-	expect(await keys('file_versions')).toEqual([first]);
-	expect(await keys('object_cleanup_queue')).toEqual([dropped]);
-	await liveFor('video.bin', 61);
-	const lived = (await live('video.bin'))!.storage_key;
-	await save('single', 'video.bin', large(4));
-	await retainedAgo(61);
-	const recent = (await live('video.bin'))!.storage_key;
-	await save('single', 'video.bin', large(5));
-	expect(await keys('file_versions')).toEqual([first, lived, recent].sort());
+it('keeps the copy of a file untouched since the latest checkpoint while other files change', async () => {
+	const quiet = await save('single', 'quiet.md', 'quiet');
+	await save('single', 'busy.md', 'busy 1');
+	await save('single', 'busy.md', 'busy 2');
+	await checkpointsAgo(30);
+	await save('single', 'busy.md', 'busy 3');
+	await save('single', 'quiet.md', 'quiet edited');
+	expect(await keys('file_versions')).toContain(quiet);
 });
 
 it('lists kept versions and restores one, keeping the copy an explicit restore replaces', async () => {
@@ -117,7 +109,10 @@ it('coalesces Worker-side Markdown commits and atomic two-file writes', async ()
 		source: { path: 'Reminders/a.md', content: '# A', expectedHash: a1.hash },
 		destination: { path: 'Reminders/b.md', content: '- [ ] Two <!-- crate-id:two -->\n- [ ] One <!-- crate-id:one -->', expectedHash: b1.hash },
 	});
+	// The second file's first commit saved a checkpoint with only the first file. The second
+	// file's first version is kept as the first copy of its path since that checkpoint.
 	expect(await keys('file_versions')).toEqual([a1.storage_key, b1.storage_key].sort());
+	await checkpointsAgo(11);
 	const [a2, b2] = [await read('Reminders/a.md'), await read('Reminders/b.md')];
 	await writeCommittedMarkdownFilePair(env.BUCKET, env.DB, {
 		source: { path: 'Reminders/a.md', content: '- [ ] One <!-- crate-id:one -->', expectedHash: a2.hash },
@@ -125,22 +120,19 @@ it('coalesces Worker-side Markdown commits and atomic two-file writes', async ()
 	});
 	const a3 = await read('Reminders/a.md');
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/a.md', '- [x] One <!-- crate-id:one -->', a3.hash);
-	expect(await keys('file_versions')).toEqual([a1.storage_key, b1.storage_key].sort());
-	expect(await keys('object_cleanup_queue')).toEqual([a2.storage_key, b2.storage_key, a3.storage_key].sort());
+	expect(await keys('file_versions')).toEqual([a1.storage_key, b1.storage_key, a2.storage_key, b2.storage_key].sort());
+	expect(await keys('object_cleanup_queue')).toEqual([a3.storage_key]);
 });
 
 const checkpointFile = (id: string, path: string, revision: string) =>
 	worker.fetch(new Request(`https://worker.test/sync/checkpoint-file?id=${id}&path=${encodeURIComponent(path)}&revision=${encodeURIComponent(revision)}`, { headers: headers() }), env);
-const createCheckpoint = async () => (await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: { id: string } }).checkpoint;
+const createCheckpoint = async () => (await (await createSharedCheckpoint(env.DB)).json() as { checkpoint: { id: string } }).checkpoint;
 
 it('keeps the copy a shared checkpoint recorded when a bulk change replaces it within the window', async () => {
-	// 12:00 an edit keeps the older copy, 12:04 a checkpoint records the edit, 12:06 a bulk change replaces it.
+	// An edit keeps the older copy, a checkpoint records the edit, then a bulk change replaces it within ten minutes.
 	const before = await save('single', 'notes.txt', 'before the session');
-	await liveFor('notes.txt', 24 * 60);
 	const checkpointed = await save('single', 'notes.txt', 'checkpointed');
 	const checkpoint = await createCheckpoint();
-	await liveFor('notes.txt', 6); await retainedAgo(6);
-	await env.DB.prepare("UPDATE maintenance_state SET value = datetime('now', '-2 minutes') WHERE key = ?").bind(SHARED_CHECKPOINT_AT_KEY).run();
 	const bulk = await save('single', 'notes.txt', 'bulk change');
 	// A copy that became live after the checkpoint is still coalesced.
 	await save('single', 'notes.txt', 'next change');

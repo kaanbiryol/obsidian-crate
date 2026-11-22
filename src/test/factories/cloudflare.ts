@@ -248,7 +248,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 			const results: Array<{ meta: { changes: number } }> = [];
 			for (const statement of statements as MockD1Statement[]) {
 				let changes = 0;
-				if (statement._sql.includes('INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor)')) {
+				if (statement._sql.includes('INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor')) {
 					const path = getBoundString(statement._args, 0);
 					if (statement._sql.includes('DO NOTHING') && files.has(path)) {
 						changes = 0;

@@ -4,6 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
+import { createSharedCheckpoint } from '../sync/history-checkpoints';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
 import type { PathTags } from '../../../encryption/path-tags';
@@ -125,7 +126,7 @@ it('decrypts retained baselines and shared history when comparing unsynced local
 	const first = await device('first'), path = '.obsidian/appearance.json';
 	const original = '{"theme":"original private setting"}', local = '{"theme":"local unsynced setting"}';
 	first.disk.write(path, original); await sync(first);
-	const checkpoint = await first.engine.saveSharedHistoryCheckpoint(); expect(checkpoint).toBeDefined();
+	const checkpoint = (await (await createSharedCheckpoint(env.DB)).json() as { checkpoint?: { id: string } }).checkpoint; expect(checkpoint).toBeDefined();
 	const second = await device('second'); await sync(second);
 	second.disk.write(path, '{"theme":"new remote setting"}'); await sync(second);
 	first.disk.write(path, local); await first.engine.onRawFileChange(path);

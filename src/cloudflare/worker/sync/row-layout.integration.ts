@@ -73,11 +73,11 @@ it('writes one lease row per request and no unchanged key on update', async () =
 		expect(response.status).toBe(200);
 		return meter.writes();
 	};
-	// A lease insert and delete, the files row, changelog, receipt.
-	expect(await put('Journal/a.md', '# A', null)).toBe(5);
-	// The kept version writes its row and three index entries; the update writes the files row only.
-	await env.DB.prepare("UPDATE files SET modified = datetime('now', '-11 minutes')").run();
-	expect(await put('Journal/a.md', '# A2', await sha256Hex('# A'))).toBe(9);
+	// A lease insert and delete, the files row, changelog, receipt and the file count.
+	expect(await put('Journal/a.md', '# A', null)).toBe(6);
+	// The first commit with a file saves a checkpoint row, which keeps the replaced copy: its row
+	// and three index entries. The update writes the files row only.
+	expect(await put('Journal/a.md', '# A2', await sha256Hex('# A'))).toBe(10);
 
 	const files = await Promise.all(Array.from({ length: 32 }, async (_, i) => ({ path: `Bulk/${i}.md`, content: btoa(`# ${i}`), expectedHash: null as string | null,
 		operationId: createReminderOperationId(day), contentType: 'text/markdown', hash: await sha256Hex(`# ${i}`) })));
@@ -88,10 +88,10 @@ it('writes one lease row per request and no unchanged key on update', async () =
 		expect((await response.json() as { success: boolean }).success).toBe(true);
 		return meter.writes();
 	};
-	// Bulk: one lease, rows, one changelog insert, receipts.
-	expect(await batch({ files, bulkNewFiles: true })).toBe(2 + 32 * 3);
-	await env.DB.prepare("UPDATE files SET modified = datetime('now', '-11 minutes')").run();
+	// Bulk: one lease, rows, one changelog insert, receipts and the file count.
+	expect(await batch({ files, bulkNewFiles: true })).toBe(3 + 32 * 3);
+	await env.DB.prepare('UPDATE history_checkpoints SET created_at = created_at - 660000').run();
 	const updates = files.map((file, i) => ({ ...file, content: btoa(`# ${i} edited`), hash: undefined, expectedHash: file.hash, operationId: createReminderOperationId(day) }));
-	// Before: 9 per file, two of them the file's own lease.
-	expect(await batch({ files: updates })).toBe(2 + 32 * 7);
+	// Before: 9 per file, two of them the file's own lease. Ten minutes on, the batch saves a checkpoint row.
+	expect(await batch({ files: updates })).toBe(3 + 32 * 7);
 });

@@ -118,9 +118,9 @@ and confirm another device converges. Interrupt a restore and restart Obsidian t
 verify automatic sync stays off and the local recovery copies remain available.
 
 Shared-checkpoint coverage also exercises a second device discovering and restoring
-another device's checkpoint without its local history, retained attachments over
-256 KB, concurrent publication, lost index-write responses, page-generation races,
-20-entry limits, expiry, metadata cleanup, and vault-token authorization. Run
+a commit-saved checkpoint without its local history, retained attachments over
+256 KB, repeated saves of one state, rebuilding seeded random histories across
+thinning and expiry, list limits, expiry, and vault-token authorization. Run
 `npx vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync/history-state-restore.integration.ts`
-for those real D1/R2/DO checks. Hosted and physical-device acceptance still requires
+for those real D1/R2/DO checks, and `src/cloudflare/worker/sync/checkpoint-cost.integration.ts` for their row reads. Hosted and physical-device acceptance still requires
 updating the server and plugin on both devices and restoring from the second one.

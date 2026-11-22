@@ -121,7 +121,7 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 		// Keep reset authority even after the vault returns to plaintext mode; features return to
 		// their defaults and the initial import to none.
 		env.DB.prepare(`UPDATE server_state SET encryption = ?, features = NULL, import_token = NULL, import_state = NULL,
-			import_generation = 0, import_snapshot_seq = 0, settings = NULL, settings_version = NULL WHERE id = 1`)
+			import_generation = 0, import_snapshot_seq = 0, settings = NULL, settings_version = NULL, file_count = 0 WHERE id = 1`)
 			.bind(setup ? JSON.stringify({ ...state, mode: 'active' }) : null),
 		save(env.DB, PREFIX + receipt.id, complete),
 	]);

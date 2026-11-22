@@ -1,5 +1,5 @@
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
-import { deletedFileStatements, publishedChangelogStatement } from './file-publication-statements';
+import { checkpointStatement, deletedFileStatements, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs, fileRevisionGuard } from './file-identity';
 import { descriptorColumn, encryptionWriteGuard, prepareEncryptedFileCommit } from '../encryption/state';
 import { finishUploadLeases, uploadLeaseGuard } from './staging/upload-leases';
@@ -14,7 +14,7 @@ import { FileVersionConflictError } from './markdown-files';
 import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import type { FileDeletionReceipt } from './file-delete-audit';
 import type { MutationAuditContext } from '../http/request-diagnostics';
-import { getStoredFileRow } from './storage';
+import { getStoredFileRow, NEXT_SEQ_SQL } from './storage';
 
 /** Publish `content` at a new path and delete the exact source revision in one
  * transaction, so a rename never leaves both files or neither. */
@@ -43,9 +43,11 @@ export async function writeCommittedMarkdownMove(
 	const published = fileRevisionGuard(destination.path, destination.objectKey);
 	// Every source statement requires the new revision, so it only runs after the insert.
 	const sourceStatement = (sql: string, ...args: unknown[]) => db.prepare(`${sql} WHERE ${sourceMatch} AND ${published.sql}`).bind(...args, ...sourceArgs, ...published.args);
+	// The move adds and removes one file each, so the file count stays.
 	const beforeDelete = [
-		db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor)
-			SELECT ?, ?, ?, ?, datetime('now'), ?, ?
+		checkpointStatement(db),
+		db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor, live_from_seq)
+			SELECT ?, ?, ?, ?, datetime('now'), ?, ?, ${NEXT_SEQ_SQL}
 			WHERE EXISTS (SELECT 1 FROM files WHERE ${sourceMatch}) AND ${namespace.sql} AND ${lease.sql} AND ${guard.sql}
 			ON CONFLICT(portable_path) DO NOTHING`)
 			.bind(destination.path, portablePathKey(destination.path), destination.hash, destination.size, destination.objectKey, descriptor,
@@ -64,7 +66,7 @@ export async function writeCommittedMarkdownMove(
 			{ policy: context?.readingPolicy, encrypted: Boolean(encryption.state) }),
 		...(params.effects?.([{ path: destination.path, storageKey: destination.objectKey }]) ?? []),
 	]);
-	const inserted = changedRows(results[0]) === 1, removed = changedRows(results[beforeDelete.length]) === 1;
+	const inserted = changedRows(results[1]) === 1, removed = changedRows(results[beforeDelete.length]) === 1;
 	if (inserted !== removed) throw new Error('A move committed only one file');
 	if (!inserted) {
 		await deleteBucketObjectsOrQueue(bucket, db, [{ storageKey: destination.objectKey, path: destination.path }]);

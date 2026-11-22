@@ -1,6 +1,6 @@
 import type { ObjectReference } from '../d1/storage-references';
 import { deleteBucketObjectsOrQueue } from '../maintenance/object-cleanup';
-import { deletedFileStatements, keepReplacedVersionSql, publishedChangelogStatement } from './file-publication-statements';
+import { checkpointStatement, deletedFileStatements, fileCountStatement, keepReplacedVersionSql, publishedChangelogStatement } from './file-publication-statements';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { descriptorColumn, ENCRYPTION_STATE_SQL, encryptionWriteGuard, parseEncryptionState, prepareEncryptedFileCommit } from '../encryption/state';
 import type { EncryptionServerState } from '../../../encryption/server-state';
@@ -18,6 +18,7 @@ import { fileDeletionReceiptStatement, findFileDeletionReceipt, type FileDeletio
 import type { MutationAuditContext } from '../http/request-diagnostics';
 import {
 	FILE_VERSION_KEPT_AT_SQL,
+	NEXT_SEQ_SQL,
 	getStoredFileRow,
 	readVerifiedBytes,
 	type ExpectedFileHash,
@@ -69,16 +70,16 @@ export function uploadMutation(db: D1Database, input: UploadMutationInput): D1Pr
 	const descriptor = input.descriptor ?? null;
 	if (expectedHash === null) {
 		const namespace = uploadGuard(input);
-		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor)
-			SELECT ?, ?, ?, ?, datetime('now'), ?, ? WHERE ${namespace.sql}
+		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key, descriptor, live_from_seq)
+			SELECT ?, ?, ?, ?, datetime('now'), ?, ?, ${NEXT_SEQ_SQL} WHERE ${namespace.sql}
 			ON CONFLICT(portable_path) DO NOTHING`)
 			.bind(path, portablePathKey(path), hash, size, objectKey, descriptor, ...namespace.args);
 	}
 	const replaced = replacedRow({ ...input, expectedHash });
 	// The WHERE matches the portable path already. Setting the uniquely indexed column
-	// again would write its index entry too.
+	// again would write its index entry too. The changelog row follows in the batch.
 	return db.prepare(`UPDATE files
-		SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?
+		SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?, descriptor = ?, live_from_seq = ${NEXT_SEQ_SQL}
 		WHERE ${replaced.sql}`)
 		.bind(hash, size, objectKey, descriptor, ...replaced.args);
 }
@@ -90,8 +91,8 @@ export function uploadMutation(db: D1Database, input: UploadMutationInput): D1Pr
 function retainReplacedUpload(db: D1Database, input: UploadMutationInput, always: boolean): D1PreparedStatement[] {
 	if (input.expectedHash === null) return [];
 	const replaced = replacedRow({ ...input, expectedHash: input.expectedHash });
-	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, descriptor, kept_at)
-		SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_KEPT_AT_SQL}
+	return [db.prepare(`INSERT OR IGNORE INTO file_versions (storage_key, path, hash, size, reason, descriptor, kept_at, live_from_seq, live_until_seq)
+		SELECT storage_key, path, hash, size, 'replaced', descriptor, ${FILE_VERSION_KEPT_AT_SQL}, live_from_seq, ${NEXT_SEQ_SQL}
 		FROM files WHERE ${replaced.sql} AND storage_key != ?${always ? '' : ` AND ${keepReplacedVersionSql('files')}`}`)
 		.bind(Date.now(), ...replaced.args, input.objectKey),
 	...queueReplacedUploadCleanup(db, input)];
@@ -180,14 +181,18 @@ async function stagedFileStatements(db: D1Database, params: StagedFileCommitInpu
 	] };
 }
 
+/** The uploads that add a file: their new row exists only if they inserted it. */
+const insertedFiles = (files: readonly StagedFileCommitInput[]) => files.filter(file => file.expectedHash === null);
+
 export async function commitStagedFile(
 	bucket: R2Bucket,
 	db: D1Database,
 	params: StagedFileCommitInput,
 ): Promise<CommitResult> {
 	const plan = await stagedFileStatements(db, params, true);
-	const results: unknown[] = await db.batch([...plan.statements, ...finishUploadLeases(db, [params])]);
-	return settleStagedFile(bucket, db, params, results.slice(0, plan.statements.length), plan.mutationIndex);
+	const results: unknown[] = await db.batch([checkpointStatement(db), ...plan.statements,
+		...fileCountStatement(db, insertedFiles([params]), []), ...finishUploadLeases(db, [params])]);
+	return settleStagedFile(bucket, db, params, results.slice(1, 1 + plan.statements.length), plan.mutationIndex);
 }
 
 /** `commitStagedFile` for several uploads in one transaction and one round trip. Each
@@ -198,7 +203,7 @@ export async function commitStagedFile(
 export async function commitStagedFiles(bucket: R2Bucket, db: D1Database, files: Array<StagedFileCommitInput & { operation: UploadOperation }>): Promise<CommitResult[]> {
 	if (!files.length) return [];
 	const plans = await Promise.all(files.map(file => stagedFileStatements(db, file, false)));
-	const statements: D1PreparedStatement[] = [];
+	const statements: D1PreparedStatement[] = [checkpointStatement(db)];
 	const ranges = plans.map(plan => {
 		const start = statements.length;
 		statements.push(...plan.statements);
@@ -206,7 +211,7 @@ export async function commitStagedFiles(bucket: R2Bucket, db: D1Database, files:
 	});
 	// Index rows apply only to revisions this batch committed, so they follow every file.
 	statements.push(...await readingIndexStatements(db, files.map(file => ({ path: file.path, storageKey: file.objectKey, hash: file.hash, size: file.size, content: file.content })),
-		{ policy: files[0]!.readingPolicy, encrypted: plans[0]!.encrypted }), ...finishUploadLeases(db, files));
+		{ policy: files[0]!.readingPolicy, encrypted: plans[0]!.encrypted }), ...fileCountStatement(db, insertedFiles(files), []), ...finishUploadLeases(db, files));
 	const results: unknown[] = await db.batch(statements);
 	const commits: CommitResult[] = [];
 	// Unpublished uploads are cleaned up together, so a batch of stale uploads stays
@@ -298,6 +303,9 @@ async function unmatchedFileDelete(db: D1Database, params: FileDeleteInput): Pro
 	return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
 }
 
+/** The receipt that shows a deletion removed its file. */
+const deletedFile = (params: FileDeleteInput, plan: { deletion: FileDeletionReceipt }) => ({ storageKey: params.expectedRevision ?? '', deletion: plan.deletion.revision });
+
 export async function commitFileDelete(db: D1Database, params: FileDeleteInput): Promise<CommitResult> {
 	// The caller's verified absent snapshot is a valid linearization point for
 	// an idempotent retry. Avoid a no-op mutation batch, and never touch a newer
@@ -307,8 +315,8 @@ export async function commitFileDelete(db: D1Database, params: FileDeleteInput):
 		return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
 	}
 	const plan = await fileDeleteStatements(db, params);
-	const results: unknown[] = await db.batch(plan.statements);
-	if (changedRows(results[plan.deleteIndex]) !== 1) return unmatchedFileDelete(db, params);
+	const results: unknown[] = await db.batch([checkpointStatement(db), ...plan.statements, ...fileCountStatement(db, [], [deletedFile(params, plan)])]);
+	if (changedRows(results[1 + plan.deleteIndex]) !== 1) return unmatchedFileDelete(db, params);
 	return { committed: true, currentHash: null, deletion: plan.deletion };
 }
 
@@ -318,12 +326,16 @@ export async function commitFileDelete(db: D1Database, params: FileDeleteInput):
 export async function commitFileDeletes(db: D1Database, deletions: FileDeleteInput[]): Promise<CommitResult[]> {
 	if (!deletions.length) return [];
 	const plans = await Promise.all(deletions.map(async params => params.previousFile ? fileDeleteStatements(db, params) : null));
-	const statements: D1PreparedStatement[] = [];
+	const statements: D1PreparedStatement[] = [checkpointStatement(db)];
 	const starts = plans.map((plan, index) => {
 		const start = statements.length, params = deletions[index]!;
 		statements.push(...(plan ? plan.statements : [fileDeletionReceiptStatement(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '')]));
 		return start;
 	});
+	statements.push(...fileCountStatement(db, [], deletions.flatMap((params, index) => {
+		const plan = plans[index];
+		return plan ? [deletedFile(params, plan)] : [];
+	})));
 	const results: unknown[] = await db.batch(statements);
 	return Promise.all(deletions.map(async (params, index): Promise<CommitResult> => {
 		const plan = plans[index], start = starts[index]!;

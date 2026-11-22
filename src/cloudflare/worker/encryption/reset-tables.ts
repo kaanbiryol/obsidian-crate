@@ -9,7 +9,7 @@ export const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 
  * content. reset-tables.test.ts fails when schema.sql gains a table not listed here.
  */
 export const ENCRYPTION_RESET_TABLES = {
-	wiped: ['files', 'file_versions', 'changelog', 'operations', 'operation_chunks',
+	wiped: ['files', 'file_versions', 'history_checkpoints', 'changelog', 'operations', 'operation_chunks',
 		'reminder_file_cache', 'reminder_identities', 'reminder_occurrences', 'reminder_sources', 'reminder_source_state',
 		'reminder_projections', 'notification_projection_jobs', 'notification_file_retries', 'notification_policy',
 		'grants', 'push_subscriptions', ...READING_TABLES],

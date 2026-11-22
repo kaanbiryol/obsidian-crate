@@ -10,7 +10,6 @@ import { sha256Hex } from '@/platform/sha256';
 import { isAuthenticatedRouteAllowed } from '../router';
 import { DAY_MS } from '../../../protocol/history-retention';
 import { createSharedCheckpoint, listSharedCheckpoints } from '../sync/history-checkpoints';
-import { HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
 import type { SharedCheckpoint } from '../../../protocol/history-checkpoints';
 import { expireFileVersions } from '../maintenance/object-cleanup';
 import { meterD1Usage } from '../d1/d1-usage';
@@ -112,30 +111,35 @@ it('applies a changed period to kept versions without reviving ones maintenance 
 	expect(await versionRows()).toEqual(['recent.md']);
 });
 
+/** A one-file vault at a new sequence, so the next save names a new state. */
+async function changeVault(path: string) {
+	await env.DB.prepare("INSERT INTO changelog(path, action, hash, size) VALUES (?, 'put', '', 0)").bind(path).run();
+	await env.DB.prepare("INSERT INTO server_state (id, file_count) VALUES (1, 1) ON CONFLICT(id) DO UPDATE SET file_count = 1").run();
+}
+const save = async () => (await (await createSharedCheckpoint(env.DB)).json() as { checkpoint: SharedCheckpoint }).checkpoint;
+/** Moves every checkpoint `days` into the past, as if saved then. */
+const age = (days: number) => env.DB.prepare('UPDATE history_checkpoints SET created_at = created_at - ?').bind(days * DAY_MS).run();
+const listed = async () => (await (await listSharedCheckpoints(new Request('https://crate.test/sync/checkpoints?all=1'), env.DB)).json() as { checkpoints: SharedCheckpoint[] }).checkpoints;
+
 it('saves checkpoints for the chosen period and hides older ones after shortening it', async () => {
-	await env.DB.prepare("INSERT INTO changelog(path, action, hash, size) VALUES ('a.md', 'delete', '', 0)").run();
-	const created = await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: SharedCheckpoint };
-	expect(created.checkpoint.expiresAt - Date.parse(created.checkpoint.timestamp)).toBe(30 * DAY_MS);
-	// Rewrite the index as if the checkpoint were saved ten days ago.
-	const old = { ...created.checkpoint, timestamp: new Date(Date.now() - 10 * DAY_MS).toISOString(), expiresAt: Date.now() + 20 * DAY_MS };
-	await env.BUCKET.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints: [old] }));
-	const listed = async () => (await (await listSharedCheckpoints(new Request("https://crate.test/sync/checkpoints"), env.BUCKET, env.DB)).json() as { checkpoints: SharedCheckpoint[] }).checkpoints;
+	await changeVault('a.md');
+	const created = await save();
+	expect(created.expiresAt - Date.parse(created.timestamp)).toBe(30 * DAY_MS);
+	await age(10);
 	expect(await listed()).toHaveLength(1);
 
 	await setRetention(7);
 	expect(await listed()).toEqual([]);
-	await env.DB.prepare("INSERT INTO changelog(path, action, hash, size) VALUES ('b.md', 'delete', '', 0)").run();
-	const next = await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: SharedCheckpoint };
-	expect(next.checkpoint.expiresAt - Date.parse(next.checkpoint.timestamp)).toBe(7 * DAY_MS);
-	expect((await listed()).map(entry => entry.id)).toEqual([next.checkpoint.id]);
+	await changeVault('b.md');
+	const next = await save();
+	expect(next.expiresAt - Date.parse(next.timestamp)).toBe(7 * DAY_MS);
+	expect((await listed()).map(entry => entry.id)).toEqual([next.id]);
 });
 
 it('keeps checkpoints hidden after a longer period once maintenance removed versions they need', async () => {
-	await env.DB.prepare("INSERT INTO changelog(path, action, hash, size) VALUES ('a.md', 'delete', '', 0)").run();
-	const created = await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: SharedCheckpoint };
-	const old = { ...created.checkpoint, timestamp: new Date(Date.now() - 10 * DAY_MS).toISOString(), expiresAt: Date.now() + 20 * DAY_MS };
-	await env.BUCKET.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints: [old] }));
-	const listed = async () => (await (await listSharedCheckpoints(new Request("https://crate.test/sync/checkpoints"), env.BUCKET, env.DB)).json() as { checkpoints: SharedCheckpoint[] }).checkpoints;
+	await changeVault('a.md');
+	const old = await save();
+	await age(10);
 	// A file the checkpoint saw was replaced nine days ago.
 	await deleteFile('replaced.md');
 	await backdate('replaced.md', 9);
@@ -144,9 +148,17 @@ it('keeps checkpoints hidden after a longer period once maintenance removed vers
 	expect(await expireFileVersions(env.BUCKET, env.DB)).toBe(false);
 	expect(await versionRows()).toEqual([]);
 	await setRetention(30);
+	// Only the checkpoint the deletion's commit saved before it remains.
+	expect((await listed()).map(entry => entry.id)).not.toContain(old.id);
+	expect(await listed()).toHaveLength(1);
+});
+
+it('starts a hidden checkpoint of an unchanged vault again from now', async () => {
+	await changeVault('a.md');
+	const old = await save();
+	await age(40);
 	expect(await listed()).toEqual([]);
-	// The vault is unchanged, so a new checkpoint is saved instead of returning the broken one.
-	const next = await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: SharedCheckpoint };
-	expect(next.checkpoint.id).not.toBe(old.id);
-	expect((await listed()).map(entry => entry.id)).toEqual([next.checkpoint.id]);
+	const next = await save();
+	expect(next.id).toBe(old.id);
+	expect((await listed()).map(entry => entry.id)).toEqual([next.id]);
 });

@@ -32,7 +32,7 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 				if (!await wakeProjection(env)) throw new Error('Reading coordinator unavailable');
 			}
 		}],
-				['prune shared checkpoints', bounded(() => pruneSharedCheckpoints(env.BUCKET, db))],
+				['prune shared checkpoints', bounded(() => pruneSharedCheckpoints(db))],
 		// Encrypted file descriptors live in these rows, so pruning them releases the descriptors too.
 		['prune changelog', bounded(() => pruneChangelog(db))],
 		['expire file versions', bounded(() => expireFileVersions(env.BUCKET, db, Date.now()))],

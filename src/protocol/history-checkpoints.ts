@@ -4,13 +4,11 @@ import type { FileEntry } from './sync-types';
 import { MAX_HISTORY_RETENTION_MS } from './history-retention';
 
 export const SHARED_CHECKPOINT_CAPABILITY = 'shared-history-checkpoints-v1';
-export const MAX_SHARED_CHECKPOINTS = 20;
-/** A self-hosted server keeps more; lists up to this size parse. */
+/** The most that clients which do not ask for the whole list accept. */
 export const SELF_HOSTED_SHARED_CHECKPOINTS = 100;
-export const MAX_CHECKPOINT_FILES = 100_000;
-export const MAX_CHECKPOINT_BYTES = 32 * 1024 * 1024;
-/** Encrypted documents expand the plaintext by base64url and envelope overhead. */
-export const MAX_ENCRYPTED_CHECKPOINT_BYTES = 48 * 1024 * 1024;
+/** Thinning keeps every checkpoint of a day, one per hour for a week and one per day for
+ * up to a year of history, at most 144 + 144 + 358. */
+export const MAX_LISTED_CHECKPOINTS = 1000;
 export const isCheckpointId = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 
 export interface SharedCheckpoint {
@@ -26,10 +24,10 @@ export interface SharedCheckpointDocument {
 	files: Record<string, FileEntry>;
 }
 
-export function parseSharedCheckpoint(value: unknown): SharedCheckpoint {
+function parseSharedCheckpoint(value: unknown): SharedCheckpoint {
 	if (!isRecord(value) || !isCheckpointId(value.id) || !isSyncSequence(value.sequence)
 		|| !isSyncDate(value.timestamp) || !isSyncSequence(value.expiresAt)
-		|| !isSyncSequence(value.fileCount) || value.fileCount > MAX_CHECKPOINT_FILES
+		|| !isSyncSequence(value.fileCount)
 		|| value.expiresAt <= Date.parse(value.timestamp) || value.expiresAt > Date.parse(value.timestamp) + MAX_HISTORY_RETENTION_MS) {
 		throw new Error('Invalid shared checkpoint metadata');
 	}
@@ -37,7 +35,7 @@ export function parseSharedCheckpoint(value: unknown): SharedCheckpoint {
 }
 
 export function parseSharedCheckpointList(value: unknown): SharedCheckpoint[] {
-	if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.checkpoints) || value.checkpoints.length > SELF_HOSTED_SHARED_CHECKPOINTS) throw new Error('Invalid shared checkpoint list');
+	if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.checkpoints) || value.checkpoints.length > MAX_LISTED_CHECKPOINTS) throw new Error('Invalid shared checkpoint list');
 	const checkpoints = value.checkpoints.map(parseSharedCheckpoint);
 	if (new Set(checkpoints.map(entry => entry.id)).size !== checkpoints.length) throw new Error('Duplicate shared checkpoint');
 	return checkpoints;

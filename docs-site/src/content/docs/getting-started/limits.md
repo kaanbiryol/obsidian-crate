@@ -23,8 +23,8 @@ File names also have to work on every device. [Sync errors](/docs/troubleshootin
 | Limit | What it means for you |
 | --- | --- |
 | 30 days of server history by default | Replaced and deleted files are kept this long. Choose 7, 14, 30, 60 or 90 days under **Sync options → Keep history for**. |
-| About one version every 10 minutes while editing | Crate keeps the version from before you started editing, then about one every 10 minutes, or every hour for files of 1 MB or more. Not every save is kept. |
-| Latest 20 checkpoints | Saved states of your whole vault, kept for up to your history period. They cover recent syncs, not an unlimited backup archive. |
+| About one version every 10 minutes while editing | Crate keeps the version from before you started editing and the first version of a new file, then about one every 10 minutes. Not every save is kept. |
+| Checkpoints every 10 minutes while you edit | Saved states of your whole vault: every one from the last day, one per hour for the past week, then one per day for the rest of your history period. They aren't an unlimited backup archive. |
 
 Files that only ever existed on one device may have no server history. [History and recovery](/docs/troubleshooting/recovery/) shows how to restore.
 

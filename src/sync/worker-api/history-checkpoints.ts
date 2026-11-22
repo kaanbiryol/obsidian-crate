@@ -1,5 +1,4 @@
-import { parseSharedCheckpoint, parseSharedCheckpointList, parseSharedCheckpointDocument, type SharedCheckpoint } from '../../protocol/history-checkpoints';
-import { isRecord } from '../../platform/validation';
+import { parseSharedCheckpointList, parseSharedCheckpointDocument, type SharedCheckpoint, type SharedCheckpointDocument } from '../../protocol/history-checkpoints';
 import type { FileEntry } from '../../protocol/sync-types';
 import { MAX_CONFIGURABLE_FILE_BYTES } from '../../protocol/sync-limits';
 import { HttpError, TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
@@ -11,16 +10,15 @@ import { HistoryVersionUnavailableError } from '../history/source';
 export class SharedHistoryApi {
 	constructor(private http: WorkerApiHttpClient) {}
 	private encryption?: EncryptedFiles;
-	setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; }
-	async save(): Promise<SharedCheckpoint | undefined> {
-		const result: unknown = await this.http.requestJson('/sync/checkpoints', { method: 'POST', body: '{}' }, TRANSFER_TIMEOUT_MS);
-		if (!isRecord(result)) throw new Error('Invalid shared checkpoint response');
-		return parseSharedCheckpoint(result.checkpoint);
-	}
+	/** The last document loaded. A checkpoint's state never changes, so a restore reuses
+	 * the comparison's document instead of rebuilding it on the server. */
+	private loaded?: SharedCheckpointDocument;
+	setEncryption(encryption: EncryptedFiles): void { this.encryption = encryption; this.loaded = undefined; }
 	async list(): Promise<SharedCheckpoint[]> {
-		return parseSharedCheckpointList(await this.http.requestJson('/sync/checkpoints'));
+		return parseSharedCheckpointList(await this.http.requestJson('/sync/checkpoints?all=1'));
 	}
-	async load(id: string) {
+	async load(id: string): Promise<SharedCheckpointDocument> {
+		if (this.loaded?.checkpoint.id === id) return { ...this.loaded, files: createPathRecord<FileEntry>(this.loaded.files) };
 		const result = parseSharedCheckpointDocument(await this.http.requestJson(`/sync/checkpoint?id=${encodeURIComponent(id)}`, {}, TRANSFER_TIMEOUT_MS));
 		if (result.checkpoint.id !== id) throw new Error('The server returned a different checkpoint.');
 		if (this.encryption) {
@@ -30,7 +28,8 @@ export class SharedHistoryApi {
 			result.files = createPathRecord<FileEntry>();
 			for (const { path, wire, entry } of entries) result.files[path] ??= { ...entry, wire };
 		}
-		return result;
+		this.loaded = result;
+		return { ...result, files: createPathRecord<FileEntry>(result.files) };
 	}
 	async download(id: string, path: string, file: FileEntry): Promise<ArrayBuffer> {
 		const wire = this.encryption ? file.wire ?? await this.encryption.paths.wireFor(path) : path;

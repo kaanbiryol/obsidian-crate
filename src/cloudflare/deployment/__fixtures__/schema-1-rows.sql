@@ -8,7 +8,8 @@ INSERT INTO file_versions(id, storage_key, path, hash, size, reason, deletion_re
 INSERT INTO auth_tokens(id, token_hash, device_id, device_name, platform, created_at, scope, expires_at) VALUES ('token-1', 'token-hash-1', 'device-1', 'Laptop', 'desktop', '2026-01-01 00:00:00', 'vault', NULL);
 INSERT INTO auth_tokens(id, token_hash, created_at, folder_path, scope, reading_generation) VALUES ('token-2', 'token-hash-2', '2026-01-01 00:00:00', 'Reading', 'reading_capture', 'generation-1');
 INSERT INTO grants(kind, key, payload, expires_at) VALUES ('device_pairing', 'pairing-1', '{"device":"Phone"}', 1790000000000);
-INSERT INTO server_state(id, features, changelog_floor, import_state, import_generation, import_snapshot_seq, settings, settings_version, history_retention_days) VALUES (1, '{"reading":true}', 3, 'complete', 2, 7, '{"theme":"dark"}', 'settings-1', 60);
+INSERT INTO server_state(id, features, changelog_floor, import_state, import_generation, import_snapshot_seq, settings, settings_version, history_retention_days, file_count) VALUES (1, '{"reading":true}', 3, 'complete', 2, 7, '{"theme":"dark"}', 'settings-1', 60, 2);
+INSERT INTO history_checkpoints(seq, created_at, file_count) VALUES (7, 1790000000000, 2);
 INSERT INTO maintenance_state(key, value) VALUES ('example_cursor', '42');
 INSERT INTO object_cleanup_queue(storage_key, file_path) VALUES ('objects/stale', 'Notes/Stale.md');
 INSERT INTO operations(kind, operation_id, request_hash, response_json) VALUES ('upload', '20260101-operation-1', 'request-hash-1', '{"ok":true}');

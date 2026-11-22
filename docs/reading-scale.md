@@ -150,7 +150,7 @@ Measured for a link still waiting for its article, before the cut above:
 
 | Rows | What | Why |
 | ---: | --- | --- |
-| 5 (2 within 10 minutes of the last edit) | File version history | 30-day history; later edits coalesce |
+| 5 (2 within 10 minutes of the latest checkpoint) | File version history | 30-day history; later edits coalesce |
 | 3 | Changelog | Other devices pick up the edit |
 | 3 | Retry receipt | A lost response and retry cannot apply the edit twice |
 | 3 | Upload staging record | Cleans up the stored copy if the save fails partway |

@@ -47,8 +47,8 @@ it.each([false, true])('bounds initial-upload writes and preserves retries (WITH
 	const result = await (await handleBatchUpload(request(files), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;
 	expect(result.success).toBe(true);
 	await drainNotificationProjections({ ...env, DB: meter.db }, 8);
-	// Each new file writes its one `files` row.
-	expect(meter.writes()).toBe(42);
+	// Each new file writes its one `files` row; the batch updates the file count once.
+	expect(meter.writes()).toBe(43);
 	expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toBeNull();
 	const beforeRetry = meter.writes();
 	const retry = await (await handleBatchUpload(request(files), env.BUCKET, meter.db, { commitUpload: commitStagedFile, commitNewFiles })).json() as BatchUploadResponse;

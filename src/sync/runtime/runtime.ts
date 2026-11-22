@@ -24,7 +24,7 @@ import { SyncApiClient, type NoteProjectionFactory } from '../worker-api/client'
 import { SyncEngine, type SyncEngineHooks } from '../engine/engine';
 import { buildDiagnosticExport } from '../diagnostics/diagnostic-export';
 import { deleteManifestFile, type ApplyInfrastructureConfigInput } from './config';
-import { recordSyncHistory, SharedCheckpointSchedule } from './sync-activity';
+import { recordSyncHistory } from './sync-activity';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { RuntimeServerStatus } from './server-status';
 import { ForegroundSyncScheduler, type ForegroundSyncReason } from './foreground-sync';
@@ -79,7 +79,6 @@ export class SyncRuntime {
 		sync: () => this.sync(),
 	});
 	private readonly serverStatus: RuntimeServerStatus;
-	private readonly checkpoints = new SharedCheckpointSchedule();
 	private readonly createNoteProjection: NoteProjectionFactory;
 
 	constructor(
@@ -603,17 +602,16 @@ export class SyncRuntime {
 		this.serverStatus.scheduleCheck();
 	}
 
-	private async recordSyncResult(engine: SyncEngine, type: SyncHistoryEntry['type'], result: SyncResult): Promise<void> {
+	private recordSyncResult(engine: SyncEngine, type: SyncHistoryEntry['type'], result: SyncResult): void {
 		if (this.syncEngine !== engine || result.outcome === 'cancelled') return;
 		const api = this.apiClient;
-		const latest = recordSyncHistory(this.settings, type, result, {
+		recordSyncHistory(this.settings, type, result, {
 			timings: engine.getTimings(),
 			...(api ? { requestDiagnostics: engine.getRequestDiagnostics() } : {}),
 		});
 		for (const listener of this.syncResultListeners) {
 			try { listener(result); } catch (error) { logger.warn('Sync result listener failed:', errorMessage(error)); }
 		}
-		await this.checkpoints.saveIfDue(this.settings, type, result, latest, engine, () => this.syncEngine === engine);
 	}
 
 	private emitCurrentState(): void {
@@ -628,7 +626,7 @@ export class SyncRuntime {
 	/** The engine already recorded `lastSync` in these settings while publishing the result. */
 	private async recordAutomaticSyncResult(engine: SyncEngine, result: SyncResult): Promise<void> {
 		if (this.syncEngine !== engine || result.outcome === 'cancelled') return;
-		await this.recordSyncResult(engine, 'sync', result);
+		this.recordSyncResult(engine, 'sync', result);
 		if (this.syncEngine !== engine) return;
 		this.emitCurrentState();
 		try {
@@ -670,7 +668,7 @@ export class SyncRuntime {
 			active.work = { phase: 'saving' };
 			this.emitProgress(active.current, active.total);
 			if (type === 'sync') this.foregroundSync.recordSync();
-			await this.recordSyncResult(engine, type, result);
+			this.recordSyncResult(engine, type, result);
 			if (this.syncEngine !== engine) return result;
 			await this.persistSettings();
 			return result;
