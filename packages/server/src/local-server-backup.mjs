@@ -156,7 +156,11 @@ export async function backupLocalServer(dataDir, output, { alreadyLocked = false
 		await mkdir(join(staging, 'remote'), { mode: 0o700 });
 		/** @type {Map<string, { size: number, mtimeMs: number, sha256: string }>} */
 		const early = new Map();
-		if (pause) for (const file of before.filter(file => isBlob(file.path))) early.set(file.path, { ...file, sha256: await place(file) });
+		if (pause) for (const file of before.filter(file => isBlob(file.path))) {
+			// Maintenance may delete an expired blob meanwhile; the listing taken while paused decides what the backup holds.
+			try { early.set(file.path, { ...file, sha256: await place(file) }); }
+			catch (error) { if (error.code !== 'ENOENT') throw error; await rm(join(staging, 'data', file.path), { force: true }); }
+		}
 		const resume = pause ? await pause() : null;
 		/** @type {import('./local-server-runtime.mjs').ServerMetadata} */
 		let metadata;

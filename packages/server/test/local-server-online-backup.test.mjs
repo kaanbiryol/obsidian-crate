@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -261,5 +261,23 @@ test('automatic backups refuse a directory inside the server data', async () => 
 	try {
 		await assert.rejects(saveAutoBackup(join(root, 'server'), { dir: join(root, 'server', 'backups'), keep: 7 }), /outside the server data/);
 		await assert.rejects(saveAutoBackup(join(root, 'server'), { dir: join(root, 'backups'), keep: 0 }), /--keep/);
+	} finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('a blob removed while a running server is backed up is left out', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'crate-backup-removed-'));
+	const dataDir = join(root, 'server');
+	await mkdir(join(dataDir, 'r2', 'blobs'), { recursive: true });
+	await writeFile(join(dataDir, 'server.json'), '{}');
+	for (const name of ['kept', 'removed']) await writeFile(join(dataDir, 'r2', 'blobs', name), name);
+	try {
+		const output = await backupLocalServer(dataDir, join(root, 'backup'), {
+			// Maintenance deletes an expired object after the backup listed the blobs.
+			available: async () => { await rm(join(dataDir, 'r2', 'blobs', 'removed')); return 1024 ** 4; },
+			pause: async () => async () => {},
+		});
+		const manifest = JSON.parse(await readFile(join(output, 'backup.json'), 'utf8'));
+		assert.deepEqual(manifest.data.map(file => file.path).sort(), ['r2/blobs/kept', 'server.json']);
+		assert.deepEqual(await readdir(join(output, 'data', 'r2', 'blobs')), ['kept']);
 	} finally { await rm(root, { recursive: true, force: true }); }
 });
