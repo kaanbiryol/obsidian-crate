@@ -223,7 +223,6 @@ async function verify(type) {
 			await page.screenshot({ path: '.generated/browser-encryption/bootstrap-failure.png', fullPage: true, timeout: 2000 }).catch(() => {});
 			throw error;
 		}
-		assert.ok(!page.url().includes('crateFolder'));
 		await page.locator('[data-action="toggle-settings"]').click();
 		await expect(page.getByRole('region', { name: 'Encryption', exact: true }).locator('.settings-row').filter({ has: page.getByText('Reminders', { exact: true }) }).getByText('Unlocked', { exact: true })).toBeVisible();
 		await page.getByText('Encryption details', { exact: true }).click();

@@ -14,7 +14,6 @@ export { READING_SESSION_KEY } from './src/pwa/reading/session/session';
 export { readingDatabase } from './src/pwa/reading/storage/database';
 export * from './src/pwa/reading/session/encryption-session';
 export * from './src/pwa/reading/session/encryption-lifecycle';
-export * from './src/pwa/encryption/encryption-fragments';
 export * from './src/pwa/encryption/encryption-keys';
 export { loadReading } from './src/pwa/reading/api';
 export { createReadingNote, parseReadingNote } from './src/reading/core/notes';
