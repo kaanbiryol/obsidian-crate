@@ -18,11 +18,11 @@ const INVALID_DESCRIPTION: IssueExplanation = {
 };
 const DUPLICATE_REMINDER_ID: IssueExplanation = {
 	summary: 'Multiple reminders have the same identifier.',
-	recovery: 'Review duplicate tasks in the affected notes. Select Refresh reminders in Crate to assign unique identifiers, then sync again.',
+	recovery: 'A task was probably copied with its hidden crate-id comment. Remove the comment from the copy, or delete the duplicate task, then sync again.',
 };
 const MARKDOWN_ENCODING: IssueExplanation = {
 	summary: 'This note uses a text encoding that reminders cannot read.',
-	recovery: 'Keep a copy of the original note, then save it as UTF-8 without null characters. Refresh reminders and sync again.',
+	recovery: 'Keep a copy of the original note, then save it as UTF-8 without null characters, then sync again.',
 };
 const REMINDER_NOTE_TOO_LARGE: IssueExplanation = {
 	summary: 'This note is too large to index its reminders.',
@@ -76,7 +76,7 @@ const MESSAGE_RULES: Array<[RegExp, IssueExplanation]> = [
 	[/25\s*(?:MB|MiB)|file is too large|file size.*limit/i, FILE_TOO_LARGE],
 	[/unresolved.*schedule|persisted.*schedule|unsupported.*(?:repeat|recurrence)|invalid.*(?:recurrence|reminder date)/i, {
 		summary: 'A reminder date or repeat rule could not be read.',
-		recovery: 'Open the note and correct the task’s date or repeat rule. Refresh reminders, then sync again.' }],
+		recovery: 'Open the note and correct the task’s date or repeat rule, then sync again.' }],
 	[/\b401\b|unauthorized|sync access is no longer valid/i, {
 		summary: 'This device needs to reconnect to sync.',
 		recovery: 'In Crate settings → Account and devices, select Reconnect. Then sync again.' }],
