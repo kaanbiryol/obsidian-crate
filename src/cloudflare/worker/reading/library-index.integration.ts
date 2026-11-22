@@ -186,3 +186,12 @@ it('rebuilds an encrypted vault\'s index in notification passes, not in web app 
 	expect(await env.DB.prepare('SELECT index_scope IS NOT NULL AS scoped, index_cursor AS cursor FROM reading_policy').first()).toEqual({ scoped: 1, cursor: null });
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM reading_items').first()).toEqual({ n: 30 });
 });
+
+it('rebuilds the index in steps of notes, skipping saved images', async () => {
+	for (let note = 0; note < 3; note++) await seed(`Reading/Note ${note}.md`);
+	// Sixty images sort before the notes, as `attachments/` does.
+	await env.DB.prepare(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 60)
+		INSERT INTO files(path, portable_path, storage_key, hash, size) SELECT 'Reading/attachments/' || x || '.png', 'reading/attachments/' || x || '.png', 'image-' || x, '', 1 FROM n`).run();
+	expect(await index()).toBe('complete');
+	expect((await (await list()).json() as { items: unknown[] }).items).toHaveLength(3);
+});

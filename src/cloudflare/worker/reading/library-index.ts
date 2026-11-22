@@ -281,8 +281,10 @@ export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readB
 			db.prepare("UPDATE reading_policy SET index_scope = ?, index_cursor = '' WHERE id = 1").bind(scope),
 		]);
 	}
+	// Only notes are indexed, so saved images and other files never take a step. LIKE matches
+	// `.md` in any letter case, as `isReadingNotePath` does.
 	const { results } = await db.prepare(`SELECT path, portable_path, hash, size, storage_key FROM files WHERE ${FILE_FOLDER_MATCH} AND portable_path > ?
-    ORDER BY portable_path LIMIT ${REBUILD_PAGE}`).bind(...fileFolderArgs(current.folder_path), index.cursor ?? '')
+    AND path LIKE '%.md' ORDER BY portable_path LIMIT ${REBUILD_PAGE}`).bind(...fileFolderArgs(current.folder_path), index.cursor ?? '')
 		.all<{ path: string; portable_path: string; hash: string; size: number; storage_key: string }>();
 	const changes: ReadingFileChange[] = [];
 	let cursor = index.cursor ?? '', unavailable = false, stopped = false, read = 0;
