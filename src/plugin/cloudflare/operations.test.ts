@@ -412,7 +412,7 @@ it('keeps connection-test retry guidance for a temporary network failure', async
 	configureCloudflareAuthorizedDevice.mockResolvedValue({ success: false, error: 'Network unavailable' });
 	await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
 	expect(progress.fail).toHaveBeenCalledWith('Crate is connected with a warning', expect.stringContaining('Network unavailable'),
-		['Your device credentials were saved. You can retry the connection test from Crate settings.']);
+		['Your device credentials were saved. Select Sync now in Crate settings to try again.']);
 	expect(offerFeatureChoice).not.toHaveBeenCalled();
 });
 

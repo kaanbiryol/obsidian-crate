@@ -60,7 +60,7 @@ export const PAIR_DEVICE_HTML = `<!DOCTYPE html>
 <div class="brand-lockup"><img src="/notifications/crate-mark-256.png" alt="Crate"></div>
 <h1 id="pair-title">Add this device to Crate.</h1>
 <a id="pair-link" href="obsidian://open" class="button">Open in Obsidian</a>
-<p class="helper">If Obsidian doesn’t open: create an empty vault in Obsidian, turn on community plugins, install Crate, then scan the code again.</p>
+<p class="helper">If Obsidian doesn’t open: create an empty vault in Obsidian, turn on community plugins, install Crate with BRAT, then scan the code again.</p>
 </main>
 <script src="/notifications/pair.js?v=${PWA_ASSET_VERSION}"></script>
 </body>

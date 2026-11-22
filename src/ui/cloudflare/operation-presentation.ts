@@ -104,7 +104,7 @@ export class CloudflareOperationPresentation {
 
 	connectionFailed(message: string): void {
 		this.progress.fail('Could not connect this device', message,
-			[this.context.intent === 'reconnect' ? 'Select “Reconnect” in Crate settings to try again.' : 'Select “Connect with Cloudflare” in Crate settings to try again.']);
+			[this.context.intent === 'reconnect' ? 'Select “Reconnect” in Crate settings to try again.' : 'Open Crate settings and connect again to try again.']);
 	}
 
 	/** `replacing` says the first sync is starting to replace this vault. */
@@ -118,7 +118,7 @@ export class CloudflareOperationPresentation {
 				], { action: { label: 'Open settings', onClick: openSettings } });
 			} else {
 				this.progress.fail('Crate is connected with a warning', `The connection test failed: ${connection.error ?? 'Unknown error'}`,
-					['Your device credentials were saved. You can retry the connection test from Crate settings.']);
+					['Your device credentials were saved. Select Sync now in Crate settings to try again.']);
 			}
 			return;
 		}

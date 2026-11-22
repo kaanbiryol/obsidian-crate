@@ -34,7 +34,7 @@ export class AddDeviceModal extends SharedModal {
 			const link = devicePairingLink(connection.origin, issued.code);
 			status.setText('On your new device:');
 			const steps = this.bodyEl.createEl('ol', { cls: 'crate-qr-desc' });
-			for (const step of ['Create an empty vault in Obsidian.', 'Turn on community plugins and install Crate.']) steps.createEl('li', { text: step });
+			for (const step of ['Create an empty vault in Obsidian.', 'Turn on community plugins and install Crate with BRAT, as on this device.']) steps.createEl('li', { text: step });
 			const connect = steps.createEl('li', { text: 'Connect it:' }).createEl('ul');
 			connect.createEl('li', { text: 'Phone or tablet: scan this code with the camera.' });
 			const computer = connect.createEl('li', { text: 'Another computer: select ' });
