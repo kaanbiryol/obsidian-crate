@@ -1,6 +1,7 @@
 import type { SyncHistoryEntry } from '../../sync/types';
 import type { App } from 'obsidian';
-import { VaultHistoryModal } from './vault-history-modal';
+import { VaultHistoryModal, type VaultHistoryView } from './vault-history-modal';
+import type { DeletedFilesRuntime } from './deleted-files-browser';
 import type { HistoryBrowserDeps } from './history-browser';
 import { renderHistoryPanel } from './history-timeline';
 import { getPendingFileActions } from './file-actions';
@@ -21,17 +22,11 @@ export class ActivityHistory {
 	private readonly toolbar: HTMLElement;
 	private readonly timeline: HTMLElement;
 
-	constructor(private app: App, private panel: HTMLElement, private deps: HistoryBrowserDeps, private onFileOpened: () => void = () => {},
-		openRecentlyDeleted?: (onClosed: () => void) => void) {
+	constructor(private app: App, private panel: HTMLElement, private deps: HistoryBrowserDeps, private deleted: DeletedFilesRuntime,
+		private onFileOpened: () => void = () => {}) {
 		panel.addClass('crate-history-timeline');
 		this.toolbar = panel.createDiv({ cls: 'crate-history-timeline-toolbar' });
 		const actions = this.toolbar.createDiv({ cls: 'crate-history-timeline-actions' });
-		if (openRecentlyDeleted) {
-			const deleted = actions.createEl('button', { text: 'Recently deleted', cls: 'crate-activity-action', attr: { type: 'button' } });
-			deleted.addEventListener('click', () => openRecentlyDeleted(() => {
-				if (this.active && deleted.isConnected) deleted.focus({ preventScroll: true });
-			}));
-		}
 		this.browse = actions.createEl('button', { text: 'Browse vault history', cls: 'crate-activity-action', attr: { type: 'button' } });
 		this.browse.addEventListener('click', () => this.show());
 		this.timeline = panel.createDiv({ cls: 'crate-history-timeline-content' });
@@ -70,12 +65,13 @@ export class ActivityHistory {
 		this.modal?.update(history);
 	}
 
-	private show(): void {
-		if (this.modal) return;
-		this.modal = new VaultHistoryModal(this.app, this.history, this.deps, () => {
+	/** Opens Vault history on `view`, or switches to it when it is already open. */
+	show(view: VaultHistoryView = 'syncs'): void {
+		if (this.modal) { this.modal.show(view); return; }
+		this.modal = new VaultHistoryModal(this.app, this.history, this.deps, this.deleted, () => {
 			this.modal = undefined;
 			if (this.active && this.browse.isConnected) this.browse.focus({ preventScroll: true });
-		});
+		}, view);
 		this.modal.open();
 	}
 

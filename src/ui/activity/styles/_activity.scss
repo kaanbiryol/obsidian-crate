@@ -123,6 +123,7 @@
 .crate-reminders-ui button.crate-sync-primary-action,
 .modal.crate-pending-discard-modal .crate-reminders-ui button.crate-activity-action,
 .modal.crate-vault-history-modal .crate-reminders-ui button.crate-activity-action,
+.modal.crate-vault-history-modal .crate-reminders-ui .reminder-modal-header-action,
 .crate-reminders-ui .crate-activity-modal button.crate-conflict-review-button,
 .modal.crate-conflict-review-modal .crate-reminders-ui button.crate-conflict-action {
     @include action.styles;

@@ -3,7 +3,8 @@ import { describeActivityStatus, isActivityBusy } from './activity-status';
 import type { SharedCheckpoint } from '../../protocol/history-checkpoints';
 import { mergeSharedHistory } from './shared-history';
 import { openFileHistoryModal } from './file-history-modal';
-import { openRecentlyDeletedModal, type RecentlyDeletedRuntime } from './recently-deleted-modal';
+import type { DeletedFilesRuntime } from './deleted-files-browser';
+import type { VaultHistoryView } from './vault-history-modal';
 import { BaseUiModal } from '../plugin/BaseUiModal';
 import { getPendingFileActions } from './file-actions';
 import type { PendingDiscardReview } from '../../sync/pending/pending-discard';
@@ -29,7 +30,7 @@ import { renderConflictsPanel, renderPendingPanel } from './panels';
 import { renderLoadingState } from './rendering';
 import type { PendingChecks, PendingDiffLoader, PendingBrowserState } from './pending-browser';
 
-export interface ActivityModalDeps extends RecentlyDeletedRuntime {
+export interface ActivityModalDeps extends DeletedFilesRuntime {
 	loadHistoryComparison(entry: SyncHistoryEntry): Promise<HistoryComparison>;
 	listSharedCheckpoints(): Promise<SharedCheckpoint[]>;
 	createHistoryRestore(entry: SyncHistoryEntry): Promise<HistoryRestoreReview>;
@@ -171,8 +172,9 @@ export class ActivityModal extends BaseUiModal {
 		}
 	}
 
+	/** `initialVaultHistory` also opens Vault history on that view once History loads. */
 	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly actions: ActivityModalActions,
-		private readonly initialTab: ActivityTab = 'pending') {
+		private readonly initialTab: ActivityTab = 'pending', private initialVaultHistory?: VaultHistoryView) {
 		super(app);
 		this.settings = settings;
 		this.deps = deps;
@@ -302,7 +304,10 @@ export class ActivityModal extends BaseUiModal {
 				restore: entry => {
 					new HistoryRestoreModal(this.app, entry, () => deps.createHistoryRestore(entry), () => this.refresh()).open();
 				},
-			}, () => this.close(), onClosed => openRecentlyDeletedModal(this.app, deps, onClosed));
+			}, deps, () => this.close());
+			const vaultHistory = this.initialVaultHistory;
+			this.initialVaultHistory = undefined;
+			if (vaultHistory) this.activityHistory.show(vaultHistory);
 		}
 		const checkpoints = this.sharedHistory?.getSnapshot().checkpoints;
 		this.activityHistory.update(checkpoints ? mergeSharedHistory(this.settings.syncHistory ?? [], checkpoints) : this.settings.syncHistory ?? []);

@@ -1,5 +1,5 @@
 import { Modal, Setting } from 'obsidian';
-import { mountModalHeader } from './mount-modal-header';
+import { mountModalHeader, type ModalHeaderState } from './mount-modal-header';
 
 export function hideNativeModalCloseButton(modalEl: HTMLElement): void {
 	// Scope native close-control styles to modal shells with a Crate replacement.
@@ -37,6 +37,10 @@ export abstract class SharedModal extends Modal {
 	protected setLayoutTitle(title: string): void {
 		this.setTitle(title);
 		this.unmountHeader?.setTitle(title);
+	}
+	protected setLayoutHeader(state: ModalHeaderState): void {
+		this.setTitle(state.title);
+		this.unmountHeader?.render(state);
 	}
 
 	onClose(): void {

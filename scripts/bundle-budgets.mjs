@@ -4,17 +4,17 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Self-hosted server health, install-aware commands, pairing links and
-		// Reading image and gist saving measure 4.996 MB raw / 2.315 MB gzip.
-		maxBytes: 4997000,
+		// Self-hosted server health, install-aware commands, pairing links, Reading image
+		// and gist saving and Vault history's Deleted files view measure 5.000 MB raw / 2.312 MB gzip.
+		maxBytes: 5000500,
 		maxGzipBytes: 2316000,
 	},
 	{
 		path: 'dist/styles.css',
-		// The Recently deleted list with Reading image highlights and their Highlights rows
-		// measure 395.5 KB raw / 49.0 KB gzip across the plugin and shared PWA surfaces.
-		maxBytes: 396000,
-		maxGzipBytes: 49100,
+		// Vault history's Deleted files view with Reading image highlights and their Highlights rows
+		// measure 399.1 KB raw / 49.4 KB gzip across the plugin and shared PWA surfaces.
+		maxBytes: 399200,
+		maxGzipBytes: 49500,
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',

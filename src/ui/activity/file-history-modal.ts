@@ -27,9 +27,17 @@ function filePreview(container: HTMLElement, text: string, label: string): void 
 	renderFileText(pre, text || '(Empty file)');
 }
 
-class FileHistoryModal extends SharedModal {
+export interface FileHistoryPanelOptions {
+	/** Opens on the newest retained version instead of the current file, for a deleted file. */
+	selectLatest?: boolean;
+	/** Runs once a restore attempt the user confirmed has finished, whatever its outcome. */
+	onRestoreSettled?: () => void;
+}
+
+/** A file's retained versions beside a preview of the selected one. File history and
+ * Vault history → **Deleted files** mount the same panel. */
+export class FileHistoryPanel {
 	private closed = false;
-	private cancelInitialFocus?: () => void;
 	private previewRevision = 0;
 	private fileVersions: RemoteFileVersion[] = [];
 	private filePage?: FileVersionsPage;
@@ -39,43 +47,32 @@ class FileHistoryModal extends SharedModal {
 	private fileRetryCursor?: string;
 	private selectedVersion?: RemoteFileVersion;
 	private busy = false;
-	private listEl!: HTMLElement;
-	private previewEl!: HTMLElement;
-	private workspaceEl!: HTMLElement;
+	private readonly listEl: HTMLElement;
+	private readonly previewEl: HTMLElement;
+	private readonly workspaceEl: HTMLElement;
 
-	constructor(app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string, private readonly onClosed?: () => void) { super(app); }
-
-	onOpen(): void {
-		this.closed = false;
-		this.openLayout('File history');
-		this.modalEl.addClass('crate-file-history-modal');
-		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
-		this.bodyEl.addClass('crate-file-history');
-		const context = this.bodyEl.createDiv({ cls: 'crate-history-file-context' });
-		context.createEl('h3', { text: this.selectedPath });
-		context.createEl('p', { cls: 'crate-history-description', text: 'Versions are kept for the history period set in Crate settings.' });
-		this.workspaceEl = this.bodyEl.createDiv({ cls: 'crate-history-workspace' });
+	constructor(private readonly app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string,
+		container: HTMLElement, private readonly options: FileHistoryPanelOptions = {}) {
+		this.workspaceEl = container.createDiv({ cls: 'crate-history-workspace' });
 		this.listEl = this.workspaceEl.createEl('nav', { cls: 'crate-history-list-pane', attr: { 'aria-label': 'File versions' } });
 		this.previewEl = this.workspaceEl.createEl('section', { cls: 'crate-history-preview-pane', attr: { 'aria-label': 'File preview' } });
-		void this.loadFileVersions();
-		void this.selectCurrent(this.selectedPath);
-		this.showPane('list');
-		const title = this.contentEl.querySelector<HTMLElement>('.reminder-modal-header-title');
-		const view = title?.ownerDocument.defaultView;
-		if (title && view) {
-			title.tabIndex = -1;
-			title.focus({ preventScroll: true });
-			// Obsidian may focus the first button after onOpen returns.
-			const frame = view.requestAnimationFrame(() => {
-				if (!this.closed && title.ownerDocument.activeElement?.classList.contains('reminder-modal-header-close')) {
-					title.focus({ preventScroll: true });
-				}
-			});
-			this.cancelInitialFocus = () => view.cancelAnimationFrame(frame);
+		if (options.selectLatest) void this.loadFileVersions().then(() => this.selectLatest());
+		else {
+			void this.loadFileVersions();
+			void this.selectCurrent(this.selectedPath, false);
 		}
+		this.showPane('list');
 	}
 
-	onClose(): void { this.cancelInitialFocus?.(); this.cancelInitialFocus = undefined; this.closed = true; ++this.previewRevision; ++this.fileRequestRevision; super.onClose(); this.onClosed?.(); }
+	/** Previews the newest version unless the user already chose one, keeping the list in view. */
+	private selectLatest(): void {
+		if (this.closed || this.previewRevision) return;
+		const latest = this.fileRows()[0];
+		void (latest ? this.selectVersion(latest, false) : this.selectCurrent(this.selectedPath, false));
+		this.showPane('list');
+	}
+
+	dispose(): void { this.closed = true; ++this.previewRevision; ++this.fileRequestRevision; }
 	private showPane(pane: 'list' | 'preview'): void { this.workspaceEl.setAttribute('data-pane', pane); }
 	private versionButton(container: HTMLElement, version: RemoteFileVersion, seconds: boolean): HTMLButtonElement {
 		const button = action(container, '', () => { void this.selectVersion(version); }, 'crate-history-version');
@@ -121,7 +118,7 @@ class FileHistoryModal extends SharedModal {
 		const rows = this.fileRows();
 		const local = this.app.vault.getFileByPath(this.selectedPath);
 		const dates = listedDates(rows, local?.stat.mtime);
-		const current = action(this.listEl, '', () => { void this.selectCurrent(this.selectedPath); }, 'crate-history-version crate-history-current');
+		const current = action(this.listEl, '', () => { void this.selectCurrent(this.selectedPath, true); }, 'crate-history-version crate-history-current');
 		current.setAttribute('data-version-key', 'current');
 		current.setAttribute('aria-label', local ? 'Current local file' : 'Current synced version');
 		current.createSpan({ cls: 'crate-history-file-name', text: local ? formatDate(new Date(local.stat.mtime), needsSeconds(new Date(local.stat.mtime), dates)) : 'Synced version', attr: local ? { title: new Date(local.stat.mtime).toLocaleString() } : {} });
@@ -140,23 +137,24 @@ class FileHistoryModal extends SharedModal {
 		else if (!rows.length) this.listEl.createEl('p', { text: 'No earlier versions retained for this file.' });
 	}
 
-	private previewHeader(title: string, caption: string): HTMLElement {
+	private previewHeader(title: string, caption: string, focus = true): HTMLElement {
 		this.previewEl.empty(); this.showPane('preview');
 		renderBackButton(this.previewEl, 'crate-history-back', 'Versions', () => {
 			this.showPane('list'); this.listEl.querySelector<HTMLButtonElement>('[aria-current="true"]')?.focus();
 		});
 		const header = this.previewEl.createDiv({ cls: 'crate-history-preview-header' });
-		header.createEl('h3', { text: title, attr: { tabindex: '-1' } }).focus();
+		const heading = header.createEl('h3', { text: title, attr: { tabindex: '-1' } });
+		if (focus) heading.focus();
 		header.createEl('p', { cls: 'crate-file-history-count', text: caption });
 		return header;
 	}
 
-	private async selectCurrent(path: string): Promise<void> {
+	private async selectCurrent(path: string, focus: boolean): Promise<void> {
 		if (this.busy) return;
 		this.selectedVersion = undefined; const revision = ++this.previewRevision; this.renderVersions();
 		const local = this.app.vault.getFileByPath(path);
 		if (local) {
-			this.previewHeader(this.formatHistoryDate(new Date(local.stat.mtime)), `Current local file · ${formatSize(local.stat.size)}`).setAttribute('title', new Date(local.stat.mtime).toLocaleString());
+			this.previewHeader(this.formatHistoryDate(new Date(local.stat.mtime)), `Current local file · ${formatSize(local.stat.size)}`, focus).setAttribute('title', new Date(local.stat.mtime).toLocaleString());
 			const content = this.previewEl.createDiv({ cls: 'crate-history-preview-output' });
 			if (local.stat.size > MAX_PREVIEW_BYTES || local.extension !== 'md') { content.createEl('p', { text: LOCAL_PREVIEW_LIMIT }); return; }
 			try {
@@ -165,7 +163,7 @@ class FileHistoryModal extends SharedModal {
 			} catch { if (!this.closed && revision === this.previewRevision) content.createEl('p', { text: 'Could not read the local file.' }); }
 			return;
 		}
-		const header = this.previewHeader('Current synced version', 'Synced file');
+		const header = this.previewHeader('Current synced version', 'Synced file', focus);
 		header.createEl('p', { cls: 'crate-history-hint', text: 'Local edits may differ' });
 		const content = this.previewEl.createDiv({ cls: 'crate-history-preview-output' });
 		content.createEl('p', { text: 'Loading current synced file…', attr: { role: 'status' } });
@@ -178,14 +176,14 @@ class FileHistoryModal extends SharedModal {
 		} catch (error) {
 			if (this.closed || revision !== this.previewRevision) return;
 			content.empty(); content.createEl('p', { text: error instanceof Error ? error.message : String(error), attr: { role: 'alert' } });
-			action(content, 'Reload current file', () => { void this.selectCurrent(path); });
+			action(content, 'Reload current file', () => { void this.selectCurrent(path, true); });
 		}
 	}
 
-	private async selectVersion(version: RemoteFileVersion): Promise<void> {
+	private async selectVersion(version: RemoteFileVersion, focus = true): Promise<void> {
 		if (this.busy) return;
 		this.selectedVersion = version; const revision = ++this.previewRevision; this.renderVersions();
-		const header = this.previewHeader(this.formatHistoryDate(parseServerTimestamp(version.created_at)), versionCaption(version));
+		const header = this.previewHeader(this.formatHistoryDate(parseServerTimestamp(version.created_at)), versionCaption(version), focus);
 		header.addClass('crate-history-version-header');
 		header.setAttribute('title', parseServerTimestamp(version.created_at).toLocaleString());
 		const actions = header.createDiv({ cls: 'crate-history-version-actions' });
@@ -193,7 +191,7 @@ class FileHistoryModal extends SharedModal {
 		const restoreText = restore.textContent ?? '';
 		restore.empty();
 		const restoreLabel = restore.createSpan({ cls: 'reminder-modal-header-action-label', text: restoreText });
-		restore.focus();
+		if (focus) restore.focus();
 		const content = this.previewEl.createDiv({ cls: 'crate-history-preview-content' });
 		content.createEl('p', { text: 'Loading preview…', attr: { role: 'status' } });
 		try {
@@ -245,6 +243,7 @@ class FileHistoryModal extends SharedModal {
 	private async restore(version: RemoteFileVersion, button: HTMLButtonElement, label: HTMLElement): Promise<void> {
 		if (this.busy) return;
 		this.busy = true; button.disabled = true; button.toggleClass('is-enabled', false); this.renderVersions();
+		let settled = false;
 		try {
 			const confirmed = this.isPending(version) || await openConfirmationModal(this.app, {
 				title: 'Restore file version', message: `Restore ${version.path} from ${parseServerTimestamp(version.created_at).toLocaleString()}?`,
@@ -252,6 +251,7 @@ class FileHistoryModal extends SharedModal {
 			});
 			if (!confirmed || this.closed) return;
 			label.setText('Restoring…');
+			settled = true;
 			const result = await this.runtime.restoreRecentFileVersion(version);
 			if (result.outcome === 'cancelled') return;
 			if (!result.success) { new Notice(`Restore confirmed remotely. Local sync is incomplete: ${result.errors[0] || 'Retry sync'}. Resume the saved restore to finish safely.`); return; }
@@ -261,7 +261,45 @@ class FileHistoryModal extends SharedModal {
 		finally {
 			this.busy = false;
 			if (!this.closed) { button.disabled = false; button.toggleClass('is-enabled', true); label.setText(restoreActionLabel(this.isPending(version))); this.renderVersions(); }
+			if (settled && !this.closed) this.options.onRestoreSettled?.();
 		}
+	}
+}
+
+class FileHistoryModal extends SharedModal {
+	private panel?: FileHistoryPanel;
+	private cancelInitialFocus?: () => void;
+
+	constructor(app: App, private readonly runtime: FileHistoryRuntime, private readonly selectedPath: string, private readonly onClosed?: () => void) { super(app); }
+
+	onOpen(): void {
+		this.openLayout('File history');
+		this.modalEl.addClass('crate-file-history-modal');
+		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
+		this.bodyEl.addClass('crate-file-history');
+		const context = this.bodyEl.createDiv({ cls: 'crate-history-file-context' });
+		context.createEl('h3', { text: this.selectedPath });
+		context.createEl('p', { cls: 'crate-history-description', text: 'Versions are kept for the history period set in Crate settings.' });
+		this.panel = new FileHistoryPanel(this.app, this.runtime, this.selectedPath, this.bodyEl);
+		const title = this.contentEl.querySelector<HTMLElement>('.reminder-modal-header-title');
+		const view = title?.ownerDocument.defaultView;
+		if (title && view) {
+			title.tabIndex = -1;
+			title.focus({ preventScroll: true });
+			// Obsidian may focus the first button after onOpen returns.
+			const frame = view.requestAnimationFrame(() => {
+				if (this.panel && title.ownerDocument.activeElement?.classList.contains('reminder-modal-header-close')) {
+					title.focus({ preventScroll: true });
+				}
+			});
+			this.cancelInitialFocus = () => view.cancelAnimationFrame(frame);
+		}
+	}
+
+	onClose(): void {
+		this.cancelInitialFocus?.(); this.cancelInitialFocus = undefined;
+		this.panel?.dispose(); this.panel = undefined;
+		super.onClose(); this.onClosed?.();
 	}
 }
 

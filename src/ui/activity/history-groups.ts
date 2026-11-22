@@ -6,11 +6,20 @@ export interface HistoryGroup {
 	rows: Array<{ entry: SyncHistoryEntry; count: number }>;
 }
 
-/** Group only the display; retain every saved sync and its diagnostics. */
-export function groupHistory(history: SyncHistoryEntry[], now = new Date()): HistoryGroup[] {
-	const today = now.toDateString();
+/** **Today**, **Yesterday**, or a short date with the year only outside the current one. */
+export function historyDayLabel(date: Date, now = new Date()): string {
+	const day = date.toDateString();
 	const yesterday = new Date(now);
 	yesterday.setDate(yesterday.getDate() - 1);
+	return day === now.toDateString() ? 'Today' : day === yesterday.toDateString() ? 'Yesterday'
+		: new Intl.DateTimeFormat(undefined, {
+			month: 'short', day: 'numeric',
+			...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}),
+		}).format(date);
+}
+
+/** Group only the display; retain every saved sync and its diagnostics. */
+export function groupHistory(history: SyncHistoryEntry[], now = new Date()): HistoryGroup[] {
 	const groups: HistoryGroup[] = [];
 	const sorted = [...history].sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
 	for (const entry of sorted) {
@@ -18,15 +27,7 @@ export function groupHistory(history: SyncHistoryEntry[], now = new Date()): His
 		const day = date.toDateString();
 		let group = groups.at(-1);
 		if (group?.day !== day) {
-			group = {
-				day,
-				label: day === today ? 'Today' : day === yesterday.toDateString() ? 'Yesterday'
-					: new Intl.DateTimeFormat(undefined, {
-						month: 'short', day: 'numeric',
-						...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}),
-					}).format(date),
-				rows: [],
-			};
+			group = { day, label: historyDayLabel(date, now), rows: [] };
 			groups.push(group);
 		}
 		const previous = group.rows.at(-1);

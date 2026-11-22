@@ -1,13 +1,13 @@
 import { registerSyncStatus } from './sync-status';
 import { registerSyncResultNotices } from './sync-result-notices';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
-import { openRecentlyDeletedModal } from '../ui/activity/recently-deleted-modal';
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, Platform, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import { ActivityModal } from '../ui/activity/activity-modal';
 import type { ActivityTab } from '../ui/activity/ActivityTabs';
+import type { VaultHistoryView } from '../ui/activity/vault-history-modal';
 import { errorMessage } from '../platform/logger';
 import { getPluginLifecycleSignal, waitForSyncReady } from './lifecycle-state';
 import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/notification-policy-sync';
@@ -73,7 +73,7 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 			if (!checking && available) {
 				const signal = getPluginLifecycleSignal(plugin);
 				void waitForSyncReady(plugin).then(() => {
-					if (!signal.aborted) openRecentlyDeletedModal(plugin.app, plugin.syncRuntime);
+					if (!signal.aborted) openSyncActivity(plugin, 'history', 'deleted');
 				});
 			}
 			return available;
@@ -115,12 +115,13 @@ function openFileHistoryWhenReady(plugin: CratePlugin, path: string): void {
 	});
 }
 
-/** Opens sync activity. Its Sync and Stop buttons run the same actions as the commands. */
-export function openSyncActivity(plugin: CratePlugin, tab?: ActivityTab): void {
+/** Opens sync activity. Its Sync and Stop buttons run the same actions as the commands.
+ * `vaultHistory` also opens Vault history on that view. */
+export function openSyncActivity(plugin: CratePlugin, tab?: ActivityTab, vaultHistory?: VaultHistoryView): void {
 	new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime, {
 		sync: held => runSyncNow(plugin, held),
 		stop: () => stopSyncNow(plugin),
-	}, tab).open();
+	}, tab, vaultHistory).open();
 }
 
 /** A sync failure notice whose link opens the errors in sync activity. */

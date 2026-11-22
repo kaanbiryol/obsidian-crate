@@ -30,7 +30,9 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 		history.descEl.appendText(' → ');
 		history.descEl.createEl('strong', { text: 'History' });
 		history.descEl.appendText(' → ');
-		history.descEl.createEl('strong', { text: 'Recently deleted' });
+		history.descEl.createEl('strong', { text: 'Browse vault history' });
+		history.descEl.appendText(' → ');
+		history.descEl.createEl('strong', { text: 'Deleted files' });
 		history.descEl.appendText(' or ');
 		history.descEl.createEl('strong', { text: 'Recover deleted file' });
 		history.descEl.appendText('.');

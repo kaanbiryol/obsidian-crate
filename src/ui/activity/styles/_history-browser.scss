@@ -54,3 +54,47 @@
         .crate-history-browser-footer > .crate-history-hint { display: none; }
     }
 }
+
+// Vault history shows its syncs or, from its header, deleted files.
+.modal.crate-shared-modal.crate-vault-history-modal .crate-modal-body.crate-vault-history-body {
+    display: flex; flex-direction: column; padding: 0; overflow: hidden;
+}
+.crate-reminders-ui .crate-vault-history-panel[hidden] { display: none; }
+
+// File history rows and headings come from the shared `.crate-file-history` styles.
+.crate-reminders-ui .crate-deleted-browser {
+    container-type: inline-size;
+    padding: 12px 16px 16px;
+    overflow: hidden;
+    .crate-deleted-browser-workspace { display: grid; grid-template-columns: minmax(220px, 28%) minmax(0, 1fr); flex: 1; min-height: 0; }
+    .crate-deleted-files-pane { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; padding-right: 12px; border-right: 1px solid var(--background-modifier-border); }
+    .crate-deleted-search {
+        position: relative;
+        input { width: 100%; height: 32px; margin: 0; padding-inline: 30px 8px; }
+        svg { position: absolute; left: 10px; top: 9px; width: 14px; height: 14px; color: var(--text-faint); pointer-events: none; }
+    }
+    // Row backgrounds extend into the inset while text aligns with the search field.
+    .crate-deleted-files {
+        flex: 1; min-height: 0; overflow: auto; margin-inline: -12px; overscroll-behavior: contain;
+        > .crate-history-group { margin: 12px 0 4px; }
+        > p, > .crate-deleted-files-more { margin: 8px 12px; }
+        > p { color: var(--text-muted); }
+    }
+    .crate-history-version.crate-deleted-file { flex-direction: row; align-items: center; }
+    .crate-deleted-file-text {
+        display: flex; flex-direction: column; flex: 1; min-width: 0;
+        > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+    }
+    .crate-deleted-file-chevron, .crate-deleted-back { display: none; color: var(--text-faint); }
+    .crate-deleted-file-pane { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; padding-left: 16px; }
+    .crate-deleted-file-header .crate-history-description { margin: 0; }
+    @container (max-width: 700px) {
+        .crate-deleted-browser-workspace { display: block; position: relative; }
+        .crate-deleted-files-pane, .crate-deleted-file-pane { display: none; position: absolute; inset: 0; padding: 0; border: 0; }
+        &[data-pane="files"] .crate-deleted-files-pane, &[data-pane="file"] .crate-deleted-file-pane { display: flex; }
+        .crate-deleted-file-chevron, .crate-deleted-back { display: inline-flex; align-items: center; gap: 6px; }
+        .crate-deleted-back { align-self: flex-start; color: inherit; }
+        .crate-deleted-file-chevron svg, .crate-deleted-back svg { display: block; width: 16px; height: 16px; }
+        button { min-height: 44px; }
+    }
+}
