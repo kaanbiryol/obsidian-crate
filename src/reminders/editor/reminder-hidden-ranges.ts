@@ -5,7 +5,8 @@ import { findReminderIdMarker } from '../core/reminderIdentity';
 /** A task with text. Only these can gain an ID, so leaving any other line skips reading the whole note. */
 export const TASK_WITH_TEXT = /^\s*-\s*\[[ xX]\]\s*\S/;
 
-const RULE_MARKERS_REGEX = /<!-- crate-(?:rule|done):[^>]*? -->/g;
+/** Hidden repeat and completion markers. */
+export const RULE_MARKERS_REGEX = /<!-- crate-(?:rule|done):[^>]*? -->/g;
 const DESCRIPTION_PREFIX = '<!-- crate-desc:';
 
 /**

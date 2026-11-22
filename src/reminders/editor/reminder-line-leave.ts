@@ -5,7 +5,7 @@ import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule
 import { extractReminderId, reminderIdMarkers, stripReminderIdMarker } from '../core/reminderIdentity';
 import { inlineDescriptionChanges } from '../data/inline-description';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
-import { TASK_WITH_TEXT } from './reminder-hidden-ranges';
+import { RULE_MARKERS_REGEX, TASK_WITH_TEXT } from './reminder-hidden-ranges';
 import { datePhraseField } from './editor-date-chips';
 
 /** The part of a view update that decides which lines a cursor left. */
@@ -99,7 +99,7 @@ export function strayIdChanges(doc: Text, lineNumbers: Iterable<number>): Change
 		let first = markers.length;
 		if (first && !line.text.slice(markers[first - 1]!.to).trim()) {
 			first--;
-			while (first > 0 && !line.text.slice(markers[first - 1]!.to, markers[first]!.from).replace(RULE_MARKER, '').trim()) first--;
+			while (first > 0 && !line.text.slice(markers[first - 1]!.to, markers[first]!.from).replace(RULE_MARKERS_REGEX, '').trim()) first--;
 		}
 		const task = TASK_WITH_TEXT.test(line.text);
 		// A description's comment line, which ends at its closer, never names a reminder.
@@ -110,7 +110,6 @@ export function strayIdChanges(doc: Text, lineNumbers: Iterable<number>): Change
 	});
 }
 
-const RULE_MARKER = /<!-- crate-(?:rule|done):[^>]*? -->/g;
 
 /**
  * Identifies reminder lines the cursor just left, so a new reminder gets its ID
