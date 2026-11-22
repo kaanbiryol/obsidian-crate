@@ -8,12 +8,14 @@ export async function reminderRevision(reminder: Reminder & { filePath?: string 
 	const value = JSON.stringify([
 		reminder.id, reminder.filePath ?? '', reminder.content, reminder.description ?? '',
 		reminder.dueDate ?? null, reminder.dueDatetime ?? null, reminder.priority,
-		reminder.completed, reminder.completedAt ?? null, reminder.project ?? DEFAULT_PROJECT,
+		reminder.completed, reminder.project ?? DEFAULT_PROJECT,
 		rule ? [rule.frequency, rule.interval ?? 1, [...(rule.daysOfWeek ?? [])].sort(), rule.dayOfMonth ?? null,
 			rule.endDate ?? null, rule.count ?? null, rule.completedCount ?? 0,
 			rule.hour ?? null, rule.minute ?? null, rule.timezone ?? null,
 			// Preserve existing revisions for minute-precision rules.
 			...(rule.second || rule.millisecond ? [rule.second ?? 0, rule.millisecond ?? 0] : [])] : null,
+		// Appended only when set, so revisions cached before completion times existed stay valid.
+		...(reminder.completedAt ? [reminder.completedAt] : []),
 	]);
 	return sha256Hex(value);
 }
