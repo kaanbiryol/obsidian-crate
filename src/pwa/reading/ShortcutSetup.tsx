@@ -66,6 +66,6 @@ export function ShortcutSetup({ session }: { session: ReadingSession }) {
 				<SetupStep number={3} title="Save your first article">After <strong>Crate setup saved</strong> appears, share an article to <strong>Save to Crate</strong>. It saves straight to Reading.</SetupStep>
 			</SetupSteps>
 		</SettingsSection>
-		<p className="setup-steps-note">Your server downloads each shared article. With encryption, it saves the note locked to your vault and can’t read it back; the shortcut can’t read your library.</p>
+		<p className="setup-steps-note">Your server downloads each shared article. The shortcut can’t read your library.</p>
 	</div>;
 }
