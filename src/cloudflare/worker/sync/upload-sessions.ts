@@ -118,13 +118,15 @@ function parseParts(value: unknown, size: number): R2UploadedPart[] | null {
 	return parts.every((part): part is R2UploadedPart => part !== null) ? parts : null;
 }
 
+const hex = (bytes: ArrayBuffer) => [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+
 /** SHA-256 of a stored object without holding it in memory. */
 async function storedObjectSha256(bucket: R2Bucket, key: string): Promise<{ hash: string; size: number } | null> {
 	const object = await bucket.get(key);
 	if (!object?.body) return null;
 	const digest = new crypto.DigestStream('SHA-256');
 	await object.body.pipeTo(digest);
-	return { hash: [...new Uint8Array(await digest.digest)].map(byte => byte.toString(16).padStart(2, '0')).join(''), size: object.size };
+	return { hash: hex(await digest.digest), size: object.size };
 }
 
 async function completeSession(bucket: R2Bucket, db: D1Database, committers: UploadCommitters, file: UploadFile, operation: UploadOperation,
@@ -189,7 +191,7 @@ export async function copyObjectInParts(bucket: R2Bucket, sourceKey: string, tar
 		await upload.abort().catch(() => {});
 		throw error;
 	}
-	return [...new Uint8Array(await digest.digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+	return hex(await digest.digest);
 }
 
 /** Aborts chunked uploads older than their lease, so R2 keeps no unfinished parts. Returns
