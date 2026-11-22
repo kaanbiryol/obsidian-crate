@@ -729,7 +729,9 @@ backup pauses sync for a moment while the database is copied.
 Backups share unchanged files through hard links, so seven daily backups take
 about as much space as one plus each day's changes. Each one still restores on
 its own, and deleting one never affects the others. A backup that would leave
-less than 1 GB free is refused. Crate never deletes anything else in the folder,
+less than 1 GB free is refused. Stopping Crate cancels a backup in progress, which
+is retried later. Crate removes the unfinished `crate-….tmp-…` copy a force-quit left
+behind once it is a day old, and never deletes anything else in the folder,
 including backups you made yourself with **backup**.
 
 `status` shows the setting and the last failure, if any; a failed backup is retried

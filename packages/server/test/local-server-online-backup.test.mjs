@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -280,4 +280,56 @@ test('a blob removed while a running server is backed up is left out', async () 
 		assert.deepEqual(manifest.data.map(file => file.path).sort(), ['r2/blobs/kept', 'server.json']);
 		assert.deepEqual(await readdir(join(output, 'data', 'r2', 'blobs')), ['kept']);
 	} finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('stopping cancels a running backup and leaves no staging copy', { timeout: 60_000 }, async () => {
+	const root = await mkdtemp(join(tmpdir(), 'crate-backup-stop-'));
+	const dataDir = join(root, 'server');
+	const runtime = await openLocalRuntime({ dataDir, handleSignals: false });
+	try {
+		// The schedule's close aborts a backup instead of waiting for it.
+		let aborted = false;
+		const slow = startBackups({ dataDir, runtime, firstCheck: 3_600_000, backup: (_dataDir, _output, options) => new Promise((_resolve, reject) => {
+			options?.signal?.addEventListener('abort', () => { aborted = true; reject(options.signal?.reason); });
+		}) });
+		const pending = slow.run(join(root, 'backups', 'manual')).catch(error => error);
+		await slow.close();
+		assert.equal(aborted, true);
+		assert.match((await pending).message, /stopping/);
+		// A real backup aborted while the server is paused publishes nothing and removes its staging copy.
+		const controller = new AbortController();
+		const output = join(root, 'backups', 'aborted');
+		await assert.rejects(backupLocalServer(dataDir, output, { alreadyLocked: true, signal: controller.signal,
+			pause: async () => { const resume = await runtime.pause(); controller.abort(new Error('Crate is stopping.')); return resume; } }), /stopping/);
+		assert.deepEqual(await readdir(join(root, 'backups')), []);
+	} finally {
+		await runtime.close();
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
+test('automatic backups remove day-old staging copies a killed process left behind', { timeout: 60_000 }, async () => {
+	const root = await mkdtemp(join(tmpdir(), 'crate-backup-leftover-'));
+	const dataDir = join(root, 'server');
+	const dir = join(root, 'backups');
+	const runtime = await openLocalRuntime({ dataDir, handleSignals: false });
+	const now = Date.now();
+	const backups = startBackups({ dataDir, runtime, now: () => now, firstCheck: 3_600_000 });
+	try {
+		await saveAutoBackup(dataDir, { dir, keep: 2 });
+		const old = join(dir, 'crate-20261101T030000Z.tmp-0f9c2d1e-0000-4000-8000-000000000000');
+		const recent = join(dir, 'crate-20261102T030000Z.tmp-1f9c2d1e-0000-4000-8000-000000000000');
+		await mkdir(join(old, 'data'), { recursive: true });
+		await mkdir(recent);
+		await utimes(old, new Date(now - 25 * 60 * 60_000), new Date(now - 25 * 60 * 60_000));
+		await backups.check();
+		const names = await readdir(dir);
+		assert.ok(!names.includes(old.slice(dir.length + 1)), 'a day-old staging copy is removed');
+		assert.ok(names.includes(recent.slice(dir.length + 1)), 'a recent one is left alone');
+		assert.equal((await listAutomaticBackups(dir)).length, 1);
+	} finally {
+		await backups.close();
+		await runtime.close();
+		await rm(root, { recursive: true, force: true });
+	}
 });

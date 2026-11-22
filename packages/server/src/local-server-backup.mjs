@@ -88,12 +88,13 @@ async function listFiles(directory, prefix = '') {
 const listOptional = directory => listFiles(directory).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
 
 /** Copies a file, hashing the bytes read from the source. Never writes through an existing
- * target: it may be a hard link into an earlier backup. @param {string} source @param {string} target */
-async function copyHashed(source, target) {
+ * target: it may be a hard link into an earlier backup. @param {string} source @param {string} target @param {AbortSignal} [signal] */
+async function copyHashed(source, target, signal) {
+	signal?.throwIfAborted();
 	await rm(target, { force: true });
 	await mkdir(dirname(target), { recursive: true, mode: 0o700 });
 	const hash = createHash('sha256');
-	await pipeline(createReadStream(source), async function* (chunks) { for await (const chunk of chunks) { hash.update(chunk); yield chunk; } }, createWriteStream(target, { flags: 'wx', mode: 0o600 }));
+	await pipeline(createReadStream(source), async function* (chunks) { for await (const chunk of chunks) { hash.update(chunk); yield chunk; } }, createWriteStream(target, { flags: 'wx', mode: 0o600 }), ...(signal ? [{ signal }] : []));
 	return hash.digest('hex');
 }
 
@@ -120,10 +121,11 @@ async function freeBytes(directory) {
  * @param {boolean} [options.alreadyLocked] The caller holds the data directory lock.
  * @param {() => Promise<() => Promise<void>>} [options.pause] Stops writes; returns a resume.
  * @param {string} [options.linkFrom] An earlier backup whose unchanged blobs are hard-linked, not copied.
+ * @param {AbortSignal} [options.signal] Stops the backup between and during copies; nothing is published.
  * @param {(directory: string) => Promise<number>} [options.available] Free bytes where the backup goes.
  * @returns {Promise<string>} The backup directory.
  */
-export async function backupLocalServer(dataDir, output, { alreadyLocked = false, pause, linkFrom, available = freeBytes } = {}) {
+export async function backupLocalServer(dataDir, output, { alreadyLocked = false, pause, linkFrom, signal, available = freeBytes } = {}) {
 	dataDir = await realpath(dataDir);
 	output = resolve(output);
 	await mkdir(dirname(output), { recursive: true, mode: 0o700 });
@@ -144,7 +146,7 @@ export async function backupLocalServer(dataDir, output, { alreadyLocked = false
 			const target = join(staging, 'data', file.path);
 			const earlier = linkable.get(file.path);
 			if (linkFrom && earlier?.size === file.size && await tryLink(join(linkFrom, 'data', file.path), target)) return earlier.sha256;
-			return copyHashed(join(dataDir, file.path), target);
+			return copyHashed(join(dataDir, file.path), target, signal);
 		};
 		const before = await listFiles(dataDir);
 		const needed = [...before, ...await listOptional(`${dataDir}.remote`)]
@@ -177,7 +179,7 @@ export async function backupLocalServer(dataDir, output, { alreadyLocked = false
 				data.push({ path: file.path, size: file.size, sha256: unchanged ? copied.sha256 : await place(file) });
 			}
 			for (const file of await listOptional(`${dataDir}.remote`)) {
-				remote.push({ path: file.path, size: file.size, sha256: await copyHashed(join(`${dataDir}.remote`, file.path), join(staging, 'remote', file.path)) });
+				remote.push({ path: file.path, size: file.size, sha256: await copyHashed(join(`${dataDir}.remote`, file.path), join(staging, 'remote', file.path), signal) });
 			}
 		} finally { await resume?.(); }
 		// Blobs deleted after they were copied.
@@ -185,6 +187,7 @@ export async function backupLocalServer(dataDir, output, { alreadyLocked = false
 		// Re-read copied bytes before publishing a completed backup.
 		if (JSON.stringify(await inventory(join(staging, 'data'))) !== JSON.stringify(data)
 			|| JSON.stringify(await inventory(join(staging, 'remote'))) !== JSON.stringify(remote)) throw new Error('Backup verification failed. No completed backup was created.');
+		signal?.throwIfAborted();
 		const createdAt = new Date().toISOString();
 		await writeFile(join(staging, 'backup.json'), JSON.stringify({ format: 1, createdAt, metadata, data, remote }), { mode: 0o600 });
 		await rename(staging, output);

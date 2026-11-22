@@ -1,6 +1,6 @@
 // Backups of a running server: one at a time, on request or once a day when automatic
 // backups are on. Settings live in `auto-backup.json` in the data directory.
-import { mkdir, readFile, readdir, realpath, rm, unlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, readdir, realpath, rm, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { backupLocalServer, readBackupManifest } from './local-server-backup.mjs';
 
@@ -9,6 +9,7 @@ import { backupLocalServer, readBackupManifest } from './local-server-backup.mjs
 
 const DAY = 24 * 60 * 60_000;
 const automaticName = /^crate-\d{8}T\d{6}Z$/;
+const unfinishedName = /^crate-\d{8}T\d{6}Z\.tmp-[0-9a-f-]+$/;
 const settingsPath = (/** @type {string} */ dataDir) => join(dataDir, 'auto-backup.json');
 
 /** @param {number} time */
@@ -55,6 +56,16 @@ export async function listAutomaticBackups(dir) {
 	return backups;
 }
 
+/** Deletes staging copies of automatic backups that a killed process left behind. Only one
+ * backup runs at a time, so a day-old one is not in progress. @param {string} dir @param {number} time */
+async function removeUnfinishedBackups(dir, time) {
+	const names = await readdir(dir).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
+	for (const name of names.filter(name => unfinishedName.test(name))) {
+		const stat = await lstat(join(dir, name)).catch(() => null);
+		if (stat?.isDirectory() && time - stat.mtimeMs >= DAY) await rm(join(dir, name), { recursive: true, force: true });
+	}
+}
+
 /** Deletes the oldest automatic backups beyond `keep`. @param {string} dir @param {number} keep */
 async function pruneAutomaticBackups(dir, keep) {
 	for (const old of (await listAutomaticBackups(dir)).slice(keep)) await rm(old.path, { recursive: true, force: true });
@@ -77,6 +88,8 @@ export function startBackups({ dataDir, runtime, now = Date.now, firstCheck = 5 
 	/** @type {{ at: string, message: string } | null} */
 	let lastFailure = null;
 	let closed = false;
+	// Stopping cancels a running backup, which otherwise holds shutdown past service timeouts.
+	const stopping = new AbortController();
 	/** @type {NodeJS.Timeout | undefined} */
 	let timer;
 
@@ -91,7 +104,7 @@ export function startBackups({ dataDir, runtime, now = Date.now, firstCheck = 5 
 				const started = Date.now();
 				return async () => { try { await resume(); } finally { pausedMs = Date.now() - started; } };
 			};
-			const created = await backup(dataDir, output, { alreadyLocked: true, pause, linkFrom });
+			const created = await backup(dataDir, output, { alreadyLocked: true, pause, linkFrom, signal: stopping.signal });
 			onChange(false);
 			return { output: created, pausedMs };
 		})().finally(() => { running = null; });
@@ -103,6 +116,7 @@ export function startBackups({ dataDir, runtime, now = Date.now, firstCheck = 5 
 		const settings = await readAutoBackup(dataDir);
 		if (!settings || running || closed) return;
 		try {
+			await removeUnfinishedBackups(settings.dir, now());
 			const [latest] = await listAutomaticBackups(settings.dir);
 			if (latest && now() - Date.parse(latest.createdAt) < DAY) return;
 			const result = await run(join(settings.dir, automaticBackupName(now())), latest?.path);
@@ -128,10 +142,11 @@ export function startBackups({ dataDir, runtime, now = Date.now, firstCheck = 5 
 		async status() {
 			return { settings: await readAutoBackup(dataDir), lastFailure, running: running !== null };
 		},
-		/** Stops scheduling and waits for a running backup, which holds the runtime paused. */
+		/** Stops scheduling, cancels a running backup and waits for it to release the runtime. */
 		async close() {
 			closed = true;
 			clearTimeout(timer);
+			stopping.abort(new Error('Crate is stopping.'));
 			await running?.catch(() => {});
 		},
 	};
