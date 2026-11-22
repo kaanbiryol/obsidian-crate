@@ -61,14 +61,16 @@ export async function checkUpgrade({ dataDir, values }) {
 
 /** Before Docker serves a newer image, migrates data that needs it, after a verified backup
  * into `backupRoot`. Incompatible data throws the check's reason; a fresh volume has nothing to check.
- * @param {string} dataDir @param {string} backupRoot @param {() => Date} [now]
+ * @param {string} dataDir @param {string} backupRoot
  * @returns {Promise<string | null>} The migration backup, or null when none was needed. */
-export async function migrateBeforeStart(dataDir, backupRoot, now = () => new Date()) {
+export async function migrateBeforeStart(dataDir, backupRoot) {
 	if (!await access(join(dataDir, 'server.json')).then(() => true, () => false)) return null;
-	if (!(await checkLocalUpgrade(dataDir)).requiresMigration) return null;
-	const output = join(backupRoot, `before-migration-${now().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}`);
-	console.log(`This release needs a database migration. Backing up to ${output} first.`);
-	const upgraded = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false, upgradeBackup: output });
+	const checked = await checkLocalUpgrade(dataDir);
+	if (!checked.requiresMigration) return null;
+	// One backup per transition: Compose restarts a failing migration, which must not copy the data each time.
+	const output = join(backupRoot, `before-migration-r${checked.from}-to-r${checked.to}`);
+	console.log(`This release needs a database migration. Backing up to ${output} first, unless an earlier attempt already did.`);
+	const upgraded = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false, upgradeBackup: output, reuseUpgradeBackup: true });
 	await upgraded.close();
 	console.log('Server data migrated.');
 	return output;

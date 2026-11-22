@@ -297,10 +297,11 @@ async function removeStaleLock(path, previous) {
  * @param {boolean} [options.administrative] Registers no Durable Objects, so no alarm runs.
  * @param {boolean} [options.handleSignals] Keeps Miniflare's own signal handlers.
  * @param {string} [options.upgradeBackup] Migrates the database after backing up here.
+ * @param {boolean} [options.reuseUpgradeBackup] Keeps a complete backup already at `upgradeBackup`.
  * @param {number} [options.maxFileBytes] Largest synced file; the Worker's default when unset.
  * @returns {Promise<LocalRuntime>}
  */
-export async function openLocalRuntime({ dataDir, origin = 'http://localhost:8787', administrative = false, handleSignals = true, upgradeBackup, maxFileBytes }) {
+export async function openLocalRuntime({ dataDir, origin = 'http://localhost:8787', administrative = false, handleSignals = true, upgradeBackup, reuseUpgradeBackup = false, maxFileBytes }) {
 	dataDir = resolve(dataDir);
 	origin = normalizeLocalOrigin(origin);
 	const [schema, releaseText, runtimeText, worker] = await Promise.all([
@@ -349,8 +350,11 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
         const current = /** @type {ServerMetadata} */ (previous);
         if (current.schemaHash !== expected.schemaHash) assertLocalMigrationPath(current.schemaVersion, release);
         assertCompatibleLocalMetadata({ ...current, schemaHash: expected.schemaHash }, expected);
-        const { backupLocalServer } = await import('./local-server-backup.mjs');
-        await backupLocalServer(dataDir, upgradeBackup, { alreadyLocked: true });
+        const { backupLocalServer, readBackupManifest } = await import('./local-server-backup.mjs');
+        // A retried migration keeps the backup taken before its first attempt.
+        if (!reuseUpgradeBackup || !await readBackupManifest(upgradeBackup).then(() => true, () => false)) {
+          await backupLocalServer(dataDir, upgradeBackup, { alreadyLocked: true });
+        }
       }
     }
 
