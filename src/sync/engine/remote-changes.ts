@@ -1,5 +1,4 @@
 import type { CheckResponse, FileEntry } from '../../protocol/sync-types';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { unsupportedLocalPathIssue } from '../local/local-path-safety';
 import { readIncrementalChangelog } from '../planner/incremental-changelog';
 
@@ -9,6 +8,8 @@ interface RemoteChangesContext {
 	files: Parameters<typeof readIncrementalChangelog>[0];
 	getBaseline(path: string): Readonly<FileEntry> | undefined;
 	shouldIgnore(path: string): boolean;
+	/** The largest file this device syncs with its server. */
+	maxFileBytes(): number;
 	signal: AbortSignal;
 }
 
@@ -29,7 +30,7 @@ export async function hasRemoteChanges(context: RemoteChangesContext): Promise<b
 		const baseline = context.getBaseline(path);
 		if (entry.action === 'delete') {
 			if (baseline) return true;
-		} else if (entry.size <= MAX_FILE_SIZE_BYTES && baseline?.hash !== entry.hash) {
+		} else if (entry.size <= context.maxFileBytes() && baseline?.hash !== entry.hash) {
 			return true;
 		}
 	}

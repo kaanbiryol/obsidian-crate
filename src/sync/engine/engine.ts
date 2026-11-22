@@ -321,6 +321,7 @@ export class SyncEngine {
 			files: this.files,
 			getBaseline: path => this.localManifest.getEntry(path),
 			shouldIgnore: this.ignore.shouldIgnore,
+			maxFileBytes: () => this.api.fileLimit(),
 			signal: this.lifecycle.abortSignal,
 		});
 	}

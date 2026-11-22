@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ChangelogEntry, CheckResponse, FileEntry } from '../../protocol/sync-types';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
 import { hasRemoteChanges } from './remote-changes';
 
 const put = (path: string, hash: string, seq: number, size = 10): ChangelogEntry => ({ seq, path, action: 'put', hash, size, created_at: '2026-01-01T00:00:00Z' });
 const remove = (path: string, seq: number): ChangelogEntry => ({ seq, path, action: 'delete', hash: '', size: 0, created_at: '2026-01-01T00:00:00Z' });
+const FILE_LIMIT = 25 * 1024 * 1024;
 const baseline = (hash: string): FileEntry => ({ hash, size: 10, modified: '2026-01-01T00:00:00Z' });
 
-function context(options: { check?: Partial<CheckResponse>; changes?: ChangelogEntry[]; baselines?: Record<string, FileEntry>; lastSeq?: number }) {
+function context(options: { check?: Partial<Pick<CheckResponse, 'hasChanges' | 'cursorExpired'>>; changes?: ChangelogEntry[]; baselines?: Record<string, FileEntry>; lastSeq?: number }) {
 	const getChanges = vi.fn(async () => ({ changes: options.changes ?? [], lastSeq: 20, hasMore: false }));
-	const checkForChanges = vi.fn(async () => ({ lastSeq: 20, hasChanges: true, ...options.check }));
+	const checkForChanges = vi.fn(async (): Promise<CheckResponse> => ({ lastSeq: 20, hasChanges: true, storageId: 'storage-1', ...options.check }));
 	return {
 		getChanges,
 		checkForChanges,
@@ -19,6 +19,7 @@ function context(options: { check?: Partial<CheckResponse>; changes?: ChangelogE
 			files: { getChanges },
 			getBaseline: (path: string) => options.baselines?.[path],
 			shouldIgnore: (path: string) => path.startsWith('.trash/'),
+			maxFileBytes: () => FILE_LIMIT,
 			signal: new AbortController().signal,
 		},
 	};
@@ -46,7 +47,7 @@ describe('hasRemoteChanges', () => {
 
 	it("ignores this device's own uploads and deletes that follow the saved cursor", async () => {
 		const { context: ctx } = context({
-			changes: [put('a.md', 'old', 11), put('a.md', 'mine', 12), remove('gone.md', 13), put('.trash/x.md', 'other', 14), put('big.bin', 'other', 15, MAX_FILE_SIZE_BYTES + 1)],
+			changes: [put('a.md', 'old', 11), put('a.md', 'mine', 12), remove('gone.md', 13), put('.trash/x.md', 'other', 14), put('big.bin', 'other', 15, FILE_LIMIT + 1)],
 			baselines: { 'a.md': baseline('mine') },
 		});
 		await expect(hasRemoteChanges(ctx)).resolves.toBe(false);
