@@ -48,6 +48,8 @@ export interface CloudflareDeploymentServiceOptions {
 	withAuthorization: WithCloudflareAuthorization;
 	beforeServerReset?: () => Promise<void>;
 	beforeServerSwitch?: () => Promise<void>;
+	/** Signs out of the account a switch moved away from, whose saved login nothing reads again. */
+	onAccountReplaced?: (previousAccountId: string) => Promise<void>;
 	/** False on mobile, where devices only connect to existing servers. */
 	serverChangesAllowed?: boolean;
 	now?: () => number;
@@ -165,6 +167,7 @@ export class CloudflareDeploymentService {
 		metadata.accountId = account.id;
 		metadata.accountName = account.name;
 		await this.persistMetadata(metadata);
+		if (previous?.accountId && previous.accountId !== account.id) await this.options.onAccountReplaced?.(previous.accountId).catch(() => {});
 	}
 
 	private async deleteServer(api: CloudflareApiClient, account: DeploymentAccount, metadata: CloudflareDeploymentMetadata, savedLogin: boolean, onProgress?: (message: string) => void): Promise<CloudflareDeploymentResult> {

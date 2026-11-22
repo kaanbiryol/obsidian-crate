@@ -467,6 +467,25 @@ describe('server selection', () => {
 		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 	});
 
+	it('signs out of the previous account only when a switch moves to another account', async () => {
+		const onAccountReplaced = vi.fn(async (_accountId: string) => {});
+		const h = createHarness(undefined, { onAccountReplaced });
+		const previousAccount = 'fedcba9876543210fedcba9876543210';
+		h.settings.cloudflareDeployment = { ...savedServer(), accountId: previousAccount };
+		h.selectDeployment.mockResolvedValue({ metadata: { ...savedServer(), deploymentId: 'fedcba9876543210', workerName: 'crate-fedcba9876543210' }, modifiedOn: null });
+		await h.service.startDeployment('switch');
+		await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, h.selectDeployment);
+		expect(h.settings.cloudflareDeployment?.accountId).toBe(CLIENT_ID);
+		expect(onAccountReplaced).toHaveBeenCalledExactlyOnceWith(previousAccount);
+		const sameAccount = vi.fn(async (_accountId: string) => {});
+		const same = createHarness(undefined, { onAccountReplaced: sameAccount });
+		same.settings.cloudflareDeployment = savedServer();
+		same.selectDeployment.mockResolvedValue({ metadata: { ...savedServer(), deploymentId: 'fedcba9876543210', workerName: 'crate-fedcba9876543210' }, modifiedOn: null });
+		await same.service.startDeployment('switch');
+		await same.service.handleCallback({ code: 'code', state: firstOpenedUrl(same.opened).searchParams.get('state')! }, same.selectDeployment);
+		expect(sameAccount).not.toHaveBeenCalled();
+	});
+
 	it.each([1, 2])('reconnects with %i available vaults', async count => {
 		const h = createHarness();
 		const saved = savedServer();

@@ -40,6 +40,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 			await clearServerConnection(plugin, signal);
 			plugin.refreshSettingsTab();
 		},
+		onAccountReplaced: accountId => plugin.cloudflareSavedLogin.forget(accountId),
 		beforeServerReset: async () => {
 			signal.throwIfAborted();
 			await clearServerConnection(plugin, signal);

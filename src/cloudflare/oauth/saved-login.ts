@@ -50,7 +50,10 @@ export class CloudflareSavedLogin {
 	acceptAuthorization(accountId: string, tokens: CloudflareOAuthTokens): void {
 		this.check(accountId, this.revision);
 		this.validateScope(tokens);
+		const replaced = this.read(accountId);
 		this.save(accountId, tokens);
+		// Nothing can use the replaced login again, so it must not stay valid at Cloudflare.
+		if (replaced && replaced.accessToken !== tokens.accessToken) void this.oauth.revokeTokens(replaced).catch(() => {});
 		this.authorizationRequired = false;
 		++this.revision;
 	}

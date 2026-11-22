@@ -128,3 +128,13 @@ it.each([
 	expect(deploy).not.toHaveBeenCalled();
 	expect(h.connection.needsAuthorization).toBe(status === 400);
 });
+
+it('revokes a saved login that a new authorization replaces', async () => {
+	const h = setup();
+	h.connection.acceptAuthorization('account-a', { accessToken: 'first-access', refreshToken: 'first-refresh', expiresIn: 3600 });
+	h.connection.acceptAuthorization('account-a', { accessToken: 'second-access', refreshToken: 'second-refresh', expiresIn: 3600 });
+	await vi.waitFor(() => expect(h.transport).toHaveBeenCalledTimes(2));
+	expect(h.transport.mock.calls.map(([, request]) => new URLSearchParams(request?.body as string).get('token')))
+		.toEqual(['first-access', 'first-refresh']);
+	expect(h.values.get('crate-cloudflare-login-account-a')).toContain('second-access');
+});
