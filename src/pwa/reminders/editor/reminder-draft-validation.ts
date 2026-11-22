@@ -14,7 +14,6 @@ const modalSchema = storedObject({
 	recovery: v.optional(v.boolean()),
 	filePath: optionalString,
 	completedAt: optionalString,
-	pendingSave: v.optional(v.never()),
 });
 
 function filePath(value: string | undefined, folderPath: string): boolean {

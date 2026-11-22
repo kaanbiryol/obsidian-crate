@@ -54,7 +54,7 @@ it.each(['malformed credentials', 'unavailable credential reads'])('app logout c
 	await act(async () => { await test.hook.current.logOut(); });
 	expect(current()).toBe(false);
 	expect(clearReadingData).toHaveBeenCalledOnce();
-	expect(resetReminderEncryption).toHaveBeenCalledWith(true);
+	expect(resetReminderEncryption).toHaveBeenCalledWith();
 	expect(clearEncryptionSessionMarkers).toHaveBeenCalledOnce();
 	expect(clearPersistedEncryption).toHaveBeenCalledOnce();
 	expect(clearReminderDrafts).toHaveBeenCalledOnce();

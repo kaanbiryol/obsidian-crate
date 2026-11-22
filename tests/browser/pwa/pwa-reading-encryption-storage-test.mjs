@@ -55,8 +55,7 @@ for (const engine of [chromium, webkit]) {
       // The library lists encrypted cards a page at a time; this one is empty.
       window.fetch = async path => Response.json(String(path).startsWith('/reading/items')
         ? { cards: [], cursor: null } : { encryption: state, folderLabel: folder.label });
-      location.hash = 'crateReadingKey=' + encodeURIComponent(recovery);
-      t.consumeReadingKeyFragment();
+      await t.rememberVaultKeys(bundle);
       const db = await t.readingDatabase();
       const original = { url: 'https://private.example/draft' };
       await db.put('values', original, 'draft:reader');

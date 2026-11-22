@@ -9,8 +9,8 @@ export function ListStyleSetting({ preferences, onPreferencesChange }: {
 }) {
 	return <SettingsRow as="label" className="settings-row--preference" title="List style" description="This device · reminders, projects, and Reading">
 		<span className="settings-preference-control settings-preference-control--select">
-			<select aria-label="List style" className="settings-preference-input" value={preferences.reminderListStyle}
-				onChange={event => onPreferencesChange({ reminderListStyle: normalizeListStyle(event.currentTarget.value) })}>
+			<select aria-label="List style" className="settings-preference-input" value={preferences.listStyle}
+				onChange={event => onPreferencesChange({ listStyle: normalizeListStyle(event.currentTarget.value) })}>
 				<option value="flat">Flat</option>
 				<option value="cards">Cards</option>
 			</select>

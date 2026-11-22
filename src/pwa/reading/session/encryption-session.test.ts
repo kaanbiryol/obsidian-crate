@@ -1,7 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { prepareReadingEncryption } from './encryption-session';
 import { resetReadingEncryption } from './encryption-lifecycle';
-import { consumeReadingKeyFragment, pendingReadingKey } from '../../encryption/encryption-fragments';
 import { readingRequest } from '../api';
 import { decodeReadingValue, encodeReadingValue } from '../storage/private-storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session';
@@ -9,7 +8,7 @@ import { AUTH_TOKEN_KEY } from '../../config';
 
 vi.mock('../../connection/server-compatibility', () => ({ requireCompatibleProtocol: vi.fn().mockResolvedValue(1), forgetCompatibleProtocol: vi.fn() }));
 
-afterEach(() => { resetReadingEncryption(true); vi.unstubAllGlobals(); });
+afterEach(() => { resetReadingEncryption(); vi.unstubAllGlobals(); });
 function storage(): Storage {
 	const values: Record<string, string> = {};
 	return Object.defineProperties(values, {
@@ -83,12 +82,3 @@ it('keeps unverified Reading storage locked after a network failure', async () =
 	expect(() => decodeReadingValue('list:session', { items: [] })).toThrow('Could not verify encryption');
 });
 
-it('keeps this link\'s Reading key through sign-in and forgets it on logout', () => {
-	vi.stubGlobal('window', { location: { pathname: '/notifications', search: '', hash: '#crateReadingKey=code' },
-		history: { state: null, replaceState: vi.fn() } });
-	consumeReadingKeyFragment();
-	resetReadingEncryption();
-	expect(pendingReadingKey()).toBe('code');
-	resetReadingEncryption(true);
-	expect(pendingReadingKey()).toBeUndefined();
-});

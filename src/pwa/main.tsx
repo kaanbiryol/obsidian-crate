@@ -1,5 +1,3 @@
-import { consumeReadingKeyFragment } from './encryption/encryption-fragments';
-import { consumeReminderEncryptionFragment } from './reminders/encryption-session';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { FeatureShell } from './FeatureShell';
@@ -7,8 +5,6 @@ import { RemindersApp } from './reminders/RemindersApp';
 import { isStandaloneApp } from './shell/device';
 import { protectInstalledAppStorage } from './storage/browser-storage';
 
-consumeReadingKeyFragment();
-consumeReminderEncryptionFragment();
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app root');
 createRoot(root).render(<FeatureShell reminders={<RemindersApp />} />);

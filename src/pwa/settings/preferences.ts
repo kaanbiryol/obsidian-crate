@@ -9,22 +9,22 @@ export const PWA_PREFERENCES_KEY = 'crate-reminders-preferences';
 export interface PwaPreferences {
 	defaultScreen: PwaStartScreen;
 	dockTabs: DockTab[];
-	/** Shared by reminders and Reading; retain the existing storage key. */
-	reminderListStyle: ListStyle;
+	/** Shared by reminders and Reading. */
+	listStyle: ListStyle;
 }
 
 export function loadPwaPreferences(): PwaPreferences {
 	try {
 		const value = JSON.parse(localStorage.getItem(PWA_PREFERENCES_KEY) ?? '{}') as Partial<PwaPreferences> | null;
 		return {
-			reminderListStyle: normalizeListStyle(value?.reminderListStyle),
+			listStyle: normalizeListStyle(value?.listStyle),
 			dockTabs: normalizeDockTabs(value?.dockTabs),
 			defaultScreen: value?.defaultScreen === 'inbox' || value?.defaultScreen === 'upcoming' || value?.defaultScreen === 'browse'
 				|| value?.defaultScreen === 'reading' || value?.defaultScreen === 'favorites' || value?.defaultScreen === 'archive'
 				? value.defaultScreen : 'today',
 		};
 	} catch {
-		return { defaultScreen: 'today', dockTabs: normalizeDockTabs(null), reminderListStyle: DEFAULT_LIST_STYLE };
+		return { defaultScreen: 'today', dockTabs: normalizeDockTabs(null), listStyle: DEFAULT_LIST_STYLE };
 	}
 }
 

@@ -19,11 +19,7 @@ interface PushNotification {
 	data?: NotificationData;
 }
 
-interface PushPayload extends PushNotification {
-	notification?: PushNotification;
-	project?: string;
-	reminderId?: string;
-}
+interface PushPayload { notification?: PushNotification }
 
 /** Safari supplies a declarative Notification instead of PushMessageData. */
 type DeclarativePushEvent = PushEvent & { notification?: PushNotification };
@@ -152,7 +148,7 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 	scope.addEventListener('push', (event: DeclarativePushEvent) => {
 		let payload: PushPayload = {};
 		try { payload = (event.data?.json() as PushPayload | null) || {}; } catch { /* Show a generic reminder for malformed payloads. */ }
-		const notification = event.notification || payload.notification || payload;
+		const notification = event.notification || payload.notification || {};
 		const data = notification.data || {};
 		event.waitUntil((async () => {
 			const display = data.encrypted ? await decryptPushDisplay(data.encrypted) : null;
@@ -163,8 +159,8 @@ export function initialize(scope: ServiceWorkerGlobalScope, config: ServiceWorke
 				tag: notification.tag || 'crate-reminder',
 				icon: notification.icon || `/notifications/crate-icon-192.png?v=${config.version}`,
 				data: {
-					project: data.project || payload.project || '',
-					reminderId: data.reminderId || payload.reminderId || '',
+					project: data.project || '',
+					reminderId: data.reminderId || '',
 					navigate: notification.navigate || '',
 				},
 			};

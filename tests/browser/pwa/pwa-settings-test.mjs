@@ -120,7 +120,7 @@ try {
 			await sheet.getByRole('button', { name: 'Light', exact: true }).click();
 			await sheet.getByRole('combobox', { name: 'Open app to' }).selectOption('favorites');
 			await checkSettingsFocus(page, sheet);
-			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', dockTabs: ['inbox', 'today', 'browse', 'reading'], reminderListStyle: 'flat' });
+			await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('crate-reminders-preferences')))).toEqual({ defaultScreen: 'favorites', dockTabs: ['inbox', 'today', 'browse', 'reading'], listStyle: 'flat' });
 			await page.screenshot({ path: 'test-results/settings/' + name + '-light.png' });
 			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 			await expect(sheet).toHaveCount(0);
@@ -206,7 +206,7 @@ try {
 				await peer.goto(origin + '/notifications?tab=inbox');
 				await peer.evaluate(() => {
 					const preferences = JSON.parse(localStorage.getItem('crate-reminders-preferences'));
-					localStorage.setItem('crate-reminders-preferences', JSON.stringify({ ...preferences, reminderListStyle: 'cards' }));
+					localStorage.setItem('crate-reminders-preferences', JSON.stringify({ ...preferences, listStyle: 'cards' }));
 				});
 				await expect(readingLibrary).toHaveAttribute('data-list-style', 'cards');
 				await expect(reminderRow).toHaveAttribute('data-reminder-list-style', 'cards');

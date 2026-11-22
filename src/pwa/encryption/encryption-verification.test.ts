@@ -76,16 +76,17 @@ describe('encryption verification', () => {
 	it('offers the plaintext offline copy for an unanswered check only without encryption evidence', async () => {
 		const unanswered = async () => { throw new TypeError('network'); };
 		await expect(load(unanswered)).rejects.toMatchObject({ offlineCopy: true });
-		await expect(loadEncryptionState({ token: 'token', purpose: 'reading', fragment: 'e2ee', request: unanswered, current: () => true }))
-			.rejects.toMatchObject({ offlineCopy: false });
+		localStorage.setItem('crate-encryption-session:other', '{}');
+		await expect(load(unanswered)).rejects.toMatchObject({ offlineCopy: false });
+		localStorage.removeItem('crate-encryption-session:other');
 		await load(async () => Response.json({ encryption: await encryptionState() }));
 		await expect(load(async () => Response.json({ error: 'Deploying' }, { status: 503 }))).rejects.toMatchObject({ offlineCopy: false });
 	});
 
-	it('requires one online verification for an encrypted session link', async () => {
+	it('requires one online verification for a new session on an encrypted device', async () => {
 		vi.stubGlobal('navigator', { onLine: false });
-		await expect(loadEncryptionState({ token: 'token', purpose: 'reminders', fragment: 'e2ee', request: async () => { throw new TypeError('offline'); }, current: () => true }))
-			.rejects.toThrow('Go online once');
+		localStorage.setItem('crate-encryption-session:other', '{}');
+		await expect(load(async () => { throw new TypeError('offline'); })).rejects.toThrow('Go online once');
 	});
 
 	it('does not remember a state for a connection that changed meanwhile', async () => {

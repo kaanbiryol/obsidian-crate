@@ -70,9 +70,9 @@ describe('PWA reminder cache encryption lock', () => {
 		});
 		vi.stubGlobal('navigator', { onLine: true });
 		vi.stubGlobal('IDBKeyRange', { bound: (lower: unknown, upper: unknown) => ({ lower, upper }) });
-		resetReminderEncryption(true);
+		resetReminderEncryption();
 	});
-	afterEach(() => { memory.stores = null; resetReminderEncryption(true); vi.unstubAllGlobals(); });
+	afterEach(() => { memory.stores = null; resetReminderEncryption(); vi.unstubAllGlobals(); });
 
 	it('keeps an unencrypted offline copy when the encryption check is unavailable', async () => {
 		await prepareReminderEncryption('session', async () => Response.json({ encryption: null }));

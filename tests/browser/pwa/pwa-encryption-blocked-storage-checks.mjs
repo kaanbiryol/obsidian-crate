@@ -73,7 +73,7 @@ export async function verifyBlockedEncryptionStorage(page) {
 		}
 		await t.rememberVaultKeys(bundle);
 		if ((await t.decryptPushDisplay(notice))?.title !== 'Private push') throw new Error('Push decryption did not recover after unblocking');
-		t.resetReminderEncryption(true);
+		t.resetReminderEncryption();
 		// A newer database must survive attempts to read, enroll, or erase it.
 		for (const [name, store] of databases) {
 			const db = await open(name, 2, db => db.createObjectStore('future'));

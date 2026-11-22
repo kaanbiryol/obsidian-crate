@@ -105,10 +105,12 @@ try {
   injectShell = true;
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => { if ((request.url() + (request.postData() ?? '')).includes(recovery)) recoverySent = true; if (request.method() !== 'GET') requests.push({ path: new URL(request.url()).pathname, body: request.postData() ?? '' }); });
-  await page.goto(`${origin}/notifications?section=reading&browserToken=${token}#crateReadingKey=${encodeURIComponent(recovery)}`);
+  await page.goto(`${origin}/notifications?section=reading&browserToken=${token}`);
+  await page.getByRole('button', { name: 'Use recovery key instead', exact: true }).click();
+  await page.getByLabel('Recovery key', { exact: true }).fill(recovery);
+  await page.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
   try { await expect(page.getByText('Encrypted Reading article', { exact: true })).toBeVisible({ timeout: 30000 }); }
   catch (error) { console.log('Reading bootstrap:', await page.locator('body').innerText({ timeout: 2000 }).catch(() => 'unavailable'), errors); throw error; }
-  assert.ok(!page.url().includes('crateReadingKey'));
   await expect.poll(() => page.evaluate(() => window.cspViolations.includes('script-src-attr'))).toBe(true);
   assert.equal(await page.evaluate(() => window.cspProbe), undefined);
   await expect.poll(() => page.evaluate(() => window.cspBlockedScripts.some(uri => uri.endsWith('/notifications/csp-probe.js')))).toBe(true);

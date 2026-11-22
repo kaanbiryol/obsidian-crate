@@ -105,7 +105,7 @@ async function verify(browser) {
 			request.onsuccess = () => {
 				const db = request.result; const tx = db.transaction('snapshots', 'readwrite');
 				// Metadata promising notes that are not stored: the whole copy is damaged.
-				tx.objectStore('snapshots').put({ folderPath: 'Reminders', layout: 'notes', projects: ['Inbox'], savedAt: Date.now(),
+				tx.objectStore('snapshots').put({ folderPath: 'Reminders', projects: ['Inbox'], savedAt: Date.now(),
 					etag: 'damaged-etag', issues: [], noteVersions: [['Reminders/Missing.md', 'damaged']], sessionScope });
 				tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => reject(tx.error);
 			};

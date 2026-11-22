@@ -43,15 +43,15 @@ for (const browserType of [chromium, webkit]) {
 					return { version: db.version, stores: Array.from(db.objectStoreNames), raw };
 				} finally { db.close(); }
 			};
-			const seedLegacy = async () => {
+			const seedUnknownLayout = async () => {
 				await cache.clearCachedReminderSnapshots();
 				const db = await open(1, db => db.createObjectStore('snapshots', { keyPath: 'folderPath' }));
 				await put(db, snapshot); return db;
 			};
 			// An unknown store layout is preserved rather than reset.
-			const old = await seedLegacy(); old.close();
-			const migrated = await cache.loadCachedReminderSnapshot('Reminders');
-			const migration = await inspect();
+			const old = await seedUnknownLayout(); old.close();
+			const unknownLayout = await cache.loadCachedReminderSnapshot('Reminders');
+			const unknownStores = await inspect();
 
 			const nativeOpen = IDBFactory.prototype.open;
 
@@ -136,14 +136,14 @@ for (const browserType of [chromium, webkit]) {
 			db.close();
 			await cache.saveCachedReminderSnapshot({ folderPath: 'Reminders', reminders: [reminder], projects: ['Inbox'], savedAt: 400, etag: 'four' });
 			const afterClear = await cache.loadCachedReminderSnapshot('Reminders');
-			return { snapshot, migrated, migration, blocked, blockedMs, blockedProblem, unblocked,
+			return { snapshot, unknownLayout, unknownStores, blocked, blockedMs, blockedProblem, unblocked,
 				damaged, damagedProblem, beforeRebuild, rebuilt, afterRebuild, healthy, quotaProblem, afterQuota,
 				abortedWriteProblem, afterAbortedWrite, abortedRead, abortedReadProblem, denied, deniedProblem, otherSession,
 				future, futureProblem, futureReset, futurePreserved, blockedClear, afterClear,
 				pending: localStorage.getItem('crate-reminder-outbox:recovery-fixture'), draft: sessionStorage.getItem('crate-reminder-draft:recovery-fixture') };
 		});
-		assert.equal(results.migrated, null);
-		assert.deepEqual(results.migration, { version: 1, stores: ['snapshots'], raw: [results.snapshot] });
+		assert.equal(results.unknownLayout, null);
+		assert.deepEqual(results.unknownStores, { version: 1, stores: ['snapshots'], raw: [results.snapshot] });
 		assert.equal(results.blocked, null); assert.equal(results.blockedProblem, 'blocked'); assert.ok(results.blockedMs < 4_500);
 		assert.equal(results.unblocked, null);
 

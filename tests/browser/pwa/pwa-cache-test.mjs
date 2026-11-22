@@ -125,7 +125,7 @@ for (const browserType of [chromium, webkit]) {
 		assert.deepEqual(result.refreshed.issues, [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }]);
 		assert.match(result.stored.sessionScope, /^[a-f0-9]{64}$/);
 		assert.equal(result.stored.savedAt, 100, '304 must not rewrite the snapshot');
-		assert.equal(result.stored.layout, 'notes');
+		assert.ok(Array.isArray(result.stored.noteVersions));
 		assert.equal(result.afterPartial['Reminders/A.md'], result.before['Reminders/A.md'], 'An unchanged note keeps its record');
 		assert.notEqual(result.afterPartial['Reminders/B.md'], result.before['Reminders/B.md']);
 		assert.deepEqual(result.peerWritten.reminders.map(item => item.id), ['a', 'b2'], 'Another tab\'s complete write is a valid snapshot');

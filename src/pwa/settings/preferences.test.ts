@@ -15,25 +15,25 @@ function storage(raw: string | null = null) {
 describe('PWA preferences', () => {
 	it('defaults to Today', () => {
 		storage();
-		expect(loadPwaPreferences()).toEqual({ defaultScreen: 'today', dockTabs: [...DEFAULT_DOCK_TABS], reminderListStyle: 'flat' });
+		expect(loadPwaPreferences()).toEqual({ defaultScreen: 'today', dockTabs: [...DEFAULT_DOCK_TABS], listStyle: 'flat' });
 	});
 
 	it('persists each supported launch screen', () => {
 		storage();
 		for (const defaultScreen of ['today', 'inbox', 'upcoming', 'browse', 'reading', 'favorites', 'archive'] as const) {
-			savePwaPreferences({ defaultScreen, dockTabs: [...DEFAULT_DOCK_TABS], reminderListStyle: 'flat' });
-			expect(loadPwaPreferences()).toEqual({ defaultScreen, dockTabs: [...DEFAULT_DOCK_TABS], reminderListStyle: 'flat' });
+			savePwaPreferences({ defaultScreen, dockTabs: [...DEFAULT_DOCK_TABS], listStyle: 'flat' });
+			expect(loadPwaPreferences()).toEqual({ defaultScreen, dockTabs: [...DEFAULT_DOCK_TABS], listStyle: 'flat' });
 		}
 	});
 
-	it('drops an upcoming range stored by an older version and rejects an invalid launch screen', () => {
-		storage(JSON.stringify({ defaultScreen: 'invalid', upcomingDays: 23 }));
-		expect(loadPwaPreferences()).toEqual({ defaultScreen: 'today', dockTabs: [...DEFAULT_DOCK_TABS], reminderListStyle: 'flat' });
+	it('rejects an invalid launch screen', () => {
+		storage(JSON.stringify({ defaultScreen: 'invalid' }));
+		expect(loadPwaPreferences()).toEqual({ defaultScreen: 'today', dockTabs: [...DEFAULT_DOCK_TABS], listStyle: 'flat' });
 	});
 
 	it.each(['{', 'null'])('recovers from malformed stored preferences: %s', (raw) => {
 		storage(raw);
-		expect(loadPwaPreferences()).toEqual({ defaultScreen: 'today', dockTabs: [...DEFAULT_DOCK_TABS], reminderListStyle: 'flat' });
+		expect(loadPwaPreferences()).toEqual({ defaultScreen: 'today', dockTabs: [...DEFAULT_DOCK_TABS], listStyle: 'flat' });
 	});
 });
 
@@ -55,13 +55,13 @@ it('persists hidden and reordered tabs independently of the launch screen', () =
 	expect(loadPwaPreferences()).toMatchObject({ defaultScreen: 'today', dockTabs: ['reading', 'inbox', 'today', 'browse'] });
 });
 
-it.each(['flat', 'cards'] as const)('persists the %s reminder style without changing other preferences', reminderListStyle => {
+it.each(['flat', 'cards'] as const)('persists the %s reminder style without changing other preferences', listStyle => {
 	storage();
-	savePwaPreferences({ ...loadPwaPreferences(), reminderListStyle });
-	expect(loadPwaPreferences()).toMatchObject({ reminderListStyle, defaultScreen: 'today' });
+	savePwaPreferences({ ...loadPwaPreferences(), listStyle });
+	expect(loadPwaPreferences()).toMatchObject({ listStyle, defaultScreen: 'today' });
 });
 
-it.each([undefined, null, 'compact', 42])('defaults invalid reminder styles to flat: %s', reminderListStyle => {
-	storage(JSON.stringify({ reminderListStyle }));
-	expect(loadPwaPreferences().reminderListStyle).toBe('flat');
+it.each([undefined, null, 'compact', 42])('defaults invalid reminder styles to flat: %s', listStyle => {
+	storage(JSON.stringify({ listStyle }));
+	expect(loadPwaPreferences().listStyle).toBe('flat');
 });

@@ -12,10 +12,3 @@ export function takeFragmentValues<Name extends string>(names: readonly Name[]):
 	window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (fragment.size ? '#' + fragment.toString() : ''));
 	return values;
 }
-
-let readingKey: string | undefined;
-export function consumeReadingKeyFragment(): void {
-	readingKey = takeFragmentValues(['crateReadingKey']).crateReadingKey ?? readingKey;
-}
-export const pendingReadingKey = () => readingKey;
-export function forgetReadingKey(): void { readingKey = undefined; }

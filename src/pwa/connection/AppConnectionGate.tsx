@@ -72,7 +72,7 @@ export function AppConnectionGate({ section, onOpenFeature, children }: {
 		if (!app.authToken && (section === 'reminders' || !reading.session && !reading.lockedSession && !reading.connecting)) {
 			// Expiry removes credentials, but preserved encryption data still needs a
 			// recovery/logout action after reload. It must not look like a fresh install.
-			const issue = app.error ?? reading.issue ?? (!reading.session && !reading.lockedSession && hasEncryptedSessionEvidence(null, undefined) ? SESSION_RECOVERY_ISSUE : null);
+			const issue = app.error ?? reading.issue ?? (!reading.session && !reading.lockedSession && hasEncryptedSessionEvidence(null) ? SESSION_RECOVERY_ISSUE : null);
 			return shell(<>{issue ? <ErrorState issue={issue} onRetry={() => location.reload()} onLogout={() => { void app.logOut(); }} loggingOut={app.loggingOut} />
 				: <EmptyAuthState />}{switchFeature}</>);
 		}

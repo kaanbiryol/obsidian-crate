@@ -64,8 +64,7 @@ describe('stored command schema compatibility', () => {
 		expect(validChange({ ...reorder, followUp: { operationId: 'another_123456789', input } })).toBe(false);
 	});
 
-	it('rejects obsolete retained attempts instead of resending them', () => {
-		expect(validModal({ ...modal, pendingSave: { path: '/reminders/create', body: JSON.stringify(body), input, draftKey: 'key' } })).toBe(false);
+	it('rejects a malformed stored modal', () => {
 		expect(validModal({ ...modal, mode: ['create'] })).toBe(false);
 		expect(validModal(modal)).toBe(true);
 	});

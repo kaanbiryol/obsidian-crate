@@ -210,8 +210,11 @@ async function verify(type) {
 		let recoverySent = false;
 		const requests = []; page.on('request', request => { if ((request.url() + (request.postData() ?? '')).includes(enrolled.grant)) recoverySent = true; if (request.method() !== 'GET') requests.push({ url: request.url(), body: request.postData() }); });
 		// The plugin's link for an encrypted vault: the folder's name travels only in the fragment.
-		const fragment = new URLSearchParams({ crateKey: enrolled.grant, crateReadingKey: enrolled.grant, crateFolder: 'Reminders' });
+		const fragment = new URLSearchParams({ crateFolder: 'Reminders' });
 		await page.goto(`${origin}/notifications?browserToken=${enrolled.browserToken}&tab=inbox#${fragment}`);
+		await page.getByRole('button', { name: 'Use recovery key instead', exact: true }).click();
+		await page.getByLabel('Recovery key', { exact: true }).fill(enrolled.grant);
+		await page.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
 		try { await expect(page.getByText('Encrypted appointment', { exact: true })).toBeVisible({ timeout: 20000 }); }
 		catch (error) {
 			console.log('PWA bootstrap errors:', errors);
@@ -220,7 +223,7 @@ async function verify(type) {
 			await page.screenshot({ path: '.generated/browser-encryption/bootstrap-failure.png', fullPage: true, timeout: 2000 }).catch(() => {});
 			throw error;
 		}
-		assert.ok(!page.url().includes('crateKey'));
+		assert.ok(!page.url().includes('crateFolder'));
 		await page.locator('[data-action="toggle-settings"]').click();
 		await expect(page.getByRole('region', { name: 'Encryption', exact: true }).locator('.settings-row').filter({ has: page.getByText('Reminders', { exact: true }) }).getByText('Unlocked', { exact: true })).toBeVisible();
 		await page.getByText('Encryption details', { exact: true }).click();

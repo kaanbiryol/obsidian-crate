@@ -34,7 +34,6 @@ async function cacheSessionScope(): Promise<string> {
  * rejects the whole snapshot, and a save learns what is stored without reading
  * the notes. Versions carry no content. */
 interface SnapshotMetadata {
-	layout: 'notes';
 	projects: string[];
 	savedAt: number;
 	etag?: string;
@@ -61,7 +60,7 @@ function openMetadata(raw: StoredMetadata, sessionScope: string, folderPath: str
 	try {
 		if (raw.sessionScope !== sessionScope || Boolean(raw.encrypted) !== privateStorageUnlocked()) return null;
 		const metadata = (raw.encrypted ? JSON.parse(openPrivateValue(raw.encrypted, `cache:${sessionScope}:${folderPath}`)) : raw) as Partial<SnapshotMetadata>;
-		if (metadata.layout !== 'notes' || !Array.isArray(metadata.noteVersions)) return null;
+		if (!Array.isArray(metadata.noteVersions)) return null;
 		const versions = new Map<string, string>();
 		for (const entry of metadata.noteVersions as unknown[]) {
 			if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string' || typeof entry[1] !== 'string' || versions.has(entry[0])) return null;
@@ -191,13 +190,13 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 					: { folderPath, path, sessionScope, version, encrypted: sealed } satisfies StoredNote);
 				written.set(path, { version, json: note.json, reminders: note.reminders });
 			}
-			const metadata: SnapshotMetadata = { layout: 'notes', projects: snapshot.projects, savedAt: snapshot.savedAt, etag: snapshot.etag,
+			const metadata: SnapshotMetadata = { projects: snapshot.projects, savedAt: snapshot.savedAt, etag: snapshot.etag,
 				...(snapshot.deltaBase ? { deltaBase: snapshot.deltaBase } : {}), issues: snapshot.issues ?? [],
 				noteVersions: [...written].map(([path, note]) => [path, note.version]) };
 			const plain = JSON.stringify({ ...metadata, sessionScope });
 			const protectedValue = sealPrivateValue(plain, `cache:${sessionScope}:${folderPath}`);
 			await transaction.objectStore(CACHE_STORE_NAME).put(protectedValue === plain ? { folderPath, ...metadata, sessionScope }
-				: { folderPath, sessionScope, layout: 'notes', encrypted: protectedValue });
+				: { folderPath, sessionScope, encrypted: protectedValue });
 			await transaction.objectStore(FRESHNESS_STORE_NAME).delete(folderPath);
 		}
 		await Promise.all([

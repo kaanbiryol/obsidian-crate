@@ -25,7 +25,7 @@ const strings = (value: unknown): value is string[] => Array.isArray(value) && v
 /** Uses the same storage-event ordering as removing an acknowledged command. */
 export async function createReminderSettlementChannel(authToken: string, folderPath: string) {
 	const hash = await sha256Hex(authToken);
-	// Old clients ignore this reserved namespace, while their logout still erases it.
+	// Inside the outbox prefix, so logout erases it with the outbox.
 	const key = `${REMINDER_OUTBOX_PREFIX}confirmed:${hash}:${encodeURIComponent(folderPath)}`;
 	return {
 		key,

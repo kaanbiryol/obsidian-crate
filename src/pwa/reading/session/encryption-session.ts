@@ -5,7 +5,6 @@ import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER } from '@/encrypt
 import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionVerificationUnavailableError, ENCRYPTION_CHECK_TIMEOUT_MS } from '../../encryption/encryption-verification';
 import type { EncryptionServerState } from '@/encryption/server-state';
 import { unlockLocalState, type FeatureKeys } from '../../encryption/encryption-keys';
-import { pendingReadingKey, forgetReadingKey } from '../../encryption/encryption-fragments';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from '../storage/private-storage';
 import { assertReadingSession, isReadingSessionCurrent, type ReadingSession } from './session';
@@ -17,9 +16,8 @@ let pending: { identity: string; promise: Promise<FeatureKeys | null> } | undefi
 let currentKeys: FeatureKeys | null = null;
 let expected: EncryptionServerState | null = null;
 let verifiedIdentity: string | undefined;
-onReadingEncryptionReset(discardKeys => {
+onReadingEncryptionReset(() => {
 	pending = undefined; currentKeys = null; expected = null; verifiedIdentity = undefined;
-	if (discardKeys) forgetReadingKey();
 	lockReadingStorage();
 });
 export function readingEncryptionHeaders(): Record<string, string> {
@@ -34,15 +32,14 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 	if (pending?.identity === identity) return pending.promise;
 	const current = () => isReadingSessionCurrent(session) && pending?.promise === work;
 	const work = (async () => {
-		const verified = await loadEncryptionState({ token: session.token, purpose: 'reading', fragment: pendingReadingKey(), current,
+		const verified = await loadEncryptionState({ token: session.token, purpose: 'reading', current,
 			request: () => fetch('/reading/encryption', { cache: 'no-store', signal: AbortSignal.timeout(ENCRYPTION_CHECK_TIMEOUT_MS), headers: crateRequestHeaders(session.token) }) });
 		const state = verified?.state ?? null;
 		expected = state;
 		if (!state) { verifiedIdentity = identity; currentKeys = null; lockReadingStorage(false); return null; }
 		if (!currentKeys) lockReadingStorage();
 		assertEncryptionActive(state);
-		const keys = await loadVaultKeys(verified!, session.folderPath, current, pendingReadingKey());
-		forgetReadingKey();
+		const keys = await loadVaultKeys(verified!, session.folderPath, current);
 		const local = await unlockLocalState(keys, 'reading');
 		if (!current()) { local.destroy(); throw new Error('Reading sign-in changed.'); }
 		unlockReadingStorage(local);

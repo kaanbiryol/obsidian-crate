@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { consumeReminderEncryptionFragment, reminderEncryptionSnapshot, prepareReminderEncryption, resetReminderEncryption } from './encryption-session';
+import { reminderEncryptionSnapshot, prepareReminderEncryption, resetReminderEncryption } from './encryption-session';
 import { invalidatePwaSession } from '../connection/session-generation';
 import { AUTH_TOKEN_KEY } from '../config';
 import { LocalStateCipher } from '../../encryption/local-state';
@@ -29,9 +29,9 @@ beforeEach(() => {
 	vi.stubGlobal('sessionStorage', storage());
 	vi.stubGlobal('navigator', { onLine: true });
 	localStorage.setItem(AUTH_TOKEN_KEY, 'session');
-	resetReminderEncryption(true);
+	resetReminderEncryption();
 });
-afterEach(() => { invalidatePwaSession(); resetReminderEncryption(true); vi.unstubAllGlobals(); });
+afterEach(() => { invalidatePwaSession(); resetReminderEncryption(); vi.unstubAllGlobals(); });
 
 it('keeps the confirmed push provider during a same-session encryption recheck', async () => {
 	expect(reminderEncryptionSnapshot().status).toBe('checking');
@@ -66,7 +66,7 @@ it('restores durable writes when an open encrypted tab adopts a verified unencry
 	const retainedKey = 'retained-ciphertext';
 	const retained = sealPrivateValue('preserve for recovery', retainedKey);
 	// The peer's logout clears shared state; this tab locks its in-memory key.
-	localStorage.clear(); invalidatePwaSession(); resetReminderEncryption(true);
+	localStorage.clear(); invalidatePwaSession(); resetReminderEncryption();
 	localStorage.setItem(AUTH_TOKEN_KEY, 'new-session');
 	invalidatePwaSession(); resetReminderEncryption();
 	localStorage.setItem(retainedKey, retained);
@@ -94,14 +94,6 @@ it.each([[200, 'no longer reports'], [404, 'Could not verify encryption']] as co
 	// Only a definite answer offers the recovery-key card; evidence hides the plaintext copy.
 	expect(reminderEncryptionSnapshot()).toMatchObject({ status: 'locked', unavailable: status !== 200, offlineCopy: false });
 	expect(() => sealPrivateValue('must remain locked', 'test')).toThrow('Unlock');
-});
-
-it.each([200, 404])('rejects plaintext mode for a fresh encrypted setup link when the server returns %s', async status => {
-	vi.stubGlobal('window', { location: { hash: '#crateKey=private-setup-key', pathname: '/notifications', search: '' }, history: { state: null, replaceState: vi.fn() } });
-	consumeReminderEncryptionFragment();
-	await expect(prepareReminderEncryption('session', async () => Response.json({ encryption: null }, { status }))).rejects.toThrow();
-	expect(reminderEncryptionSnapshot().status).toBe('locked');
-	expect(() => sealPrivateValue('private draft', 'test')).toThrow('Unlock');
 });
 
 it('keeps storage locked after an unavailable check and permits writes after a successful plaintext retry', async () => {

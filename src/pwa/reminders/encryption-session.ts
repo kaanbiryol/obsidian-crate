@@ -6,7 +6,6 @@ import { requirePrivateStorageUnlock, unlockPrivateStorage, lockPrivateStorage, 
 import { capturePwaSession } from '../connection/session-generation';
 import { AUTH_TOKEN_KEY, adoptReminderFolder } from '../config';
 import type { ApiFetch } from '../types';
-import { takeFragmentValues } from '../encryption/encryption-fragments';
 import { unlockLocalState } from '../encryption/encryption-keys';
 import { rememberRecoveryKey } from '../encryption/web-app-unlock';
 
@@ -16,23 +15,16 @@ let view: EncryptionView = { status: 'checking' };
 const listeners = new Set<() => void>();
 let pending: { token: string; promise: Promise<FeatureKeys | null> } | undefined;
 let state: EncryptionServerState | undefined;
-let fragmentCode: string | undefined;
 
 export const subscribeReminderEncryption = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const reminderEncryptionSnapshot = () => view;
 function publish(next: EncryptionView) { view = next; for (const listener of listeners) listener(); }
 
-export function consumeReminderEncryptionFragment(): void {
-	const { crateKey } = takeFragmentValues(['crateKey']);
-	if (crateKey) fragmentCode = crateKey;
-}
+/** This device remembers an encrypted session. */
+export const hasReminderEncryptionEvidence = () => hasEncryptedSessionEvidence(null);
 
-/** This device remembers an encrypted session or holds a key from its link. */
-export const hasReminderEncryptionEvidence = () => hasEncryptedSessionEvidence(null, fragmentCode);
-
-export function resetReminderEncryption(discardKeys = false): void {
+export function resetReminderEncryption(): void {
 	pending = undefined; state = undefined;
-	if (discardKeys) fragmentCode = undefined;
 	lockPrivateStorage();
 	publish({ status: 'checking' });
 }
@@ -46,7 +38,7 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 	// startup and reset already publish checking; changing it here races push
 	// provider selection against an ordinary concurrent reminder-list request.
 	const work = (async () => {
-		const verified = await loadEncryptionState({ token, purpose: 'reminders', fragment: fragmentCode, request: () => rawFetch('/encryption', { signal: AbortSignal.timeout(ENCRYPTION_CHECK_TIMEOUT_MS) }), current });
+		const verified = await loadEncryptionState({ token, purpose: 'reminders', request: () => rawFetch('/encryption', { signal: AbortSignal.timeout(ENCRYPTION_CHECK_TIMEOUT_MS) }), current });
 		const expected = verified?.state;
 		if (!verified || !expected) {
 			useUnencryptedStorage();
@@ -58,8 +50,7 @@ export function prepareReminderEncryption(token: string, rawFetch: ApiFetch, ref
 		if (view.status !== 'ready') requirePrivateStorageUnlock();
 		assertEncryptionActive(expected);
 		if (!verified.folderPath) throw new Error('Update the Crate server and reconnect this app from Obsidian.');
-		const keys = await loadVaultKeys(verified, verified.folderPath, current, fragmentCode);
-		fragmentCode = undefined;
+		const keys = await loadVaultKeys(verified, verified.folderPath, current);
 		const local = await unlockLocalState(keys, 'reminders');
 		if (!current()) { local.destroy(); throw new Error('Session changed before unlocking'); }
 		// The session follows reminders folder changes made in Obsidian.

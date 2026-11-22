@@ -62,7 +62,7 @@ try {
         await expect(shellOnly.locator('[data-pwa-static-shell], .pwa-opening-dock')).toHaveCount(0);
         await shellOnly.close();
         const page = await safari.newPage();
-        await page.goto(`${origin}/notifications?token=install-onboarding&browserToken=safari-onboarding&tab=inbox#${new URLSearchParams({ crateKey: recovery, crateReadingKey: recovery, crateFolder: 'Reminders' })}`);
+        await page.goto(`${origin}/notifications?token=install-onboarding&browserToken=safari-onboarding&tab=inbox#${new URLSearchParams({ crateFolder: 'Reminders' })}`);
         await expect(page.getByRole('heading', { name: 'Welcome to Crate', exact: true })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Continue to web', exact: true })).toBeVisible();
         await expect(page.locator('.crate-feature-panel')).toHaveCount(0);
@@ -80,7 +80,6 @@ try {
         await page.screenshot({ path: `.generated/encryption-onboarding/${engine.name()}-browser-install.png`, fullPage: true });
         await page.getByText('Open Crate from your Home Screen.', { exact: true }).scrollIntoViewIfNeeded();
         await expect(page.getByText('Open Crate from your Home Screen.', { exact: true })).toBeInViewport();
-        await expect.poll(() => page.evaluate(id => localStorage.getItem('crate-encryption-unlocked:' + id), bundle.vaultId)).toBe('1');
         await page.reload();
         await expect(page.getByRole('heading', { name: 'Welcome to Crate', exact: true })).toBeVisible();
         await expect(page.locator('.crate-feature-panel')).toHaveCount(0);
@@ -90,6 +89,11 @@ try {
         await page.screenshot({ path: `.generated/encryption-onboarding/${engine.name()}-browser-choice.png`, fullPage: true });
         await page.getByRole('button', { name: 'Continue to web', exact: true }).click();
         await expect(page.getByRole('heading', { name: 'Welcome to Crate', exact: true })).toHaveCount(0);
+        // A new browser unlocks with the recovery key; the link carries only the folder.
+        await page.getByRole('button', { name: 'Use recovery key instead', exact: true }).click();
+        await page.getByLabel('Recovery key', { exact: true }).fill(recovery);
+        await page.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
+        await expect.poll(() => page.evaluate(id => localStorage.getItem('crate-encryption-unlocked:' + id), bundle.vaultId)).toBe('1');
         await page.getByRole('button', { name: 'Open settings', exact: true }).click();
         await expect(page.locator('.pwa-home-screen-prompt')).toHaveCount(0);
         await page.getByRole('button', { name: 'Add to home screen', exact: true }).click();
@@ -150,8 +154,7 @@ try {
           const unlockedReload = page.waitForEvent('domcontentloaded');
           await page.evaluate(() => window.releaseUnlock());
           await unlockedReload;
-          await expect.poll(() => page.evaluate(id => localStorage.getItem('crate-encryption-unlocked:' + id), bundle.vaultId)).toBe('1');
-          await expect(page.locator('.crate-encryption-unlock')).toHaveCount(0);
+            await expect(page.locator('.crate-encryption-unlock')).toHaveCount(0);
           await page.reload();
           await expect.poll(() => page.evaluate(async () => {
             const db = await new Promise((resolve, reject) => { const r = indexedDB.open('crate-encryption-keys', 1); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });

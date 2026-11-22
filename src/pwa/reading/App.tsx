@@ -118,7 +118,7 @@ function ReadingAppContent() {
 		onRetry={() => { if (session) void run(refreshManually); else void connect(); }} onReview={() => setSettingsOpen(true)} />;
 	return <main className="pwa-screen crate-reading-web" data-pwa-back={!!reader}>
 		{!session && !readingDisabled ? <ReadingWelcome share={share} notices={notices} /> : <>
-			<ReadingLibraryPanel images={imageLoader} listStyle={preferences.reminderListStyle} initialSection={featureNavigation?.readingTab}
+			<ReadingLibraryPanel images={imageLoader} listStyle={preferences.listStyle} initialSection={featureNavigation?.readingTab}
 				renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
 				renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} addBlocked={readOnly} onAdd={openCapture} />}
 				source={source} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length,

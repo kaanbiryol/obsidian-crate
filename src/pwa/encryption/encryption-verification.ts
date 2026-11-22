@@ -3,12 +3,11 @@ import { responseError } from '../connection/response-error';
 import { EncryptionKeyRequiredError } from './encryption-onboarding';
 import { validateEncryptionState, type EncryptionServerState } from '../../encryption/server-state';
 import { readVaultKeys, type FeatureKeys } from './encryption-keys';
-import { rememberRecoveryKey } from './web-app-unlock';
 import { PathTags } from '../../encryption/path-tags';
 import { openFolderLabel } from '../../encryption/folder-label';
 
-export function hasEncryptedSessionEvidence(remembered: string | null, incoming: string | undefined): boolean {
-	return !!(remembered || incoming || Object.keys(localStorage).some(key => key.startsWith('crate-encryption-session:')));
+export function hasEncryptedSessionEvidence(remembered: string | null): boolean {
+	return !!(remembered || Object.keys(localStorage).some(key => key.startsWith('crate-encryption-session:')));
 }
 
 function parseEncryptionState(value: unknown): EncryptionServerState {
@@ -33,8 +32,8 @@ export const ENCRYPTION_UNVERIFIED = 'Could not verify encryption. Check your co
  * feature folder the session reads. */
 export interface VerifiedEncryption { state: EncryptionServerState; folderLabel: string | null; folderPath: string | null }
 
-export async function loadEncryptionState({ token, purpose, fragment, request, current }: {
-	token: string; purpose: 'reading' | 'reminders'; fragment?: string;
+export async function loadEncryptionState({ token, purpose, request, current }: {
+	token: string; purpose: 'reading' | 'reminders';
 	request: () => Promise<Response>; current: () => boolean;
 }): Promise<VerifiedEncryption | null> {
 	const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
@@ -42,7 +41,7 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
 	const remembered = localStorage.getItem(marker);
 	let expected: EncryptionServerState | null;
 	let folderLabel: string | null = null, folderPath: string | null = null;
-	const offlineCopy = !hasEncryptedSessionEvidence(remembered, fragment);
+	const offlineCopy = !hasEncryptedSessionEvidence(remembered);
 	try {
 		const response = await request().catch((cause: unknown) => {
 			throw new EncryptionVerificationUnavailableError(ENCRYPTION_UNVERIFIED, { cause }, offlineCopy);
@@ -57,10 +56,10 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
 		expected = data.encryption === null ? null : parseEncryptionState(data.encryption);
 		folderLabel = typeof data.folderLabel === 'string' ? data.folderLabel : null;
 		folderPath = typeof data.folderPath === 'string' ? data.folderPath : null;
-		if (!expected && hasEncryptedSessionEvidence(remembered, fragment)) throw new Error('The server no longer reports this vault’s encryption configuration. Reconnect from Obsidian before syncing.');
+		if (!expected && hasEncryptedSessionEvidence(remembered)) throw new Error('The server no longer reports this vault’s encryption configuration. Reconnect from Obsidian before syncing.');
 	} catch (cause) {
 		if (navigator.onLine !== false) throw cause;
-		if (!remembered && hasEncryptedSessionEvidence(remembered, fragment)) throw new Error('Go online once to verify this encrypted connection.');
+		if (!remembered && hasEncryptedSessionEvidence(remembered)) throw new Error('Go online once to verify this encrypted connection.');
 		expected = remembered ? parseEncryptionState(JSON.parse(remembered)) : null;
 		const folder = JSON.parse(localStorage.getItem(`${marker}:folder`) ?? 'null') as { path?: unknown; label?: unknown } | null;
 		folderLabel = typeof folder?.label === 'string' ? folder.label : null;
@@ -74,8 +73,7 @@ export async function loadEncryptionState({ token, purpose, fragment, request, c
 
 /** Shared key import and checks; features retain their own local-data hydration.
  * `wireFolder` is the feature folder as the server names it; its label holds the plaintext name. */
-export async function loadVaultKeys({ state: expected, folderLabel }: VerifiedEncryption, wireFolder: string, current: () => boolean, code?: string): Promise<FeatureKeys> {
-	if (code) await rememberRecoveryKey(code, expected, current);
+export async function loadVaultKeys({ state: expected, folderLabel }: VerifiedEncryption, wireFolder: string, current: () => boolean): Promise<FeatureKeys> {
 	const keys = await readVaultKeys(expected.vaultId);
 	if (!keys) throw new EncryptionKeyRequiredError(expected.vaultId);
 	if (keys.generation !== expected.generation || keys.vault.id !== expected.keyId || keys.notifications.id !== expected.notificationKeyId

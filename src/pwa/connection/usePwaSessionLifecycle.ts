@@ -82,9 +82,9 @@ export function usePwaSessionLifecycle({
 		let closeSettings = discardPrivateData;
 		try { closeSettings ||= localStorage.getItem(AUTH_TOKEN_KEY) !== null; } catch { closeSettings = true; }
 		invalidatePwaSession();
-		resetReminderEncryption(discardPrivateData);
+		resetReminderEncryption();
 		setAuthToken(nextToken);
-		resetReadingEncryption(discardPrivateData);
+		resetReadingEncryption();
 		resetView();
 		if (closeSettings) setSettingsOpen(false);
 		// A derived Reading credential belongs to the same app connection. Remove
