@@ -147,6 +147,9 @@ main { overflow-x:clip; }
 .notify-column .notify-banner:nth-child(2) { transition-delay:150ms; }
 .notify-column--right .notify-banner:nth-child(1) { transition-delay:300ms; }
 .notify-column--right .notify-banner:nth-child(2) { transition-delay:450ms; }
+.notify-desktop { width:min(100%,345px); margin:56px auto 0; }
+.notify-desktop img { display:block; width:100%; height:auto; filter:drop-shadow(0 18px 40px #00000059); }
+.notify-desktop p { margin:20px 0 0; color:var(--muted); font-size:15px; line-height:1.6; }
 @media(prefers-reduced-motion:reduce) { .notify-stage .notify-banner,.notification-preview video { transition:none; } }
 @media(max-width:900px) {
  .notify-stage { grid-template-columns:minmax(0,1fr); gap:20px; justify-items:center; }
