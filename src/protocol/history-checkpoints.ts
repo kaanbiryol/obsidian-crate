@@ -5,7 +5,7 @@ import { MAX_HISTORY_RETENTION_MS } from './history-retention';
 
 export const SHARED_CHECKPOINT_CAPABILITY = 'shared-history-checkpoints-v1';
 export const MAX_SHARED_CHECKPOINTS = 20;
-/** A self-hosted server keeps more; lists up to this size parse, and older clients get the newest 20. */
+/** A self-hosted server keeps more; lists up to this size parse. */
 export const SELF_HOSTED_SHARED_CHECKPOINTS = 100;
 export const MAX_CHECKPOINT_FILES = 100_000;
 export const MAX_CHECKPOINT_BYTES = 32 * 1024 * 1024;
