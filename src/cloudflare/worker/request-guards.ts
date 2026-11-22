@@ -11,7 +11,7 @@ function hasCompatibleProtocol(request: Request, range: CrateProtocolRange): boo
 }
 
 /** Runs after admission, before public grants or authenticated route handling. */
-/** `range` is this server's protocol range, which a raised file limit narrows. */
+/** `range` is this server's protocol range. */
 export function checkRequestProtocol(request: Request, shortcut: ShortcutTransport | null, range: CrateProtocolRange): Response | null {
 	const path = new URL(request.url).pathname;
 	const method = request.method;

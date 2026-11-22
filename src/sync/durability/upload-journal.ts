@@ -6,7 +6,6 @@ import { validateUploadIntent, type IntendedUpload, type JournalUpload, type Pre
 import { sha256Hex } from '@/platform/sha256';
 
 export const UPLOAD_JOURNAL_VERSION = 1;
-/** Records of chunked uploads, whose bytes are in a `<operation>.bin` file beside them. */
 
 /** A record whose write never reached its final name. Its request was never dispatched. */
 export const isUnfinishedUploadRecord = (path: string): boolean => path.endsWith('.json.tmp');
