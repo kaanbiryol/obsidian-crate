@@ -111,8 +111,13 @@ describe('set-completed command', () => {
 		expect(resent.files[0]!.content).toBe(first.files[0]!.content);
 	});
 
-	it.each([['an invalid', 'now'], ['a missing', undefined]])('rejects %s time when completing, and needs none to reopen', async (_name, completedAt) => {
-		await expect(applyReminderFileCommand('set-completed', { ...await body(open), completed: true, completedAt }, folder, async () => open))
+	it('completes a request queued before completion times existed', async () => {
+		const completed = await applyReminderFileCommand('set-completed', { ...await body(open), completed: true }, folder, async () => open);
+		expect(completed.files[0]!.content).toMatch(/^- \[x\] Pay the bill/);
+	});
+
+	it('rejects an invalid time when completing, and needs none to reopen', async () => {
+		await expect(applyReminderFileCommand('set-completed', { ...await body(open), completed: true, completedAt: 'now' }, folder, async () => open))
 			.rejects.toMatchObject({ status: 400, code: 'invalid_reminder_input' });
 		const done = `- [x] Pay the bill 2099-01-02 <!-- crate-done:${at} --> <!-- crate-id:r1 -->\n`;
 		const reopened = await applyReminderFileCommand('set-completed', { ...await body(done), completed: false }, folder, async () => done);

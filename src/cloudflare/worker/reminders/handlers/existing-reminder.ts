@@ -40,6 +40,7 @@ export function handleDeleteReminder(request: Request, env: Env, arm?: () => Pro
 
 export function handleSetReminderCompleted(request: Request, env: Env, arm?: () => Promise<void>): Promise<Response> {
 	return handleExistingReminder(request, env, arm, 'complete', 'set-completed',
-		{ valid: body => typeof body.completed === 'boolean' && (!body.completed || isCompletionInstant(body.completedAt)),
-			required: 'id and completed required, with completedAt when completing' });
+		// Completions queued by web apps before completion times existed carry none.
+		{ valid: body => typeof body.completed === 'boolean' && (!body.completed || body.completedAt === undefined || isCompletionInstant(body.completedAt)),
+			required: 'id and completed required, with a valid completedAt when completing' });
 }

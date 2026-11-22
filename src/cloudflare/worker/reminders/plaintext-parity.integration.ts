@@ -128,6 +128,17 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 		expect(workerOutcome).toEqual(core);
 	});
 
+	it('completes a reminder queued before completion times existed', async () => {
+		// Each side stamps its own time, so compare everything else.
+		const body = await edit(seeded, 'r-plain', { completed: true });
+		const stamped = (files: Record<string, string | null>): unknown => JSON.parse(JSON.stringify(files).replace(/crate-done:[^ ]+ -->/g, 'crate-done:time -->'));
+		const core = await runCore('set-completed', body, seeded);
+		const workerOutcome = await runWorker('set-completed', body, seeded);
+		expect([core.status, workerOutcome.status]).toEqual([200, 200]);
+		expect(stamped(workerOutcome.files)).toEqual(stamped(core.files));
+		expect(core.files[inbox]).toContain('- [x] Buy bread');
+	});
+
 	const oversizedNote = oversized('- [ ] First <!-- crate-id:r-big-1 -->\n- [ ] Second <!-- crate-id:r-big-2 -->');
 	const sizeError = 'Split reminder notes larger than 1 MiB before editing them in the web app.';
 	const revisionError = 'Reminder changed on another device. Reload it and review your draft before saving';
@@ -154,7 +165,7 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 			core: { status: 400, body: { error: 'Enter a valid reminder project.', code: 'invalid_reminder_input' } },
 		}],
 		['rejects an invalid completion time', 'set-completed', seeded, files => edit(files, 'r-plain', { completed: true, completedAt: 'now' }), {
-			worker: { status: 400, body: { error: 'id and completed required, with completedAt when completing' } },
+			worker: { status: 400, body: { error: 'id and completed required, with a valid completedAt when completing' } },
 			core: { status: 400, body: { error: 'Choose a valid completion time', code: 'invalid_reminder_input' } },
 		}],
 		['rejects an edit in an oversized note', 'update', { [inbox]: oversizedNote }, files => edit(files, 'r-big-1', { content: 'Changed' }), {
