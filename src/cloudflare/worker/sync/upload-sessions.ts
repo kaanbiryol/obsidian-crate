@@ -98,8 +98,14 @@ async function receivePart(request: Request, bucket: R2Bucket, url: URL): Promis
 	const body = await readLimitedRequestBody(request, expected, 'Upload part exceeds its size');
 	if (!body.ok) return body.response;
 	if (body.bytes.byteLength !== expected) return corsResponse({ success: false, path: session.path, error: 'Upload part has the wrong size', code: 'validation' }, 400);
-	const uploaded = await bucket.resumeMultipartUpload(session.storageKey, session.uploadId).uploadPart(part, body.bytes);
-	return corsResponse({ etag: uploaded.etag });
+	try {
+		const uploaded = await bucket.resumeMultipartUpload(session.storageKey, session.uploadId).uploadPart(part, body.bytes);
+		return corsResponse({ etag: uploaded.etag });
+	} catch (error) {
+		// A retry after the parts were combined but not committed: completing checks the stored hash.
+		if ((await bucket.head(session.storageKey))?.size === session.size) return corsResponse({ etag: 'combined' });
+		throw error;
+	}
 }
 
 function parseParts(value: unknown, size: number): R2UploadedPart[] | null {

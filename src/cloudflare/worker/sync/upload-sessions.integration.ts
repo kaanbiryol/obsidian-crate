@@ -73,6 +73,24 @@ it('uploads a large attachment in parts, publishes it once and serves it in rang
 	expect((await env.DB.prepare('SELECT COUNT(*) AS n FROM changelog').first<{ n: number }>())!.n).toBe(1);
 });
 
+it('commits a retry whose parts were already combined before the commit failed', { timeout: 120_000 }, async () => {
+	const size = UPLOAD_PART_BYTES + 1024 * 1024;
+	const { content, hash } = await attachment(size);
+	const id = operation();
+	await post('begin', id, file(hash, size));
+	const parts = await sendParts(id, content);
+	// The parts were combined, then the request stopped before the commit.
+	const session = JSON.parse(await (await env.BUCKET.get(`${UPLOAD_SESSION_PREFIX}${id}.json`))!.text()) as { storageKey: string; uploadId: string };
+	await env.BUCKET.resumeMultipartUpload(session.storageKey, session.uploadId).complete(parts);
+	expect(await live()).toBeNull();
+	// The client retries in its usual order: begin, every part, then complete.
+	expect((await post('begin', id, file(hash, size))).status).toBe(200);
+	const resent = await sendParts(id, content);
+	const completed = await post('complete', id, { ...file(hash, size), parts: resent });
+	expect(await completed.json()).toMatchObject({ success: true, hash });
+	expect(await live()).toMatchObject({ hash, size });
+});
+
 it('publishes nothing when the parts do not match the declared hash', { timeout: 120_000 }, async () => {
 	const size = UPLOAD_PART_BYTES + 1024 * 1024;
 	const { content } = await attachment(size);
