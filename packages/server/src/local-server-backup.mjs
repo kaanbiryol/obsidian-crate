@@ -195,6 +195,19 @@ export async function backupLocalServer(dataDir, output, { alreadyLocked = false
 	} finally { await rm(staging, { recursive: true, force: true }); await unlock(); }
 }
 
+/** Backs up stopped data before a migration into `output`, or reuses the backup already
+ * there while it is this data directory's latest backup: Compose restarts a failing
+ * migration, which must not copy the data each time. A backup that is no longer the latest
+ * (a restore, a later backup, or a lost record) is kept, and a new one is made beside it.
+ * @param {string} dataDir @param {string} output @returns {Promise<string>} The backup used. */
+export async function prepareMigrationBackup(dataDir, output) {
+	const latest = await readLastBackup(dataDir);
+	const existing = await realpath(output).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+	if (existing && latest?.output === existing && await readBackupManifest(existing).then(() => true, () => false)) return existing;
+	const target = existing ? `${output}-${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}` : output;
+	return backupLocalServer(dataDir, target, { alreadyLocked: true });
+}
+
 /** @param {string} backup @returns {Promise<BackupManifest>} */
 export async function readBackupManifest(backup) {
 	const manifest = JSON.parse(await readFile(join(backup, 'backup.json'), 'utf8'));

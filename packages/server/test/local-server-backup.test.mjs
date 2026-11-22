@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { backupLocalServer, checkLocalUpgrade, readLastBackup, restoreLocalServer } from '../src/local-server-backup.mjs';
+import { backupLocalServer, checkLocalUpgrade, prepareMigrationBackup, readLastBackup, restoreLocalServer } from '../src/local-server-backup.mjs';
 import { issueLocalDevice, openLocalRuntime } from '../src/local-server-runtime.mjs';
 
 test('verified backup restores files, credentials and durable alarm storage into a fresh server', { timeout: 60_000 }, async () => {
@@ -77,4 +77,23 @@ test('verified backup restores files, credentials and durable alarm storage into
 		await assert.rejects(checkLocalUpgrade(source), /tested migration/);
 		assert.equal(JSON.parse(await readFile(join(source, 'server.json'), 'utf8')).runtimeVersion, 'incompatible');
 	} finally { await runtime?.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('a retried migration reuses its backup only while it is the latest, and never fails on its name', { timeout: 60_000 }, async () => {
+	const directory = await realpath(await mkdtemp(join(tmpdir(), 'crate-migration-backup-test-')));
+	const dataDir = join(directory, 'server'), output = join(directory, 'backups', 'before-migration-r1-to-r2');
+	try {
+		await (await openLocalRuntime({ dataDir, administrative: true })).close();
+		assert.equal(await prepareMigrationBackup(dataDir, output), output);
+		// A restart after a failed attempt reuses it.
+		assert.equal(await prepareMigrationBackup(dataDir, output), output);
+		assert.deepEqual(await readdir(join(directory, 'backups')), ['before-migration-r1-to-r2']);
+		// A later backup, or a lost record, makes it stale: keep it and back up beside it instead of failing.
+		await backupLocalServer(dataDir, join(directory, 'later'));
+		assert.match(await prepareMigrationBackup(dataDir, output), /before-migration-r1-to-r2-\d{8}T\d{6}Z$/);
+		await rm(join(dataDir, 'last-backup.json'));
+		await new Promise(resolve => setTimeout(resolve, 1100));
+		assert.match(await prepareMigrationBackup(dataDir, output), /before-migration-r1-to-r2-\d{8}T\d{6}Z$/);
+		assert.equal((await readdir(join(directory, 'backups'))).length, 3);
+	} finally { await rm(directory, { recursive: true, force: true }); }
 });

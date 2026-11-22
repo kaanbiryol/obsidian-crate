@@ -813,8 +813,10 @@ docker compose pull && docker compose up -d
 ```
 
 Before serving, the container runs the compatibility check. When the release
-needs a migration, it makes a verified backup to `/backups/before-migration-r<from>-to-r<to>`, reused if a restart retries the migration
-(or `/data/backups/…` when no backup folder is mounted), then migrates. Data it
+needs a migration, it makes a verified backup to `/backups/before-migration-r<from>-to-r<to>`
+(or `/data/backups/…` when no backup folder is mounted), then migrates. A restart
+that retries the migration reuses that backup while it is the latest one; otherwise
+it keeps it and makes a new one beside it with a time suffix. Data it
 cannot read stops startup with the reason, and Compose retries; pin the previous
 release with `CRATE_VERSION` to go back. Set `CRATE_AUTO_MIGRATE=0` to migrate by
 hand with `docker compose run --rm crate upgrade --output /data/backups/before-migration`.

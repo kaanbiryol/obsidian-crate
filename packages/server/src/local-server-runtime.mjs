@@ -2,7 +2,7 @@ import { assertLocalMigrationPath, migrateLocalDatabase } from './local-server-m
 import { watchRuntime } from './local-server-watchdog.mjs';
 import { coordinatorPath, packaged, revocationPath, runtimeVersion, serverAssetPath, workerPath } from './assets.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { link, mkdir, open, readFile, readdir, realpath, rename, unlink } from 'node:fs/promises';
+import { link, mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { uptime as osUptime } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -350,13 +350,10 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
         const current = /** @type {ServerMetadata} */ (previous);
         if (current.schemaHash !== expected.schemaHash) assertLocalMigrationPath(current.schemaVersion, release);
         assertCompatibleLocalMetadata({ ...current, schemaHash: expected.schemaHash }, expected);
-        const { backupLocalServer, readBackupManifest, readLastBackup } = await import('./local-server-backup.mjs');
-        // A retried migration keeps the backup taken before its first attempt, but only when it is
-        // this data directory's latest backup: a restore or a later backup makes it stale.
-        const latest = reuseUpgradeBackup ? await readLastBackup(dataDir) : null;
-        const reusable = latest !== null && latest.output === await realpath(upgradeBackup).catch(() => null)
-          && await readBackupManifest(upgradeBackup).then(() => true, () => false);
-        if (!reusable) await backupLocalServer(dataDir, upgradeBackup, { alreadyLocked: true });
+        const { backupLocalServer, prepareMigrationBackup } = await import('./local-server-backup.mjs');
+        // A retried migration keeps the backup taken before its first attempt while it still holds this data.
+        if (reuseUpgradeBackup) await prepareMigrationBackup(dataDir, upgradeBackup);
+        else await backupLocalServer(dataDir, upgradeBackup, { alreadyLocked: true });
       }
     }
 
