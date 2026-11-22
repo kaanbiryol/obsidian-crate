@@ -23,12 +23,18 @@ import { join } from 'node:path';
  * @property {() => Promise<unknown>} findTailscale Rejects with install guidance.
  */
 
-/** iCloud Drive when this Mac has it, so backups also leave the computer.
- * @param {{ platform?: NodeJS.Platform, home?: string }} [options] */
-export async function defaultBackupDir({ platform = process.platform, home = homedir() } = {}) {
-	const icloud = join(home, 'Library/Mobile Documents/com~apple~CloudDocs');
-	if (platform === 'darwin' && await access(icloud).then(() => true, () => false)) return join(icloud, 'Crate backups');
+/** A folder on this computer. Backups hold vault contents and server credentials, so they
+ * leave it only when the person chooses a synced folder such as iCloud Drive.
+ * @param {{ home?: string }} [options] */
+export function defaultBackupDir({ home = homedir() } = {}) {
 	return join(home, 'Crate backups');
+}
+
+/** The iCloud Drive backup folder, when this Mac has iCloud Drive.
+ * @param {{ platform?: NodeJS.Platform, home?: string }} [options] @returns {Promise<string | null>} */
+export async function icloudBackupDir({ platform = process.platform, home = homedir() } = {}) {
+	const icloud = join(home, 'Library/Mobile Documents/com~apple~CloudDocs');
+	return platform === 'darwin' && await access(icloud).then(() => true, () => false) ? join(icloud, 'Crate backups') : null;
 }
 
 /** @param {WizardEnvironment['ask']} ask @param {string} question @param {string[]} options @returns {Promise<number>} */
@@ -77,7 +83,9 @@ export async function runSetupWizard({ ask, log = console.log, platform = proces
 	const service = supported && access !== 'quick'
 		&& await confirm(ask, 'Start Crate when you log in, and restart it if it stops?', true);
 	const keepAwake = platform === 'darwin' && await confirm(ask, 'Keep this Mac awake while Crate runs, so devices can always sync?', true);
-	const suggested = await defaultBackupDir({ platform, home });
+	const suggested = defaultBackupDir({ home });
+	const icloud = await icloudBackupDir({ platform, home });
+	if (icloud) log(`To also keep backups off this computer, type ${icloud}. Backups hold your vault and server credentials, so iCloud stores those too.`);
 	const backup = (await ask(`Back up daily to this folder (type none to skip) [${suggested}]: `)).trim();
 	const backupDir = backup.toLowerCase() === 'none' ? null : backup || suggested;
 	return { access, ...(hostname ? { hostname } : {}), service, keepAwake, backupDir };

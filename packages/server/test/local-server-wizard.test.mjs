@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { defaultBackupDir, runSetupWizard } from '../src/local-server-wizard.mjs';
+import { defaultBackupDir, icloudBackupDir, runSetupWizard } from '../src/local-server-wizard.mjs';
 
 /** @param {string[]} answers */
 function script(answers) {
@@ -33,12 +33,13 @@ test('a temporary address never becomes a service, and invalid answers ask again
 	assert.equal(asked.filter(question => question.includes('How will your phone')).length, 2);
 });
 
-test('suggests iCloud Drive for backups when this Mac has it', async () => {
+test('backs up on this computer by default and offers iCloud Drive only by name', async () => {
 	const home = await mkdtemp(join(tmpdir(), 'crate-wizard-'));
 	try {
-		assert.equal(await defaultBackupDir({ platform: 'darwin', home }), join(home, 'Crate backups'));
+		assert.equal(await icloudBackupDir({ platform: 'darwin', home }), null);
 		await mkdir(join(home, 'Library/Mobile Documents/com~apple~CloudDocs'), { recursive: true });
-		assert.equal(await defaultBackupDir({ platform: 'darwin', home }), join(home, 'Library/Mobile Documents/com~apple~CloudDocs/Crate backups'));
-		assert.equal(await defaultBackupDir({ platform: 'linux', home }), join(home, 'Crate backups'));
+		assert.equal(defaultBackupDir({ home }), join(home, 'Crate backups'));
+		assert.equal(await icloudBackupDir({ platform: 'darwin', home }), join(home, 'Library/Mobile Documents/com~apple~CloudDocs/Crate backups'));
+		assert.equal(await icloudBackupDir({ platform: 'linux', home }), null);
 	} finally { await rm(home, { recursive: true, force: true }); }
 });

@@ -291,8 +291,9 @@ suggestion:
    version, so the service survives npx's cache.
 3. **Keep this Mac awake** (macOS): `--keep-awake` runs `caffeinate -i` for as
    long as Crate runs.
-4. **Daily backups to a folder:** iCloud Drive when this Mac has it, otherwise
-   `~/Crate backups`. Type `none` to skip. See [automatic backups](#automatic-backups).
+4. **Daily backups to a folder:** `~/Crate backups` on this computer. On a Mac with
+   iCloud Drive, setup names its folder too; backups hold vault contents and server
+   credentials, so choose it only if iCloud may store them. Type `none` to skip. See [automatic backups](#automatic-backups).
 
 With a service, setup provisions the address, installs the service, and shows
 its log until the address is public and a pairing QR code is on screen.
@@ -810,7 +811,7 @@ docker compose pull && docker compose up -d
 ```
 
 Before serving, the container runs the compatibility check. When the release
-needs a migration, it makes a verified backup to `/backups/before-migration-<time>`
+needs a migration, it makes a verified backup to `/backups/before-migration-r<from>-to-r<to>`, reused if a restart retries the migration
 (or `/data/backups/…` when no backup folder is mounted), then migrates. Data it
 cannot read stops startup with the reason, and Compose retries; pin the previous
 release with `CRATE_VERSION` to go back. Set `CRATE_AUTO_MIGRATE=0` to migrate by
