@@ -7,9 +7,10 @@ export const bundleBudgets = {
 		// Self-hosted server health, install-aware commands, pairing links, Reading image
 		// and gist saving, Vault history's Deleted files view and chunked transfers for
 		// self-hosted servers, plus readable connection and pairing errors, conflict review
-		// links and the recovery key option when requesting keys, measure 5.016 MB raw / 2.318 MB gzip.
-		maxBytes: 5016500,
-		maxGzipBytes: 2317800,
+		// links, the recovery key option when requesting keys and revoking replaced Cloudflare
+		// logins, measure 5.017 MB raw / 2.318 MB gzip.
+		maxBytes: 5017000,
+		maxGzipBytes: 2318000,
 	},
 	{
 		path: 'dist/styles.css',
@@ -37,15 +38,17 @@ export const bundleBudgets = {
 		assetName: 'app.js',
 		// Every feature loads at startup. Reading article images (vault image loading,
 		// encrypted image saves, offline copies, image highlights) and the advertised
-		// server file and batch limits, with readable network errors, measure 1.2067 MB raw / 395.7 KB gzip.
-		maxBytes: 1206700,
+		// server file and batch limits, with readable network errors and the Reading connection
+		// view, measure 1.2069 MB raw / 395.7 KB gzip.
+		maxBytes: 1207000,
 		maxGzipBytes: 395800,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Reading article images, offline copies, image highlights and the advertised
-		// server file and batch limits, with readable network errors, measure 1.9285 MB raw / 637.0 KB gzip.
-		maxBytes: 1928500,
-		maxGzipBytes: 637000,
+		// server file and batch limits, with readable network errors and the Reading connection
+		// view, measure 1.9287 MB raw / 637.0 KB gzip.
+		maxBytes: 1928800,
+		maxGzipBytes: 637100,
 	}],
 };
