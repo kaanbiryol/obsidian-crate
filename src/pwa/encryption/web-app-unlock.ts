@@ -26,7 +26,11 @@ async function storeBundle(bundle: VaultKeyBundle, expected: EncryptionServerSta
 export async function rememberRecoveryKey(code: string, expected: EncryptionServerState, sessionCurrent: () => boolean): Promise<void> {
 	const current = connectionGuard(sessionCurrent);
 	if (!current()) throw new Error('The web app connection changed. Retry unlocking.');
-	await storeBundle(await openRecoveryBundle(expected.recovery, code), expected, current);
+	// A mistyped, outdated or other vault's key fails here with a cryptography message.
+	const bundle = await openRecoveryBundle(expected.recovery, code).catch(() => {
+		throw new Error('This recovery key doesn’t unlock this vault. Use the key saved when encryption was last turned on, or connect with Obsidian.');
+	});
+	await storeBundle(bundle, expected, current);
 }
 
 /** Accept the vault keys from an approved encrypted transfer. */

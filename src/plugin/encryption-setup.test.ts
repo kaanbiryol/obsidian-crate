@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import type CratePlugin from './CratePlugin';
 import { createVaultKeyBundle, generateRecoveryCode, sealRecoveryBundle } from '../encryption/key-bundle';
 import { createEncryptionState } from '../encryption/server-state';
-import { encryptionModalState, syncWithoutEncryption } from './encryption-setup';
+import { WRONG_RECOVERY_KEY, encryptionModalState, syncWithoutEncryption, unlockVault } from './encryption-setup';
 import { SECRET_KEYS } from '../platform/secret-keys';
 
 async function encrypted(mode: 'active' | 'resetting' = 'active') {
@@ -57,4 +57,14 @@ it('keeps refusing plaintext when the connection changed', async () => {
 	await expect(syncWithoutEncryption(plugin, () => { throw new Error('The server connection changed.'); })).rejects.toThrow('connection changed');
 	expect(writeSettings).not.toHaveBeenCalled();
 	expect(refusePlaintext).not.toHaveBeenCalled();
+});
+
+it.each([
+	['a mistyped key', async () => 'crate-recovery.typo'],
+	['a well-formed key for other keys', () => generateRecoveryCode()],
+])('explains %s without a cryptography error', async (_label, code) => {
+	const { state } = await encrypted();
+	const { plugin, runEncryptionSetup } = downgradedPlugin();
+	await expect(unlockVault(plugin, state, await code(), () => {})).rejects.toThrow(WRONG_RECOVERY_KEY);
+	expect(runEncryptionSetup).not.toHaveBeenCalled();
 });

@@ -118,8 +118,13 @@ export async function syncWithoutEncryption(plugin: CratePlugin, assertCurrent: 
 	plugin.syncRuntime.getApiClient()?.refusePlaintext(false);
 }
 
+export const WRONG_RECOVERY_KEY = 'This recovery key doesn’t unlock this vault. Use the key saved when encryption was last turned on, or request keys from an unlocked device.';
+
 export async function unlockVault(plugin: CratePlugin, state: EncryptionServerState, recoveryCode: string, assertCurrent: () => void): Promise<void> {
-	const bundle = await openRecoveryBundle(state.recovery, recoveryCode);
+	// A mistyped, outdated or other vault's key fails here with a cryptography message.
+	const bundle = await openRecoveryBundle(state.recovery, recoveryCode).catch(() => {
+		throw new Error(WRONG_RECOVERY_KEY);
+	});
 	assertEncryptionKeys(state, bundle);
 	await plugin.syncRuntime.runEncryptionSetup(async () => {
 		assertCurrent();
