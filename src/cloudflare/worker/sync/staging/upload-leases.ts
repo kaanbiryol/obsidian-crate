@@ -68,10 +68,13 @@ export function finishUploadLeases(db: D1Database, files: readonly LeasedObject[
 	return [
 		db.prepare(input + `INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path)
       SELECT key, path FROM input WHERE NOT EXISTS (SELECT 1 FROM files WHERE portable_path = input.portable AND storage_key = input.key)`).bind(json),
-		// Each request attempt owns distinct keys, so a lease whose every key was attempted is
-		// settled; counting avoids reading each key. Only a partly settled lease is rewritten.
+		// Each request attempt owns distinct keys, so a lease whose every remaining key was
+		// attempted is settled; counting avoids reading each key. Only a partly settled lease is rewritten.
+		// A key settled earlier is no longer in the lease, so it must not count: a retry that
+		// settles it again would otherwise delete the lease of an object still in flight.
 		db.prepare(input + `DELETE FROM upload_leases WHERE id IN (SELECT id FROM input)
-      AND json_array_length(keys) = (SELECT count(*) FROM input i WHERE i.id = upload_leases.id)`).bind(json),
+      AND json_array_length(keys) = (SELECT count(*) FROM input i WHERE i.id = upload_leases.id
+        AND instr(upload_leases.keys, '"storageKey":' || json_quote(i.key)) > 0)`).bind(json),
 		db.prepare(input + `UPDATE upload_leases SET keys = (SELECT json_group_array(json(value)) FROM (${remaining}))
       WHERE id IN (SELECT id FROM input)`).bind(json),
 	];

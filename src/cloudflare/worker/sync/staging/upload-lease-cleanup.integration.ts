@@ -4,7 +4,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../../test-support/schema-test-harness';
 import { cleanUploadLeases } from '../../maintenance/upload-lease-cleanup';
-import { trackUploadLease } from './upload-leases';
+import { finishUploadLeases, trackUploadLease } from './upload-leases';
 import { commitStagedFile } from '../mutations';
 import { commitNewFiles } from './bulk-new-file-commit';
 import { handleBatchUpload } from '../batch/upload';
@@ -55,6 +55,18 @@ it('registers one lease before any R2 puts and retires it with the successful co
 	expect((await handleBatchUpload(request(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles })).status).toBe(200);
 	expect(counts).toEqual(Array(8).fill(1));
 	expect(await env.DB.prepare('SELECT id FROM upload_leases').first()).toBeNull();
+});
+
+it('keeps a lease that still guards an object when a settled key is settled again', async () => {
+	const id = await lease(['a', 'b', 'c'], false);
+	const settle = (keys: string[]) => env.DB.batch(finishUploadLeases(env.DB, keys.map(key => ({ path: `${key}.md`, objectKey: key, leaseId: id }))));
+	await settle(['a', 'b']);
+	// A per-file retry after a lost batch response settles a again while c's put may still land.
+	await settle(['a']);
+	const row = await env.DB.prepare('SELECT keys FROM upload_leases WHERE id = ?').bind(id).first<{ keys: string }>();
+	expect(JSON.parse(row!.keys)).toEqual([expect.objectContaining({ storageKey: 'c' })]);
+	await settle(['c']);
+	expect(await env.DB.prepare('SELECT id FROM upload_leases WHERE id = ?').bind(id).first()).toBeNull();
 });
 
 it('does not upload any objects when lease registration fails', async () => {
