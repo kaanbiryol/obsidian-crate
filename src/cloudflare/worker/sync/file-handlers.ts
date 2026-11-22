@@ -48,7 +48,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		return corsResponse({ error: 'Invalid Content-Length header' }, 400);
 	}
 	if ((declaredSize ?? 0) > limit || (contentLength ?? 0) > limit) {
-		return corsResponse({ error: `File exceeds ${formatFileLimit(single)} limit` }, 413);
+		return corsResponse({ error: `File exceeds ${formatFileLimit(single)} limit`, code: 'file_too_large' }, 413);
 	}
 
 	const expectedHash = parseExpectedFileHash(request.headers.get(EXPECTED_HASH_HEADER));

@@ -205,7 +205,7 @@ These routes are answered by `routes/public.ts` before authentication.
 - Query: `?path=<url-encoded-path>`
 - Headers: `X-File-Hash`, `X-File-Size`, `X-Crate-Expected-Hash`, `X-Crate-Upload-Operation`, `Content-Type`
 - `X-Crate-Expected-Hash` is the 64-character remote hash observed while planning, or `absent` for a new path
-- Body: raw binary, consumed incrementally with a hard cap at the server's file limit (25 MB by default, `limits.maxFileBytes` in `/.well-known/crate`); oversized declared or chunked requests stop before the remainder is buffered
+- Body: raw binary, consumed incrementally with a hard cap at the server's file limit (25 MB by default, `limits.maxFileBytes` in `/.well-known/crate`); oversized declared or chunked requests stop before the remainder is buffered. A declared size over the limit answers `413` with code `file_too_large`, so clients settle a pending upload instead of retrying it
 - Response: `{ success, path, hash, revision }`
 - A stale expected hash returns `409` with `{ success: false, path, error, code: "version_conflict", currentHash }` and does not replace the committed object
 - Persist the exact request and its server-dated operation ID before dispatch. Replaying it returns the original success or rejected precondition, including after deletion. Missing IDs receive 428; mismatched payloads receive 409 `operation_mismatch`; expired IDs without receipts receive 410 `operation_expired`. See [upload recovery](upload-recovery.md).

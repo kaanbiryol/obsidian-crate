@@ -107,7 +107,7 @@ describe('a self-hosted server with a raised file limit', () => {
 		const over = await send('/sync/upload?path=other.bin', { method: 'PUT', body: 'x',
 			headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', 'X-File-Size': String(limit + 1) } });
 		expect(over.status).toBe(413);
-		expect(await over.json()).toEqual({ error: `File exceeds ${formatFileLimit(limit)} limit` });
+		expect(await over.json()).toEqual({ error: `File exceeds ${formatFileLimit(limit)} limit`, code: 'file_too_large' });
 	});
 });
 
