@@ -10,7 +10,8 @@ import { BATCH_FILE_SIZE_LIMIT, deviceBatchLimits, MAX_PREVIEW_BYTES, UPLOAD_PAR
 import { Platform } from 'obsidian';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { requestFileVersions } from './version-contract';
-import { parseChanges, parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
+import { parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
+import { readRawChanges, readRawManifest } from './manifest-read';
 import { parseBatchDelete, parseBatchDownload, parseBatchUpload, parseUploadResult } from './mutation-contracts';
 import { errorMessage } from '../../platform/logger';
 import { HOST_STATUS_PATH, parseHostStatusResponse, type HostStatus } from '../../protocol/host-status';
@@ -39,7 +40,7 @@ import {
 	isCompatibleCrateServer,
 	type CrateServerInfo,
 } from '../../protocol/server-info';
-import { assertPortablePathNames, assertPortablePaths } from '../../protocol/portable-path';
+import { assertPortablePathNames } from '../../protocol/portable-path';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, REVISION_HEADER } from '../../protocol/http-headers';
 import {
@@ -187,53 +188,8 @@ export class SyncWorkerApi {
 	}
 
 	/** The manifest as the server stores it, at one snapshot: wire paths in an encrypted vault. */
-	async getRawManifest(): Promise<{ files: Record<string, FileEntry>; lastSeq: number }> {
-		const files = createPathRecord<FileEntry>();
-		let after: string | undefined;
-		let snapshotSeq: number | undefined;
-		let lastSeq = 0;
-		const cursors = new Set<string>();
-		while (true) {
-			const params = new URLSearchParams({ limit: '2000' });
-			if (after) params.set('after', after);
-			if (snapshotSeq !== undefined) params.set('snapshotSeq', String(snapshotSeq));
-			const page = parseManifestPage(await this.http.requestJson<unknown>(`/sync/manifest?${params.toString()}`));
-			if (snapshotSeq !== undefined && page.snapshotSeq !== snapshotSeq) throw new Error('Remote manifest snapshot changed during pagination');
-			if (Object.keys(page.files).some(path => Object.prototype.hasOwnProperty.call(files, path))) throw new Error('Remote manifest repeated a file during pagination');
-			Object.assign(files, page.files);
-			lastSeq = page.lastSeq ?? lastSeq;
-			snapshotSeq ??= page.snapshotSeq ?? page.lastSeq ?? 0;
-			if (!page.hasMore) break;
-			if (!page.nextCursor || cursors.has(page.nextCursor)) {
-				throw new Error('Remote manifest pagination did not advance');
-			}
-			after = page.nextCursor;
-			cursors.add(after);
-		}
-
-		let changeCursor = snapshotSeq ?? lastSeq;
-		while (true) {
-			const changes = await this.getRawChanges(changeCursor);
-			if (changes.cursorExpired) throw new Error('Remote manifest changed too quickly to load safely');
-			for (const change of changes.changes) {
-				if (change.action === 'delete') {
-					delete files[change.path];
-				} else {
-					files[change.path] = {
-						hash: change.hash,
-						revision: change.revision,
-						size: change.size,
-						modified: change.created_at,
-					};
-				}
-			}
-			lastSeq = changes.lastSeq;
-			if (!changes.hasMore || changes.changes.length === 0) break;
-			changeCursor = changes.changes.at(-1)?.seq ?? changeCursor;
-		}
-
-		assertPortablePaths(Object.keys(files));
-		return { files, lastSeq };
+	getRawManifest(): Promise<{ files: Record<string, FileEntry>; lastSeq: number }> {
+		return readRawManifest(this.http);
 	}
 
 	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
@@ -401,10 +357,8 @@ export class SyncWorkerApi {
 		return { ...response, changes, nextSince: response.changes.at(-1)?.seq ?? since };
 	}
 
-	private async getRawChanges(since: number): Promise<ChangesResponse> {
-		const response = parseChanges(await this.http.requestJson<unknown>(`/sync/changes?since=${since}`), since);
-		assertPortablePathNames(response.changes.map(change => change.path));
-		return response;
+	private getRawChanges(since: number): Promise<ChangesResponse> {
+		return readRawChanges(this.http, since);
 	}
 
 	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
