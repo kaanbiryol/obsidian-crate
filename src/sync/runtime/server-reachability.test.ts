@@ -110,4 +110,95 @@ describe('manual sync server status', () => {
 		await vi.advanceTimersByTimeAsync(2_000);
 		expect(fetch).toHaveBeenCalledTimes(2);
 	});
+
+	it('shows server changes from a manual-mode check and clears them when a sync starts', async () => {
+		const { runtime, engineHooks } = createRuntimeHarness({ automaticSync: false });
+		const state: SyncState = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 0, conflictCount: 0 };
+		const sync = vi.fn();
+		const hasRemoteChanges = vi.fn(async () => true);
+		await initializeRuntime(runtime, { getState: () => state, sync, forceFullSync: sync, hasRemoteChanges });
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(serverInfo))));
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(runtime.getState().remoteChanges).toBe(true);
+		expect(sync).not.toHaveBeenCalled();
+
+		// Found changes stay until a sync, so the next check skips the changelog.
+		await vi.advanceTimersByTimeAsync(60_000);
+		runtime.triggerForegroundSync('focus');
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(hasRemoteChanges).toHaveBeenCalledOnce();
+
+		state.status = 'syncing';
+		engineHooks().onStateChange?.(state);
+		state.status = 'idle';
+		expect(runtime.getState().remoteChanges).toBeUndefined();
+	});
+
+	it('checks for server changes on the manual interval without a foreground event', async () => {
+		const { runtime, engineHooks } = createRuntimeHarness({ automaticSync: false });
+		const state: SyncState = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 0, conflictCount: 0 };
+		const hasRemoteChanges = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+		await initializeRuntime(runtime, { getState: () => state, hasRemoteChanges });
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(serverInfo))));
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(runtime.getState().remoteChanges).toBeUndefined();
+
+		await vi.advanceTimersByTimeAsync(60_000);
+		engineHooks().onManualCheckDue?.();
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(runtime.getState().remoteChanges).toBe(true);
+	});
+
+	it('skips the changes check while the server is unavailable', async () => {
+		const { runtime } = createRuntimeHarness({ automaticSync: false });
+		const state: SyncState = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 0, conflictCount: 0 };
+		const hasRemoteChanges = vi.fn(async () => true);
+		await initializeRuntime(runtime, { getState: () => state, hasRemoteChanges });
+		vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(runtime.getState()).toMatchObject({ status: 'offline' });
+		expect(hasRemoteChanges).not.toHaveBeenCalled();
+	});
+
+	it('does not publish server changes found by a check that a sync overtook', async () => {
+		const { runtime } = createRuntimeHarness({ automaticSync: false });
+		const state: SyncState = { status: 'idle', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 0, conflictCount: 0 };
+		const pending = createDeferred<boolean>();
+		await initializeRuntime(runtime, { getState: () => state, hasRemoteChanges: () => pending.promise });
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(serverInfo))));
+		await vi.advanceTimersByTimeAsync(2_000);
+		state.lastSync = '2026-01-01T00:00:03.000Z';
+		pending.resolve(true);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(runtime.getState().remoteChanges).toBeUndefined();
+	});
+
+	it('runs a check on every tick of a one-minute interval', async () => {
+		const { runtime, engineHooks } = createRuntimeHarness({ automaticSync: false });
+		await initializeRuntime(runtime, { hasRemoteChanges: vi.fn(async () => false) });
+		const fetch = vi.fn(async () => new Response(JSON.stringify(serverInfo)));
+		vi.stubGlobal('fetch', fetch);
+		await vi.advanceTimersByTimeAsync(2_000);
+		for (let tick = 0; tick < 3; tick++) {
+			await vi.advanceTimersByTimeAsync(58_000);
+			engineHooks().onManualCheckDue?.();
+			await vi.advanceTimersByTimeAsync(2_000);
+		}
+		expect(fetch).toHaveBeenCalledTimes(4);
+	});
+
+	it('does not start the cooldown for a check that a running sync skipped', async () => {
+		const { runtime } = createRuntimeHarness({ automaticSync: false });
+		const state: SyncState = { status: 'syncing', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 0, conflictCount: 0 };
+		await initializeRuntime(runtime, { getState: () => state, hasRemoteChanges: vi.fn(async () => false) });
+		const fetch = vi.fn(async () => new Response(JSON.stringify(serverInfo)));
+		vi.stubGlobal('fetch', fetch);
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(fetch).not.toHaveBeenCalled();
+
+		state.status = 'idle';
+		runtime.triggerForegroundSync('focus');
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(fetch).toHaveBeenCalledOnce();
+	});
 });

@@ -23,6 +23,7 @@ editor.
 | Offline | The server cannot be reached | "Server unavailable", with the last error in the tooltip |
 | Syncing | A sync runs, or startup is still checking local files | The current phase from `formatSyncProgress` in `ui/activity/progress-label.ts`, such as "Uploading 3 of 10 files"; "Checking local files…" during startup checks |
 | Pending | Local changes wait to sync | "1 change pending" or "{N} changes pending" |
+| Pending | With automatic sync off, the server has changes a sync would bring here and no local changes wait | "Changes on server" |
 | Synced | A sync has completed | "Synced just now", "Synced 5m ago", "Synced 2h ago" |
 | Cached | No sync has run yet | "Not synced yet" |
 

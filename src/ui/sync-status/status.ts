@@ -125,7 +125,14 @@ export class StatusBarManager {
 			case 'pending':
 				return {
 					text: status.text,
-					tooltip: `${state.pendingChanges} local file changes waiting to sync, including deletions. This is not the total number of files in your vault.`,
+					tooltip: `${state.pendingChanges} local file changes waiting to sync, including deletions. This is not the total number of files in your vault.`
+						+ (state.remoteChanges ? ' Your other devices also have changes on the server.' : ''),
+				};
+
+			case 'remote':
+				return {
+					text: status.text,
+					tooltip: 'Your other devices synced changes that this device does not have yet. Sync to get them.',
 				};
 
 			case 'never':

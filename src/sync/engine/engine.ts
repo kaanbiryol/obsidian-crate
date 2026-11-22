@@ -34,6 +34,7 @@ import { SyncEngineLifecycle } from './lifecycle';
 import { createEmptySyncResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { LocalChangeDetection } from './local-changes';
+import { hasRemoteChanges } from './remote-changes';
 import type { SyncSettings } from '../settings';
 import { syncStoragePaths } from '../manifest/storage-paths';
 import { isMarkdownNoteInFolder } from '../../protocol/note-paths';
@@ -50,6 +51,8 @@ export interface SyncEngineHooks {
 	prepareReminderScope?: () => Promise<void>;
 	/** Runs when a first upload starts, before it lists vault files. */
 	prepareInitialUpload?: () => Promise<void>;
+	/** Runs at the check interval while automatic sync is off, for checks that never sync. */
+	onManualCheckDue?: () => void;
 }
 
 export type SyncEngineHost = Pick<Plugin, 'app' | 'manifest'>;
@@ -139,6 +142,8 @@ export class SyncEngine {
 			fullSyncRequested: () => this.settings.fullSyncRequested === true,
 			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await this.hasUnsyncedLocalChanges(),
 			verifyLocalContent: () => this.localChanges.verifyTracked(),
+			getManualCheckSeconds: () => this.settings.syncInterval,
+			manualCheckDue: () => this.hooks.onManualCheckDue?.(),
 			checkForChanges: async (lastSeq: number) => {
 				void this.retryReminderScope();
 				return this.api.checkForChanges(lastSeq);
@@ -306,6 +311,18 @@ export class SyncEngine {
 
 	getState(): SyncState {
 		return { ...this.state };
+	}
+
+	/** Whether a sync would bring server changes here. Read-only: it never moves the cursor. */
+	hasRemoteChanges(): Promise<boolean> {
+		return hasRemoteChanges({
+			lastSeq: this.settings.lastSeq,
+			checkForChanges: since => this.api.checkForChanges(since),
+			files: this.files,
+			getBaseline: path => this.localManifest.getEntry(path),
+			shouldIgnore: this.ignore.shouldIgnore,
+			signal: this.lifecycle.abortSignal,
+		});
 	}
 
 	private pendingChanges() {

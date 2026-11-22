@@ -2,7 +2,7 @@ import type { SyncActivityProgress, SyncState } from '../../sync/types';
 import { formatTimeAgo } from '../shared/format';
 import { formatSyncProgress } from './progress-label';
 
-type SyncStatusKind = 'syncing' | 'error' | 'offline' | 'checking' | 'pending' | 'synced' | 'never';
+type SyncStatusKind = 'syncing' | 'error' | 'offline' | 'checking' | 'pending' | 'remote' | 'synced' | 'never';
 
 function lastSyncStatus(state: SyncState, syncing: boolean, now: number): { kind: SyncStatusKind; text: string } {
 	if (syncing) return { kind: 'syncing', text: 'Syncing…' };
@@ -18,7 +18,9 @@ export function describeSyncStatus(state: SyncState, pending: number, syncing = 
 	const lastSync = lastSyncStatus(state, syncing, now);
 	const status = pending > 0 && (lastSync.kind === 'synced' || lastSync.kind === 'never')
 		? { kind: 'pending' as const, text: `${pending} ${pending === 1 ? 'change' : 'changes'} pending` }
-		: lastSync;
+		: state.remoteChanges && lastSync.kind === 'synced'
+			? { kind: 'remote' as const, text: 'Changes on server' }
+			: lastSync;
 	return { ...status, lastSyncLabel: lastSync.text };
 }
 
@@ -48,7 +50,7 @@ export function describeActivityStatus(
 	return {
 		lastSyncLabel: status.lastSyncLabel,
 		text,
-		subtitleState: syncing || checking ? 'syncing' : needsAttention ? 'attention' : status.kind === 'pending' ? 'pending' : status.kind === 'synced' ? 'synced' : 'idle',
+		subtitleState: syncing || checking ? 'syncing' : needsAttention ? 'attention' : status.kind === 'pending' || status.kind === 'remote' ? 'pending' : status.kind === 'synced' ? 'synced' : 'idle',
 		indicatorState: syncing ? { ...state, status: 'syncing' as const } : state,
 		checkingConflicts: checking || syncing && !['saving', 'reminders'].includes(state.work?.phase ?? ''),
 		/** The Pending tab's sync button. While `idle` it starts a sync, and the file list names

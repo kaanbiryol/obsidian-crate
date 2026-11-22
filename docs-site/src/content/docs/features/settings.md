@@ -67,7 +67,7 @@ Appears once a server is connected. **Sync options** holds everything except **A
 | --- | --- | --- | --- |
 | **Automatic sync** | Syncs after edits, on startup and resume, and at the check interval. Turning it off lets a running sync finish. | This device | Off |
 | **Sync delay after editing (seconds)** | How long to wait after a change before syncing. 0 syncs right away. | This device | 5 |
-| **Check for remote changes** | How often to look for edits from your other devices while automatic sync is on: **Off**, 1, 5 or 15 minutes, or a custom number of seconds. | All devices | 5 minutes |
+| **Check for remote changes** | How often to look for edits from your other devices: **Off**, 1, 5 or 15 minutes, or a custom number of seconds. With automatic sync off, changes found show as **Changes on server** and are not synced. | All devices | 5 minutes |
 | **Sync Crate updates** | Shares the Crate version installed here with your other devices and installs newer ones they share. See [Crate updates](/docs/features/sync/#crate-updates). | This device | On |
 | **Keep history for** | How long the server keeps earlier file versions and saved vault states: 7, 14, 30, 60 or 90 days, and also 180 or 365 on a [self-hosted server](/docs/reference/self-hosting/#other-self-hosted-limits). | All devices | 30 days |
 | **Excluded files and folders** | Files that stay local, one pattern per line. See [Keep files on one device](/docs/features/sync/#keep-files-on-one-device). | All devices | Common temporary and system files, such as `.git/`, `.trash/` and `.DS_Store` |

@@ -17,17 +17,26 @@ export class RuntimeServerStatus {
 	private controller: AbortController | null = null;
 	private lastCheckAt: number | null = null;
 	private connectionIssue: string | null = null;
+	private remoteChangesFound = false;
 
 	constructor(private readonly options: {
 		settings: Pick<SyncRuntimeSettings,'workerUrl' | 'cloudflareDeployment'>;
 		getClient: () => SyncApiClient | null;
 		/** Capture the idle engine generation; reject observations after sync or replacement. */
 		captureIdleState: () => (() => boolean) | null;
-		onIssueChange: () => void;
+		/** Whether a sync would bring server changes to this device. */
+		checkRemoteChanges: () => Promise<boolean>;
+		onChange: () => void;
 	}) {}
 
 	get issue(): string | null { return this.connectionIssue; }
-	clearIssue(): void { this.connectionIssue = null; }
+	/** The server has changes this device has not applied, kept until a sync clears it. */
+	get remoteChanges(): boolean { return this.remoteChangesFound; }
+	/** A sync is starting: it reports reachability and applies the remote changes itself. */
+	clearObservations(): void {
+		this.connectionIssue = null;
+		this.remoteChangesFound = false;
+	}
 
 	private versionConnection(): string {
 		const { workerUrl, cloudflareDeployment: deployment } = this.options.settings;
@@ -63,12 +72,13 @@ export class RuntimeServerStatus {
 
 	reset(): void {
 		this.cancelCheck();
-		this.clearIssue();
+		this.clearObservations();
 		this.lastCheckAt = null;
 	}
 
 	cancelCheck(): void {
-		if (this.timer) clearTimeout(this.timer);
+		// A check that never ran does not hold back the next one.
+		if (this.timer) { clearTimeout(this.timer); this.lastCheckAt = null; }
 		this.timer = null;
 		this.controller?.abort();
 		this.controller = null;
@@ -77,6 +87,8 @@ export class RuntimeServerStatus {
 	scheduleCheck(): void {
 		if (this.timer || this.controller) return;
 		if (this.lastCheckAt !== null && Date.now() - this.lastCheckAt < SERVER_CHECK_COOLDOWN_MS) return;
+		// Measured from scheduling, so a one-minute check interval is not skipped every other time.
+		this.lastCheckAt = Date.now();
 		this.timer = setTimeout(() => {
 			this.timer = null;
 			void this.check();
@@ -85,20 +97,28 @@ export class RuntimeServerStatus {
 
 	private async check(): Promise<void> {
 		const isCurrent = this.options.captureIdleState();
-		if (!isCurrent) return;
+		// Nothing was asked of the server, so the next trigger may check right away.
+		if (!isCurrent) { this.lastCheckAt = null; return; }
 		const controller = new AbortController();
 		this.controller = controller;
-		this.lastCheckAt = Date.now();
 		let timedOut = false;
 		const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, SERVER_CHECK_TIMEOUT_MS);
+		const stale = () => (controller.signal.aborted && !timedOut) || this.controller !== controller || !isCurrent();
 		try {
 			const result = await checkServerReachability(this.options.settings.workerUrl, controller.signal);
-			if ((controller.signal.aborted && !timedOut) || this.controller !== controller || !isCurrent()) return;
+			clearTimeout(timeout);
+			if (stale()) return;
 			const issue = timedOut ? 'The sync server took too long to respond. Check that it is running.' : result;
 			if (this.connectionIssue !== issue) {
 				this.connectionIssue = issue;
-				this.options.onIssueChange();
+				this.options.onChange();
 			}
+			// Found changes stay until a sync clears them, so later checks skip the request.
+			if (issue || this.remoteChangesFound) return;
+			const found = await this.options.checkRemoteChanges();
+			if (stale() || !found) return;
+			this.remoteChangesFound = true;
+			this.options.onChange();
 		} catch (error) {
 			if (!controller.signal.aborted) logger.warn('Server check failed:', errorMessage(error));
 		} finally {

@@ -37,6 +37,8 @@ export interface SyncState {
 	lastIssues?: SyncIssue[];
 	pendingChanges: number;
 	conflictCount: number;
+	/** While automatic sync is off: the server has changes a sync would bring here. */
+	remoteChanges?: boolean;
 }
 
 export interface SyncResult {

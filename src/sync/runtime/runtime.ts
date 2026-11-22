@@ -101,7 +101,8 @@ export class SyncRuntime {
 				return () => this.syncEngine === engine
 					&& engine.getState().status === 'idle' && engine.getState().lastSync === lastSync;
 			},
-			onIssueChange: () => this.emitCurrentState(),
+			checkRemoteChanges: () => this.requireEngine().hasRemoteChanges(),
+			onChange: () => this.emitCurrentState(),
 		});
 	}
 
@@ -179,9 +180,10 @@ export class SyncRuntime {
 	getState(): SyncState {
 		if (this.syncEngine) {
 			const state = { ...this.syncEngine.getState(), ...(this.initializing ? { initializing: true } : {}) };
-			return this.serverStatus.issue && state.status === 'idle'
-				? { ...state, status: 'offline', lastError: this.serverStatus.issue, lastIssues: undefined }
-				: state;
+			if (state.status !== 'idle') return state;
+			if (this.serverStatus.issue) return { ...state, status: 'offline', lastError: this.serverStatus.issue, lastIssues: undefined };
+			// Automatic sync applies remote changes itself; the check runs only while it is off.
+			return this.serverStatus.remoteChanges && !this.settings.automaticSync ? { ...state, remoteChanges: true } : state;
 		}
 		return { status: this.initializationError ? 'error' : 'idle', lastSync: null, lastError: this.initializationError, pendingChanges: 0, conflictCount: 0,
 			...(this.initializing && !this.initializationError ? { initializing: true } : {}),
@@ -353,11 +355,12 @@ export class SyncRuntime {
 			onAutomaticSyncResult: result => this.recordAutomaticSyncResult(syncEngine, result),
 			onStateChange: (state: SyncState) => {
 				if (this.syncEngine !== syncEngine) return;
-				if (state.status === 'syncing') this.serverStatus.clearIssue();
+				if (state.status === 'syncing') this.serverStatus.clearObservations();
 				this.emitCurrentState();
 			},
 			prepareReminderScope: this.options.prepareReminderScope,
 			prepareInitialUpload: this.options.prepareInitialUpload,
+			onManualCheckDue: () => { if (this.syncEngine === syncEngine) this.scheduleServerCheck(); },
 		};
 		syncEngine = (this.options.createEngine ?? ((plugin, api, settings, engineHooks) => new SyncEngine(plugin, api, settings, engineHooks)))(
 			this.plugin, this.apiClient, this.settings, hooks);

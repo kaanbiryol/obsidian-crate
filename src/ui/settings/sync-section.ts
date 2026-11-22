@@ -48,11 +48,11 @@ export function renderSyncSection(context: SettingsSectionContext): () => void {
 					if (await persistSettings({ debounceDelay: Number(value) })) rerender();
 				}, value => parseSettingInteger(value, 0, MAX_TIMER_SECONDS) !== null);
 			});
-
-		renderSyncInterval(options, () => plugin.settings.syncInterval, async syncInterval => {
-			if (await persistSettings({ syncInterval })) rerender();
-		});
 	}
+
+	renderSyncInterval(options, () => plugin.settings.syncInterval, async syncInterval => {
+		if (await persistSettings({ syncInterval })) rerender();
+	});
 
 	new Setting(options)
 		.setName('Plugins and settings')

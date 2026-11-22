@@ -71,6 +71,8 @@ it.each<[string, Partial<SyncState>, string]>([
 	['one pending change', { pendingChanges: 1 }, '1 change pending'],
 	['pending changes after a sync', { pendingChanges: 2, lastSync: '2026-10-01T00:00:00Z' }, '2 changes pending'],
 	['a recent sync', { lastSync: new Date().toISOString() }, 'Synced just now'],
+	['remote changes after a sync', { remoteChanges: true, lastSync: new Date().toISOString() }, 'Changes on server'],
+	['local and remote changes', { remoteChanges: true, pendingChanges: 1, lastSync: new Date().toISOString() }, '1 change pending'],
 	['no completed sync', {}, 'Not synced yet'],
 ])('labels %s with the Sync activity phrase', (_, patch, text) => {
 	const { plugin, items } = createPlugin();

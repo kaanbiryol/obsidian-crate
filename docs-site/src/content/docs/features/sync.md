@@ -20,12 +20,12 @@ Phones pause apps in the background, and sync pauses with them. Before switching
 <details>
 <summary>Fine-tune timing</summary>
 
-Under **Sync → Sync options**, while **Automatic sync** is on:
+Under **Sync → Sync options**:
 
 | Setting | What it does |
 | --- | --- |
-| **Sync delay after editing (seconds)** | How long Crate waits after you stop typing. The default is 5 seconds; 0 syncs right away. |
-| **Check for remote changes** | How often your Obsidian devices look for edits from each other. It applies to all devices. The default is every 5 minutes. **Off** stops these checks, but edits, startup, and resume still sync. |
+| **Sync delay after editing (seconds)** | Shown while **Automatic sync** is on. How long Crate waits after you stop typing. The default is 5 seconds; 0 syncs right away. |
+| **Check for remote changes** | How often your Obsidian devices look for edits from each other. It applies to all devices. The default is every 5 minutes. **Off** stops these checks, but edits, startup, and resume still sync. With **Automatic sync** off, this setting stays available and changes found show as **Changes on server** instead of syncing. |
 
 </details>
 

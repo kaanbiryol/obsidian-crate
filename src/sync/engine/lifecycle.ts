@@ -24,6 +24,9 @@ interface SyncEngineLifecycleDependencies {
 	hasLocalFileChanges(): Promise<boolean>;
 	/** Advance the rotating content check without network access. */
 	verifyLocalContent?(): Promise<void>;
+	/** Seconds between server checks that never sync, while automatic sync is off; 0 is off. */
+	getManualCheckSeconds?(): number;
+	manualCheckDue?(): void;
 	checkForChanges(lastSeq: number): Promise<{ hasChanges: boolean; cursorExpired?: boolean }>;
 	sync(): Promise<SyncResult>;
 	onCheckSuccess(): void;
@@ -32,6 +35,7 @@ interface SyncEngineLifecycleDependencies {
 
 export class SyncEngineLifecycle {
 	private syncInterval: ReturnType<typeof setInterval> | null = null;
+	private manualCheckInterval: ReturnType<typeof setInterval> | null = null;
 	private abortController = new AbortController();
 	private consecutiveCheckFailures = 0;
 	private lastCheckAttempt = 0;
@@ -58,8 +62,13 @@ export class SyncEngineLifecycle {
 			);
 			return;
 		}
-		if (this.dependencies.automaticSyncEnabled?.() === false && this.dependencies.verifyLocalContent) {
+		if (this.dependencies.automaticSyncEnabled?.() !== false) return;
+		if (this.dependencies.verifyLocalContent) {
 			this.syncInterval = setInterval(() => { void this.localContentCheck(); }, LOCAL_CONTENT_CHECK_INTERVAL_MS);
+		}
+		const manualCheckSeconds = this.dependencies.getManualCheckSeconds?.() ?? 0;
+		if (manualCheckSeconds > 0 && this.dependencies.manualCheckDue) {
+			this.manualCheckInterval = setInterval(() => this.dependencies.manualCheckDue?.(), manualCheckSeconds * 1000);
 		}
 	}
 
@@ -151,8 +160,9 @@ export class SyncEngineLifecycle {
 	}
 
 	private stopPeriodicSync(): void {
-		if (!this.syncInterval) return;
-		clearInterval(this.syncInterval);
+		if (this.syncInterval) clearInterval(this.syncInterval);
+		if (this.manualCheckInterval) clearInterval(this.manualCheckInterval);
 		this.syncInterval = null;
+		this.manualCheckInterval = null;
 	}
 }

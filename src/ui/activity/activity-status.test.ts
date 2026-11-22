@@ -16,6 +16,14 @@ it.each([
 	expect(describeActivityStatus({ ...state, status }, null, pending, true, false, now)).toMatchObject({ text, subtitleState });
 });
 
+it('names remote changes only when nothing more urgent applies', () => {
+	const remote = { ...state, remoteChanges: true };
+	expect(describeActivityStatus(remote, null, 0, true, false, now)).toMatchObject({ text: 'Changes on server', subtitleState: 'pending' });
+	expect(describeActivityStatus(remote, null, 2, true, false, now)).toMatchObject({ text: '2 changes pending' });
+	expect(describeActivityStatus({ ...remote, status: 'offline' }, null, 0, true, false, now)).toMatchObject({ text: 'Server unavailable' });
+	expect(describeActivityStatus({ ...remote, lastSync: null }, null, 0, true, false, now)).toMatchObject({ text: 'Not synced yet' });
+});
+
 it('keeps Stop sync enabled through completion work after the engine becomes idle', () => {
 	const progress: SyncActivityProgress = { type: 'sync', current: 1, total: 1 };
 	const busy = describeActivityStatus(state, progress, 1, true, false, now);

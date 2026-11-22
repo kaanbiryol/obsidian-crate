@@ -30,6 +30,18 @@ saved last-sync timestamp does not show green before those checks finish. Sync
 activity shows **Checking local files…** during local startup checks; errors and
 server availability warnings remain visible.
 
+With automatic sync off, the plugin still checks for server changes without
+syncing: after layout readiness, on foreground and network events, and at the
+`syncInterval` (**Check for remote changes**; **Off** keeps only the event checks),
+at most once a minute. After the public reachability probe succeeds it
+calls `GET /sync/check?since=<lastSeq>` and, only when that reports entries, reads
+the changelog. A sync saves the cursor it read before uploading, so this device's
+own uploads also follow the cursor; entries that match a local baseline, and
+ignored, oversized or unsupported paths, do not count. Anything else, or an expired
+cursor, shows **Changes on server** (`engine/remote-changes.ts`). The flag stays
+until a sync starts, so later checks skip the changelog. It never moves the cursor
+or transfers files.
+
 With automatic sync off, removing or editing an exclusion pattern runs the same
 local scan, so files the old pattern hid appear as pending changes. Unchanged
 files fire no vault events, so without this scan they would only surface at the

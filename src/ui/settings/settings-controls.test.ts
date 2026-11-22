@@ -141,6 +141,7 @@ describe('settings controls', () => {
 		const automatic = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Automatic sync')!;
 		expect(automatic.toggles[0]!.value).toBe(false);
 		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Sync delay after editing (seconds)')).toBe(false);
+		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Check for remote changes')).toBe(true);
 		expect(plugin.writeSettings).not.toHaveBeenCalled();
 		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
 		expect(plugin.syncRuntime.updateSyncSettings).not.toHaveBeenCalled();

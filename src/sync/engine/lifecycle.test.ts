@@ -7,6 +7,7 @@ import {
 } from './engine-test-harness';
 import { createDeferred } from '../runtime/runtime-test-harness';
 import { sha256Hex } from '../../platform/sha256';
+import { LOCAL_CONTENT_CHECK_INTERVAL_MS } from './lifecycle';
 
 describe('SyncEngine initialization', () => {
 	it('defers conflict recovery until the workspace layout is ready', async () => {
@@ -41,6 +42,44 @@ describe('SyncEngine initialization', () => {
 			await vi.runAllTimersAsync();
 
 			expect(recoverFromVault).not.toHaveBeenCalled();
+		} finally {
+			harness.engine.destroy();
+			vi.useRealTimers();
+		}
+	});
+});
+
+describe('SyncEngine manual server checks', () => {
+	it.each([
+		['automatic sync on', true, 60, 0],
+		['the check interval off', false, 0, 0],
+		['a one-minute interval', false, 60, 5],
+		['a fifteen-minute interval', false, 900, 0],
+	] as const)('runs manual checks at the check interval with %s', async (_name, automaticSync, syncInterval, calls) => {
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+		const harness = createHarness({ automaticSync, syncInterval });
+		const onManualCheckDue = vi.fn();
+		harness.hooks.onManualCheckDue = onManualCheckDue;
+		try {
+			await harness.engine.initialize();
+			await vi.advanceTimersByTimeAsync(LOCAL_CONTENT_CHECK_INTERVAL_MS);
+			expect(onManualCheckDue).toHaveBeenCalledTimes(calls);
+		} finally {
+			harness.engine.destroy();
+			vi.useRealTimers();
+		}
+	});
+
+	it('restarts the manual check timer when the interval changes', async () => {
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+		const harness = createHarness({ automaticSync: false, syncInterval: 60 });
+		const onManualCheckDue = vi.fn();
+		harness.hooks.onManualCheckDue = onManualCheckDue;
+		try {
+			await harness.engine.initialize();
+			harness.engine.updateSettings({ ...harness.settings, syncInterval: 0 });
+			await vi.advanceTimersByTimeAsync(LOCAL_CONTENT_CHECK_INTERVAL_MS);
+			expect(onManualCheckDue).not.toHaveBeenCalled();
 		} finally {
 			harness.engine.destroy();
 			vi.useRealTimers();
