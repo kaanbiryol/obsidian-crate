@@ -37,7 +37,7 @@ interface ImportContext {
 	heldPaths?: ReadonlySet<string>;
 }
 
-export const ANOTHER_DEVICE_IMPORTING = 'Another device is uploading this vault for the first time. Let it finish, then sync. If this device started it, select Replace server files.';
+export const ANOTHER_DEVICE_IMPORTING = 'Another device is uploading this vault for the first time. Let it finish, then sync here. Only if this device started that upload before it was reset, select Server → Advanced server actions → Replace server files, which deletes files that exist only on the server.';
 export const FIRST_UPLOAD_UNFINISHED = 'The first upload of this vault has not finished. Sync on the device that started it, then sync here.';
 export const OWN_FIRST_UPLOAD_UNFINISHED = 'The first upload of this vault has not finished. Sync again to finish it.';
 
