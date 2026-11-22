@@ -53,8 +53,8 @@ export async function start(context, resources) {
 	const { quick, tailscale, port, host } = resolveStartMode(command, values, remote);
 	const maxFileBytes = resolveMaxFileBytes(values);
 	if (maxFileBytes) {
-		console.log(`Syncing files up to ${maxFileBytes / 1024 / 1024} MB. Every device needs the current Crate plugin; mobile devices skip files over 25 MB.`);
-		if (maxFileBytes > 100_000_000 && (quick || (remote && !tailscale))) console.log('Cloudflare Tunnel refuses uploads over 100 MB, so larger files fail to sync through it.');
+		console.log(`Syncing files up to ${maxFileBytes / 1024 / 1024} MB. Every device needs the current Crate plugin; mobile devices skip files over 25 MB, and encrypted vaults and Markdown notes stay at 128 MB.`);
+		if (maxFileBytes > 100_000_000 && (quick || (remote && !tailscale))) console.log('Cloudflare Tunnel refuses single uploads over 100 MB, so encrypted files and Markdown notes over 100 MB fail to sync through it. Other files travel in smaller parts.');
 	}
 	if (quick) {
 		await serveQuickTunnel(context, port, resources, maxFileBytes);

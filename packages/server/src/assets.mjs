@@ -14,7 +14,8 @@ export const packageVersion = /** @type {string} */ (runtimePackage.version);
 export const runtimeVersion = runtimePackage.crateServerRuntime ?? runtimePackage.devDependencies.miniflare;
 /** @param {string} name */
 export const serverAssetPath = name => join(runtimeRoot, packaged ? 'assets' : 'src/cloudflare', name);
-export const workerPath = packaged ? serverAssetPath('worker.mjs') : join(runtimeRoot, '.generated/cloudflare/worker.mjs');
+/** The self-hosted Worker bundle, which a package ships as `assets/worker.mjs`. */
+export const workerPath = packaged ? serverAssetPath('worker.mjs') : join(runtimeRoot, '.generated/cloudflare/worker-self-hosted.mjs');
 // Source runs shared TypeScript modules through Node type stripping; the package ships them transpiled.
 /** @param {string} source @param {string} asset */
 const sharedModulePath = (source, asset) => packaged ? serverAssetPath(asset) : join(runtimeRoot, source);

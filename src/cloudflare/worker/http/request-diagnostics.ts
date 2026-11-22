@@ -1,4 +1,4 @@
-import { BATCH_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
+import { MAX_BATCH_UPLOAD_FILES } from '../sync/storage';
 import { reminderOperationDay } from '../../../protocol/reminder-operation';
 import type { AuthPrincipal } from '../auth/authenticate';
 import { MANAGED_FILE_OBJECT } from '../../../protocol/storage-keys';
@@ -47,7 +47,7 @@ export async function logMutation(request: Request, response: Response, requestI
 		route: /^\/(sync|reminders|notifications|auth)\/(?:import\/)?[a-z-]+$/.test(path) ? path : 'other',
 		clientSession: opaque(request.headers.get(CLIENT_SESSION_HEADER)),
 		operationId: opaque(request.headers.get(OPERATION_ID_HEADER)),
-		uploadOperationIds: (request.headers.get(UPLOAD_OPERATION_HEADER) ?? request.headers.get(UPLOAD_OPERATIONS_HEADER) ?? '').split(',').filter(id => reminderOperationDay(id) !== null).slice(0, BATCH_UPLOAD_MAX_FILES),
+		uploadOperationIds: (request.headers.get(UPLOAD_OPERATION_HEADER) ?? request.headers.get(UPLOAD_OPERATIONS_HEADER) ?? '').split(',').filter(id => reminderOperationDay(id) !== null).slice(0, MAX_BATCH_UPLOAD_FILES),
 		deviceId: principal.tokenId, scope: principal.scope, revisions, consumedRevisions, deleteRequestIds,
 	});
 }

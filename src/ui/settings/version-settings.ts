@@ -26,7 +26,7 @@ export function renderVersionSettings(container: HTMLElement, plugin: CratePlugi
 			const info = await checkServerVersion(plugin);
 			const version = `Revision ${serverBuildLabel(info.serverRevision, info.developmentBuild)}`;
 			const comparison = info.deploymentFingerprint
-				? info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint
+				? [EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, EMBEDDED_CLOUDFLARE_ARTIFACT.selfHostedFingerprint].includes(info.deploymentFingerprint)
 					? 'Matches the bundled server.' : 'Differs from the bundled server.'
 				: 'Build comparison unavailable.';
 			server.setDesc(`${version} · ${comparison}`);

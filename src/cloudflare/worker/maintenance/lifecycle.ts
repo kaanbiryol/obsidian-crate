@@ -54,8 +54,9 @@ export async function runMaintenanceEpisode(state: DurableObjectState, env: Env)
 	const day = utcDay(Date.now());
 	const spent = await state.storage.get<{ day: number; rowsWritten: number }>(DAILY_WRITES_KEY);
 	const written = spent?.day === day ? spent.rowsWritten : 0;
-	// Out of today's budget: the episode resumes with this pass after the daily reset.
-	if (written >= MAINTENANCE_DAILY_WRITE_BUDGET) {
+	// Out of today's budget: the episode resumes with this pass after the daily reset. A
+	// self-hosted server has no daily D1 quota, so its cleanup never waits.
+	if (!__CRATE_SELF_HOSTED__ && written >= MAINTENANCE_DAILY_WRITE_BUDGET) {
 		await state.storage.setAlarm(nextD1DailyReset());
 		return;
 	}

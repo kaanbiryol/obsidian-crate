@@ -15,6 +15,7 @@ import { handleListFileVersions, handleRestoreFileVersion } from '../sync/file-v
 import { readEncryptionState } from '../encryption/state';
 import type { Env } from '../types';
 import { maxFileBytes } from '../server/file-limit';
+import { handleUploadSession } from '../sync/upload-sessions';
 import { mutationAuditContext } from '../http/request-diagnostics';
 import { beginInitialImport, finishInitialImport } from '../sync/import/initial-import';
 import { pruneInitialImport } from '../sync/import/initial-import-prune';
@@ -31,7 +32,7 @@ export async function handleSyncRoute(
 	const audit = mutationAuditContext(request, principal, requestId);
 	const db = env.DB;
 	const bucket = env.BUCKET;
-		if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(bucket, db);
+		if (path === '/sync/checkpoints' && method === 'GET') return listSharedCheckpoints(request, bucket, db);
 		if (path === '/sync/checkpoints' && method === 'POST') return createSharedCheckpoint(bucket, db);
 		if (path === '/sync/checkpoint' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpoint);
 		if (path === '/sync/checkpoint-file' && method === 'GET') return forwardTransferRequest(request, env, TRANSFER_PATHS.historyCheckpointFile);
@@ -61,6 +62,9 @@ export async function handleSyncRoute(
 	}
 	if (path === '/sync/upload' && method === 'PUT') {
 		return await handleUpload(request, bucket, db, uploadCommitters, encryption, resetGeneration, maxFileBytes(env));
+	}
+	if (__CRATE_SELF_HOSTED__ && path === '/sync/upload-session' && (method === 'POST' || method === 'PUT')) {
+		return await handleUploadSession(request, bucket, db, uploadCommitters, maxFileBytes(env), encryption === undefined ? await readEncryptionState(db) : encryption, resetGeneration);
 	}
 	if (path === '/sync/download' && method === 'GET') {
 		return await handleDownload(request, bucket, db);

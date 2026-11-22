@@ -58,8 +58,32 @@ interface R2ListResult {
 	cursor?: string;
 }
 
+interface R2GetOptions {
+	range?: { offset: number; length?: number };
+}
+
+interface R2MultipartOptions {
+	httpMetadata?: R2HttpMetadata;
+	customMetadata?: Record<string, string>;
+}
+
+interface R2UploadedPart {
+	partNumber: number;
+	etag: string;
+}
+
+interface R2MultipartUpload {
+	readonly key: string;
+	readonly uploadId: string;
+	uploadPart(partNumber: number, value: ArrayBuffer | ArrayBufferView | ReadableStream | string): Promise<R2UploadedPart>;
+	abort(): Promise<void>;
+	complete(uploadedParts: R2UploadedPart[]): Promise<R2Object>;
+}
+
 interface R2Bucket {
-	get(key: string): Promise<R2ObjectBody | null>;
+	get(key: string, options?: R2GetOptions): Promise<R2ObjectBody | null>;
+	createMultipartUpload(key: string, options?: R2MultipartOptions): Promise<R2MultipartUpload>;
+	resumeMultipartUpload(key: string, uploadId: string): R2MultipartUpload;
 	head(key: string): Promise<R2Object | null>;
 	put(key: string, value: BodyInit | null, options?: R2PutOptions): Promise<R2Object | null>;
 	delete(keys: string | string[]): Promise<void>;
@@ -106,6 +130,8 @@ declare module 'cloudflare:workers' {
 		DB: D1Database;
 		REMINDER_ALARMS: DurableObjectNamespace;
 	};
+	/** In Worker runtime tests, the `main` Worker's exports, such as the deployed bundle. */
+	export const exports: { default: { fetch(input: string, init?: RequestInit): Promise<Response> } };
 }
 
 interface ScheduledController {
@@ -115,3 +141,17 @@ interface ScheduledController {
 }
 
 interface ExecutionContext { waitUntil(promise: Promise<unknown>): void; }
+
+/** workerd's streaming digest: write bytes to it, then await `digest`. */
+declare class DigestStream extends WritableStream<ArrayBuffer | ArrayBufferView> {
+	constructor(algorithm: 'SHA-256');
+	readonly digest: Promise<ArrayBuffer>;
+}
+
+interface Crypto {
+	DigestStream: typeof DigestStream;
+}
+
+/** True in the self-hosted server's Worker bundle. The Cloudflare bundle is built with false,
+ * so its raised-limit features (chunked uploads, ranged downloads) are left out entirely. */
+declare const __CRATE_SELF_HOSTED__: boolean;

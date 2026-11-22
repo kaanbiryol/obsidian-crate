@@ -1,6 +1,6 @@
 import { recordSyncError, SyncIssueError, withSyncFileContext } from '../issues';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
-import { BATCH_FILE_SIZE_LIMIT } from '@/protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, DEFAULT_BATCH_LIMITS, usesChunkedTransfer, type BatchLimits } from '@/protocol/sync-limits';
 import type { SyncApiClient } from '../worker-api/client';
 import type { SyncResult, SyncWork } from '../types';
 import type { PreparedUpload } from '../transfer/types';
@@ -67,9 +67,9 @@ const verifiedModified = (upload: PreparedUpload) => upload.mtime === undefined 
 const batchBytes = (batch: PreparedUpload[]) => batch.reduce((sum, file) => sum + file.content.byteLength, 0);
 
 /** Small files share requests within the batch limits; larger files go one per request. */
-function importBatches(prepared: PreparedUpload[]): PreparedUpload[][] {
+function importBatches(prepared: PreparedUpload[], limits: BatchLimits): PreparedUpload[][] {
 	return [
-		...chunkPreparedUploads(prepared.filter(file => file.size < BATCH_FILE_SIZE_LIMIT), INITIAL_IMPORT_MAX_FILES),
+		...chunkPreparedUploads(prepared.filter(file => file.size < BATCH_FILE_SIZE_LIMIT), Math.max(INITIAL_IMPORT_MAX_FILES, limits.uploadFiles), limits.uploadBytes),
 		...prepared.filter(file => file.size >= BATCH_FILE_SIZE_LIMIT).map(file => [file]),
 	];
 }
@@ -95,7 +95,10 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 		context.setImportToken(session.token);
 		await context.save();
 	}
-	const held = context.heldPaths ?? new Set<string>();
+	// Large attachments travel in parts, which an import does not take. Held back like files
+	// the user left unchecked, they upload as new files once the import finishes.
+	const held = new Set([...context.heldPaths ?? [], ...local.filter(file => file.size <= transfer.maxFileBytes()
+		&& usesChunkedTransfer(file.path, file.size, transfer.encrypted(), true)).map(file => file.path)]);
 	const localPaths = new Set(local.map(file => file.path));
 	const obsolete = Object.keys(remote.files).filter(path => !localPaths.has(path) && !held.has(path));
 	await context.api.initialImport.prune(session.token, obsolete.map(path => ({ path, hash: remote.files[path]!.hash, revision: remote.files[path]!.revision })));
@@ -120,6 +123,8 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	let savedAt = Date.now();
 	try {
 		const maxFileBytes = transfer.maxFileBytes();
+		// A self-hosted server takes larger batches; mobile and other servers keep the defaults.
+		const limits = transfer.files.batchLimits?.() ?? DEFAULT_BATCH_LIMITS;
 		const maxBytes = getTransferBudgetBytes(maxFileBytes);
 		// Bytes of prepared files that wait for or are in an upload request.
 		let retained = 0;
@@ -136,7 +141,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 				return null;
 			}
 			return upload;
-		}, maxBytes, INITIAL_IMPORT_MAX_FILES, () => maxBytes - retained, PREPARE_CONCURRENCY, maxFileBytes);
+		}, maxBytes, Math.max(INITIAL_IMPORT_MAX_FILES, limits.uploadFiles), () => maxBytes - retained, PREPARE_CONCURRENCY, maxFileBytes);
 		const queue: PreparedUpload[][] = [];
 		let exhausted = false;
 		let producing: Promise<void> | undefined;
@@ -150,7 +155,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 			while (!exhausted && !stopped() && queue.length < IMPORT_UPLOAD_CONCURRENCY && maxBytes - retained >= maxFileBytes) {
 				const next = await source.next();
 				if (next.done) { exhausted = true; break; }
-				for (const batch of importBatches(next.value)) {
+				for (const batch of importBatches(next.value, limits)) {
 					retained += batchBytes(batch);
 					queue.push(batch);
 				}

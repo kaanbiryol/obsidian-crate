@@ -12,6 +12,7 @@ import { isRefusedWrite, isStalePreparedUpload, refusedUploadResult } from '../f
 import type { UploadPreconditions } from '../encryption/encrypted-files';
 import { sha256Hex } from '@/platform/sha256';
 import { isSyncRevision } from '@/protocol/sync-validation';
+import { MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
 
 interface UploadTransport {
 	prepareUploadWire?(file: JournalUpload, preconditions?: UploadPreconditions): ReturnType<PrepareUploadWire>;
@@ -21,6 +22,8 @@ interface UploadTransport {
 	getServerInfo(): Promise<{ reminderOperationDay: number }>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
 	uploadFile(path: string, content: ArrayBuffer, hash: string, size: number, contentType: string, expectedHash: string | null, operationId?: string): Promise<UploadResult>;
+	/** Sends a large plaintext file in parts; see `usesChunkedTransfer`. */
+	uploadChunked?(path: string, content: ArrayBuffer, hash: string, size: number, contentType: string, expectedHash: string | null, operationId: string): Promise<UploadResult>;
 }
 
 const RECEIPTS_PER_CHECKPOINT = 64;
@@ -79,6 +82,14 @@ export class DurableUploads {
 		return this.sendSingle(durable!, bytes);
 	}
 
+	/** A large plaintext upload: its bytes are saved beside the journal record instead of as
+	 * base64 in it, and sent in parts. */
+	async chunked(file: Omit<BatchUploadFile, 'content'>, bytes: ArrayBuffer): Promise<UploadResult> {
+		const durable = await this.manifest.uploadJournal.prepareChunked(file, bytes, await this.currentServerDay(), this.clientSession);
+		await this.trace(durable, 'prepared');
+		return this.sendSingle(durable, bytes);
+	}
+
 	/** Replay original bytes before reading state for a new reconciliation plan. */
 	recover(onProgress?: (current: number, total: number) => void): Promise<void> {
 		if (this.recovering) return this.recovering;
@@ -120,13 +131,18 @@ export class DurableUploads {
 		return this.recovering;
 	}
 
-	private async prepare(files: IntendedUpload[], preconditions?: UploadPreconditions): Promise<JournalUpload[]> {
+	private async currentServerDay(): Promise<number> {
 		if (!this.serverDay || this.serverDay.expires <= performance.now()) {
 			const info = await this.transport.getServerInfo();
 			this.serverDay = { day: info.reminderOperationDay, expires: performance.now() + 60_000 };
 		}
+		return this.serverDay.day;
+	}
+
+	private async prepare(files: IntendedUpload[], preconditions?: UploadPreconditions): Promise<JournalUpload[]> {
+		const day = await this.currentServerDay();
 		const transport = this.transport;
-		const prepared = await this.manifest.uploadJournal.prepare(files, this.serverDay.day, this.clientSession,
+		const prepared = await this.manifest.uploadJournal.prepare(files, day, this.clientSession,
 			transport.prepareUploadWire && (file => transport.prepareUploadWire!(file, preconditions)));
 		for (const file of prepared) await this.trace(file, 'prepared');
 		return prepared;
@@ -140,8 +156,15 @@ export class DurableUploads {
 			try {
 				await this.transport.assertPreparedUpload(file);
 				const wire = uploadWire(file);
-				const body = bytes && !file.encryptedWire ? bytes : base64ToArrayBuffer(wire.content);
-				result = await this.transport.uploadFile(wire.path, body, wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
+				if (file.contentFile) {
+					// Recovery reads the saved bytes back; the first attempt already holds them.
+					const content = bytes ?? await this.manifest.uploadJournal.readContent(file);
+					if (!this.transport.uploadChunked) throw new Error('This connection cannot send chunked uploads');
+					result = await this.transport.uploadChunked(wire.path, content, wire.hash, wire.size, wire.contentType, wire.expectedHash, file.operationId);
+				} else {
+					const body = bytes && !file.encryptedWire ? bytes : base64ToArrayBuffer(wire.content);
+					result = await this.transport.uploadFile(wire.path, body, wire.hash, wire.size, wire.contentType, wire.expectedHash, wire.operationId);
+				}
 			} catch (error) {
 				result = refusedUploadResult(file.path, error);
 			}
@@ -171,7 +194,8 @@ export class DurableUploads {
 			// It remains valid after response loss, local I/O failure, or a new edit.
 			const base = file.intent.kind === 'merge' ? file.intent.preimage : file;
 			// Only Markdown keeps a merge base; avoid decoding other uploads again.
-			if (isMarkdownPath(file.path)) await this.cache.putBase(file.path, base.hash, base64ToArrayBuffer(base.content));
+			// The cache keeps no base above the default limit, so do not decode one.
+			if (isMarkdownPath(file.path) && base.size <= MAX_FILE_SIZE_BYTES) await this.cache.putBase(file.path, base.hash, base64ToArrayBuffer(base.content));
 			if (file.intent.kind === 'merge' && !await this.cache.readBase(file.path, base.hash)) throw new Error('The merged upload committed, but its recovery base could not be saved. Pending upload preserved; retry sync after storage is available.');
 			this.manifest.setEntry(file.path, { hash: base.hash, size: base.size, modified: UNVERIFIED_MODIFIED,
 				...(file.intent.kind === 'local' ? { revision: result.revision } : {}) });

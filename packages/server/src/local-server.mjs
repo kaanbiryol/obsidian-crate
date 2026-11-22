@@ -51,8 +51,8 @@ auto-backup makes a verified backup every day while the server runs and keeps th
 service starts Crate at login (launchd on macOS, systemd on Linux) and restarts it after a failure.
 --keep-awake keeps a Mac from idle sleep while Crate runs.
 --max-file-size MB (start, setup, service; CRATE_MAX_FILE_SIZE_MB in Docker) syncs files up to
-that size, from 25 (the default) to 128. Above 25, every device needs the current Crate plugin,
-mobile devices still skip files over 25 MB, and Cloudflare Tunnels refuse uploads over 100 MB.
+that size, from 25 (the default) to 1024. Above 25, every device needs the current Crate plugin
+and mobile devices still skip files over 25 MB. Encrypted vaults and Markdown notes stay at 128 MB.
 update installs the newest release after a verified backup and rolls back if it fails;
 other installs print their own update steps. doctor checks the server and prints a fix for each problem.
 Stop the server before offline add-device administration.

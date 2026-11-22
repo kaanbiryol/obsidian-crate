@@ -365,8 +365,9 @@ Release and transfer values are also checked against source in [current contract
 | `debounceDelay` default | 5 seconds | `settings.ts` |
 | `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `settings.ts` |
 | Large upload quiet / maximum wait | 1 MiB files: 60 s / 5 min | `queue/controller.ts` |
-| `MAX_FILE_SIZE_BYTES` | 25 MB, the default; a self-hosted server may advertise up to `MAX_CONFIGURABLE_FILE_BYTES` (128 MB), and mobile devices keep 25 MB | `protocol/sync-limits.ts` |
-| `BATCH_UPLOAD_MAX_FILES` | 32 | `protocol/sync-limits.ts` |
+| `MAX_FILE_SIZE_BYTES` | 25 MB, the default; a self-hosted server may advertise up to `MAX_CONFIGURABLE_FILE_BYTES` (1 GB). Mobile devices keep 25 MB, and encrypted vaults and Markdown notes `MAX_BUFFERED_FILE_BYTES` (128 MB), since they travel in one request | `protocol/sync-limits.ts` |
+| `UPLOAD_PART_BYTES` | 32 MiB; plaintext attachments over 25 MB upload in parts and download in ranges of this size (see [chunked uploads](worker-api.md#chunked-uploads-syncupload-session)). Initial import holds them back, and the next sync uploads them as new files | `protocol/sync-limits.ts` |
+| `BATCH_UPLOAD_MAX_FILES` | 32; a self-hosted server advertises `SELF_HOSTED_BATCH_LIMITS` (100 files and 32 MiB per batch) in `limits.batch`, which desktop clients use | `protocol/sync-limits.ts` |
 | `BATCH_DELETE_MAX_FILES` | 32 | `protocol/sync-limits.ts` |
 | `BATCH_DOWNLOAD_MAX_FILES` | 50 | `protocol/sync-limits.ts` |
 | `BATCH_UPLOAD_MAX_BYTES` | 10 MB | `protocol/sync-limits.ts` |
@@ -656,7 +657,7 @@ and a mismatching final inventory is never reported as a successful restore.
 
 ## History retention
 
-One server-wide setting, `server_state.history_retention_days` (7, 14, 30, 60 or 90; NULL
+One server-wide setting, `server_state.history_retention_days` (7, 14, 30, 60 or 90, and 180 or 365 on a self-hosted server; NULL
 means 30), sets how long replaced and deleted versions and shared checkpoints are kept.
 Vault credentials read it with `GET /history-retention` and change it with
 `POST /history-retention { days }`; the plugin shows it under **Sync options** →

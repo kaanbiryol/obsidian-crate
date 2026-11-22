@@ -5,14 +5,17 @@ import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
 import { D1_MAX_BOUND_PARAMETERS } from '../d1/platform-limits';
 import { DAY_MS, DEFAULT_HISTORY_RETENTION_DAYS } from '../../../protocol/history-retention';
-export {
-	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
-	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
-	BATCH_DOWNLOAD_MAX_FILES as MAX_BATCH_DOWNLOAD_FILES,
-	BATCH_UPLOAD_MAX_BYTES as MAX_BATCH_TOTAL_BYTES,
-	BATCH_UPLOAD_MAX_FILES as MAX_BATCH_UPLOAD_FILES,
-	MAX_FILE_SIZE_BYTES as MAX_FILE_BYTES,
-} from '../../../protocol/sync-limits';
+import { DEFAULT_BATCH_LIMITS, SELF_HOSTED_BATCH_LIMITS } from '../../../protocol/sync-limits';
+export { MAX_FILE_SIZE_BYTES as MAX_FILE_BYTES } from '../../../protocol/sync-limits';
+
+/** This server's batch sizes: a self-hosted server has no D1 query or Worker memory limit,
+ * so it accepts, and advertises, larger batches. */
+export const BATCH_LIMITS = __CRATE_SELF_HOSTED__ ? SELF_HOSTED_BATCH_LIMITS : DEFAULT_BATCH_LIMITS;
+export const MAX_BATCH_DELETE_FILES = BATCH_LIMITS.deleteFiles;
+export const MAX_BATCH_DOWNLOAD_BYTES = BATCH_LIMITS.downloadBytes;
+export const MAX_BATCH_DOWNLOAD_FILES = BATCH_LIMITS.downloadFiles;
+export const MAX_BATCH_TOTAL_BYTES = BATCH_LIMITS.uploadBytes;
+export const MAX_BATCH_UPLOAD_FILES = BATCH_LIMITS.uploadFiles;
 /** The server's history retention in milliseconds, read in the statement that uses it. */
 export const HISTORY_RETENTION_MS_SQL = `(COALESCE((SELECT history_retention_days FROM server_state WHERE id = 1), ${DEFAULT_HISTORY_RETENTION_DAYS}) * ${DAY_MS})`;
 /** A retained version's `kept_at`, its commit time. Bind `Date.now()`; the database clock,

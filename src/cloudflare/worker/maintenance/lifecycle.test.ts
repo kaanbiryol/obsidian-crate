@@ -3,7 +3,7 @@ import { MAINTENANCE_DAILY_WRITE_BUDGET, runMaintenanceEpisode } from './lifecyc
 import { runScheduledMaintenance } from './run';
 vi.mock('./run', () => ({ runScheduledMaintenance: vi.fn(async () => ({ removedObjects: 0, backlog: false })) }));
 beforeEach(() => { vi.clearAllMocks(); });
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function fixture(advancing: 'queue' | 'lease' | null) {
 	let cursor = 0;
@@ -52,6 +52,8 @@ function writing(rows: number) {
 const DAY = 86_400_000;
 
 it('stops a backlog at the daily write budget and resumes it after the reset', async () => {
+	// A Cloudflare server shares the Free plan's daily D1 writes.
+	vi.stubGlobal('__CRATE_SELF_HOSTED__', false);
 	vi.useFakeTimers({ now: 10 * DAY + 1000, toFake: ['Date'] });
 	writing(8_000);
 	const { state, env, storage } = fixture(null);
@@ -66,6 +68,14 @@ it('stops a backlog at the daily write budget and resumes it after the reset', a
 	await runMaintenanceEpisode(state, env);
 	expect(runScheduledMaintenance).toHaveBeenCalledTimes(4);
 	expect(await storage.get('maintenanceDailyWrites')).toEqual({ day: 11, rowsWritten: 8_000 });
+});
+
+it('keeps a self-hosted backlog going past the Cloudflare daily write budget', async () => {
+	vi.useFakeTimers({ now: 10 * DAY + 1000, toFake: ['Date'] });
+	writing(8_000);
+	const { state, env } = fixture(null);
+	for (let pass = 0; pass < 4; pass++) await runMaintenanceEpisode(state, env);
+	expect(runScheduledMaintenance).toHaveBeenCalledTimes(4);
 });
 
 it('waits for the daily reset when D1 reports its limit', async () => {

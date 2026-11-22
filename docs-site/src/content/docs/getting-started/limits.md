@@ -9,7 +9,7 @@ The numbers Crate works within. Feature guides link here when a limit applies.
 
 | Limit | What happens |
 | --- | --- |
-| 25 MB per synced file | Bigger files stay on the device and show up as sync errors. Keep large media outside the vault, or [exclude it](/docs/features/sync/#keep-files-on-one-device). A [self-hosted server](/docs/reference/self-hosting/#sync-larger-files) can allow up to 128 MB on desktop. |
+| 25 MB per synced file | Bigger files stay on the device and show up as sync errors. Keep large media outside the vault, or [exclude it](/docs/features/sync/#keep-files-on-one-device). A [self-hosted server](/docs/reference/self-hosting/#sync-larger-files) can allow up to 1 GB on desktop (128 MB in encrypted vaults and for Markdown notes). |
 | 1 MB or 20,000 lines for merging | When two devices change a bigger note, Crate keeps both versions as a [conflict](/docs/troubleshooting/conflicts/) instead of combining them. |
 | 1 MB per Reading note | Bigger notes are reported instead of opened in Reading. Shorten the note or read the original source. |
 | 1 MB per reminder note in the web app | Bigger notes, or notes with a very large number of reminders, are left out with an explanation. [Archive completed reminders](/docs/features/reminders/#archive-completed-reminders) or split the note into smaller projects. |

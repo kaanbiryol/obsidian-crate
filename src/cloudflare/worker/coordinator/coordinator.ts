@@ -53,7 +53,9 @@ export const TRANSFER_PATHS = {
 	historyCheckpoint: '/history-checkpoint',
 	historyCheckpointFile: '/history-checkpoint-file',
 } as const;
-export type TransferPath = typeof TRANSFER_PATHS[keyof typeof TRANSFER_PATHS];
+/** Self-hosted only, so it stays out of `TRANSFER_PATHS`: the Cloudflare bundle leaves it out. */
+export const UPLOAD_SESSION_TRANSFER_PATH = '/sync-upload-session';
+export type TransferPath = typeof TRANSFER_PATHS[keyof typeof TRANSFER_PATHS] | typeof UPLOAD_SESSION_TRANSFER_PATH;
 
 /** Marks a public request that the Worker forwarded to run under the coordinator lock. */
 export const INTERNAL_MUTATION_HEADER = 'X-Crate-Internal-Mutation';

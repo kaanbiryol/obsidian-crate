@@ -69,7 +69,7 @@ export function validateCommandOptions(positionals, values, { dockerWithoutTails
 }
 
 // Mirrors MAX_FILE_SIZE_BYTES and MAX_CONFIGURABLE_FILE_BYTES in src/protocol/sync-limits.ts.
-export const MIN_FILE_MB = 25, MAX_FILE_MB = 128;
+export const MIN_FILE_MB = 25, MAX_FILE_MB = 1024;
 
 /** Bytes for a whole number of MB between the default and the ceiling. @param {string} value */
 function maxFileSizeBytes(value) {

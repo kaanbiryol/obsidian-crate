@@ -15,12 +15,12 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 | Shortcut template revision | 1 |
 | Oldest compatible shortcut revision | 1 |
 | Registered migrations | None |
-| Upload batch | 32 files |
-| Delete batch | 32 files |
-| Download batch | 50 files |
-| Upload batch bytes | 10485760 |
-| Download batch bytes | 8388608 |
-| Largest file | 26214400 bytes by default; a self-hosted server may advertise up to 134217728 bytes |
+| Upload batch | 32 files (self-hosted: 100) |
+| Delete batch | 32 files (self-hosted: 100) |
+| Download batch | 50 files (self-hosted: 100) |
+| Upload batch bytes | 10485760 (self-hosted: 33554432) |
+| Download batch bytes | 8388608 (self-hosted: 33554432) |
+| Largest file | 26214400 bytes by default; a self-hosted server may advertise up to 1073741824 bytes |
 
 Schema 1 is the baseline with no registered migrations. Matching numbers alone
 do not establish compatibility. See [server upgrades](server-upgrades.md),

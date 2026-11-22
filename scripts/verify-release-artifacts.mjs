@@ -87,7 +87,8 @@ for (const requiredMarker of ['/.well-known/crate', 'notifications-v1']) {
 	assert(workerBundle.includes(requiredMarker), `Worker bundle is missing required route/capability: ${requiredMarker}`);
 }
 
-assert(wrangler.main === '.generated/cloudflare/worker.mjs', 'wrangler main must target the generated Worker bundle');
+// wrangler.jsonc drives only the Worker runtime tests, which run the self-hosted superset.
+assert(wrangler.main === '.generated/cloudflare/worker-self-hosted.mjs', 'wrangler main must target the generated self-hosted Worker bundle');
 assert(wrangler.d1_databases?.some(binding => binding.binding === 'DB'), 'wrangler DB binding is required');
 assert(wrangler.r2_buckets?.some(binding => binding.binding === 'BUCKET'), 'wrangler BUCKET binding is required');
 assert(wrangler.ratelimits?.some(binding => binding.name === 'NOTIFICATION_REQUEST_LIMITER' && binding.simple?.limit === 60 && binding.simple?.period === 60), 'notification rate limit binding is required');

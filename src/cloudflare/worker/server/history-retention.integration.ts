@@ -119,7 +119,7 @@ it('saves checkpoints for the chosen period and hides older ones after shortenin
 	// Rewrite the index as if the checkpoint were saved ten days ago.
 	const old = { ...created.checkpoint, timestamp: new Date(Date.now() - 10 * DAY_MS).toISOString(), expiresAt: Date.now() + 20 * DAY_MS };
 	await env.BUCKET.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints: [old] }));
-	const listed = async () => (await (await listSharedCheckpoints(env.BUCKET, env.DB)).json() as { checkpoints: SharedCheckpoint[] }).checkpoints;
+	const listed = async () => (await (await listSharedCheckpoints(new Request("https://crate.test/sync/checkpoints"), env.BUCKET, env.DB)).json() as { checkpoints: SharedCheckpoint[] }).checkpoints;
 	expect(await listed()).toHaveLength(1);
 
 	await setRetention(7);
@@ -135,7 +135,7 @@ it('keeps checkpoints hidden after a longer period once maintenance removed vers
 	const created = await (await createSharedCheckpoint(env.BUCKET, env.DB)).json() as { checkpoint: SharedCheckpoint };
 	const old = { ...created.checkpoint, timestamp: new Date(Date.now() - 10 * DAY_MS).toISOString(), expiresAt: Date.now() + 20 * DAY_MS };
 	await env.BUCKET.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints: [old] }));
-	const listed = async () => (await (await listSharedCheckpoints(env.BUCKET, env.DB)).json() as { checkpoints: SharedCheckpoint[] }).checkpoints;
+	const listed = async () => (await (await listSharedCheckpoints(new Request("https://crate.test/sync/checkpoints"), env.BUCKET, env.DB)).json() as { checkpoints: SharedCheckpoint[] }).checkpoints;
 	// A file the checkpoint saw was replaced nine days ago.
 	await deleteFile('replaced.md');
 	await backdate('replaced.md', 9);

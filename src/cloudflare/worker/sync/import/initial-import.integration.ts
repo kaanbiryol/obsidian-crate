@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { LAST_SEQ_SQL } from '../storage';
+import { LAST_SEQ_SQL, MAX_BATCH_TOTAL_BYTES } from '../storage';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -242,10 +242,12 @@ it('splits larger import batches at the existing byte limit', async () => {
 	vi.spyOn(console, 'info').mockImplementation(() => {});
 	const client = new SyncTestDevice('import-byte-budget', env); clients.push(client);
 	await client.authorize(); await client.open();
-	for (let index = 0; index < 12; index++) client.disk.write(`asset-${index}.bin`, 'x'.repeat(900 * 1024));
+	// One file more than a batch at the server's byte limit holds.
+	const perBatch = Math.floor(MAX_BATCH_TOTAL_BYTES / (900 * 1024));
+	for (let index = 0; index <= perBatch; index++) client.disk.write(`asset-${index}.bin`, 'x'.repeat(900 * 1024));
 	const upload = vi.spyOn(client.api.initialImport, 'upload');
 	expect((await client.engine.sync()).errors).toEqual([]);
-	expect(upload.mock.calls.map(([, files]) => files.length)).toEqual([11, 1]);
+	expect(upload.mock.calls.map(([, files]) => files.length)).toEqual([perBatch, 1]);
 });
 
 it.each([8, INITIAL_IMPORT_MAX_FILES])('measures 10,000-note import writes with %i-file batches including setup and completion', async batchSize => {

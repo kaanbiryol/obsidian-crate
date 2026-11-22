@@ -6,7 +6,8 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../encryption/file-format';
 import { base64ToArrayBuffer } from '@/platform/base64';
 import type { RestoreIntent } from '../durability/restore-intent';
 import type { RemoteFileVersion } from '../../protocol/sync-types';
-import { BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, BATCH_UPLOAD_MAX_FILES, MAX_PREVIEW_BYTES } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, deviceBatchLimits, MAX_PREVIEW_BYTES, UPLOAD_PART_BYTES, usesChunkedTransfer, type BatchLimits } from '../../protocol/sync-limits';
+import { Platform } from 'obsidian';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { requestFileVersions } from './version-contract';
 import { parseChanges, parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
@@ -49,6 +50,8 @@ import {
 	type WorkerApiHttpClient,
 } from './http';
 import { sha256Hex } from '@/platform/sha256';
+import { isRecord } from '@/platform/validation';
+import { isAbortError } from '../abort';
 
 // Bounds decrypted plaintext held at once while overlapping batch decryption.
 const DECRYPT_CONCURRENCY = 4;
@@ -68,6 +71,18 @@ export type ChangesPage = ChangesResponse & { nextSince?: number };
 /** Upload operation IDs carry the server's reminder operation day. */
 function createUploadOperationId(info: CrateServerInfo): string {
 	return createReminderOperationId(info.reminderOperationDay);
+}
+
+/** Retries one part of a large transfer after a network failure or server error, so a single
+ * failed request does not restart the whole file. Refusals are returned at once. */
+async function retryTransientRequest<T>(request: () => Promise<T>, attempts = 3): Promise<T> {
+	for (let attempt = 1; ; attempt++) {
+		try { return await request(); } catch (error) {
+			const transient = !(error instanceof HttpError) || error.status === 0 || error.status >= 500;
+			if (!transient || attempt >= attempts || isAbortError(error)) throw error;
+			await new Promise(resolve => window.setTimeout(resolve, 1000 * attempt));
+		}
+	}
 }
 
 export class SyncWorkerApi {
@@ -229,8 +244,9 @@ export class SyncWorkerApi {
 		const uniquePaths = [...new Set(await Promise.all(requested.map(path => this.wireFor(path))))];
 		const files = createPathRecord<FileEntry>();
 
-		for (let index = 0; index < uniquePaths.length; index += BATCH_DOWNLOAD_MAX_FILES) {
-			const chunk = uniquePaths.slice(index, index + BATCH_DOWNLOAD_MAX_FILES);
+		const perRequest = this.batchLimits().downloadFiles;
+		for (let index = 0; index < uniquePaths.length; index += perRequest) {
+			const chunk = uniquePaths.slice(index, index + perRequest);
 			const response = await requestFileMetadata(this.http, chunk);
 			Object.assign(files, response.files);
 		}
@@ -263,15 +279,55 @@ export class SyncWorkerApi {
 		}, transferTimeout(content.byteLength)));
 	}
 
+	/** The batch sizes this device sends to its server; mobile keeps the defaults. */
+	batchLimits(): BatchLimits {
+		return deviceBatchLimits(this.http.serverBatchLimits(), Platform.isMobile);
+	}
+
+	/** Whether this file travels in parts on this server. */
+	usesChunkedUpload(path: string, size: number): boolean {
+		return usesChunkedTransfer(path, size, Boolean(this.encryption), this.http.supportsChunkedUploads());
+	}
+
+	/** Uploads a large plaintext file in parts under one operation. A stored receipt answers
+	 * every step of a retry, and a resumed session accepts every part again. */
+	async uploadChunked(path: string, content: ArrayBuffer, hash: string, size: number, contentType: string,
+		expectedHash: string | null, operationId: string): Promise<UploadResult> {
+		const headers = { [UPLOAD_OPERATION_HEADER]: operationId };
+		const file = { path, hash, size, contentType, expectedHash };
+		const begun = await this.http.requestJson<unknown>('/sync/upload-session?action=begin', { method: 'POST', body: JSON.stringify(file), headers });
+		const partBytes = isRecord(begun) && isRecord(begun.session) ? begun.session.partBytes : undefined;
+		if (partBytes === undefined) return parseUploadResult(begun);
+		if (typeof partBytes !== 'number' || !Number.isSafeInteger(partBytes) || partBytes < 5 * 1024 * 1024) throw new Error('Server returned an invalid upload session');
+		const parts: Array<{ partNumber: number; etag: string }> = [];
+		for (let offset = 0, partNumber = 1; offset < size; offset += partBytes, partNumber++) {
+			const body = content.slice(offset, Math.min(size, offset + partBytes));
+			const response = await retryTransientRequest(() => this.http.requestJson<unknown>(`/sync/upload-session?part=${partNumber}`, {
+				method: 'PUT', body, headers: { ...headers, 'Content-Type': 'application/octet-stream' },
+			}, transferTimeout(body.byteLength)));
+			if (!isRecord(response) || typeof response.etag !== 'string') throw new Error('Server returned an invalid upload part receipt');
+			parts.push({ partNumber, etag: response.etag });
+		}
+		// The server reads the combined file back to check its hash before publishing it.
+		return parseUploadResult(await this.http.requestJson<unknown>('/sync/upload-session?action=complete', {
+			method: 'POST', body: JSON.stringify({ ...file, parts }), headers,
+		}, transferTimeout(0) + Math.ceil(size / (8 * 1024 * 1024)) * 1000));
+	}
+
 	private async newUploadOperationId(): Promise<string> {
 		return createUploadOperationId(await this.getServerInfo());
 	}
 
-	/** `size`, when known, extends the timeout for a large file. */
+	/** `size`, when known, extends the timeout for a large file, and a large plaintext file
+	 * downloads in ranges on a server that offers them. */
 	async downloadFile(path: string, size?: number): Promise<DownloadedFile> {
 		const wire = await this.wireFor(path);
 		const encodedPath = encodeURIComponent(wire);
-		const { body, headers } = await this.http.requestBinary(`/sync/download?path=${encodedPath}`, {}, transferTimeout(size ?? 0));
+		// An unknown size (0) is read from the first range's reply.
+		const ranged = size ? this.usesChunkedUpload(path, size) : this.usesChunkedUpload(path, Number.MAX_SAFE_INTEGER);
+		const { body, headers } = ranged
+			? await this.downloadRanges(`/sync/download?path=${encodedPath}`, path)
+			: await this.http.requestBinary(`/sync/download?path=${encodedPath}`, {}, transferTimeout(size ?? 0));
 		const contentLengthHeader = getHeader(headers, 'Content-Length');
 		const contentLength = contentLengthHeader && /^\d+$/.test(contentLengthHeader)
 			? Number(contentLengthHeader)
@@ -286,6 +342,31 @@ export class SyncWorkerApi {
 		if (!this.encryption) return result;
 		const opened = await this.encryption.download(wire, body, { check: result, expected: path });
 		return { ...result, content: opened.content, ...opened.metadata, verified: true };
+	}
+
+	/** Fetches a file in `UPLOAD_PART_BYTES` ranges into one buffer. Every range must come from
+	 * the same stored revision; the caller still checks the whole file's hash. */
+	private async downloadRanges(url: string, path: string): Promise<{ body: ArrayBuffer; headers: Record<string, string> }> {
+		const range = (offset: number) => retryTransientRequest(() => this.http.requestBinary(url,
+			{ headers: { Range: `bytes=${offset}-${offset + UPLOAD_PART_BYTES - 1}` } }, transferTimeout(UPLOAD_PART_BYTES)));
+		const first = await range(0);
+		// A reply without Content-Range holds the whole file, as for an empty one.
+		const total = Number(/\/(\d+)$/.exec(getHeader(first.headers, 'Content-Range') ?? '')?.[1] ?? first.body.byteLength);
+		if (!Number.isSafeInteger(total) || total < first.body.byteLength) throw new Error('Server returned an invalid download range');
+		if (total === first.body.byteLength) return first;
+		const bytes = new Uint8Array(total);
+		bytes.set(new Uint8Array(first.body), 0);
+		const revision = getHeader(first.headers, REVISION_HEADER);
+		for (let offset = first.body.byteLength; offset < total; offset += UPLOAD_PART_BYTES) {
+			const part = await range(offset);
+			if (part.body.byteLength !== Math.min(UPLOAD_PART_BYTES, total - offset) || getHeader(part.headers, REVISION_HEADER) !== revision) {
+				throw new Error(`${path} changed on the server while downloading. Sync again.`);
+			}
+			bytes.set(new Uint8Array(part.body), offset);
+		}
+		// The first part's length and range headers describe only that part.
+		const headers = Object.fromEntries(Object.entries(first.headers).filter(([name]) => !['content-length', 'content-range'].includes(name.toLowerCase())));
+		return { body: bytes.buffer, headers: { ...headers, 'Content-Length': String(total) } };
 	}
 
 	async checkForChanges(since: number): Promise<CheckResponse> {
@@ -344,10 +425,11 @@ export class SyncWorkerApi {
 		if (files.some(file => !file.operationId)) {
 			files = files.map(file => ({ ...file, operationId: file.operationId ?? createUploadOperationId(info) }));
 		}
-		if (files.length > BATCH_UPLOAD_MAX_FILES) {
+		const perRequest = this.batchLimits().uploadFiles;
+		if (files.length > perRequest) {
 			const results: BatchUploadResponse['results'] = [];
-			for (let offset = 0; offset < files.length; offset += BATCH_UPLOAD_MAX_FILES) {
-				results.push(...(await this.batchUpload(files.slice(offset, offset + BATCH_UPLOAD_MAX_FILES))).results);
+			for (let offset = 0; offset < files.length; offset += perRequest) {
+				results.push(...(await this.batchUpload(files.slice(offset, offset + perRequest))).results);
 			}
 			return { success: results.every(result => result.success), results };
 		}

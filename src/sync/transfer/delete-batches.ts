@@ -1,4 +1,4 @@
-import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
+import { BATCH_DELETE_MAX_FILES, type BatchLimits } from '../../protocol/sync-limits';
 import { isAbortError } from '../abort';
 import { errorMessage } from '../../platform/logger';
 import type { MutationFailure } from '../../protocol/sync-types';
@@ -13,6 +13,8 @@ export interface ConditionalDeleteCandidate {
 }
 
 export interface ConditionalDeleteApi {
+	/** The batch sizes the server accepts; the defaults when absent. */
+	batchLimits?(): BatchLimits;
 	batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>): Promise<{
 		success: boolean;
 		deleted: string[];
@@ -37,13 +39,14 @@ export async function deleteFilesInBatches(
 	const errors: MutationFailure[] = [];
 	let nextIndex = 0;
 	let stopped = false;
+	const perRequest = api.batchLimits?.().deleteFiles ?? BATCH_DELETE_MAX_FILES;
 	let cancelled = false;
 
 	async function worker(): Promise<void> {
 		while (!stopped && nextIndex < files.length) {
 			const index = nextIndex;
-			nextIndex += BATCH_DELETE_MAX_FILES;
-			const chunk = files.slice(index, index + BATCH_DELETE_MAX_FILES);
+			nextIndex += perRequest;
+			const chunk = files.slice(index, index + perRequest);
 			try {
 				await Promise.all(chunk.map(async file => { await assertAbsent?.(file.path); }));
 				if (cancelled) return;
@@ -88,7 +91,7 @@ export async function deleteFilesInBatches(
 	}
 	// Drain dispatched requests before returning so cancellation cannot discard
 	// acknowledgements from a sibling request that already committed.
-	await Promise.all(Array.from({ length: Math.min(BATCH_DELETE_CONCURRENCY, Math.ceil(files.length / BATCH_DELETE_MAX_FILES)) }, worker));
+	await Promise.all(Array.from({ length: Math.min(BATCH_DELETE_CONCURRENCY, Math.ceil(files.length / perRequest)) }, worker));
 
 	const acknowledged = new Set(deleted);
 	return { outcome: cancelled ? 'cancelled' : errors.length === 0 ? 'completed' : 'failed', success: !cancelled && errors.length === 0, deleted: files.filter(file => acknowledged.has(file.path)).map(file => file.path), errors };

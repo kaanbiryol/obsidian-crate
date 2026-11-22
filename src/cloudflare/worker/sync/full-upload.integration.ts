@@ -99,8 +99,9 @@ it('uses larger commits for the initial import', async () => {
 	const result = await client.engine.sync();
 	expect(result.errors).toEqual([]);
 	expect(result.uploaded).toBe(64);
-	expect(batch.mock.calls.map(([, files]) => files.length)).toEqual([32, 32]);
-	expect(client.requests.filter(route => route === 'POST /sync/import/upload')).toHaveLength(2);
+	// A self-hosted server takes the 64 in one batch.
+	expect(batch.mock.calls.map(([, files]) => files.length)).toEqual([64]);
+	expect(client.requests.filter(route => route === 'POST /sync/import/upload')).toHaveLength(1);
 	expect(Object.keys(client.checkpoint().files)).toHaveLength(64);
 	for (let index = 0; index < 64; index++) {
 		expect(await remote(client, `initial-${index}.md`)).toBe(`Initial note ${index}`);

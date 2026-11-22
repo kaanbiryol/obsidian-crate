@@ -23,7 +23,7 @@ import type { CrateServerInfo } from '../../protocol/server-info';
 import type { HostStatus } from '../../protocol/host-status';
 import { WorkerApiHttpClient } from './http';
 import { Platform } from 'obsidian';
-import { deviceFileLimit } from '../../protocol/sync-limits';
+import { deviceFileLimit, type BatchLimits } from '../../protocol/sync-limits';
 import type { ApiHttpTransport } from './http';
 import type {
 	PushSubscriptionsResponse,
@@ -122,9 +122,14 @@ export class SyncApiClient {
 		if (!this.http.knowsServerFileLimit()) await this.http.getServerInfo();
 	}
 
+	/** The batch sizes this device sends to this server. */
+	batchLimits(): BatchLimits {
+		return this.syncApi.batchLimits();
+	}
+
 	/** The largest file this device syncs with this server. */
 	fileLimit(): number {
-		return deviceFileLimit(this.http.serverFileLimit(), Platform.isMobile);
+		return deviceFileLimit(this.http.serverFileLimit(), Platform.isMobile, this.isEncrypted());
 	}
 
 	isConfigured(): boolean {

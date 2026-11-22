@@ -1,9 +1,9 @@
 import { decryptBytes, encryptBytes, type EncryptionContext, type EncryptionKey } from './envelope';
 import { openFileMetadataEnvelope, sealFileMetadata } from './file-metadata-envelope';
-import { encodeEncryptedFile, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
+import { encodeEncryptedFile, MAX_BUFFERED_ENCRYPTED_FILE_BYTES, parseEncryptedFile, validateFileDescriptor, type EncryptedFileDescriptor } from './file-format';
 import { sha256Hex } from '../platform/sha256';
 import { isSha256Hex } from '../platform/validation';
-import { MAX_CONFIGURABLE_FILE_BYTES } from '../protocol/sync-limits';
+import { MAX_BUFFERED_FILE_BYTES } from '../protocol/sync-limits';
 
 export interface PrivateFileMetadata {
 	/** The version of the descriptor that sealed it. */
@@ -44,7 +44,7 @@ function validateMetadata(value: unknown): asserts value is PrivateFileMetadata 
 	if (!value || typeof value !== 'object') throw new Error('Invalid encrypted file metadata');
 	const item = value as Partial<PrivateFileMetadata>;
 	if (item.version !== 1 || typeof item.path !== 'string' || !item.path || item.path.length > 4096 || !isSha256Hex(item.hash)
-		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > MAX_CONFIGURABLE_FILE_BYTES
+		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > MAX_BUFFERED_FILE_BYTES
 		|| !isSha256Hex(item.publicDataHash)) {
 		throw new Error('Encrypted file metadata does not match the requested file');
 	}
@@ -62,8 +62,8 @@ export async function sealFile(input: FileInput, authority: FileEncryptionAuthor
 	const descriptor: EncryptedFileDescriptor = { version: 1, vaultId: authority.vaultId, scopeId: authority.scopeId, objectId: crypto.randomUUID(), keyId: key.id, metadata: '' };
 	descriptor.metadata = await sealFileMetadata(metadata, key, descriptor);
 	// Callers apply the server's and the device's limit before sealing.
-	const ciphertext = await encryptBytes(input.content, key, context(descriptor, 'file'), MAX_CONFIGURABLE_FILE_BYTES);
-	const bytes = encodeEncryptedFile({ descriptor, ciphertext, publicData }, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES);
+	const ciphertext = await encryptBytes(input.content, key, context(descriptor, 'file'), MAX_BUFFERED_FILE_BYTES);
+	const bytes = encodeEncryptedFile({ descriptor, ciphertext, publicData }, MAX_BUFFERED_ENCRYPTED_FILE_BYTES);
 	return { bytes, descriptor, metadata, hash: await digest(bytes) };
 }
 
@@ -87,12 +87,12 @@ export async function openFile(bytes: Uint8Array<ArrayBuffer>, binding: PathBind
 	metadata: PrivateFileMetadata;
 	publicData: unknown;
 }> {
-	const packet = parseEncryptedFile(bytes, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES);
+	const packet = parseEncryptedFile(bytes, MAX_BUFFERED_ENCRYPTED_FILE_BYTES);
 	const { metadata, key } = await openMetadataWithKey(packet.descriptor, binding, authority);
 	if (await digest(new TextEncoder().encode(JSON.stringify(packet.publicData))) !== metadata.publicDataHash) {
 		throw new Error('Encrypted file scheduling metadata failed authentication');
 	}
-	const content = await decryptBytes(packet.ciphertext, key, context(packet.descriptor, 'file'), MAX_CONFIGURABLE_FILE_BYTES);
+	const content = await decryptBytes(packet.ciphertext, key, context(packet.descriptor, 'file'), MAX_BUFFERED_FILE_BYTES);
 	if (content.byteLength !== metadata.size || await digest(content) !== metadata.hash) throw new Error('Encrypted file failed content verification');
 	return { content, metadata, publicData: packet.publicData };
 }

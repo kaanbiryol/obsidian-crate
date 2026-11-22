@@ -7,8 +7,9 @@ import { containsControlCharacters, isRecord } from '../../../platform/validatio
 export const SMALL_JSON_BODY_BYTES = 24_576;
 /** Reading edits and deletions, which carry highlights and notes. */
 export const READING_EDIT_JSON_BODY_BYTES = 262_144;
-/** Batch and initial-import uploads, whose files travel as base64 inside the JSON. */
-export const UPLOAD_BATCH_JSON_BODY_BYTES = 15 * 1024 * 1024;
+/** Batch and initial-import uploads, whose files travel as base64 inside the JSON: room for
+ * the batch byte limit (10 MiB, or 32 MiB self-hosted) as base64 plus metadata. */
+export const UPLOAD_BATCH_JSON_BODY_BYTES = (__CRATE_SELF_HOSTED__ ? 48 : 15) * 1024 * 1024;
 
 export async function parseJsonObject(
 	request: Request,

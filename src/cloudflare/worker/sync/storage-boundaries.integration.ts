@@ -6,7 +6,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { ADVERTISED_FILE_LIMIT_PROTOCOL, CRATE_PLUGIN_PROTOCOL } from '../../../protocol/server-info';
-import { formatFileLimit, MAX_FILE_SIZE_BYTES } from '../../../protocol/sync-limits';
+import { formatFileLimit, MAX_FILE_SIZE_BYTES, SELF_HOSTED_BATCH_LIMITS } from '../../../protocol/sync-limits';
 import { sha256Hex } from '@/platform/sha256';
 
 beforeEach(async () => {
@@ -90,8 +90,9 @@ describe('a self-hosted server with a raised file limit', () => {
 		headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', ...headers } }, protocol);
 
 	it('advertises its limit and refuses clients that predate it', async () => {
-		const info = await (await send('/.well-known/crate')).json() as { limits: unknown; protocol: unknown };
-		expect(info.limits).toEqual({ maxFileBytes: limit });
+		const info = await (await send('/.well-known/crate')).json() as { limits: unknown; protocol: unknown; capabilities: string[] };
+		expect(info.limits).toEqual({ maxFileBytes: limit, batch: SELF_HOSTED_BATCH_LIMITS });
+		expect(info.capabilities).toContain('chunked-uploads-v1');
 		expect(info.protocol).toEqual({ current: CRATE_PLUGIN_PROTOCOL.current, oldestCompatible: ADVERTISED_FILE_LIMIT_PROTOCOL });
 		const old = await upload('old client', {}, 1);
 		expect(old.status).toBe(428);
@@ -114,8 +115,10 @@ describe('a self-hosted server with a raised file limit', () => {
 });
 
 it('keeps the default limit and protocol range without the self-hosted binding', async () => {
-	const info = await (await request('/.well-known/crate')).json() as { limits: unknown; protocol: unknown };
-	expect(info.limits).toEqual({ maxFileBytes: MAX_FILE_SIZE_BYTES });
+	const info = await (await request('/.well-known/crate')).json() as { limits: unknown; protocol: unknown; capabilities: string[] };
+	expect(info.limits).toEqual({ maxFileBytes: MAX_FILE_SIZE_BYTES, batch: SELF_HOSTED_BATCH_LIMITS });
+	// A server at the default, as on Cloudflare, offers no chunked transfers, so clients use one request as before.
+	expect(info.capabilities).not.toContain('chunked-uploads-v1');
 	expect(info.protocol).toEqual(CRATE_PLUGIN_PROTOCOL);
 	const over = await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: 'x',
 		headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', 'X-File-Size': String(MAX_FILE_SIZE_BYTES + 1) } });

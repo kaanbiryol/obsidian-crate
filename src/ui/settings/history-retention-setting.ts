@@ -1,7 +1,7 @@
 import { Notice, type Setting } from 'obsidian';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { serverRequest } from '../../plugin/server-request';
-import { HISTORY_RETENTION_DAYS, parseHistoryRetention, type HistoryRetentionDays } from '../../protocol/history-retention';
+import { HISTORY_RETENTION_DAYS, parseHistoryRetention, type HistoryRetention, type HistoryRetentionDays } from '../../protocol/history-retention';
 import { openConfirmationModal } from '../plugin/confirmation-modal';
 import { errorMessage } from '../../platform/logger';
 
@@ -9,10 +9,10 @@ type RetentionHost = Pick<CratePlugin, 'app' | 'settings' | 'secretStorage'>;
 
 const label = (days: number) => `${days} days`;
 
-async function requestRetention(plugin: RetentionHost, body?: { days: HistoryRetentionDays }): Promise<HistoryRetentionDays> {
+async function requestRetention(plugin: RetentionHost, body?: { days: HistoryRetentionDays }): Promise<HistoryRetention> {
 	const retention = parseHistoryRetention(await serverRequest<unknown>(plugin, '/history-retention', body, { timeout: 10_000 }));
 	if (!retention) throw new Error('Could not read the history period.');
-	return retention.days;
+	return retention;
 }
 
 /** Adds the server's history period to `setting`. Every device shares it. */
@@ -21,7 +21,9 @@ export function addHistoryRetentionDropdown(setting: Setting, plugin: RetentionH
 		for (const days of HISTORY_RETENTION_DAYS) dropdown.addOption(String(days), label(days));
 		dropdown.setDisabled(true);
 		let current: HistoryRetentionDays | null = null;
-		void requestRetention(plugin).then(days => {
+		void requestRetention(plugin).then(({ days, options }) => {
+			// A self-hosted server offers longer periods than the default list.
+			for (const option of options) if (!(HISTORY_RETENTION_DAYS as readonly number[]).includes(option)) dropdown.addOption(String(option), label(option));
 			current = days;
 			dropdown.setValue(String(days)).setDisabled(false);
 		}).catch(() => { dropdown.selectEl.title = 'Could not load the history period from your server.'; });
@@ -39,7 +41,7 @@ export function addHistoryRetentionDropdown(setting: Setting, plugin: RetentionH
 				return;
 			}
 			dropdown.setDisabled(true);
-			try { current = await requestRetention(plugin, { days }); }
+			try { current = (await requestRetention(plugin, { days })).days; }
 			catch (error) { new Notice(`Could not change the history period: ${errorMessage(error)}`); }
 			finally { dropdown.setValue(String(current)).setDisabled(false); }
 		});

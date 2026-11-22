@@ -11,6 +11,7 @@ import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { countD1Queries } from '../test-support/d1-query-test-harness';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
 import { BATCH_UPLOAD_MAX_FILES } from '@/protocol/sync-limits';
+import { MAX_BATCH_UPLOAD_FILES } from './storage';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -73,8 +74,8 @@ it('stays within the query budget on full Markdown replacement and stale batches
 
 it('rejects batches above the limit before storing objects', async () => {
 	const put = vi.spyOn(env.BUCKET, 'put');
-	expect((await send(files('md', BATCH_UPLOAD_MAX_FILES + 1))).status).toBe(400);
-	expect((await send(files('svg', BATCH_UPLOAD_MAX_FILES + 1))).status).toBe(400);
+	expect((await send(files('md', MAX_BATCH_UPLOAD_FILES + 1))).status).toBe(400);
+	expect((await send(files('svg', MAX_BATCH_UPLOAD_FILES + 1))).status).toBe(400);
 	expect(put).not.toHaveBeenCalled();
 });
 

@@ -1,6 +1,6 @@
 import { isEncryptionId, validateBase64Url } from './encoding';
 import { MAX_FILE_METADATA_ENVELOPE_BYTES, MIN_FILE_METADATA_ENVELOPE_BYTES } from './file-metadata-envelope';
-import { MAX_CONFIGURABLE_FILE_BYTES, MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
+import { MAX_BUFFERED_FILE_BYTES, MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export const ENCRYPTED_FILE_CONTENT_TYPE = 'application/vnd.crate.encrypted-file';
 const ENCRYPTED_FILE_PREFIX = 'CRATE-E2EE/1\n';
@@ -12,8 +12,8 @@ export const MAX_ENCRYPTED_PUBLIC_DATA_BYTES = 2 * 1024 * 1024;
 export function encryptedFileLimit(maxFileBytes: number): number {
 	return Math.max(MAX_ENCRYPTED_FILE_BYTES, Math.ceil(maxFileBytes * 4 / 3) + MAX_ENCRYPTED_PUBLIC_DATA_BYTES + 64 * 1024);
 }
-/** The largest encrypted file any server may allow. */
-export const MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES = encryptedFileLimit(MAX_CONFIGURABLE_FILE_BYTES);
+/** The largest encrypted file any server may allow; encrypted files always travel in one request. */
+export const MAX_BUFFERED_ENCRYPTED_FILE_BYTES = encryptedFileLimit(MAX_BUFFERED_FILE_BYTES);
 
 /** This descriptor contains no plaintext content digest or decryption key. It seals
  * `metadata` as the compact envelope in `file-metadata-envelope.ts`. */

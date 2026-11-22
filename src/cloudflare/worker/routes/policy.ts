@@ -1,6 +1,6 @@
 import type { AuthPrincipal } from '../auth/authenticate';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
-import { TRANSFER_PATHS } from '../coordinator/coordinator';
+import { TRANSFER_PATHS, UPLOAD_SESSION_TRANSFER_PATH } from '../coordinator/coordinator';
 
 type Scope = AuthPrincipal['scope'];
 interface ApiRoutePolicy {
@@ -8,7 +8,7 @@ interface ApiRoutePolicy {
 	readonly execution?:
 		| { readonly kind: 'coordinator'; readonly wake: boolean }
 		| { readonly kind: 'reading-grant' }
-		| { readonly kind: 'transfer'; readonly path: typeof TRANSFER_PATHS.syncUpload | typeof TRANSFER_PATHS.syncBatchUpload };
+		| { readonly kind: 'transfer'; readonly path: typeof TRANSFER_PATHS.syncUpload | typeof TRANSFER_PATHS.syncBatchUpload | typeof UPLOAD_SESSION_TRANSFER_PATH };
 	readonly initializeProjection?: boolean;
 	/** Requests per actor per minute, charged only after the actor is verified. */
 	readonly rateLimit?: number;
@@ -93,6 +93,11 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /sync/batch-delete': { scopes: VAULT, execution: COORDINATOR },
 	'POST /sync/restore-version': { scopes: VAULT, execution: COORDINATOR },
 	'PUT /sync/upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncUpload } },
+	// Self-hosted only: chunked uploads of large plaintext attachments, begin or complete (POST), one part (PUT).
+	...__CRATE_SELF_HOSTED__ ? {
+		'POST /sync/upload-session': { scopes: VAULT, execution: { kind: 'transfer', path: UPLOAD_SESSION_TRANSFER_PATH }, plaintextOnly: true },
+		'PUT /sync/upload-session': { scopes: VAULT, execution: { kind: 'transfer', path: UPLOAD_SESSION_TRANSFER_PATH }, plaintextOnly: true },
+	} as const : {},
 	'PUT /sync/import/upload': { scopes: VAULT },
 	'POST /notifications/reminders-exchange': { ...PUBLIC, rateLimit: 10 },
 	'POST /auth/device-pairing': { ...PUBLIC, rateLimit: 10 },

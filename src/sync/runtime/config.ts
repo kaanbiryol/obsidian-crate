@@ -1,3 +1,4 @@
+import { sha256Hex } from '@/platform/sha256';
 import type { Plugin } from "obsidian";
 import type { SecretStorageService } from "../secret-storage";
 import { requireNormalizedWorkerUrl } from "../connection/worker-url";
@@ -20,7 +21,7 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
 	signal?.throwIfAborted();
 	const adapter = plugin.app.vault.adapter;
 	const paths = syncStoragePaths(plugin.manifest.dir!);
-	const checkpoints: Array<{ path: string; content: string; backupPath?: string }> = [];
+	const checkpoints: Array<{ path: string; content: string | ArrayBuffer; backupPath?: string }> = [];
 	for (const path of [paths.manifest, paths.manifestTmp, paths.manifestLog]) {
 		if (await adapter.exists(path)) {
 			signal?.throwIfAborted();
@@ -35,7 +36,9 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
 			signal?.throwIfAborted();
 			// An interrupted record write was never dispatched; the next journal load removes it.
 			if (isUnfinishedUploadRecord(path)) continue;
-			checkpoints.push({ path, content: await adapter.read(path), backupPath: retiredUploadPath(plugin.manifest.dir!, path.split('/').at(-1)!) });
+			// A chunked upload's bytes are binary; records are text.
+			checkpoints.push({ path, content: path.endsWith('.bin') ? await adapter.readBinary(path) : await adapter.read(path),
+				backupPath: retiredUploadPath(plugin.manifest.dir!, path.split('/').at(-1)!) });
 		}
 	}
 	// Preserve both generations for investigation/recovery before invalidating
@@ -44,9 +47,12 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
 	for (const checkpoint of checkpoints) {
 		signal?.throwIfAborted();
 		const backup = previousCheckpointCopy(checkpoint.backupPath ?? checkpoint.path, recoveryId);
-		await adapter.write(backup, checkpoint.content);
+		const { content } = checkpoint;
+		if (typeof content === 'string') await adapter.write(backup, content); else await adapter.writeBinary(backup, content);
 		signal?.throwIfAborted();
-		if (await adapter.read(backup) !== checkpoint.content) throw new Error('Could not verify the previous sync checkpoint backup');
+		const copied = typeof content === 'string' ? await adapter.read(backup) === content
+			: await sha256Hex(await adapter.readBinary(backup)) === await sha256Hex(content);
+		if (!copied) throw new Error('Could not verify the previous sync checkpoint backup');
 	}
 	for (const checkpoint of checkpoints) {
 		signal?.throwIfAborted();

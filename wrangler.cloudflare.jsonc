@@ -1,0 +1,49 @@
+{
+	"name": "crate-sync",
+	"main": ".generated/cloudflare/worker.mjs",
+	"compatibility_date": "2026-08-18",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+	"workers_dev": true,
+	"vars": { "CRATE_PUBLIC_ORIGIN": "http://localhost:8787" },
+	"no_bundle": true,
+	"triggers": {
+		"crons": []
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "crate-sync",
+			"database_id": "00000000-0000-0000-0000-000000000000"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "BUCKET",
+			"bucket_name": "crate-sync"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "REMINDER_ALARMS",
+				"class_name": "ReminderAlarm"
+			}
+		]
+	},
+	"exports": {
+		"ReminderAlarm": {
+			"type": "durable-object",
+			"storage": "sqlite"
+		}
+	},
+	"ratelimits": [
+		{
+			"name": "NOTIFICATION_REQUEST_LIMITER",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 60,
+				"period": 60
+			}
+		}
+	]
+}

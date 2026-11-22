@@ -1,7 +1,7 @@
 import type { EncryptionServerState } from '../../../encryption/server-state';
 import { trackUploadLease } from './staging/upload-leases';
-import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES } from '../../../encryption/file-format';
-import { formatFileLimit, MAX_CONFIGURABLE_FILE_BYTES, MAX_FILE_SIZE_BYTES } from '../../../protocol/sync-limits';
+import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit, MAX_BUFFERED_ENCRYPTED_FILE_BYTES } from '../../../encryption/file-format';
+import { formatFileLimit, MAX_BUFFERED_FILE_BYTES, MAX_CONFIGURABLE_FILE_BYTES, MAX_FILE_SIZE_BYTES } from '../../../protocol/sync-limits';
 import { EncryptionStateError, validateUploadEncryption } from '../encryption/state';
 import { beginUploadOperation } from './upload-operations';
 import { exactArrayBuffer, readLimitedRequestBody } from '../http/body-reader';
@@ -24,7 +24,9 @@ import { FILE_HASH_HEADER, FILE_SIZE_HEADER, EXPECTED_HASH_HEADER, UPLOAD_OPERAT
 import { sha256Hex } from '../../../platform/sha256';
 
 export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, committers: UploadCommitters, expectedEncryption?: EncryptionServerState | null, resetGeneration?: string | null, maxFileBytes = MAX_FILE_SIZE_BYTES): Promise<Response> {
-	const limit = fileTransportLimit(request.headers.get('Content-Type') ?? undefined, maxFileBytes);
+	// Larger plaintext attachments use chunked upload sessions.
+	const single = Math.min(maxFileBytes, MAX_BUFFERED_FILE_BYTES);
+	const limit = fileTransportLimit(request.headers.get('Content-Type') ?? undefined, single);
 	const url = new URL(request.url);
 	const rawPath = url.searchParams.get('path');
 	if (!rawPath) return corsResponse({ error: 'Path query parameter required' }, 400);
@@ -46,7 +48,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		return corsResponse({ error: 'Invalid Content-Length header' }, 400);
 	}
 	if ((declaredSize ?? 0) > limit || (contentLength ?? 0) > limit) {
-		return corsResponse({ error: `File exceeds ${formatFileLimit(maxFileBytes)} limit` }, 413);
+		return corsResponse({ error: `File exceeds ${formatFileLimit(single)} limit` }, 413);
 	}
 
 	const expectedHash = parseExpectedFileHash(request.headers.get(EXPECTED_HASH_HEADER));
@@ -129,6 +131,19 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 	}
 }
 
+/** One `bytes=start-end` range inside a file of `size` bytes, so a large file downloads
+ * in parts; null without a Range header. */
+function parseByteRange(header: string | null, size: number): { offset: number; length: number } | null | 'invalid' {
+	// An empty file has no range to serve; it is returned whole.
+	if (header === null || size === 0) return null;
+	const match = /^bytes=(\d+)-(\d*)$/.exec(header.trim());
+	if (!match) return 'invalid';
+	// A range past the end is cut to the file, so a client may ask for a part before it knows the size.
+	const offset = Number(match[1]), end = Math.min(match[2] ? Number(match[2]) : size - 1, size - 1);
+	if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(end) || offset > end) return 'invalid';
+	return { offset, length: end - offset + 1 };
+}
+
 export async function handleDownload(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const url = new URL(request.url);
 	const rawPath = url.searchParams.get('path');
@@ -146,11 +161,14 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 
 	const objectKey = storedFile?.storageKey ?? null;
 	if (!objectKey) return corsResponse({ error: 'File not found' }, 404);
-	if (storedFile && storedFile.size > MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES) {
+	if (storedFile && storedFile.size > Math.max(MAX_CONFIGURABLE_FILE_BYTES, MAX_BUFFERED_ENCRYPTED_FILE_BYTES)) {
 		return corsResponse({ error: 'File exceeds the download limit' }, 413);
 	}
 
-	const obj = await bucket.get(objectKey);
+	// Only self-hosted servers, whose larger files download in parts, serve ranges.
+	const range = __CRATE_SELF_HOSTED__ && storedFile ? parseByteRange(request.headers.get('Range'), storedFile.size) : null;
+	if (range === 'invalid') return corsResponse({ error: 'Requested range is not satisfiable' }, 416);
+	const obj = __CRATE_SELF_HOSTED__ && range ? await bucket.get(objectKey, { range }) : await bucket.get(objectKey);
 	if (!obj) {
 		return corsResponse({ error: 'File content unavailable' }, 503);
 	}
@@ -162,10 +180,11 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 	}
 
 	return new Response(obj.body, {
-		status: 200,
+		status: __CRATE_SELF_HOSTED__ && range ? 206 : 200,
 		headers: {
 			'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
-			'Content-Length': String(obj.size),
+			'Content-Length': String(__CRATE_SELF_HOSTED__ && range ? range.length : obj.size),
+			...(__CRATE_SELF_HOSTED__ && range ? { 'Content-Range': `bytes ${range.offset}-${range.offset + range.length - 1}/${obj.size}` } : {}),
 			'Cache-Control': 'private, no-store',
 			[REVISION_HEADER]: storedFile?.storageKey ?? '',
 			[FILE_HASH_HEADER]: storedFile?.hash || obj.customMetadata?.hash || '',

@@ -18,7 +18,7 @@ import { HttpError } from '../worker-api/http';
 const logger = createLogger("SyncTransfer");
 
 type UploadTransferContext = Pick<TransferContext, 'runConcurrent' | 'retryWithBackoff' | 'getModifiedIso'> & {
-	files: Pick<TransferContext['files'], 'uploadFile' | 'batchUpload'>;
+	files: Pick<TransferContext['files'], 'uploadFile' | 'batchUpload' | 'batchLimits'>;
 	localManifest: Pick<TransferContext['localManifest'], 'setEntry'>;
 	markdownBaseCache?: Pick<NonNullable<TransferContext['markdownBaseCache']>, 'putBase'>;
 };
@@ -44,7 +44,7 @@ export async function uploadPreparedFiles(
 	};
 
 	if (batchable.length > 0) {
-		const chunks = createBatchUploadChunks(batchable);
+		const chunks = createBatchUploadChunks(batchable, context.files.batchLimits?.());
 		const batchTasks = chunks.map((chunk) => async () => {
 			if (stopped !== undefined) {
 				failUploads(chunk, stopped);

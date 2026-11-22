@@ -97,8 +97,9 @@ export async function listenLocalServer(runtime, { host = '127.0.0.1', port = 87
 			response.end(JSON.stringify({ error: 'Local server unavailable' }));
 		}
 	});
-	// Two minutes, or long enough to receive the largest file at 256 KiB/s.
-	server.requestTimeout = Math.max(120_000, Math.ceil(maxFileBytes / (256 * 1024)) * 1000);
+	// Two minutes, or long enough to receive the largest single request at 256 KiB/s. Larger
+	// files travel in parts; 128 MiB mirrors MAX_BUFFERED_FILE_BYTES in src/protocol/sync-limits.ts.
+	server.requestTimeout = Math.max(120_000, Math.ceil(Math.min(maxFileBytes, 128 * 1024 * 1024) / (256 * 1024)) * 1000);
 	await /** @type {Promise<void>} */ (new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); }));
 	return server;
 }

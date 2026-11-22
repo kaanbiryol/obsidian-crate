@@ -5,9 +5,10 @@ export const bundleBudgets = {
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
 		// Self-hosted server health, install-aware commands, pairing links, Reading image
-		// and gist saving and Vault history's Deleted files view measure 5.000 MB raw / 2.312 MB gzip.
-		maxBytes: 5000500,
-		maxGzipBytes: 2316000,
+		// and gist saving, Vault history's Deleted files view and chunked transfers for
+		// self-hosted servers measure 5.011 MB raw / 2.316 MB gzip.
+		maxBytes: 5011500,
+		maxGzipBytes: 2317000,
 	},
 	{
 		path: 'dist/styles.css',
@@ -23,21 +24,27 @@ export const bundleBudgets = {
 		// 4.043 MB raw / 1.294 MB gzip.
 		maxBytes: 4085000,
 		maxGzipBytes: 1307000,
+	}, {
+		path: '.generated/cloudflare/worker-self-hosted.mjs',
+		// The server package's Worker: the deployable one plus chunked uploads and ranged
+		// downloads, 4.019 MB raw / 1.282 MB gzip.
+		maxBytes: 4085000,
+		maxGzipBytes: 1307000,
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
 		// Every feature loads at startup. Reading article images (vault image loading,
 		// encrypted image saves, offline copies, image highlights) and the advertised
-		// server file limit measure 1.2055 MB raw / 395.5 KB gzip.
-		maxBytes: 1205600,
-		maxGzipBytes: 395500,
+		// server file and batch limits measure 1.2062 MB raw / 395.7 KB gzip.
+		maxBytes: 1206200,
+		maxGzipBytes: 395800,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Reading article images, offline copies, image highlights and the advertised
-		// server file limit measure 1.926 MB raw / 636.4 KB gzip.
-		maxBytes: 1926100,
-		maxGzipBytes: 636500,
+		// server file and batch limits measure 1.928 MB raw / 636.7 KB gzip.
+		maxBytes: 1927800,
+		maxGzipBytes: 636700,
 	}],
 };

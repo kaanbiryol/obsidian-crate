@@ -2,7 +2,8 @@ import { expect, it, vi } from 'vitest';
 import release from '../../cloudflare/server-release.json';
 import { checkServerVersion, isBundledServerNewer } from './server-version';
 
-vi.mock('../../cloudflare/deployment/embedded-artifacts', () => ({ EMBEDDED_CLOUDFLARE_ARTIFACT: { fingerprint: 'a'.repeat(64) } }));
+// Self-hosted servers are compared with the self-hosted bundle's fingerprint.
+vi.mock('../../cloudflare/deployment/embedded-artifacts', () => ({ EMBEDDED_CLOUDFLARE_ARTIFACT: { fingerprint: 'c'.repeat(64), selfHostedFingerprint: 'a'.repeat(64) } }));
 
 it('offers the bundled server for an older revision or a development build it can replace', () => {
 	const development = { worker: 'crate-0123456789abcdef', number: 3 };

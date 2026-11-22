@@ -8,7 +8,7 @@ type Live = { serverRevision?: number; deploymentFingerprint?: string; developme
 
 async function render(live: Live | Error, options: { deployment?: object; host?: object | null } = {}) {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../../../cloudflare/deployment/embedded-artifacts', () => ({ EMBEDDED_CLOUDFLARE_ARTIFACT: { fingerprint: bundled } }));
+	vi.doMock('../../../cloudflare/deployment/embedded-artifacts', () => ({ EMBEDDED_CLOUDFLARE_ARTIFACT: { fingerprint: 'c'.repeat(64), selfHostedFingerprint: bundled } }));
 	const { renderSelfHostedUpdateNotice } = await import('./self-hosted-update-notice');
 	const plugin = {
 		settings: { workerUrl: 'https://crate.example', cloudflareDeployment: options.deployment ?? null },

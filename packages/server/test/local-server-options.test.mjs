@@ -66,13 +66,13 @@ test('reads the file limit from --max-file-size or CRATE_MAX_FILE_SIZE_MB', () =
 	const MB = 1024 * 1024;
 	assert.equal(resolveMaxFileBytes({}, {}), undefined);
 	assert.equal(resolveMaxFileBytes({ 'max-file-size': '100' }, {}), 100 * MB);
-	assert.equal(resolveMaxFileBytes({}, { CRATE_MAX_FILE_SIZE_MB: ' 128 ' }), 128 * MB);
+	assert.equal(resolveMaxFileBytes({}, { CRATE_MAX_FILE_SIZE_MB: ' 1024 ' }), 1024 * MB);
 	assert.equal(resolveMaxFileBytes({ 'max-file-size': '30' }, { CRATE_MAX_FILE_SIZE_MB: '200' }), 30 * MB);
-	for (const value of ['24', '129', '1.5', 'big', '']) {
-		assert.throws(() => resolveMaxFileBytes({ 'max-file-size': value }, {}), { message: '--max-file-size must be a whole number of MB from 25 to 128.' });
+	for (const value of ['24', '1025', '1.5', 'big', '']) {
+		assert.throws(() => resolveMaxFileBytes({ 'max-file-size': value }, {}), { message: '--max-file-size must be a whole number of MB from 25 to 1024.' });
 	}
 	assert.throws(() => validateCommandOptions(['backup'], { 'max-file-size': '100' }), { message: '--max-file-size belongs to start, setup and service.' });
-	assert.throws(() => validateCommandOptions(['start'], { 'max-file-size': '1000' }), { message: '--max-file-size must be a whole number of MB from 25 to 128.' });
+	assert.throws(() => validateCommandOptions(['start'], { 'max-file-size': '2000' }), { message: '--max-file-size must be a whole number of MB from 25 to 1024.' });
 	assert.doesNotThrow(() => validateCommandOptions(['service'], { 'max-file-size': '100' }));
 });
 

@@ -26,11 +26,11 @@ Run \`node scripts/check-contract-docs.mjs --write\` after changing those contra
 | Shortcut template revision | ${shortcut.revision} |
 | Oldest compatible shortcut revision | ${shortcut.minimumRevision} |
 | Registered migrations | ${release.migrations.map(item => `\`${item.id}\` (${item.from} → ${item.to})`).join(', ') || 'None'} |
-| Upload batch | ${limits.BATCH_UPLOAD_MAX_FILES} files |
-| Delete batch | ${limits.BATCH_DELETE_MAX_FILES} files |
-| Download batch | ${limits.BATCH_DOWNLOAD_MAX_FILES} files |
-| Upload batch bytes | ${limits.BATCH_UPLOAD_MAX_BYTES} |
-| Download batch bytes | ${limits.BATCH_DOWNLOAD_MAX_BYTES} |
+| Upload batch | ${limits.BATCH_UPLOAD_MAX_FILES} files (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.uploadFiles}) |
+| Delete batch | ${limits.BATCH_DELETE_MAX_FILES} files (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.deleteFiles}) |
+| Download batch | ${limits.BATCH_DOWNLOAD_MAX_FILES} files (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.downloadFiles}) |
+| Upload batch bytes | ${limits.BATCH_UPLOAD_MAX_BYTES} (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.uploadBytes}) |
+| Download batch bytes | ${limits.BATCH_DOWNLOAD_MAX_BYTES} (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.downloadBytes}) |
 | Largest file | ${limits.MAX_FILE_SIZE_BYTES} bytes by default; a self-hosted server may advertise up to ${limits.MAX_CONFIGURABLE_FILE_BYTES} bytes |
 
 Schema 1 is the baseline with no registered migrations. Matching numbers alone

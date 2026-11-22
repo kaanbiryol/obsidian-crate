@@ -1,3 +1,4 @@
+import { formatFileLimit } from '../../../protocol/sync-limits';
 import { MAX_ENCRYPTED_REMINDER_REQUEST_BYTES, isReceiptEnvelope } from '../../../encryption/receipt-format';
 
 import { ENCRYPTED_INVENTORY_PAGE, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '../../../encryption/file-inventory';
@@ -151,7 +152,7 @@ async function downloadEncryptedFiles(request: Request, env: Env, label: string,
 		const row = stored.get(file.path);
 		return total + (row?.storageKey === file.revision && row.size <= MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES ? row.size : 0);
 	}, 0);
-	if (declared > MAX_BATCH_DOWNLOAD_BYTES) return corsResponse({ error: 'Batch download exceeds 8MB limit; download fewer notes' }, 413);
+	if (declared > MAX_BATCH_DOWNLOAD_BYTES) return corsResponse({ error: `Batch download exceeds ${formatFileLimit(MAX_BATCH_DOWNLOAD_BYTES)} limit; download fewer notes` }, 413);
 	const download = async (file: { path: string; revision: string }): Promise<DownloadedNote> => {
 		const row = stored.get(file.path);
 		if (!row) return { ...file, error: 'Note not found', code: 'not_found' };

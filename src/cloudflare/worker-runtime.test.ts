@@ -23,3 +23,12 @@ it('runs the development and test Worker with the deployed runtime settings', ()
 	expect(Object.keys(wrangler.exports)).toEqual([runtime.durableObjectClass]);
 	expect(wrangler.ratelimits.map(({ name, simple }) => ({ name, simple }))).toEqual([{ name: runtime.bindings.notificationRateLimiter, simple: runtime.notificationRateLimit }]);
 });
+
+// The Cloudflare bundle's suite uses its own config; it must differ only in which bundle it runs.
+it('runs the Cloudflare bundle suite with the same runtime as every other Worker suite', () => {
+	const selfHosted = JSON.parse(readFileSync('wrangler.jsonc', 'utf8')) as WranglerConfig & { main: string };
+	const cloudflare = JSON.parse(readFileSync('wrangler.cloudflare.jsonc', 'utf8')) as WranglerConfig & { main: string };
+	expect(selfHosted.main).toBe('.generated/cloudflare/worker-self-hosted.mjs');
+	expect(cloudflare.main).toBe('.generated/cloudflare/worker.mjs');
+	expect({ ...cloudflare, main: selfHosted.main }).toEqual(selfHosted);
+});

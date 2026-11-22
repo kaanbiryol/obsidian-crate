@@ -1,8 +1,8 @@
 import { emptyRequestTimings } from '../diagnostics/timings';
 import type { CrateServerInfo } from '../../protocol/server-info';
 import { normalizeUploadOperationIds } from '../diagnostics/request-diagnostics';
-import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo, serverMaxFileBytes } from '../../protocol/server-info';
-import { MAX_FILE_SIZE_BYTES } from '../../protocol/sync-limits';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo, serverBatchLimits, serverMaxFileBytes } from '../../protocol/server-info';
+import { CHUNKED_UPLOAD_CAPABILITY, DEFAULT_BATCH_LIMITS, MAX_FILE_SIZE_BYTES, type BatchLimits } from '../../protocol/sync-limits';
 import { UPLOAD_OPERATION_HEADER, UPLOAD_OPERATIONS_HEADER, CLIENT_SESSION_HEADER, OPERATION_ID_HEADER, REQUEST_ID_HEADER } from '../../protocol/http-headers';
 import { requestUrl } from 'obsidian';
 import { createLogger } from '../logger';
@@ -178,6 +178,8 @@ export class WorkerApiHttpClient {
 	private serverInfoRequest?: Promise<CrateServerInfo>;
 	/** From the last server info this connection read. */
 	private maxFileBytes?: number;
+	private chunkedUploads = false;
+	private batchLimits: BatchLimits = DEFAULT_BATCH_LIMITS;
 	private requestGeneration = 0;
 	private readonly encryptionGuard = new EncryptionDowngradeGuard();
 
@@ -224,6 +226,8 @@ export class WorkerApiHttpClient {
 			if (this.serverInfoRequest === pending) {
 				this.serverInfo = { value: info, expires: performance.now() + SERVER_INFO_CACHE_MS };
 				this.maxFileBytes = serverMaxFileBytes(info);
+				this.chunkedUploads = info.capabilities.includes(CHUNKED_UPLOAD_CAPABILITY);
+				this.batchLimits = serverBatchLimits(info);
 			}
 			return info;
 		}).finally(() => {
@@ -236,6 +240,16 @@ export class WorkerApiHttpClient {
 	/** The largest file the server accepts, as of the last `getServerInfo`; the default until then. */
 	serverFileLimit(): number {
 		return this.maxFileBytes ?? MAX_FILE_SIZE_BYTES;
+	}
+
+	/** The batch sizes the server accepts, as of the last `getServerInfo`; the defaults until then. */
+	serverBatchLimits(): BatchLimits {
+		return this.batchLimits;
+	}
+
+	/** Whether the server, as of the last `getServerInfo`, takes large files in parts. */
+	supportsChunkedUploads(): boolean {
+		return this.chunkedUploads;
 	}
 
 	/** Whether this connection has read the server's file limit. */

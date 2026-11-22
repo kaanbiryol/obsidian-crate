@@ -11,7 +11,7 @@ import { errorMessage } from "../../platform/logger";
 import type { SyncResult } from '../types';
 import type { MutationFailure } from '../../protocol/sync-types';
 import { fileFailure, isAuthError, isTransientSyncFailure } from '../failures';
-import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT } from '../../protocol/sync-limits';
+import { BATCH_FILE_SIZE_LIMIT, DEFAULT_BATCH_LIMITS } from '../../protocol/sync-limits';
 import { sha256Hex } from '../../platform/sha256';
 import { getBatchDownloadConcurrency, getDownloadApplyConcurrency } from './budget';
 
@@ -150,13 +150,14 @@ export async function parallelDownloadAndSaveFiles(
 	}
 
 	if (batchable.length > 0) {
+		const limits = context.files.batchLimits?.() ?? DEFAULT_BATCH_LIMITS;
 		const chunks: DownloadRequest[][] = [];
 		let currentChunk: DownloadRequest[] = [];
 		let currentBytes = 0;
 		for (const request of batchable) {
 			if (
-				currentChunk.length >= BATCH_DOWNLOAD_MAX_FILES
-				|| (currentChunk.length > 0 && currentBytes + request.remoteSize > BATCH_DOWNLOAD_MAX_BYTES)
+				currentChunk.length >= limits.downloadFiles
+				|| (currentChunk.length > 0 && currentBytes + request.remoteSize > limits.downloadBytes)
 			) {
 				chunks.push(currentChunk);
 				currentChunk = [];

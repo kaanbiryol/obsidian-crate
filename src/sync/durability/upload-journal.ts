@@ -3,8 +3,11 @@ import { createAbortError } from '../abort';
 import { createReminderOperationId, reminderOperationDay } from '@/protocol/reminder-operation';
 import { isRecord } from '@/platform/validation';
 import { validateUploadIntent, type IntendedUpload, type JournalUpload, type PrepareUploadWire } from './upload-intent';
+import { sha256Hex } from '@/platform/sha256';
 
 export const UPLOAD_JOURNAL_VERSION = 1;
+/** Records of chunked uploads, whose bytes are in a `<operation>.bin` file beside them. */
+const CHUNKED_UPLOAD_JOURNAL_VERSION = 2;
 
 /** A record whose write never reached its final name. Its request was never dispatched. */
 export const isUnfinishedUploadRecord = (path: string): boolean => path.endsWith('.json.tmp');
@@ -30,6 +33,13 @@ export class UploadJournal {
 		const ordered: Array<{ file: JournalUpload; sequence: number }> = [];
 		for (const path of listing.files) {
 			if (path.endsWith('/.DS_Store')) continue;
+			// A chunked upload's bytes, read with its record. Without a record it was never dispatched.
+			if (path.endsWith('.bin')) {
+				if (!present.has(`${path.slice(0, -4)}.json`)) {
+					try { await this.adapter.remove(path); } catch { /* Ignored again on the next load. */ }
+				}
+				continue;
+			}
 			// Discard an interrupted write. A final record for the same id is read on its own.
 			if (isUnfinishedUploadRecord(path)) {
 				try { await this.adapter.remove(path); } catch { /* Still never dispatched; ignored on every load. */ }
@@ -40,8 +50,10 @@ export class UploadJournal {
 			let raw: unknown;
 			try { raw = JSON.parse(await this.adapter.read(path)); } catch { throw new Error('Unreadable upload journal. Preserve the vault and its sync metadata before resetting.'); }
 			if (!isRecord(raw) || raw.authority !== this.authority || !isRecord(raw.file)) throw new Error('Upload journal belongs to another server or is damaged. Preserve it before resetting sync.');
-			if (raw.version !== UPLOAD_JOURNAL_VERSION) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing.');
 			const file = raw.file;
+			const chunked = raw.version === CHUNKED_UPLOAD_JOURNAL_VERSION && file.contentFile !== undefined;
+			if (raw.version !== UPLOAD_JOURNAL_VERSION && !chunked) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing.');
+			if (chunked && !present.has(`${this.directory}/${String(file.contentFile)}`)) throw new Error('A pending upload lost its saved bytes. Preserve the vault and compare local and remote files before resetting sync.');
 			if (typeof raw.sequence !== 'number' || !Number.isSafeInteger(raw.sequence) || raw.sequence < 1) throw new Error('Invalid upload journal sequence');
 			this.sequence = Math.max(this.sequence, raw.sequence);
 			if (typeof file.operationId !== 'string' || reminderOperationDay(file.operationId) === null
@@ -56,6 +68,19 @@ export class UploadJournal {
 	completedSnapshot(): string[] { return [...this.completed]; }
 	complete(id: string): void { this.entries.delete(id); this.completed.add(id); }
 
+	/** Records a chunked upload: `bytes` are saved beside the record, never as base64 in it. */
+	async prepareChunked(file: Omit<IntendedUpload, 'content' | 'intent'>, bytes: ArrayBuffer, day: number, clientSession: string = crypto.randomUUID()): Promise<JournalUpload> {
+		return this.prepareOne({ ...file, content: '', intent: { kind: 'local' } }, day, clientSession, undefined, bytes);
+	}
+
+	/** A chunked upload's saved bytes, checked against its record. */
+	async readContent(file: JournalUpload): Promise<ArrayBuffer> {
+		if (!file.contentFile) throw new Error('This upload keeps its bytes in its record');
+		const bytes = await this.adapter.readBinary(`${this.directory}/${file.contentFile}`);
+		if (bytes.byteLength !== file.size || await sha256Hex(bytes) !== file.hash) throw new Error('A pending upload\'s saved bytes are damaged. Preserve the vault and compare local and remote files before resetting sync.');
+		return bytes;
+	}
+
 	async prepare(files: IntendedUpload[], day: number, clientSession: string = crypto.randomUUID(), prepareWire?: PrepareUploadWire): Promise<JournalUpload[]> {
 		const result: JournalUpload[] = [];
 		for (const file of files) result.push(await this.prepareOne(file, day, clientSession, prepareWire));
@@ -64,10 +89,11 @@ export class UploadJournal {
 
 	/** Encrypts outside the write chain, so concurrent batches only serialize
 	 * sequence assignment and the journal write. */
-	private async prepareOne(file: IntendedUpload, day: number, clientSession: string, prepareWire?: PrepareUploadWire): Promise<JournalUpload> {
+	private async prepareOne(file: IntendedUpload, day: number, clientSession: string, prepareWire?: PrepareUploadWire, bytes?: ArrayBuffer): Promise<JournalUpload> {
 		if (this.closed) throw createAbortError('Sync engine closed');
 		const seal = async (): Promise<JournalUpload> => {
-			const durable: JournalUpload = { ...file, origin: { clientSession, at: new Date().toISOString() }, operationId: file.operationId ?? createReminderOperationId(day) };
+			const operationId = file.operationId ?? createReminderOperationId(day);
+			const durable: JournalUpload = { ...file, origin: { clientSession, at: new Date().toISOString() }, operationId, ...(bytes ? { contentFile: `${operationId}.bin` } : {}) };
 			this.assertNewOperation(durable.operationId);
 			const encryptedWire = await prepareWire?.(durable);
 			// Sealing already hashed this plaintext and ciphertext; check only the shape.
@@ -94,14 +120,18 @@ export class UploadJournal {
 			// write leaves only a temporary file, and a damaged final record still fails closed.
 			const path = this.path(durable.operationId);
 			const temporary = `${path}.tmp`;
+			const contentPath = durable.contentFile && `${this.directory}/${durable.contentFile}`;
 			try {
 				// A record already at this name may have been sent; never replace it.
 				if (await this.adapter.exists(path)) throw new Error('Invalid or reused upload operation identity');
-				await this.adapter.write(temporary, JSON.stringify({ version: UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
+				// The bytes land before the record, so a record never names missing bytes.
+				if (contentPath && bytes) await this.adapter.writeBinary(contentPath, bytes);
+				await this.adapter.write(temporary, JSON.stringify({ version: contentPath ? CHUNKED_UPLOAD_JOURNAL_VERSION : UPLOAD_JOURNAL_VERSION, authority: this.authority, sequence: ++this.sequence, file: durable }));
 				await this.adapter.rename(temporary, path);
 			} catch (error) {
 				this.directoryReady = false;
 				try { await this.adapter.remove(temporary); } catch { /* Removed on the next load. */ }
+				if (contentPath) try { await this.adapter.remove(contentPath); } catch { /* Removed on the next load. */ }
 				throw error;
 			}
 			this.entries.set(durable.operationId, durable);
@@ -123,6 +153,9 @@ export class UploadJournal {
 	async pruneCompleted(ids: string[]): Promise<void> {
 		for (const id of ids) {
 			try { await this.adapter.remove(this.path(id)); } catch { continue; }
+			// Bytes without their record are removed on the next load if this fails.
+			const contentPath = `${this.directory}/${id}.bin`;
+			if (await this.adapter.exists(contentPath)) try { await this.adapter.remove(contentPath); } catch { /* See above. */ }
 			this.entries.delete(id);
 			this.completed.delete(id);
 		}

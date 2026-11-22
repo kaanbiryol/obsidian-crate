@@ -1,3 +1,4 @@
+import type { BatchLimits } from '../../protocol/sync-limits';
 import type { PlannedContent } from '../planner/planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { DownloadedBatch, DownloadedFile } from '../worker-api/sync';
@@ -50,6 +51,8 @@ interface TransferApi {
 	downloadFile(path: string, size?: number): Promise<DownloadedFile>;
 	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
 	batchDownload(paths: string[]): Promise<DownloadedBatch>;
+	/** The batch sizes the server accepts; the defaults when absent. */
+	batchLimits?(): BatchLimits;
 }
 
 export interface TransferContext {

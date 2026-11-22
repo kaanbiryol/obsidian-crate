@@ -1,4 +1,5 @@
-import { MAX_CHECKPOINT_BYTES, MAX_CHECKPOINT_FILES, MAX_ENCRYPTED_CHECKPOINT_BYTES, MAX_SHARED_CHECKPOINTS, isCheckpointId,
+import { ADVERTISED_FILE_LIMIT_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../../protocol/server-info';
+import { MAX_CHECKPOINT_BYTES, MAX_CHECKPOINT_FILES, MAX_ENCRYPTED_CHECKPOINT_BYTES, MAX_SHARED_CHECKPOINTS, SELF_HOSTED_SHARED_CHECKPOINTS, isCheckpointId,
 	parseSharedCheckpointList, type SharedCheckpoint } from '../../../protocol/history-checkpoints';
 import type { FileEntry } from '../../../protocol/sync-types';
 import { portablePathKey } from '../../../protocol/portable-path';
@@ -55,6 +56,9 @@ async function generation(db: D1Database) {
 }
 
 /** Snapshot authoritative metadata only. Every page must belong to one generation. */
+/** Checkpoints the index keeps; a self-hosted server's storage is its own disk. */
+export const SHARED_CHECKPOINT_LIMIT = __CRATE_SELF_HOSTED__ ? SELF_HOSTED_SHARED_CHECKPOINTS : MAX_SHARED_CHECKPOINTS;
+
 export async function createSharedCheckpoint(bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const start = await generation(db);
 	if (start.state !== 'complete') return response({ error: 'Finish the initial sync before creating a checkpoint.' }, 409);
@@ -97,7 +101,7 @@ export async function createSharedCheckpoint(bucket: R2Bucket, db: D1Database): 
 		const current = index.checkpoints.filter(entry => live(entry, start));
 		const duplicate = current.find(entry => entry.sequence === checkpoint.sequence);
 		if (duplicate) return deleteCheckpointObjects(bucket, [checkpoint], response({ checkpoint: duplicate }));
-		const checkpoints = [...current, checkpoint].sort((a, b) => b.sequence - a.sequence || b.timestamp.localeCompare(a.timestamp)).slice(0, MAX_SHARED_CHECKPOINTS);
+		const checkpoints = [...current, checkpoint].sort((a, b) => b.sequence - a.sequence || b.timestamp.localeCompare(a.timestamp)).slice(0, SHARED_CHECKPOINT_LIMIT);
 		if (!checkpoints.some(entry => entry.id === checkpoint.id)) return deleteCheckpointObjects(bucket, [checkpoint], response({ error: 'Newer checkpoints replaced this state. Sync again.' }, 409));
 		const written = await bucket.put(HISTORY_INDEX_KEY, JSON.stringify({ version: 1, checkpoints }), {
 			onlyIf: index.etag ? { etagMatches: index.etag } : { etagDoesNotMatch: '*' },
@@ -117,9 +121,12 @@ async function deleteCheckpointObjects(bucket: R2Bucket, checkpoints: SharedChec
 	return result;
 }
 
-export async function listSharedCheckpoints(bucket: R2Bucket, db: D1Database): Promise<Response> {
+export async function listSharedCheckpoints(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const [index, limits] = await Promise.all([readIndex(bucket), historyLimits(db)]);
-	return response({ version: 1, checkpoints: index.checkpoints.filter(entry => live(entry, limits)) });
+	const checkpoints = index.checkpoints.filter(entry => live(entry, limits));
+	// Plugins before protocol 2 refuse a list longer than 20; give them the newest 20.
+	const older = Number(request.headers.get(CRATE_PROTOCOL_HEADER)) < ADVERTISED_FILE_LIMIT_PROTOCOL;
+	return response({ version: 1, checkpoints: __CRATE_SELF_HOSTED__ && older ? checkpoints.slice(0, MAX_SHARED_CHECKPOINTS) : checkpoints });
 }
 
 const replaced = () => response({ error: 'This shared checkpoint expired or was replaced by a newer checkpoint.' }, 410);

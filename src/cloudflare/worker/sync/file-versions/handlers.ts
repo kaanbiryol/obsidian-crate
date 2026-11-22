@@ -5,7 +5,8 @@ import { corsResponse } from '../../http/cors';
 import { commitStagedFile } from '../mutations';
 import { FileNamespaceConflictError } from '../file-namespace';
 import { ENCRYPTED_FILE_CONTENT_TYPE, fileTransportLimit } from '../../../../encryption/file-format';
-import { MAX_CONFIGURABLE_FILE_BYTES } from '../../../../protocol/sync-limits';
+import { MAX_BUFFERED_FILE_BYTES, MAX_CONFIGURABLE_FILE_BYTES } from '../../../../protocol/sync-limits';
+import { copyObjectInParts } from '../upload-sessions';
 import {
 	storedObjectMatchesMetadata,
 } from '../storage';
@@ -57,8 +58,11 @@ export async function handleRestoreFileVersion(
 	})) {
 		return corsResponse({ error: 'Stored file version content is unavailable' }, 503);
 	}
-	const content = await object.arrayBuffer();
-	if (content.byteLength !== version.size || await sha256Hex(content) !== version.hash) {
+	// A file above the buffered limit is a plaintext attachment, copied in parts; nothing
+	// at publication reads its bytes.
+	const large = __CRATE_SELF_HOSTED__ && version.size > MAX_BUFFERED_FILE_BYTES;
+	const content = large ? new ArrayBuffer(0) : await object.arrayBuffer();
+	if (!large && (content.byteLength !== version.size || await sha256Hex(content) !== version.hash)) {
 		return corsResponse({ error: 'Stored file version content failed integrity validation' }, 503);
 	}
 
@@ -66,14 +70,21 @@ export async function handleRestoreFileVersion(
 	const objectKey = createManagedObjectKey(version.hash);
 	try {
 		const { id: leaseId } = await trackUploadLease(db, [{ storageKey: objectKey, path }], { encrypted: object.httpMetadata?.contentType === ENCRYPTED_FILE_CONTENT_TYPE });
-		await bucket.put(objectKey, content, {
+		if (__CRATE_SELF_HOSTED__ && large) {
+			await object.body?.cancel();
+			const copied = await copyObjectInParts(bucket, version.storage_key, objectKey, version.size, { httpMetadata: object.httpMetadata, customMetadata: { hash: version.hash } });
+			if (copied !== version.hash) {
+				await bucket.delete(objectKey);
+				return corsResponse({ error: 'Stored file version content failed integrity validation' }, 503);
+			}
+		} else await bucket.put(objectKey, content, {
 			httpMetadata: object.httpMetadata,
 			customMetadata: { hash: version.hash },
 		});
 		const result = await commitStagedFile(bucket, db, {
 			path,
 			hash: version.hash,
-			size: content.byteLength,
+			size: version.size,
 			objectKey,
 			leaseId,
 			content,

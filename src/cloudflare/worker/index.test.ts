@@ -1,3 +1,4 @@
+import { SELF_HOSTED_BATCH_LIMITS } from '../../protocol/sync-limits';
 import serverRelease from '../server-release.json';
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol/server-info';
 import { READING_SHORTCUT_CONTRACT as shortcut } from '@/reading/shortcut';
@@ -180,7 +181,7 @@ describe('worker entrypoint', () => {
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Content-Type')).toBe('application/json');
-		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, shortcut: { version: shortcut.version, revision: shortcut.revision, minimumRevision: shortcut.minimumRevision }, schemaVersion: serverRelease.schemaVersion, serverRevision: serverRelease.revision, reminderOperationDay: Math.floor(Date.now() / 86_400_000), limits: { maxFileBytes: 25 * 1024 * 1024 } });
+		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, shortcut: { version: shortcut.version, revision: shortcut.revision, minimumRevision: shortcut.minimumRevision }, schemaVersion: serverRelease.schemaVersion, serverRevision: serverRelease.revision, reminderOperationDay: Math.floor(Date.now() / 86_400_000), limits: { maxFileBytes: 25 * 1024 * 1024, batch: SELF_HOSTED_BATCH_LIMITS } });
 	});
 
 	it('does not expose the public device enrollment routes', async () => {
@@ -275,7 +276,7 @@ describe('worker entrypoint', () => {
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Cache-Control')).toBe('no-store');
-		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, shortcut: { version: shortcut.version, revision: shortcut.revision, minimumRevision: shortcut.minimumRevision }, schemaVersion: serverRelease.schemaVersion, serverRevision: serverRelease.revision, reminderOperationDay: Math.floor(Date.now() / 86_400_000), limits: { maxFileBytes: 25 * 1024 * 1024 } });
+		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, shortcut: { version: shortcut.version, revision: shortcut.revision, minimumRevision: shortcut.minimumRevision }, schemaVersion: serverRelease.schemaVersion, serverRevision: serverRelease.revision, reminderOperationDay: Math.floor(Date.now() / 86_400_000), limits: { maxFileBytes: 25 * 1024 * 1024, batch: SELF_HOSTED_BATCH_LIMITS } });
 	});
 
 	it('serves PWA version metadata without authentication', async () => {

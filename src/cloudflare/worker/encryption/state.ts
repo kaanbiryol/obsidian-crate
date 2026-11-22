@@ -1,5 +1,5 @@
 import { ENCRYPTION_GENERATION_HEADER, ENCRYPTION_VAULT_HEADER, validateEncryptionState, type EncryptionServerState } from '../../../encryption/server-state';
-import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES, parseEncryptedFile, type EncryptedFileDescriptor } from '../../../encryption/file-format';
+import { ENCRYPTED_FILE_CONTENT_TYPE, isEncryptedFile, MAX_BUFFERED_ENCRYPTED_FILE_BYTES, parseEncryptedFile, type EncryptedFileDescriptor } from '../../../encryption/file-format';
 import { validateEncryptedSchedules } from '../../../encryption/notification-format';
 import { isWirePath } from '../../../protocol/encrypted-path';
 import { readServerState, saveServerState, serverStateValue } from '../d1/server-state';
@@ -87,7 +87,7 @@ function validateEncryptedContent(state: EncryptionServerState, path: string, co
 	const bytes = typeof content === 'string' || content instanceof Uint8Array ? content : new Uint8Array(content);
 	if (!isEncryptedFile(bytes)) throw new EncryptionStateError('This vault requires encrypted file content', 428);
 	// Each route has already bounded the body by the server's file limit.
-	const { descriptor, publicData } = parseEncryptedFile(bytes, MAX_CONFIGURABLE_ENCRYPTED_FILE_BYTES);
+	const { descriptor, publicData } = parseEncryptedFile(bytes, MAX_BUFFERED_ENCRYPTED_FILE_BYTES);
 	if (descriptor.vaultId !== state.vaultId || descriptor.scopeId !== 'vault' || descriptor.keyId !== state.keyId) {
 		throw new EncryptionStateError('File encryption keys do not match this vault', 428);
 	}

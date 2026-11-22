@@ -1,5 +1,6 @@
 import type { BatchUploadResponse } from '@/protocol/sync-types';
-import { BATCH_UPLOAD_MAX_BYTES, formatFileLimit, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
+import { formatFileLimit, MAX_FILE_SIZE_BYTES } from '@/protocol/sync-limits';
+import { MAX_BATCH_TOTAL_BYTES, MAX_BATCH_UPLOAD_FILES } from '../storage';
 import { fileTransportLimit } from '@/encryption/file-format';
 import { INITIAL_IMPORT_MAX_FILES } from '@/protocol/initial-import';
 import { base64ToArrayBuffer } from '@/platform/base64';
@@ -53,7 +54,7 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
 	} else {
 		const parsed = await parseJsonObject(request, UPLOAD_BATCH_JSON_BODY_BYTES);
 		if (!parsed.ok) return parsed.response;
-		if (!Array.isArray(parsed.value.files) || !parsed.value.files.length || parsed.value.files.length > INITIAL_IMPORT_MAX_FILES) {
+		if (!Array.isArray(parsed.value.files) || !parsed.value.files.length || parsed.value.files.length > Math.max(INITIAL_IMPORT_MAX_FILES, MAX_BATCH_UPLOAD_FILES)) {
 			return corsResponse({ error: 'Invalid import batch' }, 400);
 		}
 		for (const value of parsed.value.files as unknown[]) {
@@ -78,7 +79,7 @@ export async function uploadInitialFiles(request: Request, bucket: R2Bucket, db:
 		} catch { return corsResponse({ error: 'Invalid import content' }, 400); }
 		total += content.byteLength;
 		const contentType = typeof value.contentType === 'string' ? value.contentType : 'application/octet-stream';
-		if (content.byteLength > fileTransportLimit(contentType, maxFileBytes) || request.method !== 'PUT' && total > BATCH_UPLOAD_MAX_BYTES) return corsResponse({ error: 'Import payload too large' }, 413);
+		if (content.byteLength > fileTransportLimit(contentType, maxFileBytes) || request.method !== 'PUT' && total > MAX_BATCH_TOTAL_BYTES) return corsResponse({ error: 'Import payload too large' }, 413);
 		if (await sha256Hex(content) !== value.hash) return corsResponse({ error: 'Import content hash mismatch' }, 400);
 		files.push({ path, hash: value.hash, size: content.byteLength, content, contentType, expectedHash });
 	}

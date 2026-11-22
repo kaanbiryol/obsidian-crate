@@ -48,12 +48,17 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
       }
       if (schemaVersion !== serverRelease.schemaVersion) throw new Error('Missing database migration path');
       const artifactFingerprint = sha256(JSON.stringify({ workerBundleSha256, d1SchemaSha256, serverRelease }));
+      // The self-hosted server runs its own bundle from the same commit; its fingerprint
+      // lets the plugin recognize that build too, without embedding it.
+      const selfHostedWorker = readFileSync(resolve(rootDir, '.generated/cloudflare/worker-self-hosted.mjs'));
+      const selfHostedFingerprint = sha256(JSON.stringify({ workerBundleSha256: sha256(selfHostedWorker), d1SchemaSha256, serverRelease }));
 
 			return [
 				`export const artifactVersion = ${JSON.stringify(packageJson.version)};`,
 				`export const workerBundleGzipBase64 = ${JSON.stringify(gzipSync(workerBundle, { level: 9 }).toString('base64'))};`,
 				`export const workerBundleSha256 = ${JSON.stringify(workerBundleSha256)};`,
 				`export const artifactFingerprint = ${JSON.stringify(artifactFingerprint)};`,
+				`export const selfHostedFingerprint = ${JSON.stringify(selfHostedFingerprint)};`,
 				`export const d1SchemaGzipBase64 = ${JSON.stringify(gzipSync(d1Schema).toString('base64'))};`,
 				`export const d1SchemaSha256 = ${JSON.stringify(d1SchemaSha256)};`,
 			].join('\n');

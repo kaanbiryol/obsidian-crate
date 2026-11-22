@@ -52,6 +52,9 @@ type MockR2Bucket = {
 	head: Mock<(this: void, key: string) => Promise<CompatibleR2ObjectBody | null>>;
 	delete: Mock<(this: void, keys: string | string[]) => Promise<void>>;
 	list: Mock<(this: void, options?: { prefix?: string; limit?: number; cursor?: string }) => Promise<{ objects: CompatibleR2ObjectBody[]; truncated: boolean; cursor?: string }>>;
+	/** Multipart uploads are covered by the Worker runtime suites, not this mock. */
+	createMultipartUpload: Mock<(this: void, key: string) => Promise<never>>;
+	resumeMultipartUpload: Mock<(this: void, key: string, uploadId: string) => never>;
 };
 
 type MockD1Statement = CompatibleD1PreparedStatement & {
@@ -129,6 +132,8 @@ export function createMockR2Bucket(initialEntries: Record<string, string> = {}) 
 			const entry = store.get(key);
 			return entry ? asObject(key, entry) : null;
 		}),
+		createMultipartUpload: vi.fn(async () => { throw new Error('Multipart uploads need the Worker runtime suite'); }),
+		resumeMultipartUpload: vi.fn(() => { throw new Error('Multipart uploads need the Worker runtime suite'); }),
 		delete: vi.fn(async (keys: string | string[]) => {
 			for (const key of Array.isArray(keys) ? keys : [keys]) {
 				store.delete(key);

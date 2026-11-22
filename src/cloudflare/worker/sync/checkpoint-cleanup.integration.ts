@@ -3,10 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
-import { createSharedCheckpoint, getSharedCheckpoint } from './history-checkpoints';
+import { createSharedCheckpoint, getSharedCheckpoint, SHARED_CHECKPOINT_LIMIT as MAX_SHARED_CHECKPOINTS } from './history-checkpoints';
 import { runMaintenanceEpisode } from '../maintenance/lifecycle';
 import { HISTORY_CHECKPOINT_PREFIX, HISTORY_INDEX_KEY } from '../../../protocol/storage-keys';
-import { MAX_SHARED_CHECKPOINTS, type SharedCheckpoint } from '../../../protocol/history-checkpoints';
+import type { SharedCheckpoint } from '../../../protocol/history-checkpoints';
 
 beforeEach(async () => { await applySchema(env.DB); });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });

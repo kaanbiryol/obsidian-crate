@@ -529,7 +529,7 @@ record or tunnel.
 ## Sync larger files
 
 Crate syncs files up to 25 MB by default, the same limit as a Cloudflare
-deployment. A self-hosted server can allow up to 128 MB per file:
+deployment. A self-hosted server can allow up to 1024 MB per file:
 
 ```sh
 crate-server start --max-file-size 100
@@ -545,14 +545,33 @@ The startup output shows the active limit.
   the plugin on that device, not the server.
 - Mobile devices keep the 25 MB limit. Larger files show as sync errors on a
   phone and still sync between desktops.
-- Whole files are held in memory while they transfer, on the server and in
-  Obsidian, so allow for several times the limit in free memory.
-- Cloudflare Tunnel, including Quick Tunnel, rejects uploads over 100 MB. Use
-  Tailscale Funnel or your own reverse proxy for a larger limit, and allow that
-  body size in the proxy. Large uploads over a slow link need a longer request
-  timeout; Crate's own listener scales its timeout with the limit.
+- Attachments over 25 MB travel in 32 MB parts. Obsidian holds one copy of the
+  file in memory while it transfers, and the server never holds more than a part.
+  A pending upload also keeps a copy in the plugin folder until the server
+  confirms it, so allow that much free disk space.
+- Encrypted vaults and Markdown notes stay at 128 MB: they travel in one request,
+  which Cloudflare Tunnel (including Quick Tunnel) refuses above 100 MB. Use
+  Tailscale Funnel or your own reverse proxy for those, and allow 128 MB request
+  bodies in the proxy.
 - Lowering the limit later keeps larger files on the server and downloadable,
   but devices stop uploading them.
+
+### Other self-hosted limits
+
+A self-hosted server is not bound by Cloudflare's free plan, so it also allows
+more than a Cloudflare deployment, without any option to set:
+
+| | Cloudflare | Self-hosted |
+| --- | --- | --- |
+| **Keep history for** | 7 to 90 days | Also 180 and 365 days |
+| Saved vault states | 20 | 100 |
+| Cleanup of expired history | Up to 20,000 database writes a day | No daily cap |
+| Files per sync request | 32 uploads or deletes, 50 downloads | 100 each |
+| Bytes per batch request | 10 MB up, 8 MB down | 32 MB each way |
+
+Mobile devices keep the smaller batches. Plugins older than this release see the
+newest 20 saved vault states, and show **Could not read the history period** while
+the server keeps history for 180 or 365 days.
 
 ## Start Crate automatically
 

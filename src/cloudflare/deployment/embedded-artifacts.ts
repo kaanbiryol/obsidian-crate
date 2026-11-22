@@ -2,6 +2,7 @@ import { DEVELOPMENT_BUILD } from '../../protocol/server-build';
 import {
 	artifactFingerprint,
 	artifactVersion,
+	selfHostedFingerprint,
 	d1SchemaGzipBase64,
 	d1SchemaSha256,
 	workerBundleGzipBase64,
@@ -13,6 +14,8 @@ export const EMBEDDED_CLOUDFLARE_ARTIFACT = Object.freeze({
 	development: DEVELOPMENT_BUILD ?? undefined,
 		version: artifactVersion,
 	fingerprint: artifactFingerprint,
+	/** A self-hosted server built from the same commit runs this bundle instead. */
+	selfHostedFingerprint,
 });
 
 /** Decodes per call so the Worker source is released when its operation ends. */

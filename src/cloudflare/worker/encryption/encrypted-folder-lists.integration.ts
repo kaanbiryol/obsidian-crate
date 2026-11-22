@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { MAX_BATCH_DOWNLOAD_FILES } from '../sync/storage';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
@@ -197,7 +198,7 @@ it('downloads listed notes at their revisions and reports each changed or missin
 	expect(files[0]).toMatchObject({ path: kept!.path, revision: kept!.revision, size: notes[0]!.sealed.bytes.length });
 	expect(measured.cost.r2.get).toBe(1);
 
-	expect((await download(Array.from({ length: 51 }, (_, i) => ({ path: `${h.wire}/${i}.md`, revision: 'r' })))).status).toBe(400);
+	expect((await download(Array.from({ length: MAX_BATCH_DOWNLOAD_FILES + 1 }, (_, i) => ({ path: `${h.wire}/${i}.md`, revision: 'r' })))).status).toBe(400);
 	expect((await download([{ path: kept!.path, revision: 'r' }, { path: kept!.path, revision: 'r' }])).status).toBe(400);
 	expect((await download([{ path: 'Elsewhere/note.md', revision: 'r' }])).status).toBe(403);
 	expect((await download([{ path: kept!.path, revision: 'r' }], undefined, '/reminders', h.reading)).status).toBe(403);

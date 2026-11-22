@@ -1,6 +1,6 @@
 # Worker API
 
-Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment. `src/cloudflare/worker-runtime.json` holds the compatibility date, flags, binding names and rate limit that the deployment payload and the local server both use; a test keeps `wrangler.jsonc` in step with it.
+Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs` and the self-hosted server's module, which adds raised file limits and chunked transfers, to `.generated/cloudflare/worker-self-hosted.mjs` (see [architecture](architecture.md)). Routes marked self-hosted below do not exist on Cloudflare. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment. `src/cloudflare/worker-runtime.json` holds the compatibility date, flags, binding names and rate limit that the deployment payload and the local server both use; a test keeps `wrangler.jsonc` in step with it.
 
 Each route is declared once in `routes/policy.ts`, with its methods, token scopes and execution. `routes/<domain>.ts` dispatches that domain's paths to handlers and holds no SQL. Handlers and their SQL live in the feature folders, such as `reminders/handlers/` and `reading/`, and throw domain errors that the request handler maps to responses.
 
@@ -79,10 +79,12 @@ All sync routes require `vault`.
 | `GET` | `/sync/manifest?limit=<n>&after=<path>&snapshotSeq=<seq>` | Stable, cursor-paginated remote manifest |
 | `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths |
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB unless the server advertises more) |
-| `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
-| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 32 files, 10 MiB total) |
+| `POST` | `/sync/upload-session?action=begin\|complete` | Self-hosted: begin or complete a chunked upload of a plaintext attachment over 25 MB (`chunked-uploads-v1`) |
+| `PUT` | `/sync/upload-session?part=<n>` | Self-hosted: send one part of a chunked upload |
+| `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2; on a self-hosted server, `Range: bytes=a-b` returns one part) |
+| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 32 files, 10 MiB total; self-hosted: 100 files, 32 MiB) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
-| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 32 files) |
+| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 32 files; self-hosted: 100) |
 | `POST` | `/sync/import` | Start or resume the initial import of a never-populated server; returns `{ import }` or `{ import: null }` |
 | `POST` | `/sync/import/upload` | Upload up to 32 base64 files into the open initial import |
 | `PUT` | `/sync/import/upload?path=<path>` | Upload one binary file into the open initial import |
@@ -112,7 +114,7 @@ All sync routes require `vault`.
 | `PUT` | `/settings` | `vault` | Store shared settings |
 | `GET` | `/features` | `vault`, `reminders` | Read the shared feature policy |
 | `POST` | `/features` | `vault` | Change the shared feature policy |
-| `GET`, `POST` | `/history-retention` | `vault` | Read or change how long file history is kept |
+| `GET`, `POST` | `/history-retention` | `vault` | Read or change how long file history is kept; a self-hosted server also returns the `options` it offers, adding 180 and 365 days |
 
 ### Reminders and notifications endpoints
 
@@ -213,6 +215,17 @@ These routes are answered by `routes/public.ts` before authentication.
 - Query: `?path=<url-encoded-path>`
 - Response headers: `Content-Type`, `Content-Length`, `X-File-Hash`, `X-Crate-Revision`
 - Body: raw binary (streamed from R2)
+- Self-hosted only: `Range: bytes=<start>-<end>` returns 206 with `Content-Range`; an end past the file is cut to it, and an empty file is returned whole. Clients fetch files over 25 MB in 32 MiB ranges and reject a range from another revision. A bad range answers 416.
+
+### Chunked uploads (`/sync/upload-session`)
+
+Self-hosted only. Plaintext attachments over 25 MB on a server that advertises `chunked-uploads-v1` (a raised limit) travel in parts, so no request carries more than 32 MiB (`UPLOAD_PART_BYTES`). Every step sends the upload's `X-Crate-Upload-Operation`; begin and complete carry the same `{ path, hash, size, contentType, expectedHash }`, which form the operation's request hash exactly as for `PUT /sync/upload`. A stored receipt answers either step of a retry. Encrypted vaults and Markdown notes are refused: they upload in one request, up to 128 MiB.
+
+1. `POST ?action=begin` creates an R2 multipart upload under a fresh managed key and an upload lease, or resumes the operation's session. Returns `{ session: { partBytes } }`.
+2. `PUT ?part=<n>` (1-based) sends exactly `partBytes`, or the remainder for the last part, and returns `{ etag }`. Resending a part replaces it.
+3. `POST ?action=complete` with `parts: [{ partNumber, etag }]` combines the parts, hashes the stored object as a stream, deletes it on a size or hash mismatch (400), then publishes it with the same receipt, changelog and lease rules as a single upload.
+
+Sessions live in R2 under `__crate__/upload-sessions/<operation>.json`. Maintenance aborts sessions older than the 24-hour lease; lease cleanup reclaims the key.
 
 ### POST /sync/batch-upload
 

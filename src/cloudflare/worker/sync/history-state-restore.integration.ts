@@ -7,7 +7,7 @@ import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { SyncRuntime } from '../../../sync/runtime/runtime';
 import type { SyncEngine } from '../../../sync/engine/engine';
 import type { SyncHistoryEntry } from '../../../sync/types';
-import { CHECKPOINT_PAGE_SIZE, createSharedCheckpoint, getSharedCheckpoint, pruneSharedCheckpoints } from './history-checkpoints';
+import { CHECKPOINT_PAGE_SIZE, createSharedCheckpoint, getSharedCheckpoint, pruneSharedCheckpoints, SHARED_CHECKPOINT_LIMIT } from './history-checkpoints';
 import { parseSharedCheckpointDocument } from '../../../protocol/history-checkpoints';
 import worker from '../index';
 import { sha256Hex } from '../../../platform/sha256';
@@ -163,17 +163,19 @@ it('expires checkpoints on the server and refuses reads by a stale client', asyn
 	await expect(device.api.sharedHistory.load(checkpoint.id)).rejects.toThrow('expired');
 });
 
-it('caps the shared index at twenty checkpoints', async () => {
+it('caps the shared index at the server\'s checkpoint limit, and lists the newest twenty to older plugins', async () => {
 	const device = new SyncTestDevice('shared-limit', env); clients.push(device);
 	await device.authorize(); await device.open();
 	const ids: string[] = [];
-	for (let index = 0; index < 22; index++) {
+	for (let index = 0; index < SHARED_CHECKPOINT_LIMIT + 2; index++) {
 		await env.DB.prepare("INSERT INTO changelog(path, action, hash, size) VALUES ('test.md', 'delete', '', 0)").run();
 		ids.push((await device.api.sharedHistory.save())!.id);
 	}
 	const list = await device.api.sharedHistory.list();
-	expect(list).toHaveLength(20);
-	expect(list.map(entry => entry.id)).toEqual(ids.slice(-20).reverse());
+	expect(list).toHaveLength(SHARED_CHECKPOINT_LIMIT);
+	expect(list.map(entry => entry.id)).toEqual(ids.slice(-SHARED_CHECKPOINT_LIMIT).reverse());
+	const older = await worker.fetch(new Request('https://crate.test/sync/checkpoints', { headers: { Authorization: `Bearer ${device.id}`, 'X-Crate-Protocol': '1' } }), env);
+	expect(((await older.json()) as { checkpoints: unknown[] }).checkpoints).toHaveLength(20);
 	await expect(device.api.sharedHistory.load(ids[0]!)).rejects.toThrow('replaced');
 });
 

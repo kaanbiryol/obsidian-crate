@@ -10,7 +10,8 @@ import {
 import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
 import { countD1Queries } from '../test-support/d1-query-test-harness';
 import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
-import { BATCH_DELETE_MAX_FILES, BATCH_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
+// The server's own limits: the self-hosted sizes here, the Free-plan-safe defaults on Cloudflare.
+import { MAX_BATCH_DELETE_FILES as BATCH_DELETE_MAX_FILES, MAX_BATCH_DOWNLOAD_BYTES, MAX_BATCH_UPLOAD_FILES as BATCH_UPLOAD_MAX_FILES } from './storage';
 
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;
@@ -45,7 +46,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		expect(metadataQueries[0]?.[0]).toContain(Array.from({ length: 50 }, () => '?').join(', '));
 	});
 
-	it('rejects mutation batches above the Free-plan-safe limit', async () => {
+	it('rejects mutation batches above the server limit', async () => {
 		const files = Array.from({ length: Math.max(BATCH_UPLOAD_MAX_FILES, BATCH_DELETE_MAX_FILES) + 1 }, (_, index) => ({
 			path: `notes/${index}.md`,
 			content: btoa('x'),
@@ -213,8 +214,9 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		const { bucket } = createMockR2Bucket();
 		const { db } = createMockD1Database({
 			files: {
-				'a.bin': { hash: 'a'.repeat(64), size: 5 * 1024 * 1024, storageKey: 'a' },
-				'b.bin': { hash: 'b'.repeat(64), size: 5 * 1024 * 1024, storageKey: 'b' },
+				// Together just over the server's batch download limit.
+				'a.bin': { hash: 'a'.repeat(64), size: MAX_BATCH_DOWNLOAD_BYTES / 2, storageKey: 'a' },
+				'b.bin': { hash: 'b'.repeat(64), size: MAX_BATCH_DOWNLOAD_BYTES / 2 + 1, storageKey: 'b' },
 			},
 		});
 

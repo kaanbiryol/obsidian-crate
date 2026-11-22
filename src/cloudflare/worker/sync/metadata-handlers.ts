@@ -4,7 +4,7 @@ import { normalizeSharedSettingsValue } from '../../../protocol/shared-settings'
 import { corsResponse } from '../http/cors';
 import { parseJsonObject, sanitizePath } from '../http/request-validation';
 import { CHANGELOG_BOUNDS_SQL, isChangelogCursorExpired, parseChangelogSince, STORAGE_ID_SQL, storageIdField } from './storage';
-import { BATCH_DOWNLOAD_MAX_FILES } from '../../../protocol/sync-limits';
+import { MAX_BATCH_DOWNLOAD_FILES } from './storage';
 import type { FileEntry } from '../../../protocol/sync-types';
 import { createPathRecord } from '../../../protocol/path-record';
 import { descriptorField, encryptionWriteGuard } from '../encryption/state';
@@ -99,8 +99,8 @@ export async function handleGetFileMetadata(request: Request, db: D1Database): P
 	if (!parsedBody.ok) return parsedBody.response;
 
 	const rawPaths = parsedBody.value.paths;
-	if (!Array.isArray(rawPaths) || rawPaths.length > BATCH_DOWNLOAD_MAX_FILES) {
-		return corsResponse({ error: `paths must contain at most ${BATCH_DOWNLOAD_MAX_FILES} entries` }, 400);
+	if (!Array.isArray(rawPaths) || rawPaths.length > MAX_BATCH_DOWNLOAD_FILES) {
+		return corsResponse({ error: `paths must contain at most ${MAX_BATCH_DOWNLOAD_FILES} entries` }, 400);
 	}
 
 	const paths: string[] = [];

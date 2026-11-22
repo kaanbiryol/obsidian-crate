@@ -5,6 +5,8 @@ import { MAX_HISTORY_RETENTION_MS } from './history-retention';
 
 export const SHARED_CHECKPOINT_CAPABILITY = 'shared-history-checkpoints-v1';
 export const MAX_SHARED_CHECKPOINTS = 20;
+/** A self-hosted server keeps more; lists up to this size parse, and older clients get the newest 20. */
+export const SELF_HOSTED_SHARED_CHECKPOINTS = 100;
 export const MAX_CHECKPOINT_FILES = 100_000;
 export const MAX_CHECKPOINT_BYTES = 32 * 1024 * 1024;
 /** Encrypted documents expand the plaintext by base64url and envelope overhead. */
@@ -35,7 +37,7 @@ export function parseSharedCheckpoint(value: unknown): SharedCheckpoint {
 }
 
 export function parseSharedCheckpointList(value: unknown): SharedCheckpoint[] {
-	if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.checkpoints) || value.checkpoints.length > MAX_SHARED_CHECKPOINTS) throw new Error('Invalid shared checkpoint list');
+	if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.checkpoints) || value.checkpoints.length > SELF_HOSTED_SHARED_CHECKPOINTS) throw new Error('Invalid shared checkpoint list');
 	const checkpoints = value.checkpoints.map(parseSharedCheckpoint);
 	if (new Set(checkpoints.map(entry => entry.id)).size !== checkpoints.length) throw new Error('Duplicate shared checkpoint');
 	return checkpoints;

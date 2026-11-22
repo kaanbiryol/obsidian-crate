@@ -27,6 +27,7 @@ export default tseslint.config(
 						'postcss.config.js',
 						'vite.config.mts',
 						'vitest.cloudflare.config.ts',
+						'vitest.cloudflare-bundle.config.ts',
 						'vitest.config.ts',
 					]
 				},
@@ -53,7 +54,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['scripts/**/*.mjs', 'tests/**/*.mjs', 'packages/server/{src,test}/**/*.mjs', 'vite.visual.config.mts', 'playwright.config.ts', 'vite.config.mts', 'vitest.cloudflare.config.ts', 'vitest.config.ts'],
+		files: ['scripts/**/*.mjs', 'tests/**/*.mjs', 'packages/server/{src,test}/**/*.mjs', 'vite.visual.config.mts', 'playwright.config.ts', 'vite.config.mts', 'vitest.cloudflare.config.ts', 'vitest.cloudflare-bundle.config.ts', 'vitest.config.ts'],
 		extends: [tseslint.configs.disableTypeChecked],
 		languageOptions: {
 			globals: {
@@ -116,6 +117,7 @@ export default tseslint.config(
 			'playwright.config.ts',
 			'vite.config.mts',
 			'vitest.cloudflare.config.ts',
+			'vitest.cloudflare-bundle.config.ts',
 			'vitest.config.ts',
 		],
 		rules: {

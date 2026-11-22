@@ -23,10 +23,9 @@ export class SyncIssueError extends Error {
 	constructor(message: string, readonly issues: SyncIssue[]) { super(message); }
 }
 
-export const oversizedLocalFileMessage = (limit: number): string => `Skipped local file larger than ${formatFileLimit(limit)}; this file is not synced`;
+const oversizedLocalFileMessage = (limit: number): string => `Skipped local file larger than ${formatFileLimit(limit)}; this file is not synced`;
 export const oversizedRemoteFileMessage = (limit: number): string => `Skipped remote file larger than ${formatFileLimit(limit)}`;
 export const OVERSIZED_LOCAL_FILE_MESSAGE = oversizedLocalFileMessage(MAX_FILE_SIZE_BYTES);
-export const OVERSIZED_REMOTE_FILE_MESSAGE = oversizedRemoteFileMessage(MAX_FILE_SIZE_BYTES);
 
 /** A file sync deliberately leaves out. It is reported as an issue, but it is not a
  * failure: it must not block the sync cursor, the queue or a completed sync. */

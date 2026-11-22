@@ -22,9 +22,10 @@ export async function checkServerVersion(plugin: CratePlugin): Promise<CrateServ
 	return info;
 }
 
-/** True when the live server runs an older revision, or a different build this plugin's bundled server can replace. */
+/** True when a live self-hosted server runs an older revision, or a different build this plugin's bundled self-hosted server can replace. */
 export function isBundledServerNewer(info: Pick<CrateServerInfo, 'serverRevision' | 'deploymentFingerprint' | 'developmentBuild'>): boolean {
-	const bundled = { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development };
+	// A self-hosted server runs the self-hosted bundle, so compare it with that build.
+	const bundled = { revision: release.revision, fingerprint: EMBEDDED_CLOUDFLARE_ARTIFACT.selfHostedFingerprint, development: EMBEDDED_CLOUDFLARE_ARTIFACT.development };
 	if (info.serverRevision < bundled.revision) return true;
 	const fingerprint = info.deploymentFingerprint;
 	return Boolean(fingerprint && fingerprint !== bundled.fingerprint

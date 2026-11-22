@@ -43,7 +43,8 @@ for (const file of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) await copyFile(join(ro
 // The source directory is the package boundary; filenames do not select runtime code.
 await cp(join(root, 'packages/server/src'), join(destination, 'scripts'), { recursive: true });
 await chmod(join(destination, 'scripts/crate-server.mjs'), 0o755);
-await copyFile(join(root, '.generated/cloudflare/worker.mjs'), join(destination, 'assets/worker.mjs'));
+// The self-hosted Worker; the plugin deploys the Cloudflare one.
+await copyFile(join(root, '.generated/cloudflare/worker-self-hosted.mjs'), join(destination, 'assets/worker.mjs'));
 await copyFile(join(root, 'src/cloudflare/schema.sql'), join(destination, 'assets/schema.sql'));
 for (const file of ['server-release.json', 'worker-runtime.json']) await copyFile(join(root, 'src/cloudflare', file), join(destination, 'assets', file));
 await cp(join(root, 'src/cloudflare/migrations'), join(destination, 'assets/migrations'), { recursive: true });

@@ -1,6 +1,6 @@
 {
 	"name": "crate-sync",
-	"main": ".generated/cloudflare/worker.mjs",
+	"main": ".generated/cloudflare/worker-self-hosted.mjs",
 	"compatibility_date": "2026-08-18",
   "compatibility_flags": ["global_fetch_strictly_public"],
 	"workers_dev": true,

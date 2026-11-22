@@ -7,6 +7,8 @@ import type { PreparedUpload } from './types';
 import {
 	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,
 	BATCH_UPLOAD_MAX_FILES,
+	DEFAULT_BATCH_LIMITS,
+	type BatchLimits,
 } from '../../protocol/sync-limits';
 import { createLogger } from "../logger";
 import type { TransferContext } from "./types";
@@ -109,13 +111,14 @@ export async function prepareUploadFromPath(
 /** New files share one bulk commit only when a batch holds nothing else, so they
  * are chunked apart from replacements. Chunks upload concurrently, so this reordering
  * changes no guarantee. */
-export function createBatchUploadChunks(prepared: PreparedUpload[]): PreparedUpload[][] {
+export function createBatchUploadChunks(prepared: PreparedUpload[], limits: BatchLimits = DEFAULT_BATCH_LIMITS): PreparedUpload[][] {
 	const isNew = (upload: PreparedUpload) => (upload.expectedHash ?? null) === null;
-	return [...chunkPreparedUploads(prepared.filter(isNew)), ...chunkPreparedUploads(prepared.filter(upload => !isNew(upload)))];
+	return [...chunkPreparedUploads(prepared.filter(isNew), limits.uploadFiles, limits.uploadBytes),
+		...chunkPreparedUploads(prepared.filter(upload => !isNew(upload)), limits.uploadFiles, limits.uploadBytes)];
 }
 
 /** Splits uploads in order into requests within the file and byte limits. */
-export function chunkPreparedUploads(prepared: PreparedUpload[], maxFiles = BATCH_UPLOAD_MAX_FILES): PreparedUpload[][] {
+export function chunkPreparedUploads(prepared: PreparedUpload[], maxFiles = BATCH_UPLOAD_MAX_FILES, maxBytes = BATCH_MAX_BYTES): PreparedUpload[][] {
 	const chunks: PreparedUpload[][] = [];
 	let currentChunk: PreparedUpload[] = [];
 	let currentBytes = 0;
@@ -123,7 +126,7 @@ export function chunkPreparedUploads(prepared: PreparedUpload[], maxFiles = BATC
 	for (const upload of prepared) {
 		if (
 			currentChunk.length >= maxFiles
-			|| (currentChunk.length > 0 && currentBytes + upload.size > BATCH_MAX_BYTES)
+			|| (currentChunk.length > 0 && currentBytes + upload.size > maxBytes)
 		) {
 			chunks.push(currentChunk);
 			currentChunk = [];

@@ -16,7 +16,7 @@ Manifest and metadata entries, changelog rows, upload acknowledgements, and batc
 
 Single uploads require `X-Crate-Upload-Operation`; every batch member requires `operationId`. The ID binds the path, verified content hash, size, content type and expected hash. The file transaction records success or rejected preconditions as an `upload` receipt in `operations`. A retry returns that outcome, even after a later edit or deletion, without publishing bytes again. A new logical upload needs a new ID. IDs use the server-issued UTC day and expiry mechanism below, with a 30-date window for uploads. The plugin persists exact upload bytes before dispatch, recovers unresolved receipts before reconciliation, and checkpoints acknowledgement before removing its local journal. See [upload recovery and rename preservation](upload-recovery.md).
 
-Batch uploads and batch deletes each accept 32 files. Both bound D1 work below the Free-plan limit of 50 queries per invocation, where a `db.batch()` counts once, with headroom for authentication and failure cleanup. A batch delete answers stale preconditions with `version_conflict` from its one read of the current files. The per-file byte limit is 25 MiB. Clients report oversized files on either side as skipped issues; they do not fail a sync or hold back the changelog cursor.
+Batch uploads and batch deletes each accept 32 files (100 on a self-hosted server, which advertises its sizes in `limits.batch`; one D1 statement still binds at most 100 values). Both bound D1 work below the Free-plan limit of 50 queries per invocation, where a `db.batch()` counts once, with headroom for authentication and failure cleanup. A batch delete answers stale preconditions with `version_conflict` from its one read of the current files. The per-file byte limit is 25 MiB. Clients report oversized files on either side as skipped issues; they do not fail a sync or hold back the changelog cursor.
 
 Live file paths form a portable filesystem namespace: no file may also be another file's parent, including case-insensitive or Unicode-normalized aliases. Each publication checks this inside its D1 transaction. A conflicting upload, restore or reminder move returns `namespace_conflict` with HTTP 409 (or a per-file batch status); preserve the local bytes and rename the conflicting file or parent folder before retrying. Same-path edits and delete-then-create replacements remain valid. Historical changes and metadata requests may include paths that no longer coexist; clients validate the final live manifest separately. Existing invalid remote namespaces require explicit repair on an originating device and are never resolved by automatically deleting one side.
 
@@ -120,7 +120,7 @@ wait or the three-hour foreground wait bound leaves all progress intact.
 ## Shared history checkpoints
 
 Protocol 1 includes `shared-history-checkpoints-v1`. Server-authored inventories are stored in R2 with a conditional shared
-index, capped at 20 states and the server's history period (at most 90 days). Creation rejects a changing inventory;
+index, capped at 20 states and the server's history period (at most 90 days; 100 states and 365 days on a self-hosted server, which lists only the newest 20 to plugins older than protocol 2). Creation rejects a changing inventory;
 publication retries deduplicate by monotonic server generation. No database schema
 change or duplicate file-content storage is introduced. Retained-version expiry is
 computed no earlier than the history period after the D1 commit, preventing an older request

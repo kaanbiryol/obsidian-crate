@@ -314,9 +314,9 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 		const first = await issueLocalDevice(runtime.db, 'Mac');
 		const second = await issueLocalDevice(runtime.db, 'Phone');
 		const info = await (await fetch(`${origin}/.well-known/crate`)).json();
-		// Same formula as the plugin's embedded artifact fingerprint.
+		// Same formula as the plugin's embedded self-hosted fingerprint.
 		const sha = value => createHash('sha256').update(value).digest('hex');
-		const [workerBundle, schema, release] = await Promise.all(['.generated/cloudflare/worker.mjs', 'src/cloudflare/schema.sql', 'src/cloudflare/server-release.json']
+		const [workerBundle, schema, release] = await Promise.all(['.generated/cloudflare/worker-self-hosted.mjs', 'src/cloudflare/schema.sql', 'src/cloudflare/server-release.json']
 			.map(path => readFile(new URL(`../../../${path}`, import.meta.url))));
 		assert.equal(info.deploymentFingerprint, sha(JSON.stringify({ workerBundleSha256: sha(workerBundle), d1SchemaSha256: sha(schema), serverRelease: JSON.parse(release) })));
 		const headers = { Authorization: `Bearer ${first.token}`, 'X-Crate-Protocol': String(info.protocol.current) };
@@ -486,7 +486,8 @@ test('a raised file limit reaches the Worker and its upload timeout', { timeout:
 	const server = await listenLocalServer(runtime, { port: 0, maxFileBytes });
 	try {
 		const info = await (await runtime.mf.dispatchFetch('http://localhost:8787/.well-known/crate')).json();
-		assert.deepEqual(info.limits, { maxFileBytes });
+		assert.deepEqual(info.limits.maxFileBytes, maxFileBytes);
+		assert.equal(info.limits.batch.uploadFiles, 100);
 		assert.equal(info.protocol.oldestCompatible, 2);
 		assert.equal(server.requestTimeout, 400_000);
 	} finally {

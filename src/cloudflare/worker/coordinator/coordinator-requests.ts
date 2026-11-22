@@ -3,11 +3,12 @@ import { fetchWorkerRequest } from '../request-handler';
 import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 import type { Env } from '../types';
 import { maxFileBytes } from '../server/file-limit';
+import { MAX_BUFFERED_FILE_BYTES } from '../../../protocol/sync-limits';
 
 import { armReadingCoordinator, publishExtraction, type Publication } from '../reading/extraction/jobs';
 import { getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
 import { armDispatcher } from '../notifications/dispatcher';
-import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, TRANSFER_PATHS } from './coordinator';
+import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, TRANSFER_PATHS, UPLOAD_SESSION_TRANSFER_PATH } from './coordinator';
 import { uploadInitialFiles } from '../sync/import/initial-import-upload';
 import { handleBatchDownload } from '../sync/batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../sync/staging/bulk-upload-dispatch';
@@ -26,10 +27,12 @@ export async function handleCoordinatorRequest(
 	withStateLock: StateLock,
 ): Promise<Response> {
 	const path = new URL(request.url).pathname;
-	if ((path === TRANSFER_PATHS.syncUpload && request.method === 'PUT') || (path === TRANSFER_PATHS.syncBatchUpload && request.method === 'POST')) {
+	if ((path === TRANSFER_PATHS.syncUpload && request.method === 'PUT') || (path === TRANSFER_PATHS.syncBatchUpload && request.method === 'POST')
+		|| (__CRATE_SELF_HOSTED__ && path === UPLOAD_SESSION_TRANSFER_PATH && ['POST', 'PUT'].includes(request.method))) {
 		// Reauthenticate inside the transfer queue so reset/revocation fences waiting writers.
 		const target = new URL(request.url);
-		target.pathname = path === TRANSFER_PATHS.syncUpload ? '/sync/upload' : '/sync/batch-upload';
+		target.pathname = path === TRANSFER_PATHS.syncUpload ? '/sync/upload'
+			: __CRATE_SELF_HOSTED__ && path === UPLOAD_SESSION_TRANSFER_PATH ? '/sync/upload-session' : '/sync/batch-upload';
 		return withStateLock(() => fetchWorkerRequest(new Request(target, request), env, { kind: 'transfer' }));
 	}
 	if (path === COORDINATOR_PATHS.commitNewFiles && request.method === 'POST') {
@@ -83,7 +86,8 @@ export async function handleCoordinatorRequest(
 		if (path === TRANSFER_PATHS.batchDownload && request.method === 'POST') return handleBatchDownload(request, env.BUCKET, env.DB);
 		if (path === TRANSFER_PATHS.importUpload && ['POST', 'PUT'].includes(request.method)) {
 			// One unpublished batch at a time bounds decoded attachment memory.
-			return uploadInitialFiles(request, env.BUCKET, env.DB, maxFileBytes(env));
+			// Initial import sends each file in one request; larger files sync after it.
+			return uploadInitialFiles(request, env.BUCKET, env.DB, Math.min(maxFileBytes(env), MAX_BUFFERED_FILE_BYTES));
 		}
 		return await handleLockedCoordinatorRequest(request, state, env) ?? new Response('Not found', { status: 404 });
 	});

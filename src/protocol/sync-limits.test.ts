@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { deviceFileLimit, formatFileLimit, MAX_CONFIGURABLE_FILE_BYTES, MAX_FILE_SIZE_BYTES, parseMaxFileBytes } from './sync-limits';
+import { deviceFileLimit, formatFileLimit, MAX_BUFFERED_FILE_BYTES, MAX_CONFIGURABLE_FILE_BYTES, MAX_FILE_SIZE_BYTES, parseMaxFileBytes, usesChunkedTransfer } from './sync-limits';
 import { serverMaxFileBytes, serverProtocolRange, CRATE_PLUGIN_PROTOCOL } from './server-info';
 import { encryptedFileLimit, fileTransportLimit, ENCRYPTED_FILE_CONTENT_TYPE, MAX_ENCRYPTED_FILE_BYTES } from '../encryption/file-format';
 
@@ -15,9 +15,11 @@ it('accepts a configured file limit only between the default and the ceiling', (
 });
 
 it('keeps mobile devices at the default limit', () => {
-	expect(deviceFileLimit(100 * MB, true)).toBe(MAX_FILE_SIZE_BYTES);
-	expect(deviceFileLimit(100 * MB, false)).toBe(100 * MB);
-	expect(deviceFileLimit(MAX_FILE_SIZE_BYTES, true)).toBe(MAX_FILE_SIZE_BYTES);
+	expect(deviceFileLimit(100 * MB, true, false)).toBe(MAX_FILE_SIZE_BYTES);
+	expect(deviceFileLimit(100 * MB, false, false)).toBe(100 * MB);
+	expect(deviceFileLimit(MAX_FILE_SIZE_BYTES, true, false)).toBe(MAX_FILE_SIZE_BYTES);
+	expect(deviceFileLimit(MAX_CONFIGURABLE_FILE_BYTES, false, true)).toBe(MAX_BUFFERED_FILE_BYTES);
+	expect(deviceFileLimit(MAX_CONFIGURABLE_FILE_BYTES, false, false)).toBe(MAX_CONFIGURABLE_FILE_BYTES);
 	expect(formatFileLimit(MAX_FILE_SIZE_BYTES)).toBe('25MB');
 });
 
@@ -35,8 +37,16 @@ it('derives the encrypted transport limit, keeping the released 38 MiB at the de
 	expect(fileTransportLimit('text/markdown', 100 * MB)).toBe(100 * MB);
 });
 
-it('keeps an encrypted upload journal record at the ceiling below the JavaScript string limit', () => {
+it('keeps an encrypted upload journal record at the buffered limit below the JavaScript string limit', () => {
 	// The record holds the plaintext and the sealed file, each base64-encoded.
-	const characters = Math.ceil(MAX_CONFIGURABLE_FILE_BYTES * 4 / 3) + Math.ceil(encryptedFileLimit(MAX_CONFIGURABLE_FILE_BYTES) * 4 / 3);
+	const characters = Math.ceil(MAX_BUFFERED_FILE_BYTES * 4 / 3) + Math.ceil(encryptedFileLimit(MAX_BUFFERED_FILE_BYTES) * 4 / 3);
 	expect(characters).toBeLessThan(2 ** 29 - 24 - 16 * MB);
+});
+
+it('sends only plaintext attachments above the default limit in parts', () => {
+	expect(usesChunkedTransfer('video.mp4', MAX_FILE_SIZE_BYTES + 1, false, true)).toBe(true);
+	expect(usesChunkedTransfer('video.mp4', MAX_FILE_SIZE_BYTES, false, true)).toBe(false);
+	expect(usesChunkedTransfer('video.mp4', MAX_FILE_SIZE_BYTES + 1, true, true)).toBe(false);
+	expect(usesChunkedTransfer('video.mp4', MAX_FILE_SIZE_BYTES + 1, false, false)).toBe(false);
+	expect(usesChunkedTransfer('Notes/Huge.MD', MAX_FILE_SIZE_BYTES + 1, false, true)).toBe(false);
 });

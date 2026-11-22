@@ -60,7 +60,7 @@
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage --testTimeout=30000",
 		"test:ci": "node --test scripts/source-references.test.mjs scripts/release-verification.test.mjs scripts/prepare-release.test.mjs scripts/shortcut-release.test.mjs scripts/development-shortcut.test.mjs scripts/browser-tests.test.mjs scripts/pwa-asset-version.test.mjs tests/browser/support/preview/pwa-preview-assets.test.mjs scripts/visual-preview.test.mjs scripts/visual-test-run.test.mjs scripts/clean.test.mjs scripts/site-deployment.test.mjs scripts/build-changelog.test.mjs scripts/tab-indentation.test.mjs scripts/check-style-tokens.test.mjs",
-		"test:worker-runtime": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts",
+		"test:worker-runtime": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts && vitest run --config vitest.cloudflare-bundle.config.ts",
 		"benchmark:reminders": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/reminders/capacity.integration.ts --reporter=verbose",
 		"benchmark:pwa": "node tests/browser/pwa/pwa-capacity-test.mjs",
 		"benchmark:reading": "READING_CAPACITY_NOTES=50000 vitest run src/reading/data/library-capacity.test.ts --reporter=verbose && npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/reading/capacity.integration.ts --reporter=verbose",

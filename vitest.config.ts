@@ -18,7 +18,7 @@ export default defineConfig({
 		},
 	},
 	test: {
-		setupFiles: ['./src/test/setup-byte-equality.ts'],
+		setupFiles: ['./src/test/setup-byte-equality.ts', './src/test/setup-build-flags.ts'],
 		include: ['src/**/*.test.ts'],
 		// Floors for the folders where a silently dropped test risks user data. They
 		// sit just under current coverage: raise them as coverage grows, never lower them

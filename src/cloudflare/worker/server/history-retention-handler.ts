@@ -1,7 +1,7 @@
 import { corsResponse } from '../http/cors';
 import { parseJsonObject } from '../http/request-validation';
 import { HISTORY_RETENTION_MS_SQL } from '../sync/storage';
-import { DAY_MS, isHistoryRetentionDays } from '../../../protocol/history-retention';
+import { DAY_MS, HISTORY_RETENTION_DAYS, isHistoryRetentionDays, SELF_HOSTED_HISTORY_RETENTION_DAYS } from '../../../protocol/history-retention';
 
 /** The retention in milliseconds, as statements that keep history read it. */
 async function historyRetentionMs(db: D1Database): Promise<number> {
@@ -15,12 +15,15 @@ async function historyRetentionMs(db: D1Database): Promise<number> {
  * a shorter one lets maintenance remove older history, and a longer one extends
  * versions maintenance has not started to remove. */
 export async function handleHistoryRetention(request: Request, db: D1Database): Promise<Response> {
-	if (request.method === 'GET') return corsResponse({ days: await historyRetentionMs(db) / DAY_MS }, 200, { 'Cache-Control': 'no-store' });
+	// Only a self-hosted server offers, and lists, the longer periods.
+	const options = __CRATE_SELF_HOSTED__ ? SELF_HOSTED_HISTORY_RETENTION_DAYS : HISTORY_RETENTION_DAYS;
+	const listed = __CRATE_SELF_HOSTED__ ? { options } : {};
+	if (request.method === 'GET') return corsResponse({ days: await historyRetentionMs(db) / DAY_MS, ...listed }, 200, { 'Cache-Control': 'no-store' });
 	const parsed = await parseJsonObject(request);
 	if (!parsed.ok) return parsed.response;
 	const { days } = parsed.value;
-	if (!isHistoryRetentionDays(days)) return corsResponse({ error: 'Choose 7, 14, 30, 60 or 90 days.' }, 400);
+	if (!isHistoryRetentionDays(days, options)) return corsResponse({ error: `Choose ${options.slice(0, -1).join(', ')} or ${options.at(-1)} days.` }, 400);
 	await db.prepare(`INSERT INTO server_state(id, history_retention_days) VALUES (1, ?)
 		ON CONFLICT(id) DO UPDATE SET history_retention_days = excluded.history_retention_days`).bind(days).run();
-	return corsResponse({ days }, 200, { 'Cache-Control': 'no-store' });
+	return corsResponse({ days, ...listed }, 200, { 'Cache-Control': 'no-store' });
 }

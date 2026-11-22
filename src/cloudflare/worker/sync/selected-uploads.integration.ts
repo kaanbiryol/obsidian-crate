@@ -5,7 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { pendingChangeKey } from '../../../sync/pending/pending-change';
-import { BATCH_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
+import { BATCH_UPLOAD_MAX_FILES, SELF_HOSTED_BATCH_LIMITS } from '../../../protocol/sync-limits';
 
 let device: SyncTestDevice;
 beforeEach(async () => {
@@ -39,7 +39,8 @@ it.each(['vault', 'selected'] as const)('batches ordinary Markdown line edits th
 	const result = await (mode === 'selected' ? device.engine.syncSelected(paths) : device.engine.sync());
 	expect(result).toMatchObject({ success: true, uploaded: paths.length, downloaded: 0, merged: 0, errors: [] });
 	expect(device.requests.filter(route => route === 'PUT /sync/upload')).toHaveLength(0);
-	expect(device.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(2);
+	// The test server is self-hosted, so these share fewer, larger batches.
+	expect(device.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(Math.ceil(paths.length / SELF_HOSTED_BATCH_LIMITS.uploadFiles));
 	for (const path of paths) {
 		expect(new TextDecoder().decode((await device.api.downloadFile(path)).content)).toBe(`${original}\nAdded line.\n`);
 	}
@@ -56,7 +57,8 @@ it.each(['vault', 'selected'] as const)('batches ordinary Markdown line edits th
 	expect(await (mode === 'selected' ? device.engine.syncSelected(paths) : device.engine.sync()))
 		.toMatchObject({ success: true, uploaded: paths.length, downloaded: 0, merged: 0, errors: [] });
 	expect(device.requests.filter(route => route === 'PUT /sync/upload')).toHaveLength(0);
-	expect(device.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(2);
+	// The test server is self-hosted, so these share fewer, larger batches.
+	expect(device.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(Math.ceil(paths.length / SELF_HOSTED_BATCH_LIMITS.uploadFiles));
 	for (const path of paths) expect(new TextDecoder().decode((await device.api.downloadFile(path)).content)).toBe(original);
 });
 

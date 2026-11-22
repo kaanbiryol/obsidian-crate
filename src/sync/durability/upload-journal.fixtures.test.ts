@@ -44,6 +44,29 @@ async function upload(text: string, operationId: string, expectedHash: string | 
 		contentType: 'text/markdown', expectedHash, intent: { kind: 'local' } };
 }
 
+const chunkedBytes = bytes('Saved beside its record, not in it');
+
+async function recordChunked(operationId: string): Promise<string> {
+	const disk = new PersistentTestVault();
+	const journal = new UploadJournal(disk.vault.adapter, directory, authority);
+	await journal.prepareChunked({ operationId, path: 'Media/video.bin', hash: await sha256Hex(chunkedBytes), size: chunkedBytes.byteLength,
+		contentType: 'application/octet-stream', expectedHash: null }, chunkedBytes, 20757, '33333333-3333-4333-8333-333333333333');
+	await journal.close();
+	return disk.text(`${directory}/${operationId}.json`);
+}
+
+async function loadChunked(saved: string) {
+	const disk = new PersistentTestVault();
+	const { file } = JSON.parse(saved) as { file: { operationId: string; contentFile: string } };
+	await disk.vault.adapter.mkdir(directory);
+	await disk.vault.adapter.writeBinary(`${directory}/${file.contentFile}`, chunkedBytes);
+	await disk.vault.adapter.write(`${directory}/${file.operationId}.json`, saved);
+	const journal = new UploadJournal(disk.vault.adapter, directory, authority);
+	await journal.load();
+	// What a retry sends: the entry and the saved bytes read back.
+	return Promise.all(journal.pending().map(async entry => ({ entry, content: new TextDecoder().decode(await journal.readContent(entry)) })));
+}
+
 describe('frozen upload journal records', () => {
 	testFrozenFixtures(new URL('./__fixtures__/', import.meta.url), [
 		{
@@ -60,6 +83,12 @@ describe('frozen upload journal records', () => {
 				intent: await mergeUploadIntent(bytes('Merged line one\n')),
 			}),
 			decode: load,
+		},
+		{
+			// A chunked upload of a large attachment: its bytes are a file beside the record.
+			file: 'upload-journal-chunked.v2.json',
+			stored: () => recordChunked('e1_00020757_44444444-1111-4111-8111-111111111111'),
+			decode: loadChunked,
 		},
 	]);
 });

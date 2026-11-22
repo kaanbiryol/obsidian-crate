@@ -9,6 +9,9 @@ import { pruneOrphanReminderCache, pruneReminderOccurrences } from './reminder-h
 import { pruneOperationReceipts } from './operation-receipts';
 import { pruneFolderLabels } from '../encryption/folder-labels';
 import { wakeProjection } from '../coordinator/coordinator';
+import { abortExpiredUploadSessions } from '../sync/upload-sessions';
+import { maxFileBytes } from '../server/file-limit';
+import { MAX_FILE_SIZE_BYTES } from '../../../protocol/sync-limits';
 
 export interface MaintenanceResult { removedObjects: number; backlog: boolean }
 
@@ -42,6 +45,8 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 		['prune tokens', () => pruneExpiredTokens(db)],
 		// After expired credentials go, so their folders' labels go in the same pass.
 		['prune folder labels', async () => { if (firstPass) await pruneFolderLabels(db).run(); }],
+		// Sessions exist only on a self-hosted server whose raised limit accepts them, so others make no R2 call.
+		...__CRATE_SELF_HOSTED__ ? [['abort expired upload sessions', bounded(async () => maxFileBytes(env) > MAX_FILE_SIZE_BYTES && await abortExpiredUploadSessions(env.BUCKET))] as [string, () => Promise<unknown>]] : [],
 		['clean unfinished uploads', async () => { removedObjects += await cleanUploadLeases(env.BUCKET, db); }],
 	];
 	for (const [name, task] of tasks) {

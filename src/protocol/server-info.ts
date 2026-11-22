@@ -1,6 +1,6 @@
 import { parseDevelopmentBuild, type DevelopmentBuild } from './server-build';
 import { isSha256Hex } from '../platform/validation';
-import { MAX_FILE_SIZE_BYTES, parseMaxFileBytes } from './sync-limits';
+import { DEFAULT_BATCH_LIMITS, MAX_FILE_SIZE_BYTES, parseBatchLimits, parseMaxFileBytes, type BatchLimits } from './sync-limits';
 export const CRATE_SERVICE_ID = 'crate';
 
 export interface CrateProtocolRange {
@@ -18,8 +18,8 @@ export interface CrateServerInfo {
 	readonly developmentBuild?: DevelopmentBuild;
 	readonly pwaAssetVersion?: string;
 	readonly deploymentFingerprint?: string;
-	/** Absent on servers older than protocol 2, which allow the default. */
-	readonly limits?: { readonly maxFileBytes: number };
+	/** Absent on servers older than protocol 2 and on Cloudflare, which allow the defaults. */
+	readonly limits?: { readonly maxFileBytes: number; readonly batch?: BatchLimits };
 }
 
 /**
@@ -31,6 +31,10 @@ export const CRATE_PLUGIN_PROTOCOL: CrateProtocolRange = Object.freeze({
 	oldestCompatible: 1,
 });
 
+/** What a Cloudflare server advertises: it never raises its file limit, so it offers protocol 1
+ * as before. It still accepts protocol 2 from current clients. */
+export const HOSTED_SERVER_PROTOCOL: CrateProtocolRange = Object.freeze({ current: 1, oldestCompatible: 1 });
+
 /** Protocol 2 clients honor the file limit a server advertises in `limits`. */
 export const ADVERTISED_FILE_LIMIT_PROTOCOL = 2;
 
@@ -39,6 +43,11 @@ export function serverProtocolRange(maxFileBytes: number): CrateProtocolRange {
 	return maxFileBytes > MAX_FILE_SIZE_BYTES
 		? Object.freeze({ current: CRATE_PLUGIN_PROTOCOL.current, oldestCompatible: ADVERTISED_FILE_LIMIT_PROTOCOL })
 		: CRATE_PLUGIN_PROTOCOL;
+}
+
+/** The batch sizes the server accepts. */
+export function serverBatchLimits(info: Pick<CrateServerInfo, 'limits'>): BatchLimits {
+	return info.limits?.batch ?? DEFAULT_BATCH_LIMITS;
 }
 
 /** The largest file the server accepts. */
@@ -99,7 +108,7 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 		serverRevision: info.serverRevision,
 		...(isSha256Hex(info.deploymentFingerprint) ? { deploymentFingerprint: info.deploymentFingerprint } : {}),
 		reminderOperationDay: info.reminderOperationDay,
-		limits: { maxFileBytes: parseMaxFileBytes(info.limits?.maxFileBytes) },
+		limits: { maxFileBytes: parseMaxFileBytes(info.limits?.maxFileBytes), batch: parseBatchLimits(info.limits?.batch) },
 	};
 }
 
