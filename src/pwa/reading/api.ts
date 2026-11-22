@@ -6,7 +6,7 @@ import { cacheReadingArticle, readReadingArticle, removeEarlierSessionCopies, ty
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { ReadingApiError } from './session/api-error';
 import type { ReadingItem } from '@/reading/core/model';
-import type { ReadingSection, ReadingTag } from '@/reading/core/reading-presentation';
+import { rankReadingTags, type ReadingSection, type ReadingTag } from '@/reading/core/reading-presentation';
 import { ENCRYPTED_READING_ACTIONS, EncryptedReadingApi } from '@/pwa/reading/encrypted-api';
 import { captureServerArticle } from './capture-article';
 import { readingImageType } from '@/reading/core/article-images';
@@ -96,13 +96,14 @@ export async function queryReadingItems(session: ReadingSession, query: ReadingI
 	return { items: page.items, issues: page.issues, cursor: page.cursor };
 }
 
-/** The tags of one section's notes, most used first with their counts. */
+/** The tags of one section's notes, most used first with their counts. The server breaks ties
+ * by term, which an encrypted vault hashes, so they are ranked again here by name. */
 export async function queryReadingTags(session: ReadingSession, section: ReadingSection): Promise<ReadingTag[]> {
 	const value = await readingRequest<unknown>(`/reading/tags?section=${section}`, session);
 	const { tags, counts } = (value ?? {}) as { tags?: unknown; counts?: unknown };
 	if (!Array.isArray(tags) || !tags.every(tag => typeof tag === 'string') || !Array.isArray(counts) || counts.length !== tags.length
 		|| !counts.every(count => Number.isSafeInteger(count) && count >= 0)) throw new Error('Reading tags response is unreadable.');
-	return tags.map((name, index) => ({ name, count: counts[index] as number }));
+	return rankReadingTags(tags.map((name, index) => ({ name, count: counts[index] as number })));
 }
 
 /** The library's first inbox page and its issues, kept in memory. The library stays on the

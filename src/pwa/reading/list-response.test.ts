@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
-import { loadReading, queryReadingItems } from './api';
+import { loadReading, queryReadingItems, queryReadingTags } from './api';
 import { removeEarlierSessionCopies } from './storage/storage';
 import { type ReadingSession } from './session/session';
 
@@ -64,4 +64,11 @@ it('asks the server for one page of a section, search and tag', async () => {
 	respond({ items: [item(1)], issues: [], cursor: null });
 	await expect(queryReadingItems(session, { section: 'archived', q: 'java mem', tag: 'Code', cursor: 'next' })).resolves.toEqual({ items: [item(1)], issues: [], cursor: null });
 	expect(network.mock.calls[0]![0]).toBe('/reading/items?section=archived&q=java+mem&tag=Code&cursor=next');
+});
+
+it('ranks tied server tags by name, as a local library does', async () => {
+	respond({ tags: ['zebra', 'apple', 'mango', 'kiwi'], counts: [2, 2, 5, 2] });
+	await expect(queryReadingTags(session, 'inbox')).resolves.toEqual([
+		{ name: 'mango', count: 5 }, { name: 'apple', count: 2 }, { name: 'kiwi', count: 2 }, { name: 'zebra', count: 2 },
+	]);
 });

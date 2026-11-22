@@ -29,7 +29,7 @@ export function filterReadingItems(items: ReadingItem[], section: ReadingSection
 export interface ReadingTag { name: string; count: number }
 
 /** Most used first, then by name. */
-function rankReadingTags(tags: ReadingTag[]): ReadingTag[] {
+export function rankReadingTags(tags: ReadingTag[]): ReadingTag[] {
 	return [...tags].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
