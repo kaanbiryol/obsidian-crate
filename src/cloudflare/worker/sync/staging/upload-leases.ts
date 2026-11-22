@@ -40,12 +40,16 @@ export async function trackUploadLease(db: D1Database, objects: ObjectReference[
 	return { id, encryptionState: state };
 }
 
+/** How a lease's `keys` JSON spells this key's entry. Managed keys contain no quote or
+ * backslash, and a path's quotes are escaped, so only that entry can contain it. */
+const leasedKeyText = (storageKey: string) => JSON.stringify({ storageKey }).slice(1, -1);
+
 /** Publication requires this pending, unexpired lease to name the object. Evaluate it
- * inside the publishing statement. */
+ * inside the publishing statement. A text search, unlike json_each, reads no row per key. */
 export function uploadLeaseGuard(id: string, storageKey: string): SqlGuard {
 	return { sql: `EXISTS (SELECT 1 FROM upload_leases l WHERE l.id = ?
     AND l.state = 'pending' AND l.expires_at > unixepoch('now') * 1000
-    AND EXISTS (SELECT 1 FROM json_each(l.keys) WHERE json_extract(value, '$.storageKey') = ?))`, args: [id, storageKey] };
+    AND instr(l.keys, ?) > 0)`, args: [id, leasedKeyText(storageKey)] };
 }
 
 export interface LeasedObject { path: string; objectKey: string; leaseId: string }
@@ -64,7 +68,10 @@ export function finishUploadLeases(db: D1Database, files: readonly LeasedObject[
 	return [
 		db.prepare(input + `INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path)
       SELECT key, path FROM input WHERE NOT EXISTS (SELECT 1 FROM files WHERE portable_path = input.portable AND storage_key = input.key)`).bind(json),
-		db.prepare(input + `DELETE FROM upload_leases WHERE id IN (SELECT id FROM input) AND NOT EXISTS (${remaining})`).bind(json),
+		// Each request attempt owns distinct keys, so a lease whose every key was attempted is
+		// settled; counting avoids reading each key. Only a partly settled lease is rewritten.
+		db.prepare(input + `DELETE FROM upload_leases WHERE id IN (SELECT id FROM input)
+      AND json_array_length(keys) = (SELECT count(*) FROM input i WHERE i.id = upload_leases.id)`).bind(json),
 		db.prepare(input + `UPDATE upload_leases SET keys = (SELECT json_group_array(json(value)) FROM (${remaining}))
       WHERE id IN (SELECT id FROM input)`).bind(json),
 	];

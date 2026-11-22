@@ -265,6 +265,20 @@ it.each([8, INITIAL_IMPORT_MAX_FILES])('measures 10,000-note import writes with 
 	console.info('Initial import D1 writes:', meter.writes());
 }, 120000);
 
+it('reads about twenty rows per imported note, without walking each lease key', async () => {
+	const token = await start();
+	const hash = await sha256Hex('# Note');
+	const meter = meterD1Usage(env.DB);
+	for (let offset = 0; offset < 64; offset += INITIAL_IMPORT_MAX_FILES) {
+		const files = Array.from({ length: INITIAL_IMPORT_MAX_FILES }, (_, i) => ({ path: `Notes/${offset + i}.md`, hash, content: btoa('# Note'), expectedHash: null }));
+		expect((await send(token, files, meter.db)).success).toBe(true);
+	}
+	console.info(`INITIAL_IMPORT_READS notes=64 read=${meter.usage.rowsRead} written=${meter.usage.rowsWritten}`);
+	// Was 51.4 rows a note, about 60% of them from json_each over the lease's keys; now 20.4.
+	expect(meter.usage.rowsRead / 64).toBeLessThan(25);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM upload_leases').first()).toEqual({ n: 0 });
+});
+
 it('verifies a large inventory in bounded primary-key pages and restarts after a concurrent change', async () => {
 	const token = await start();
 	const count = INITIAL_IMPORT_VERIFY_PAGE * 2 + 17;

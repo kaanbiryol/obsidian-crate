@@ -82,21 +82,21 @@ reminder folder. Encrypted runs measured within 1% of plaintext ones.
 
 | Per item | Rows read | Rows written | Requests |
 | --- | ---: | ---: | ---: |
-| Note, in 32-file batches | 55 | 1.09 | 1 per 32 notes |
+| Note, in 32-file batches | about 24 | 1.09 | 1 per 32 notes |
 | File of 1 MiB or more, sent alone | 34 | 4 | 1 |
 | Fixed per first sync | about 80 | 7 | 8 |
 
-Each batch request reads about 1,730 rows, the same at 2,000 and 4,000 notes, so reads
-grow linearly with the vault. The largest parts are the lease removal in
-`finishUploadLeases`, about 560 rows from its nested `json_each` match, and each file's
-insert with its namespace guard, 30 to 46 rows. The existing-file lookup and the cleanup
-queue insert read 64 each.
+Reads grow linearly with the vault. The import handler reads 20.4 rows per note in
+32-file batches (`initial-import.integration.ts`), down from 51.4: the upload lease
+guard now matches its key as text and a fully settled lease is removed by counting its
+keys, instead of walking them with `json_each`. The note row above adds the engine's own
+requests and was estimated from that change, not measured again end to end.
 
 For a vault of 50,000 notes and 5 GB of PDFs (2,500 of 2 MB) this projects to about
-65,000 row writes, 2.85 million row reads and 4,100 Worker requests, plus as many
+65,000 row writes, 1.3 million row reads and 4,100 Worker requests, plus as many
 transfer Durable Object requests. That is about 65% of the Free plan's daily writes and
-57% of its reads. The most expensive 5 GB, about 5,000 to 6,500 files just over the
-batch limit, projects to about 82,000 writes and 3.05 million reads. An encrypted file
+26% of its reads. The most expensive 5 GB, about 5,000 to 6,500 files just over the
+batch limit, projects to about 82,000 writes and 1.5 million reads. An encrypted file
 is sent alone from about 750 KB of plaintext, since its ciphertext is larger.
 
 Storage for that vault: D1 holds about 30 MB in plaintext and about 60 MB encrypted. R2
