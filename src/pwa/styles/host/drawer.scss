@@ -48,7 +48,9 @@
     needs no safe-area padding of its own. */
  .crate-reminders-ui .pwa-modal-sheet--card{--pwa-sheet-card-gap:max(8px,env(safe-area-inset-bottom));--pwa-sheet-content-safe-bottom:0px}
  .crate-reminders-ui .pwa-modal-sheet--card.is-keyboard-open{--pwa-sheet-card-gap:8px}
- .crate-reminders-ui .pwa-modal-sheet--card .pwa-modal-sheet__backdrop{background:rgba(0,0,0,.2)}
+ /* Header controls step up from the lighter card instead of sinking into it. */
+ .crate-reminders-ui .pwa-modal-sheet--card{--pwa-sheet-surface:var(--pwa-sheet-card-surface);--pwa-glass-fill:var(--pwa-sheet-card-control);--pwa-glass-hover-fill:var(--pwa-sheet-card-control-hover)}
+ .crate-reminders-ui .pwa-modal-sheet--card .pwa-modal-sheet__backdrop{background:var(--pwa-sheet-card-dim)}
  /* The surface keeps its full-width layout box and keyboard padding; transparent
     borders hold the card off the edges and ::before paints it. The registered
     keyboard inset does not inherit, so hand it to ::before. */

@@ -35,7 +35,12 @@
 	--pwa-floating-shadow:none;
 	--pwa-sheet-surface:#101013;
 	--pwa-sheet-card-radius:30px;
-	--pwa-sheet-card-border:rgba(255,255,255,.08);
+	--pwa-sheet-card-border:rgba(255,255,255,.12);
+	/* A black shadow vanishes on the dark page, so cards rise by surface lightness. */
+	--pwa-sheet-card-surface:#1c1c1f;
+	--pwa-sheet-card-dim:rgba(0,0,0,.4);
+	--pwa-sheet-card-control:#2a2a2e;
+	--pwa-sheet-card-control-hover:#323237;
 	--pwa-sheet-card-shadow:0 -12px 48px rgba(0,0,0,.22);
 	--bg:var(--background-primary);
 	--panel:var(--background-primary-alt);

@@ -161,11 +161,15 @@ and a coordinated 320ms exit. On phones (up to 640px) `PwaModalSheet`
 presents a `card` or a `page`. A card (reminders, short Reading dialogs,
 draft recovery) fits its content and floats 8px from the screen edges and the
 keyboard, and above the home indicator when the keyboard is closed
-(`--pwa-sheet-card-gap`, with no safe-area padding inside), over a lighter 20% dim; its surface keeps the full-width layout box
+(`--pwa-sheet-card-gap`, with no safe-area padding inside), over a lighter dim (`--pwa-sheet-card-dim`); its surface keeps the full-width layout box
 and keyboard padding while `::before` paints the card. A page (settings, the
 shortcut setup, full-height Reading dialogs) keeps its full height and spans
 the width without a border. Both share `--pwa-sheet-card-radius` (30px) and
-shadow tokens; only the card draws the border. Sheet swipes shorten that exit to 240–320ms
+shadow tokens; only the card draws the border. A shadow cannot show on the
+dark page, so in dark mode a card rises by surface lightness instead: it paints
+`--pwa-sheet-card-surface` (lighter than the page) over a 40% dim, with lighter
+header controls (`--pwa-sheet-card-control`). Light mode keeps a 20% dim and
+the standard sheet surface. Sheet swipes shorten that exit to 240–320ms
 using the drawer's release strength and the shared spring curve. A 240ms floor
 keeps a fast flick's remaining travel visible instead of compressing it into
 the first few frames;
