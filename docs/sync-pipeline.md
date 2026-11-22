@@ -39,8 +39,10 @@ the changelog. A sync saves the cursor it read before uploading, so this device'
 own uploads also follow the cursor; entries that match a local baseline, and
 ignored, oversized or unsupported paths, do not count. Anything else, or an expired
 cursor, shows **Changes on server** (`engine/remote-changes.ts`). The flag stays
-until a sync starts, so later checks skip the changelog. It never moves the cursor
-or transfers files.
+until a sync starts, so later checks skip the changelog. A check that finds nothing
+remembers in memory where it stopped and continues from there until a sync moves
+the cursor, so a device's own uploads are read once rather than on every check. It
+never moves the saved cursor or transfers files.
 
 With automatic sync off, removing or editing an exclusion pattern runs the same
 local scan, so files the old pattern hid appear as pending changes. Unchanged

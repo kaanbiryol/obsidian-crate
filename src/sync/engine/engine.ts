@@ -34,7 +34,7 @@ import { SyncEngineLifecycle } from './lifecycle';
 import { createEmptySyncResult, SYNC_ERROR_MESSAGES } from '../sync-result';
 import { getCheckpointAuthority } from '../connection/worker-url';
 import { LocalChangeDetection } from './local-changes';
-import { hasRemoteChanges } from './remote-changes';
+import { hasRemoteChanges, type RemoteChangesProgress } from './remote-changes';
 import type { SyncSettings } from '../settings';
 import { syncStoragePaths } from '../manifest/storage-paths';
 import { isMarkdownNoteInFolder } from '../../protocol/note-paths';
@@ -313,10 +313,14 @@ export class SyncEngine {
 		return { ...this.state };
 	}
 
+	private remoteChangesProgress: RemoteChangesProgress | null = null;
+
 	/** Whether a sync would bring server changes here. Read-only: it never moves the cursor. */
 	hasRemoteChanges(): Promise<boolean> {
 		return hasRemoteChanges({
 			lastSeq: this.settings.lastSeq,
+			progress: this.remoteChangesProgress,
+			setProgress: progress => { this.remoteChangesProgress = progress; },
 			checkForChanges: since => this.api.checkForChanges(since),
 			files: this.files,
 			getBaseline: path => this.localManifest.getEntry(path),
