@@ -93,23 +93,27 @@ export function createFileSyncProgress(setting: Setting): FileSyncProgress {
 	return { container, label, bar: progressBar, fill };
 }
 
+function setFill(progress: FileSyncProgress, pct: number): void {
+	progress.fill.setCssProps({ width: `${pct}%` });
+}
+
 export function showFileSyncProgress(progress: FileSyncProgress): void {
 	progress.container.show();
-	progress.fill.setCssProps({ width: '0%' });
+	setFill(progress, 0);
 	progress.label.textContent = '';
 }
 
 export function updateFileSyncProgress(progress: FileSyncProgress, current: number, total: number): void {
 	const safeTotal = total > 0 ? total : 1;
 	const pct = Math.round((current / safeTotal) * 100);
-	progress.fill.setCssProps({ width: `${Math.min(Math.max(pct, 0), 100)}%` });
+	setFill(progress, Math.min(Math.max(pct, 0), 100));
 	progress.bar.setAttribute('aria-valuenow', String(Math.min(Math.max(pct, 0), 100)));
 	progress.label.textContent = `${current} / ${total} files`;
 }
 
 export function hideFileSyncProgress(progress: FileSyncProgress): void {
 	progress.container.hide();
-	progress.fill.setCssProps({ width: '0%' });
+	setFill(progress, 0);
 	progress.bar.setAttribute('aria-valuenow', '0');
 	progress.label.textContent = '';
 }
