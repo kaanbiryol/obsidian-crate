@@ -25,10 +25,14 @@ export function clearServerConnection(plugin: CratePlugin, signal?: AbortSignal)
 	return plugin.syncRuntime.clearSyncConfiguration(signal);
 }
 
-/** Disconnects this device. Forgetting also cancels a pending Cloudflare deployment
- * and drops the saved server, so nothing reconnects to it. */
+/** Disconnects this device. Forgetting also cancels a pending Cloudflare deployment,
+ * drops the saved server so nothing reconnects to it, and signs out of the Cloudflare
+ * login saved for it, which nothing could reach once the server record is gone. */
 export async function disconnectDevice(plugin: CratePlugin, { forget }: { forget: boolean }): Promise<void> {
 	if (forget) plugin.cloudflareDeploymentService.cancelPendingDeployment();
 	await clearServerConnection(plugin);
-	if (forget) await plugin.writeSettings({ cloudflareDeployment: null });
+	if (!forget) return;
+	const accountId = plugin.settings.cloudflareDeployment?.accountId;
+	await plugin.writeSettings({ cloudflareDeployment: null });
+	if (accountId) await plugin.cloudflareSavedLogin.forget(accountId).catch(() => {});
 }

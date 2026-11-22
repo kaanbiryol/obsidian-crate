@@ -166,7 +166,7 @@ export function renderAccountSection(context: SettingsSectionContext): void {
 						checkbox: deployment && !deployment.deletion ? {
 
 							label: 'Forget saved connection',
-							description: 'You’ll need to select a server to reconnect.',
+							description: 'Also signs out of Cloudflare on this device. You’ll need to select a server to reconnect.',
 							onChange: checked => { forgetConnection = checked; },
 						} : undefined,
 						confirmText: 'Disconnect',

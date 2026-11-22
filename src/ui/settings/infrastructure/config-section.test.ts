@@ -157,6 +157,7 @@ describe('renderConfigSection integration', () => {
 		const plugin = { secretStorage: { get: () => null }, manifest: { version: '0.2.0' },
 			app: {}, settings: { cloudflareDeployment: saved as typeof saved | null },
 			cloudflareDeploymentService: { cancelPendingDeployment: vi.fn() },
+			cloudflareSavedLogin: { forget: vi.fn(async () => {}) },
 			clearSettingsUiState: vi.fn(),
 			syncRuntime: { getCachedVersionInfo: () => undefined, getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => false, clearSyncConfiguration: vi.fn(async () => {}) },
 			writeSettings: vi.fn(async (update: { cloudflareDeployment: null }) => { Object.assign(plugin.settings, update); }),
@@ -170,7 +171,10 @@ describe('renderConfigSection integration', () => {
 			expect(plugin.settings.cloudflareDeployment).toBeNull();
 			expect(plugin.syncRuntime.clearSyncConfiguration).toHaveBeenCalledOnce();
 			expect(plugin.cloudflareDeploymentService.cancelPendingDeployment).toHaveBeenCalledOnce();
+			// Nothing can reach the account's saved login once the server record is gone.
+			expect(plugin.cloudflareSavedLogin.forget).toHaveBeenCalledWith('account');
 		} else {
+			expect(plugin.cloudflareSavedLogin.forget).not.toHaveBeenCalled();
 			await flushMicrotasks();
 			expect(plugin.settings.cloudflareDeployment).toBe(saved);
 			expect(plugin.syncRuntime.clearSyncConfiguration).not.toHaveBeenCalled();
@@ -310,6 +314,7 @@ it.each([false, true])('disconnects with optional forgetting (%s)', async forget
 	const plugin = { secretStorage: { get: () => null },
 		app: {}, settings: { cloudflareDeployment: saved as typeof saved | null },
 		cloudflareDeploymentService: { cancelPendingDeployment: vi.fn() },
+		cloudflareSavedLogin: { forget: vi.fn(async () => {}) },
 		clearSettingsUiState: vi.fn(),
 		syncRuntime: { getCachedVersionInfo: () => undefined, isConfigured: () => true, clearSyncConfiguration: vi.fn(async () => {}) },
 		writeSettings: vi.fn(async (update: { cloudflareDeployment: null }) => { Object.assign(plugin.settings, update); }),
@@ -328,6 +333,7 @@ it.each([false, true])('disconnects with optional forgetting (%s)', async forget
 	expect(plugin.syncRuntime.clearSyncConfiguration).toHaveBeenCalledOnce();
 	expect(plugin.settings.cloudflareDeployment).toBe(forget ? null : saved);
 	expect(plugin.cloudflareDeploymentService.cancelPendingDeployment).toHaveBeenCalledTimes(forget ? 1 : 0);
+	expect(plugin.cloudflareSavedLogin.forget).toHaveBeenCalledTimes(forget ? 1 : 0);
 });
 
 it('does not forget or disconnect when the dialog is cancelled after choosing forget', async () => {
