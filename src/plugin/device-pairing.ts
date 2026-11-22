@@ -37,8 +37,16 @@ export async function redeemDevicePairing(plugin: CratePlugin, target: { origin:
 	const deployment = normalizeCloudflareDeployment(result.deployment);
 	if (!deployment?.workersSubdomain || workersDevOrigin(deployment.workerName, deployment.workersSubdomain) !== target.origin) throw new Error('The server returned an unexpected identity.');
 	if (plugin.syncRuntime.isConfigured()) throw new Error('This vault was connected while pairing. Disconnect it before pairing again.');
+	const previousDeployment = plugin.settings.cloudflareDeployment;
 	await plugin.writeSettings({ cloudflareDeployment: deployment });
-	const connection = await configureCloudflareAuthorizedDevice(plugin, target.origin, token);
+	let connection;
+	try {
+		connection = await configureCloudflareAuthorizedDevice(plugin, target.origin, token);
+	} catch (error) {
+		// Without a connection, a kept deployment would offer a Reconnect this device has no login for.
+		if (!plugin.syncRuntime.isConfigured()) await plugin.writeSettings({ cloudflareDeployment: previousDeployment });
+		throw error;
+	}
 	signal.throwIfAborted();
 	const keyed = new WorkerApiHttpClient(target.origin, token);
 	keyed.setAbortSignal(signal);
@@ -94,13 +102,13 @@ export async function startDevicePairing(plugin: CratePlugin, target: DevicePair
 		const result = await redeemDevicePairing(plugin, target);
 		plugin.refreshSettingsTab();
 		if (result.encrypted) { new DeviceKeyPairingModal(plugin).open(); return; }
-		if (!result.synced) { new Notice('Connected, but the connection test failed. Check Crate settings.'); return; }
+		if (!result.synced) { new Notice('Connected, but the connection test failed. To try again, sync from Crate settings.'); return; }
 		// Choose features first, so the replacement syncs the chosen folders.
 		void offerFeatureChoice(plugin).finally(() => {
 			if (!startVaultReplacement(plugin)) new Notice('Connected. Open the command palette and select Crate: Sync now.');
 		});
 	} catch (error) {
-		if (error instanceof ConnectionSetupError && error.code === 'replace-cancelled') new Notice(error.message);
+		if (error instanceof ConnectionSetupError && error.code === 'replace-cancelled') new Notice(`${error.message} To connect, create a new code with Add a device on your other device.`);
 		else if (!getPluginLifecycleSignal(plugin).aborted) new Notice(`Could not connect: ${errorMessage(error)}`);
 	} finally { release(); }
 }

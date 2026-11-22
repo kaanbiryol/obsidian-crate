@@ -90,6 +90,12 @@ describe('redeemDevicePairing', () => {
 		expect(mocks.configure).not.toHaveBeenCalled();
 	});
 
+	it('forgets the server identity when the connection is cancelled', async () => {
+		mocks.configure.mockRejectedValueOnce(new Error('Connection cancelled. This vault was not changed.'));
+		await expect(redeemDevicePairing(plugin as never, target)).rejects.toThrow('Connection cancelled');
+		expect(plugin.settings.cloudflareDeployment).toBeUndefined();
+	});
+
 	it('opens key approval for an encrypted vault after confirmation', async () => {
 		mocks.encryption.mockResolvedValue({ mode: 'active' });
 		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#${target.code}`);
