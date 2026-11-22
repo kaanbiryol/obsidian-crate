@@ -105,7 +105,7 @@ async function verify(browser, scenario) {
 			const listed = await (await api.handle('/reminders/list?folderPath=Reminders')).json();
 			const reminder = listed.reminders[0];
 			const change = { method: 'POST', body: JSON.stringify({ operationId: `e1_${String(day).padStart(8, '0')}_${crypto.randomUUID()}`,
-				folderPath: 'Reminders', id: reminder.id, filePath: reminder.filePath, expectedRevision: reminder.revision, completed: true }) };
+				folderPath: 'Reminders', id: reminder.id, filePath: reminder.filePath, expectedRevision: reminder.revision, completed: true, completedAt: new Date().toISOString() }) };
 			const first = await api.handle('/reminders/set-completed', change);
 			// A fresh API must settle the committed immutable attempt from the server.
 			const retry = await new t.EncryptedReminderApi(keys, apiFetch).handle('/reminders/set-completed', change);
