@@ -14,7 +14,8 @@ import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { PwaPullRefreshIndicator } from '../components/PwaChrome';
 import { PwaDock } from '../components/PwaDock';
-import { connectionIssueReason, PwaConnectionBanner } from '../components/PwaConnectionBanner';
+import { PwaConnectionBanner } from '../components/PwaConnectionBanner';
+import { readingConnectionView } from './connection-view';
 import { TabTransition } from '../../ui/shared/navigation/TabTransition';
 import { PwaUpdateButton } from '../update/PwaUpdateNotice';
 import { AUTH_TOKEN_KEY } from '../config';
@@ -62,9 +63,8 @@ function ReadingAppContent() {
 		try { readingUrl(url); return !saving; } catch { return false; }
 	})();
 	// Offline, the library is the articles saved on this device; online, the server lists it page by page.
-	// Read-only mode (an unanswered encryption check) loads no library page either, nor does a
-	// request that failed on a network the browser still reports as online.
-	const savedOnly = isOffline || readOnly || (!!session && !cache && !!error);
+	const { savedOnly, readingDisabled, connectionText, libraryError } = readingConnectionView({
+		isOffline, readOnly, hasSession: !!session, hasCache: !!cache, error, connectionState });
 	const offlineItems = useOfflineReadingItems(session, savedOnly, reader?.availableOffline);
 	const confirmedItems = savedOnly ? offlineItems : cache?.items;
 	const visibleItems = useMemo(() => presentReadingItems(confirmedItems ?? [], pending), [confirmedItems, pending]);
@@ -96,7 +96,6 @@ function ReadingAppContent() {
 	// A pending delete hides the item, but the reader keeps it while it closes.
 	const visibleReader = useMemo(() => reader && (presentReadingItems([reader.item], pending)[0] ?? reader.item), [reader, pending]);
 	const blockedItemIds = useMemo(() => blockedReadingItemIds(visibleItems, pending), [pending, visibleItems]);
-	const readingDisabled = !session && connectionState !== 'available';
 	const updateFromReader = useReaderSyncFeedback({ itemId: reader?.item.crate_reading_id, pending, showToast, claimFailure,
 		retry: () => void run(refreshManually), review: () => setSettingsOpen(true),
 		update: (item, changes) => updateItem(item, changes, reader ?? undefined),
@@ -107,11 +106,6 @@ function ReadingAppContent() {
 	if (!ready || (connecting && !session && !readingDisabled)) return <ReadingOpening />;
 	// A share stays staged until a connected Reading session copies it into its draft.
 	const share = new URL(location.href).searchParams.has('share');
-	// Offline, an unanswered encryption check and a library that never loaded share one banner.
-	const connectionText = readingDisabled ? null
-		: isOffline && (session || readOnly) ? 'Offline · showing saved articles'
-		: readOnly || (session && !cache && error) ? (readOnly && connectionIssueReason(error)) || 'Couldn’t connect · showing saved articles'
-		: null;
 	const notices = <ReadingNotices recovery={recovery} error={connectionText ? null : error} showError={!readingDisabled && !adding}
 		connectionText={connectionText} retrying={connecting}
 		syncIssue={pending.find(op => op.error || op.review)} onExport={() => void run(exportReadingData)}
@@ -122,7 +116,7 @@ function ReadingAppContent() {
 				renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
 				renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} addBlocked={readOnly} onAdd={openCapture} />}
 				source={source} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length,
-					error: !readingDisabled && !connectionText && !cache && error ? 'Your library is unavailable. Retry when connected.' : null }}
+					error: libraryError }}
 				onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }}
 				onRefresh={refreshManually} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />}
 				notice={!reader && notices} activeId={reader?.item.crate_reading_id} readerClosing={readerClosing} onReaderClosed={finishReaderClose}
