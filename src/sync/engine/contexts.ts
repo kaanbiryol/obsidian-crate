@@ -331,12 +331,12 @@ export class SyncEngineContexts {
 		if (this.dependencies.getSettings().replaceVault) throw new Error(VAULT_REPLACEMENT_UNFINISHED);
 	}
 
-	/** Runs before anything else in a standard sync. The runtime saves the cleared flag with the sync's progress. */
+	/** Runs before anything else in a standard sync. */
 	readonly replaceLocalVault = (): Promise<void> => {
 		const d = this.dependencies;
 		return replaceVaultBeforeFirstSync({
 			settings: d.getSettings(), manifest: d.localManifest, vault: d.vault, pluginDir: d.pluginDir,
-			reportWork: this.reportWork, signal: d.signal,
+			reportWork: this.reportWork, saveSettings: d.persistSettings, signal: d.signal,
 		});
 	};
 

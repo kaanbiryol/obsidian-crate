@@ -42,19 +42,24 @@ describe('replaceVaultBeforeFirstSync', () => {
 		const disk = await fixture();
 		const reportWork = vi.fn();
 		const getManifest = vi.fn(() => ({ files }));
+		// What a save writes: a restart after it must not move the vault again.
+		const saved: boolean[] = [];
+		const saveSettings = vi.fn(async () => { saved.push(settings.replaceVault); });
 		await replaceVaultBeforeFirstSync({
-			settings, manifest: { getManifest }, vault: disk.vault, pluginDir: TEST_PLUGIN_DIR, reportWork, signal: new AbortController().signal,
+			settings, manifest: { getManifest }, vault: disk.vault, pluginDir: TEST_PLUGIN_DIR, reportWork, saveSettings, signal: new AbortController().signal,
 		});
-		return { disk, reportWork, getManifest };
+		return { disk, reportWork, getManifest, saveSettings, saved };
 	}
 
 	it('moves the vault to trash before the first sync and clears the confirmation', async () => {
 		const settings = { replaceVault: true, lastSeq: 0 };
-		const { disk, reportWork } = await replace(settings);
+		const { disk, reportWork, saved } = await replace(settings);
 		expect(disk.has('root.md')).toBe(false);
 		expect(disk.trash.has('root.md')).toBe(true);
 		expect(reportWork).toHaveBeenCalledExactlyOnceWith({ phase: 'applying' });
 		expect(settings.replaceVault).toBe(false);
+		// Saved before the sync goes on, so notes made during it are never trashed by a restart.
+		expect(saved).toEqual([false]);
 	});
 
 	it.each([
@@ -71,10 +76,11 @@ describe('replaceVaultBeforeFirstSync', () => {
 
 	it('does nothing without a confirmed replacement', async () => {
 		const settings = { replaceVault: false, lastSeq: 0 };
-		const { disk, reportWork, getManifest } = await replace(settings);
+		const { disk, reportWork, getManifest, saveSettings } = await replace(settings);
 		expect(disk.trash.size).toBe(0);
 		expect(disk.has('root.md')).toBe(true);
 		expect(reportWork).not.toHaveBeenCalled();
 		expect(getManifest).not.toHaveBeenCalled();
+		expect(saveSettings).not.toHaveBeenCalled();
 	});
 });

@@ -30,15 +30,17 @@ export async function moveVaultToTrash(vault: Vault, pluginDir: string, signal: 
 }
 
 /** Carries out a confirmed vault replacement before the first sync with a joined server,
- * then clears the confirmation; the caller saves the cleared flag. Once a file has
+ * then clears the confirmation and saves it at once, so a restart during the first sync
+ * never moves notes made meanwhile to trash. Once a file has
  * synced, moving the vault again would trash the server's copies, so a vault with a
  * file baseline or a changelog cursor keeps its files. */
-export async function replaceVaultBeforeFirstSync({ settings, manifest, vault, pluginDir, reportWork, signal }: {
+export async function replaceVaultBeforeFirstSync({ settings, manifest, vault, pluginDir, reportWork, saveSettings, signal }: {
 	settings: Pick<SyncSettings, 'replaceVault' | 'lastSeq'>;
 	manifest: { getManifest(): { readonly files: Readonly<Record<string, unknown>> } };
 	vault: Vault;
 	pluginDir: string;
 	reportWork: (work: SyncWork) => void;
+	saveSettings: () => Promise<void>;
 	signal: AbortSignal;
 }): Promise<void> {
 	if (!settings.replaceVault) return;
@@ -47,4 +49,5 @@ export async function replaceVaultBeforeFirstSync({ settings, manifest, vault, p
 		await moveVaultToTrash(vault, pluginDir, signal);
 	}
 	settings.replaceVault = false;
+	await saveSettings();
 }
