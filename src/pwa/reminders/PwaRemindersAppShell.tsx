@@ -49,6 +49,8 @@ interface PwaRemindersAppShellProps {
 	addBlocked?: boolean;
 	incomplete?: boolean;
 	checkingReminders?: boolean;
+	/** Why reminders could not load when there is no saved copy to show. */
+	loadError?: string | null;
 	showLoadingIndicator?: boolean;
 	initializing?: boolean;
 	renderCard: ReminderCardRenderer;
@@ -81,6 +83,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	addBlocked = false,
 	incomplete = false,
 	checkingReminders = false,
+	loadError = null,
 	showLoadingIndicator = false,
 	initializing = false,
 	renderCard,
@@ -163,7 +166,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 
 	return (
 		<ReminderPageSizeContext.Provider value={REMINDER_PAGE_SIZE}>
-		<EmptyStateMessageContext.Provider value={checkingReminders ? LOADING_EMPTY_MESSAGE : incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
+		<EmptyStateMessageContext.Provider value={checkingReminders ? LOADING_EMPTY_MESSAGE : loadError ? { title: 'Couldn’t load reminders', description: loadError } : incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
 		<ThemeIconProvider renderer={PwaThemeIcon}>
 		  <div
 				ref={shell}

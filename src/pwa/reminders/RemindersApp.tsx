@@ -93,6 +93,8 @@ export function RemindersApp() {
 				reminders={initialContentReady ? sharedReminders : []}
 				projects={initialContentReady ? visibleProjects : []}
 				incomplete={issues.length > 0}
+				// Without a saved copy, an empty list would read as no reminders due.
+				loadError={dataMode === 'error' ? error : null}
 				checkingReminders={!initialContentReady || loading || refreshing || (dataMode === 'cached' && !isOffline && !error)}
 				showLoadingIndicator={!initialContentReady || (sharedReminders.length === 0 && (loading || (dataMode === 'cached' && !isOffline && !error)))}
 				isDarkMode={isDarkMode}
