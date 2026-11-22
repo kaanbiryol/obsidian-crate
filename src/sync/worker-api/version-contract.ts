@@ -11,7 +11,7 @@ export async function requestFileVersions(http: WorkerApiHttpClient, query: URLS
 
 export function parseFileVersions(value: unknown): FileVersionsPage {
 	if (!isRecord(value) || !Array.isArray(value.versions) || value.versions.length > 100 || typeof value.hasMore !== 'boolean') {
-		throw new Error('Update the Crate server to browse complete retained-file history');
+		throw new Error('Invalid retained-file history response');
 	}
 	if (value.hasMore && (!value.versions.length || typeof value.nextCursor !== 'string' || !value.nextCursor || value.nextCursor.length > 8192)
 		|| !value.hasMore && value.nextCursor !== undefined) throw new Error('Invalid retained-file page');

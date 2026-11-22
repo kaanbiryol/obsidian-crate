@@ -7,7 +7,7 @@ export type ReadingImageMode = 'save' | 'remote';
 export interface SharedFeatures { reading: boolean; reminders: boolean }
 
 /** The `/features` policy; `revision` stays null until the policy is first saved. A missing
- * `readingImages` means `save`: only the other choice is stored, and older servers store none. */
+ * `readingImages` means `save`: only the other choice is stored. */
 export interface FeaturePolicy extends SharedFeatures { revision: string | null; readingImages?: ReadingImageMode }
 
 export function parseSharedFeatures(value: unknown): SharedFeatures | null {

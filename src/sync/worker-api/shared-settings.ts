@@ -18,7 +18,7 @@ export class SharedSettingsWorkerApi {
 	async getSharedSettings(): Promise<VersionedSharedSettings> {
 		const result = await this.http.requestJson<{
 			settings: SharedSettings | null;
-			settingsVersion?: string | null;
+			settingsVersion: string | null;
 		}>('/settings');
 		let settings = result.settings;
 		if (this.encryption && result.settings !== null) {
@@ -26,7 +26,7 @@ export class SharedSettingsWorkerApi {
 			settings = opened === null ? null : normalizeSharedSettingsValue(opened);
 			if (opened !== null && !settings) throw new Error('Decrypted shared settings are invalid');
 		}
-		this.seen = { settings, settingsVersion: result.settingsVersion ?? null };
+		this.seen = { settings, settingsVersion: result.settingsVersion };
 		return { ...this.seen };
 	}
 

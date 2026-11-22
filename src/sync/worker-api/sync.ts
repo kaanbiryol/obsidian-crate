@@ -155,10 +155,9 @@ export class SyncWorkerApi {
 		return this.http.requestJson<BackendDiagnostics>('/diagnostics');
 	}
 
-	/** Null for a Cloudflare deployment, or a server too old to report one. */
+	/** Null for a Cloudflare deployment. */
 	async getHostStatus(): Promise<HostStatus | null> {
-		try { return parseHostStatusResponse(await this.http.requestJson<unknown>(HOST_STATUS_PATH)); }
-		catch (error) { if (error instanceof HttpError && error.status === 404) return null; throw error; }
+		return parseHostStatusResponse(await this.http.requestJson<unknown>(HOST_STATUS_PATH));
 	}
 
 	/** One raw manifest entry is enough to tell whether the server stores any file. */

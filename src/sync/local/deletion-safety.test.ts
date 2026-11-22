@@ -20,8 +20,7 @@ async function persistentHarness(lastSeq = 0) {
 		let value: unknown;
 		if (url.pathname === '/.well-known/crate') value = { service: 'crate', serverVersion: '0.1.0', serverRevision: 4, protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) };
 		else if (url.pathname === '/sync/manifest') value = { version: 1, files: { [path]: entry }, lastSeq: 100, snapshotSeq: 100, hasMore: false };
-		// A server that predates storage identities.
-		else if (url.pathname === '/sync/check') value = { lastSeq: Number(url.searchParams.get('since')), hasChanges: false };
+		else if (url.pathname === '/sync/check') value = { lastSeq: Number(url.searchParams.get('since')), hasChanges: false, storageId: 'a'.repeat(32) };
 		else if (url.pathname === '/sync/changes') value = { cursorExpired: url.searchParams.get('since') === '5', changes: [], lastSeq: 100, hasMore: false };
 		else throw new Error(`Unexpected request: ${request.url}`);
 		const text = JSON.stringify(value);

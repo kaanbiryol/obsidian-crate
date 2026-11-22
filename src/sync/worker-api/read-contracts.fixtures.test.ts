@@ -55,12 +55,7 @@ describe('frozen Worker read responses', () => {
 			decode: (stored: { since: number; response: unknown }) => parseChanges(stored.response, stored.since),
 		},
 		{
-			file: 'changes-check.v1.json',
-			stored: () => ({ since: 0, response: { lastSeq: 2, hasChanges: true } }),
-			decode: (stored: { since: number; response: unknown }) => parseChangesCheck(stored.response, stored.since),
-		},
-		{
-			// Servers that know their storage identity report it with every check.
+			// Every check reports the server's storage identity.
 			file: 'changes-check-storage-id.v1.json',
 			stored: () => ({ since: 2, response: { lastSeq: 2, hasChanges: false, storageId: '5d41402abc4b2a76b9719d911017c592' } }),
 			decode: (stored: { since: number; response: unknown }) => parseChangesCheck(stored.response, stored.since),

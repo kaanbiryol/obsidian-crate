@@ -49,7 +49,7 @@ it('preserves every reported note and reminder scope, and filters unsafe remote 
 	]);
 });
 
-it('retains older server errors without guessing which part of their text is a filename', async () => {
+it('retains server errors without guessing which part of their text is a filename', async () => {
 	const { api, requestJson } = harness();
 	requestJson.mockResolvedValue({ ready: false, error: 'note.md: bad description' });
 	const error = await api.waitUntilReady('token', new AbortController().signal).catch((error: unknown) => error);
@@ -68,7 +68,7 @@ it('stops polling when the sync is cancelled', async () => {
 	expect(requestJson).toHaveBeenCalledOnce();
 });
 
-it('reports live remaining work while polling and accepts older servers without progress', async () => {
+it('reports live remaining work while polling and skips a status without progress', async () => {
 	vi.useFakeTimers();
 	const { api, requestJson } = harness();
 	const progress = vi.fn();

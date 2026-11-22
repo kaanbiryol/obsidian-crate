@@ -254,11 +254,11 @@ Uploads compare the observed D1 content hash. Deletes also compare the original 
 
 Query: `?since=<seq>`
 
-Response: `{ lastSeq, hasChanges, cursorExpired?, storageId? }`
+Response: `{ lastSeq, hasChanges, cursorExpired?, storageId }`
 
 `cursorExpired` is true when `since` points to a pruned changelog region, signaling the client should fall back to full sync.
 
-`storageId` is the database's random storage identity (32 lowercase hex characters), kept in `maintenance_state` and created by the first check that finds none. A new server, or a restored local server, reports a new one. Older servers omit it.
+`storageId` is the database's random storage identity (32 lowercase hex characters), kept in `maintenance_state` and created by the first check that finds none. A new server, or a restored server, reports a new one.
 
 ### GET /sync/changes
 

@@ -45,7 +45,6 @@ function validateMetadata(value: unknown): asserts value is PrivateFileMetadata 
 	const item = value as Partial<PrivateFileMetadata>;
 	if (item.version !== 1 || typeof item.path !== 'string' || !item.path || item.path.length > 4096 || !isSha256Hex(item.hash)
 		|| typeof item.size !== 'number' || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > MAX_FILE_SIZE_BYTES
-		|| 'contentType' in item
 		|| !isSha256Hex(item.publicDataHash)) {
 		throw new Error('Encrypted file metadata does not match the requested file');
 	}

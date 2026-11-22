@@ -100,11 +100,11 @@ it('stops before pruning or uploading an import another device started', async (
 	expect(calls).toEqual([]);
 });
 
-it.each([['holds its token', 't', undefined], ['uploaded every server file', undefined, 'r1']] as const)('resumes an import when this device %s', async (_case, token, revision) => {
-	const { context, calls } = importContext(token, revision);
+it('resumes an import when this device holds its token', async () => {
+	const { context, calls } = importContext('t', undefined);
 	expect((await runInitialImport(context, createEmptySyncResult()))?.uploaded).toBe(200);
 	// 200 files stay under the periodic checkpoint, so uploads run back to back.
-	expect(calls.slice(0, 5)).toEqual(token ? ['prune', 'upload', 'upload', 'upload', 'upload'] : ['token t', 'save', 'prune', 'upload', 'upload']);
+	expect(calls.slice(0, 5)).toEqual(['prune', 'upload', 'upload', 'upload', 'upload']);
 	// Finishing releases the token.
 	expect(calls.indexOf('token undefined')).toBeGreaterThan(calls.lastIndexOf('upload'));
 });

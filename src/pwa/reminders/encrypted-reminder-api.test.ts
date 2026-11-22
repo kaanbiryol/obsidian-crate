@@ -49,7 +49,7 @@ async function note(path: string, text: string | Uint8Array<ArrayBuffer>): Promi
 	const sealed = await sealFile({ path, content, publicData: { version: 1, reminders: [] } }, { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault });
 	return { path, wire: await keys.paths.wire(path), sealed };
 }
-const entry = ({ wire, sealed }: Note) => ({ path: wire, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash });
+const entry = ({ wire, sealed }: Note) => ({ path: wire, hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash, modified: '2026-11-22T00:00:00.000Z' });
 
 /** A Worker that keeps every folder snapshot, so it answers 304s, deltas and batch downloads
  * as the real one does. `set` publishes a new snapshot. */
@@ -254,7 +254,7 @@ it('rejects a malformed later page before downloading any files', async () => {
 });
 
 it('rejects duplicate paths before downloading or projecting files', async () => {
-	const file = { path: await keys.paths.wire('Reminders/Inbox.md'), hash: 'a'.repeat(64), revision: 'first', size: 12 };
+	const file = { path: await keys.paths.wire('Reminders/Inbox.md'), hash: 'a'.repeat(64), revision: 'first', size: 12, modified: '2026-11-22T00:00:00.000Z' };
 	const fetch = vi.fn().mockResolvedValueOnce(Response.json({ ...page(7, 'A'), files: [file] }))
 		.mockResolvedValueOnce(Response.json({ ...page(7), files: [file] }));
 	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders')).rejects.toThrow('repeated a file');
@@ -262,7 +262,7 @@ it('rejects duplicate paths before downloading or projecting files', async () =>
 });
 
 it('rejects repeated paths in a single page', async () => {
-	const file = { path: await keys.paths.wire('Reminders/Inbox.md'), hash: 'a'.repeat(64), revision: 'first', size: 12 };
+	const file = { path: await keys.paths.wire('Reminders/Inbox.md'), hash: 'a'.repeat(64), revision: 'first', size: 12, modified: '2026-11-22T00:00:00.000Z' };
 	const fetch = vi.fn(async () => Response.json({ ...page(7), files: [file, file] }));
 	await expect(client(fetch).handle('/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': etag(6) } })).rejects.toThrow('repeated a file');
 	expect(fetch).toHaveBeenCalledOnce();

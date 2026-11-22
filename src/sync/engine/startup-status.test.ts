@@ -39,7 +39,7 @@ describe('sync status after restart', () => {
 		h.engine.destroy();
 	});
 
-	it('provides a fallback for older history without error details', () => {
+	it('provides a fallback for history without error details', () => {
 		const settings = savedFailure();
 		delete settings.syncHistory[0]!.errors;
 		const h = createHarness(settings);

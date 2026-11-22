@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { createEncryptedInventoryProgress, encryptedInventoryPages, parseEncryptedInventoryPage, parseEncryptedInventoryResponse, type EncryptedInventoryPage, ENCRYPTED_INVENTORY_PAGE, sameInventoryFile } from './file-inventory';
 
-const file = (path = 'Reading/Article.md') => ({ path, hash: 'a'.repeat(64), size: 12, revision: 'revision' });
+const file = (path = 'Reading/Article.md') => ({ path, hash: 'a'.repeat(64), size: 12, revision: 'revision', modified: '2026-11-22T00:00:00.000Z' });
 const token = (digit: string) => digit.repeat(32);
 const page = (patch: Partial<EncryptedInventoryPage> = {}): EncryptedInventoryPage => ({ files: [], generation: 1, changeToken: token('1'), deltaBase: `7.${token('b')}`, nextCursor: null, ...patch });
 

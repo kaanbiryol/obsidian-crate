@@ -5,7 +5,7 @@ import { buildPersistedCrateSettings, normalizeCrateSettings } from './settings'
 
 /**
  * Frozen `data.json` samples. A saved file must keep loading into the same settings after
- * every update, including files written before `dataVersion` existed. When a release changes
+ * every update. When a release changes
  * the layout, raise PLUGIN_DATA_VERSION, register its upgrade step and append a fixture for the
  * new version (see src/test/frozen-fixtures.ts). Never edit an existing fixture.
  */
@@ -35,6 +35,5 @@ function decode(stored: Record<string, unknown>) {
 }
 
 testFrozenFixtures(new URL('./__fixtures__/', import.meta.url), [
-	{ file: 'plugin-data.unversioned.json', stored: () => { const { dataVersion, ...rest } = written(); void dataVersion; return rest; }, decode },
 	{ file: 'plugin-data.v1.json', stored: written, decode },
 ]);

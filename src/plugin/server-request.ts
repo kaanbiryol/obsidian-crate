@@ -7,8 +7,6 @@ import { SECRET_KEYS } from '../platform/secret-keys';
 
 interface ServerRequestOptions {
 	timeout?: number;
-	/** Capability names and the instructions shown when the server lacks them. */
-	capabilities?: Readonly<Record<string, string>>;
 }
 
 /** The plugin's server address and credentials; `syncRuntime` adds its sync client. */
@@ -66,7 +64,7 @@ export async function serverRequest<T>(
 	plugin: ServerConnectionHost,
 	path: string,
 	body?: unknown,
-	{ timeout = 30_000, capabilities = {} }: ServerRequestOptions = {},
+	{ timeout = 30_000 }: ServerRequestOptions = {},
 ): Promise<T> {
 	const { signal, origin, token, assertCurrent } = captureServerConnection(plugin);
 	if (!origin || !token) throw new Error('Connect Crate to your server first.');
@@ -75,11 +73,6 @@ export async function serverRequest<T>(
 	const keys = loadEncryptionKeys(plugin.secretStorage);
 	if (keys) client.setEncryptionAuthority(keys.vaultId, keys.generation);
 	else client.refusePlaintext(Boolean(plugin.settings.encryptedVaultId));
-	const info = await client.getServerInfo(timeout);
-	assertCurrent();
-	for (const [capability, message] of Object.entries(capabilities)) {
-		if (!info.capabilities.includes(capability)) throw new Error(message);
-	}
 	const result = await client.requestJson<T>(path, body === undefined ? undefined : {
 		method: 'POST', body: JSON.stringify(body),
 	}, timeout);

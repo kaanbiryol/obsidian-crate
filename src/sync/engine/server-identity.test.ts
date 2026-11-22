@@ -6,13 +6,13 @@ import { reconcileServerIdentity } from './server-identity';
 const OLD = 'a'.repeat(32);
 const NEW = 'b'.repeat(32);
 
-function setup(saved: string | undefined, reported: string | undefined, options: { saveFails?: boolean } = {}) {
+function setup(saved: string | undefined, reported: string, options: { saveFails?: boolean } = {}) {
 	const events: string[] = [];
 	const baselines = new Set(['a.md', 'b.md']);
 	const settings: { lastSeq: number; serverStorageId?: string } = { lastSeq: 7, ...(saved === undefined ? {} : { serverStorageId: saved }) };
 	const context = {
 		settings,
-		checkForChanges: vi.fn(async (since: number): Promise<CheckResponse> => ({ lastSeq: 9, hasChanges: since < 9, ...(reported === undefined ? {} : { storageId: reported }) })),
+		checkForChanges: vi.fn(async (since: number): Promise<CheckResponse> => ({ lastSeq: 9, hasChanges: since < 9, storageId: reported })),
 		localManifest: {
 			getAllPaths: () => [...baselines],
 			removeEntry: (path: string) => { baselines.delete(path); },
@@ -36,12 +36,12 @@ describe('server storage identity', () => {
 		expect(context.checkForChanges).toHaveBeenCalledWith(7);
 	});
 
-	it('changes nothing for the same server or one that predates identities', async () => {
-		for (const [saved, reported] of [[OLD, OLD], [OLD, undefined], [undefined, undefined]] as const) {
-			const { context, settings, baselines } = setup(saved, reported);
+	it('changes nothing for the same server', async () => {
+		{
+			const { context, settings, baselines } = setup(OLD, OLD);
 			await reconcileServerIdentity(context);
 			expect(settings.lastSeq).toBe(7);
-			expect(settings.serverStorageId).toBe(saved);
+			expect(settings.serverStorageId).toBe(OLD);
 			expect(baselines.size).toBe(2);
 			expect(context.persistSettings).not.toHaveBeenCalled();
 		}

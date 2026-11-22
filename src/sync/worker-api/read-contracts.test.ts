@@ -40,11 +40,12 @@ describe('authoritative read contracts', () => {
 		const behind = { changes: [], lastSeq: 1, hasMore: false, ...(cursorExpired ? { cursorExpired } : {}) };
 		expect(() => parseChanges(behind, 50)).toThrow(ServerBehindError);
 		// The periodic check starts the sync that finds out.
-		expect(parseChangesCheck({ lastSeq: 1, hasChanges: false, ...(cursorExpired ? { cursorExpired } : {}) }, 50))
-			.toEqual({ lastSeq: 1, hasChanges: false, cursorExpired: true });
+		const storageId = 'a'.repeat(32);
+		expect(parseChangesCheck({ lastSeq: 1, hasChanges: false, storageId, ...(cursorExpired ? { cursorExpired } : {}) }, 50))
+			.toEqual({ lastSeq: 1, hasChanges: false, cursorExpired: true, storageId });
 	});
 	it('requires paginated history support instead of presenting a silently truncated older response', () => {
-		expect(() => parseFileVersions({ versions: [] })).toThrow('Update the Crate server');
+		expect(() => parseFileVersions({ versions: [] })).toThrow('Invalid retained-file history response');
 		expect(() => parseFileVersions({ versions: [], hasMore: true, nextCursor: 'cursor' })).toThrow();
 		expect(parseFileVersions({ versions: [], hasMore: false })).toEqual({ versions: [], hasMore: false });
 	});

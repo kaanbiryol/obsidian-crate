@@ -13,7 +13,7 @@ const MIGRATIONS: Readonly<Record<number, (data: PluginDataRecord) => PluginData
 
 export interface PluginDataUpgrade { status: 'current' | 'upgraded'; data: PluginDataRecord; from: number }
 
-/** Data saved before versioning has no `dataVersion` and is version 1. */
+/** A missing `dataVersion` reads as version 1, the first layout. */
 function savedPluginDataVersion(data: PluginDataRecord): number | null {
 	const version = data.dataVersion ?? 1;
 	return Number.isSafeInteger(version) && (version as number) >= 1 ? version as number : null;

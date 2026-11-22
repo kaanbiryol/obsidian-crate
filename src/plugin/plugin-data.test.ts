@@ -101,8 +101,8 @@ it('keeps the previous good copy when writing its replacement fails', async () =
 });
 
 describe('data.json versions', () => {
-	it('reads unversioned and current data as version 1 without writing a copy', async () => {
-		for (const saved of ['{"workerUrl":"https://crate.example"}', '{"dataVersion":1,"workerUrl":"https://crate.example"}']) {
+	it('reads current data as version 1 without writing a copy', async () => {
+		for (const saved of ['{"dataVersion":1,"workerUrl":"https://crate.example"}']) {
 			const h = harness({ 'data.json': saved });
 			const data = await loadPluginData(h.asPlugin);
 			expect(await upgradeLoadedPluginData(h.asPlugin, data!)).toEqual({ dataVersion: 1, workerUrl: 'https://crate.example' });

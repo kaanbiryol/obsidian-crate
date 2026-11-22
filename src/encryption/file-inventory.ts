@@ -3,8 +3,8 @@ import { sha256Hex } from '@/platform/sha256';
 import { openFile, type FileEncryptionAuthority, type PathBinding } from './file-codec';
 import { isSyncPath } from '@/protocol/sync-validation';
 
-/** `modified` is the server's time of the file's last write, absent from older servers. */
-export interface EncryptedInventoryFile { path: string; hash: string; size: number; revision: string; modified?: string }
+/** `modified` is the server's time of the file's last write. */
+export interface EncryptedInventoryFile { path: string; hash: string; size: number; revision: string; modified: string }
 /** Whether two listings name the same immutable file, so a copy opened from one serves the other. */
 export function sameInventoryFile(a: EncryptedInventoryFile, b: EncryptedInventoryFile): boolean {
 	return a.path === b.path && a.revision === b.revision && a.hash === b.hash && a.size === b.size;
@@ -48,12 +48,12 @@ export function parseEncryptedInventoryResponse(value: unknown, folder: string, 
 		if (!isRecord(file) || !inFolder(file.path)
 			|| !isSha256Hex(file.hash)
 			|| typeof file.size !== 'number' || !Number.isSafeInteger(file.size) || file.size < 0 || typeof file.revision !== 'string' || !file.revision
-			|| file.modified !== undefined && (typeof file.modified !== 'string' || file.modified.length > 40)) {
+			|| typeof file.modified !== 'string' || file.modified.length > 40) {
 			throw new Error('Invalid encrypted file metadata');
 		}
 		if (paths.has(file.path)) throw new Error('Encrypted inventory repeated a file');
 		paths.add(file.path);
-		files.push({ path: file.path, hash: file.hash, size: file.size, revision: file.revision, ...(file.modified === undefined ? {} : { modified: file.modified }) });
+		files.push({ path: file.path, hash: file.hash, size: file.size, revision: file.revision, modified: file.modified });
 	}
 	const snapshot = { files, generation, changeToken: value.changeToken, deltaBase: value.deltaBase };
 	if (!delta) return { ...snapshot, nextCursor: value.nextCursor as string | null };

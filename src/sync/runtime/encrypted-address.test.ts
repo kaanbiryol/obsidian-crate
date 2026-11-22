@@ -29,7 +29,7 @@ async function setup() {
 	storage.set(SECRET_KEYS.ENCRYPTION_KEYS, JSON.stringify(bundle));
 	storage.set(SECRET_KEYS.ENCRYPTION_RECOVERY, recovery);
 	const state = { ...createEncryptionState(bundle, await sealRecoveryBundle(bundle, recovery)), mode: 'active' as const };
-	const changes = { lastSeq: 17, hasChanges: false };
+	const changes = { lastSeq: 17, hasChanges: false, storageId: 'a'.repeat(32) };
 	const request = vi.spyOn(WorkerApiHttpClient.prototype, 'requestJson')
 		.mockImplementation(async (path: string) => path.startsWith('/sync/check') ? changes : { encryption: state });
 	vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);

@@ -60,11 +60,9 @@ for (const stage of ['metadata', 'mutation']) {
 	});
 }
 
-it('checks capabilities and mutation compatibility with one validated metadata request', async () => {
+it('checks mutation compatibility with one validated metadata request', async () => {
 	const { plugin } = harness(['shared-features-v1']);
-	await expect(serverRequest(plugin, '/features', { enabled: false }, {
-		capabilities: { 'shared-features-v1': 'Update shared features.' },
-	})).resolves.toEqual({ success: true });
+	await expect(serverRequest(plugin, '/features', { enabled: false })).resolves.toEqual({ success: true });
 	expect(transport).toHaveBeenCalledTimes(2);
 	expect(transport).toHaveBeenLastCalledWith(expect.objectContaining({
 		url: 'https://old.example/features', method: 'POST',

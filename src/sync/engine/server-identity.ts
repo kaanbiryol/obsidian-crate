@@ -21,15 +21,14 @@ export async function forgetServerBaselines(context: BaselineState): Promise<voi
 /** Runs before a standard sync plans anything. A server at this address with another
  * storage identity is a new or restored server, even when its changelog has reached this
  * device's cursor; planning against these baselines would move notes only this device has
- * to trash. A checkpoint without an identity adopts the server's; a server without one
- * predates identities and is trusted as before. */
+ * to trash. A checkpoint without an identity adopts the server's. */
 export async function reconcileServerIdentity(context: BaselineState & {
 	settings: Pick<SyncSettings, 'lastSeq' | 'serverStorageId'>;
 	checkForChanges(since: number): Promise<CheckResponse>;
 	persistSettings(): Promise<void>;
 }): Promise<void> {
 	const { storageId } = await context.checkForChanges(context.settings.lastSeq);
-	if (storageId === undefined || storageId === context.settings.serverStorageId) return;
+	if (storageId === context.settings.serverStorageId) return;
 	if (context.settings.serverStorageId !== undefined) {
 		logger.warn('This address now serves another server; merging with it as with a new server');
 		await forgetServerBaselines(context);
