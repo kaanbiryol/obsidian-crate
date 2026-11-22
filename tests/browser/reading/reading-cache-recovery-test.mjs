@@ -129,7 +129,7 @@ for (const engine of [chromium, webkit]) test(`${engine.name()}: Reading list fa
       try { await api.loadReading(session); } catch { failed = true; }
       const unavailable = { failed, article: !!await api.readReadingArticle(session, id) };
 
-      // Older servers can return HTTP 200 with missing items and source issues.
+      // A page can answer HTTP 200 with missing items and source issues.
       status = 200;
       body = { items: [], issues: [{ path: item.path, message: 'Source could not be read.' }], cursor: null };
       const uncertain = await api.loadReading(session);

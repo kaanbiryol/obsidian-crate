@@ -64,8 +64,8 @@ const EXPLANATIONS_BY_CODE: Record<SyncIssueCode, IssueExplanation> = {
 	'incoming-review': INCOMING_REVIEW,
 };
 
-/** Message matching for OS, HTTP and transport errors, and for issues saved or
- * sent without a code by older plugins and servers. Order matters. */
+/** Message matching for OS, HTTP and transport errors, and for issues raised as plain
+ * errors without a code. Order matters. */
 const MESSAGE_RULES: Array<[RegExp, IssueExplanation]> = [
 	[/More reminder notes need attention/i, MORE_REMINDER_ISSUES],
 	[/Unsupported reminder description encoding/i, UNSUPPORTED_DESCRIPTION],

@@ -47,7 +47,7 @@ describe('markdownReminderFile', () => {
 		].join('\n'));
 	});
 
-	it('edits and deletes multiline legacy descriptions without consuming the next reminder', () => {
+	it('edits and deletes multiline literal descriptions without consuming the next reminder', () => {
 		const rawLine = '- [ ] Task <!-- crate-id:r1 -->';
 		const description = 'collect 100% of receipts\nand confirm %20 deductions';
 		const next = '- [ ] Keep <!-- crate-id:r2 -->\n';
@@ -75,7 +75,7 @@ describe('markdownReminderFile', () => {
 		expect(updated.content).toBe(`${reminder.rawLine}\n<!-- crate-desc:hello%20world\nnext line -->\n`);
 	});
 
-	it('reorders multiline legacy descriptions together with their task without rewriting metadata', () => {
+	it('reorders multiline literal descriptions together with their task without rewriting metadata', () => {
 		const first = '- [ ] First <!-- crate-id:r1 -->\n<!-- crate-desc:line one\nline two -->';
 		const second = '- [ ] Second <!-- crate-id:r2 -->';
 		expect(reorderReminderBlocksInContent(`${first}\n${second}\n`, ['r2', 'r1']))

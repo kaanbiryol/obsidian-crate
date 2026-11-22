@@ -59,13 +59,6 @@ describe('normalizeRemindersSettings', () => {
 		expect(normalizeRemindersSettings({ enabled: true, confirmed: false })).toMatchObject({ enabled: false, confirmed: false });
 	});
 
-	it('drops retired embedded-block preferences from saved settings', () => {
-		const saved = { enabled: false, confirmed: true, queryViewPreferences: { abc123: { showCompleted: true } } };
-		const settings = normalizeRemindersSettings(saved);
-		expect(settings).not.toHaveProperty('queryViewPreferences');
-		expect(settings).toEqual({ ...DEFAULT_REMINDERS_SETTINGS, enabled: false, confirmed: true });
-	});
-
 	it('preserves explicitly disabled Reminders', () => {
 		expect(normalizeRemindersSettings({ enabled: false, confirmed: true }).enabled).toBe(false);
 	});

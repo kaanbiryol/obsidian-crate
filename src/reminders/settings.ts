@@ -20,7 +20,7 @@ export type RemindersSettings = {
 	enabled: boolean;
 	/** This vault agreed to let Crate change notes in the folder. A server policy alone never sets it. */
 	confirmed: boolean;
-	/** Shared by reminders and Reading; retained here for saved-setting compatibility. */
+	/** Shared by reminders and Reading. */
 	listStyle: ListStyle;
 	taskCreationDefaultDueDate: DueDateDefaultSetting;
 	remindersFolderPath: string;

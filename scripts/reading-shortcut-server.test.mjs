@@ -43,7 +43,7 @@ test('the distributed pairing and save requests reach a durable Reading receipt'
       [shortcutTemplate.WFWorkflowActions[3].WFWorkflowActionParameters.UUID]: sharedUrl,
     };
     const saveRequest = shortcutRequest(prepareAction, outputs);
-    // Retired protocols cannot bypass the wire gate.
+    // A mismatched protocol cannot bypass the wire gate.
     const unrelated = await dispatch({ ...saveRequest, url: `${origin}/reading/capture`, headers: { ...saveRequest.headers, 'X-Crate-Protocol': '11' } });
     assert.equal(unrelated.status, 428);
     const prepared = await dispatch(saveRequest);

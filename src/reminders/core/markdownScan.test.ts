@@ -60,7 +60,7 @@ describe('markdownScan', () => {
 		expect(result.reminders[0]?.description).toBe('line one\nline two --> safe');
 	});
 
-	it.each(['\n', '\r\n'])('reads legacy descriptions literally and ignores tasks inside their comment: %j', newline => {
+	it.each(['\n', '\r\n'])('reads literal descriptions as written and ignores tasks inside their comment: %j', newline => {
 		const result = scanReminderMarkdownContent('Reminders/Work.md', [
 			'- [ ] First <!-- crate-id:r1 -->',
 			'<!-- crate-desc:100% complete %20 café 😀 -->',

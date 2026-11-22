@@ -66,9 +66,9 @@ async function downloadFixture(t, items, overrides = {}) {
   return { destination, dependencies, run: () => downloadShortcut(['published', destination, '--install-page'], dependencies) };
 }
 
-test('Pages serves an unavailable page without reusing the legacy shortcut or a stale local file', async t => {
-  const legacy = release('0.3.0', '2026-09-20', { assets: [{ name: 'save-to-crate-ios-27.shortcut' }, { name: 'reading-shortcut.json' }] });
-  const f = await downloadFixture(t, [legacy], { downloadRelease: () => assert.fail('No v2 asset should be downloaded') });
+test('Pages serves an unavailable page without a stale local file when no release has the shortcut', async t => {
+  const without = release('0.3.0', '2026-09-20', { assets: [] });
+  const f = await downloadFixture(t, [without], { downloadRelease: () => assert.fail('No shortcut asset should be downloaded') });
   await writeFile(join(f.destination, shortcutName), 'stale artifact');
   await f.run();
   const page = await readFile(join(f.destination, 'index.html'), 'utf8');
@@ -104,7 +104,7 @@ test('Pages fails on network errors and corrupt artifacts instead of hiding them
 });
 
 test('the optional install page cannot weaken draft or explicit-tag verification', async () => {
-  for (const args of [['draft', 'unused', '0.4.0', '--install-page'], ['published', 'unused', '0.4.0', '--install-page'], ['published', 'unused', '--legacy', '--install-page']]) {
+  for (const args of [['draft', 'unused', '0.4.0', '--install-page'], ['published', 'unused', '0.4.0', '--install-page']]) {
     await assert.rejects(downloadShortcut(args, { getReleases: () => assert.fail('Invalid arguments must not query GitHub') }), /Usage/);
   }
 });

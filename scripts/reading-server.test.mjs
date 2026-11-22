@@ -102,7 +102,7 @@ test('built server captures, replays, isolates scopes and confirms browser hando
   } finally { await runtime?.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
-test('rejects an old development database without changing its data', { timeout: 60000 }, async () => {
+test('rejects a database with an unknown schema without changing its data', { timeout: 60000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'crate-reading-baseline-')); let runtime;
   try {
     runtime = await openLocalRuntime({ dataDir: dir, administrative: true });

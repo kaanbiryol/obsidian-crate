@@ -67,7 +67,7 @@ INSERT INTO fixture_missing VALUES (1);`;
 		const migration = step('add-partial', failing);
 		await assert.rejects(migrateLocalDatabase(runtime.db, upgradeTo(migration), async () => failing), /fixture_missing/);
 		await assert.rejects(migrateLocalDatabase(runtime.db, upgradeTo(migration), async () => `${failing}\n`), /integrity check/);
-		// Manifest checks the previous local runner skipped: duplicate IDs and non-hex checksums.
+		// Manifest checks: duplicate IDs and non-hex checksums.
 		const duplicate = step('add-partial', failing, release.schemaVersion + 1);
 		for (const target of [upgradeTo(migration, duplicate), upgradeTo({ ...migration, checksum: migration.checksum.toUpperCase() })]) {
 			await assert.rejects(migrateLocalDatabase(runtime.db, target, async () => failing), /Invalid database migration chain/);

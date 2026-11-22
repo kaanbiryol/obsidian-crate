@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-The first public release uses server revision 1 and schema 1, with no registered migrations. Pre-release beta servers (which reported revisions up to 5) cannot be upgraded; replace them with **Delete server and all data** and a new server. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
+The first public release uses server revision 1 and schema 1, with no registered migrations. See the checked [current contract](current-contract.md). **Delete server and all data** is independent of these upgrade requirements: it destroys the entire selected database and bucket without migrating or interpreting their application data.
 
 ## Independent versions
 

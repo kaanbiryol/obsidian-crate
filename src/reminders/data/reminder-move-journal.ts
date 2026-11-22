@@ -174,8 +174,7 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 				|| (await observe(record.destination, record.id)).state !== 'absent') {
 				throw new Error('The reminder source or destination changed. Refresh before moving; nothing was changed.');
 			}
-			// Recovery compares exact bytes. The source may still use an older
-			// description representation even though new writes use plain text.
+			// Recovery compares exact bytes, whichever description form the source uses.
 			record.source.block = observedSource.block!;
 			// Track before awaiting publication: an uncertain storage response must
 			// block subsequent edits until the durable journal can be reconciled.

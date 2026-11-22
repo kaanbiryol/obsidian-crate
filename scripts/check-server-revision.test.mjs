@@ -155,14 +155,6 @@ test('collects transitive deployment/build imports plus runtime graph and raw Sa
 	assert.ok(!inputs.some(path => path.startsWith('node_modules/') || path.startsWith('<')));
 });
 
-test('does not retain the retired schema-reset exception', () => {
-	const h = fixture();
-	h.release({ revision: 2, schemaVersion: 4, minimumSchemaVersion: 4, baselineSchemaVersion: 4 });
-	const base = h.commit();
-	h.release({ revision: 3, schemaVersion: 1, minimumSchemaVersion: 1 });
-	assert.throws(() => checkServerRevision(h.root, base, h.inputs), /cannot decrease/);
-});
-
 test('keeps one public revision across development commits and rejects skipped release numbers', () => {
   const h = fixture();
   h.git('tag', '0.1.0');

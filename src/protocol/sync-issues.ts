@@ -1,5 +1,5 @@
 /** Stable identifiers for issues whose wording this repo owns. Clients choose an
- * explanation by code and match message text only for peers that send none.
+ * explanation by code and match message text only for issues raised without one.
  * The reminder parser codes are the plugin's reminder diagnostic codes. */
 const SYNC_ISSUE_CODES = [
 	'file-too-large',
