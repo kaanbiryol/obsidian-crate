@@ -12,6 +12,13 @@ export function useCollapseDepartedRows(lists: SectionLists, section: ReadingSec
 	settle: (ids: readonly string[]) => void, hold: boolean, listed: boolean): void {
 	const collapsing = useRef(new Map<HTMLElement, Animation>());
 	useLayoutEffect(() => {
+		// A collapse holds its node at zero height until the node leaves. A node that stays, as a
+		// date group that gains a new row (a saved link replacing its pending copy), shows again.
+		for (const [node, animation] of collapsing.current) {
+			if (node.isConnected && node.dataset.departing === 'true') continue;
+			animation.cancel();
+			collapsing.current.delete(node);
+		}
 		if (hold || !departed.size) return;
 		// No row is painted to collapse, and the effect would not run again once one is.
 		if (!listed) { settle([...departed]); return; }
@@ -30,7 +37,7 @@ export function useCollapseDepartedRows(lists: SectionLists, section: ReadingSec
 				{ height: '0px', paddingTop: '0px', paddingBottom: '0px', marginBottom: '0px', opacity: 0 },
 			], { duration, easing, fill: 'forwards' });
 			collapsing.current.set(node, animation);
-			animation.onfinish = () => { collapsing.current.delete(node); settle(ids); };
+			animation.onfinish = () => settle(ids);
 		}
 	}, [lists, hold, listed, departed, section, settle]);
 	useEffect(() => () => { for (const animation of collapsing.current.values()) animation.cancel(); }, []);
