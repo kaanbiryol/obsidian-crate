@@ -31,7 +31,7 @@ try {
   await runtime.db.batch([
     runtime.db.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-test','revision')"),
   ]);
-  server = await listenLocalServer({ origin: runtime.origin, mf: { dispatchFetch: async (url, init) => {
+  server = await listenLocalServer({ origin: runtime.origin, request: () => runtime.request(), mf: { dispatchFetch: async (url, init) => {
     const pathname = new URL(url).pathname;
     if (pathname === '/notifications/csp-probe.js') {
       return new Response('window.cspProbe=true', { headers: { 'Content-Type': 'application/javascript' } });

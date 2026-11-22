@@ -22,6 +22,7 @@ test('requires verified SQL for supported migrations and lets retired SQL leave 
 	};
 	write('package.json', JSON.stringify({ version: '0.1.0' }));
 	write('.generated/cloudflare/worker.mjs', 'worker');
+	write('.generated/cloudflare/worker-self-hosted.mjs', 'self-hosted worker');
 	write('src/cloudflare/schema.sql', 'CREATE TABLE example(id TEXT);');
 	const sql = 'ALTER TABLE example ADD title TEXT;';
 	const supported = { revision: 2, schemaVersion: 2, minimumSchemaVersion: 1, migrations: [{ id: 'example', from: 1, to: 2, file: 'example.sql', checksum: sha256(sql) }] };

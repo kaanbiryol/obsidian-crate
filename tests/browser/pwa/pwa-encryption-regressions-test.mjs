@@ -30,7 +30,7 @@ export { unlockPrivateStorage } from './src/pwa/reminders/private-storage';
 async function verify(browser, scenario) {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-encryption-regression-'));
 	const runtime = await openLocalRuntime({ dataDir });
-	const server = await listenLocalServer({ origin: runtime.origin, mf: { dispatchFetch: async (url, init) =>
+	const server = await listenLocalServer({ origin: runtime.origin, request: () => runtime.request(), mf: { dispatchFetch: async (url, init) =>
 		new URL(url).pathname === '/regression.js' ? new Response(harness, { headers: { 'Content-Type': 'application/javascript' } }) : runtime.mf.dispatchFetch(url, init),
 	} }, { port: 0 });
 	const origin = `http://127.0.0.1:${server.address().port}`;

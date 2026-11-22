@@ -48,7 +48,7 @@ async function verify(type) {
 	const replays = []; let faultPhase = 'none', offlineApis = false;
 	// Inject faults at the HTTP boundary: WebKit does not reliably route requests
 	// owned by an installed service worker through Playwright's route handlers.
-	const server = await listenLocalServer({ origin: runtime.origin, mf: { dispatchFetch: async (url, init) => {
+	const server = await listenLocalServer({ origin: runtime.origin, request: () => runtime.request(), mf: { dispatchFetch: async (url, init) => {
 		// Only the app is offline; its Obsidian peer keeps its connection.
 		if (offlineApis && new Headers(init.headers).get('Authorization') !== `Bearer ${owner.token}`
 			&& /^\/(encryption|reminders|sync|settings|\.well-known)(\/|$)/.test(new URL(url).pathname)) return Response.json({ error: 'Injected offline API' }, { status: 503 });
