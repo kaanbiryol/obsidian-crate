@@ -8,8 +8,8 @@ export function showGetStartedNotice(plugin: CratePlugin): void {
 	void plugin.saveSettings().catch(() => {});
 	const fragment = new DocumentFragment();
 	fragment.createSpan({ text: 'Crate is installed. ' });
-	const link = fragment.createEl('a', { text: 'Open settings' });
+	const link = fragment.createEl('a', { text: 'Open settings to connect a server' });
 	link.addEventListener('click', () => { plugin.openSettingsTab(); });
-	fragment.createSpan({ text: ' to get started.' });
+	fragment.createSpan({ text: '.' });
 	new Notice(fragment, 15000);
 }

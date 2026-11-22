@@ -46,7 +46,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		fragment.createSpan({ text: `Crate server unavailable. ${state.lastError ?? 'Check your server connection.'} ` });
 		const link = fragment.createEl('a', { text: 'Open Crate settings' });
 		link.addEventListener('click', () => plugin.openSettingsTab());
-		if (!plugin.settings.cloudflareDeployment) fragment.createSpan({ text: ' → Server details → Update server address.' });
+		if (!plugin.settings.cloudflareDeployment) fragment.createSpan({ text: ' → Server → update server address.' });
 		new Notice(fragment, 12_000);
 	});
 }

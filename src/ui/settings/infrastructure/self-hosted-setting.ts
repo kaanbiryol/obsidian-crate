@@ -44,7 +44,7 @@ export function renderSelfHostedSetting({ containerEl, plugin, rerender }: Setti
 	let tokenInput: TextComponent;
 	let errorEl: HTMLElement;
 	new Setting(container).setName('Server address')
-		.setDesc(reconnect ? 'Your saved server address. Use Update server address in Server details if it has changed.' : 'Paste the HTTPS address printed in your server logs. Use localhost only for a local-only server on this device.')
+		.setDesc(reconnect ? 'Your saved server address. Use Update server address in Server if it has changed.' : 'Paste the HTTPS address printed in your server logs. Use localhost only for a local-only server on this device.')
 		.addText(input => {
 			addressInput = input;
 			input.setDisabled(reconnect).setValue(address).setPlaceholder('https://crate.example.com').onChange(value => { address = value; });
