@@ -6,10 +6,10 @@ export const bundleBudgets = {
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
 		// Self-hosted server health, install-aware commands, pairing links, Reading image
 		// and gist saving, Vault history's Deleted files view and chunked transfers for
-		// self-hosted servers, plus readable connection and pairing errors and conflict review
-		// links, measure 5.015 MB raw / 2.317 MB gzip.
-		maxBytes: 5015000,
-		maxGzipBytes: 2317200,
+		// self-hosted servers, plus readable connection and pairing errors, conflict review
+		// links and the recovery key option when requesting keys, measure 5.016 MB raw / 2.318 MB gzip.
+		maxBytes: 5016500,
+		maxGzipBytes: 2317800,
 	},
 	{
 		path: 'dist/styles.css',
