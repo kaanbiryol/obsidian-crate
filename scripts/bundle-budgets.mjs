@@ -4,9 +4,9 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Self-hosted server health, install-aware commands and pairing links
-		// measure 4.991 MB raw / 2.308 MB gzip.
-		maxBytes: 4991500,
+		// Self-hosted server health, install-aware commands, pairing links and
+		// Reading image and gist saving measure 4.996 MB raw / 2.315 MB gzip.
+		maxBytes: 4997000,
 		maxGzipBytes: 2316000,
 	},
 	{
