@@ -83,15 +83,20 @@ export async function downloadArticleImages(markdown: string, options: {
 	}
 	const directory = readingImageFolder(options.folder, options.id);
 	const files: ReadingImageFile[] = [];
-	let total = 0, next = 0;
+	let total = 0, next = 0, full = false;
 	const worker = async () => {
-		while (next < urls.length) {
+		while (next < urls.length && !full) {
 			const index = next++, url = urls[index]!;
 			options.signal.throwIfAborted();
-			const bytes = await options.fetchImage(url, limits.bytes, options.signal).catch(() => null);
+			// Ask only for what still fits the total, and stop once an image no longer does.
+			const maxBytes = Math.min(limits.bytes, limits.totalBytes - total);
+			const bytes = await options.fetchImage(url, maxBytes, options.signal).catch(() => null);
 			options.signal.throwIfAborted();
-			const format = bytes && bytes.length <= limits.bytes ? readingImageFormat(bytes) : null;
-			if (!bytes || !format || total + bytes.length > limits.totalBytes) continue;
+			const format = bytes && bytes.length <= maxBytes ? readingImageFormat(bytes) : null;
+			if (!bytes || !format || total + bytes.length > limits.totalBytes) {
+				if (maxBytes < limits.bytes || (bytes && total + bytes.length > limits.totalBytes)) full = true;
+				continue;
+			}
 			total += bytes.length;
 			files.push({ url, path: `${directory}/${index + 1}.${format.extension}`, bytes, type: format.type });
 		}

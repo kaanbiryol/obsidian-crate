@@ -53,6 +53,18 @@ describe('article images', () => {
 		expect(files).toHaveLength(1);
 	});
 
+	it('stops downloading once the total size is used and asks only for what still fits', async () => {
+		const image = (marker: number) => { const bytes = new Uint8Array(10); bytes.set(png(marker)); return bytes; };
+		const urls = Array.from({ length: 50 }, (_, i) => `https://cdn.example/${i}.png`);
+		const fetchImage = vi.fn<ReadingImageFetch>(async (url, maxBytes) => image(urls.indexOf(url)).length <= maxBytes ? image(urls.indexOf(url)) : null);
+		const files = await downloadArticleImages(urls.map(url => `![](${url})`).join('\n\n'), { folder: 'Reading', id, signal, fetchImage,
+			limits: { bytes: 100, totalBytes: 95 } });
+		expect(files).toHaveLength(9);
+		// Four downloads run at once, so up to three more start before the ninth image fills the total.
+		expect(fetchImage.mock.calls.length).toBeLessThanOrEqual(13);
+		expect(fetchImage.mock.calls.at(-1)?.[1]).toBeLessThan(10);
+	});
+
 	it('resolves image sources against the note, refusing other schemes and paths outside the vault', () => {
 		expect(readingImageSource('https://cdn.example/a.png', 'Reading/Note.md')).toEqual({ kind: 'remote', url: 'https://cdn.example/a.png' });
 		expect(readingImageSource(`attachments/${id}/1.png`, 'Reading/Note.md')).toEqual({ kind: 'vault', path: `Reading/attachments/${id}/1.png` });
