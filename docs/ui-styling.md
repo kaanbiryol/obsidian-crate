@@ -284,10 +284,10 @@ use a sampled spring curve with a cubic fallback. Direct drawer dragging
 remains unanimated, and CSS transitions resume from the current position.
 Sheet presentation and keyboard motion in the PWA are in [PWA UI](pwa-ui.md#sheets-and-keyboard).
 
-Every stationary fade uses one shared fade: 270ms `cubic-bezier(0.22, 1, 0.36, 1)`,
-fitted to Linear's screen switches. The departing screen is half gone within
-about 45ms, so two screens never sit muddled at half strength, then leaves a
-faint trace for the rest of the fade that reads as motion. It is defined once as
+Every stationary fade uses one shared fade: 270ms `cubic-bezier(0.3, 0.3, 0.2, 1)`.
+It starts moving on the first frame, is half done at about 70ms and 90% done at
+about 150ms, so a screen change reads as a dissolve rather than a cut without two
+screens sitting muddled for long. It is defined once as
 `--pwa-motion-fade-duration` and `--pwa-motion-fade-ease` in
 `src/ui/shared/styles/_navigation-motion.scss` and mirrored by `PWA_FADE` and
 `PWA_FADE_TIMING` in `src/ui/shared/navigation/motion.ts` (a unit test keeps them equal).

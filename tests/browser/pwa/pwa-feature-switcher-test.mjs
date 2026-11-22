@@ -109,8 +109,8 @@ try {
             fade.finish();
             return result;
           }, tab);
-          assert.ok(dissolve.early >= .15 && dissolve.early <= .35, `${name} → ${tab}: clear most of the outgoing screen a quarter of the way in: ${JSON.stringify(dissolve)}`);
-          assert.ok(dissolve.middle > 0 && dissolve.middle <= .1, `${name} → ${tab}: leave a faint trace of the outgoing screen halfway: ${JSON.stringify(dissolve)}`);
+          assert.ok(dissolve.early >= .4 && dissolve.early <= .65, `${name} → ${tab}: keep about half of the outgoing screen a quarter of the way in: ${JSON.stringify(dissolve)}`);
+          assert.ok(dissolve.middle > 0 && dissolve.middle <= .25, `${name} → ${tab}: clear most of the outgoing screen halfway: ${JSON.stringify(dissolve)}`);
           assert.ok(dissolve.duration <= 320 && dissolve.interactive && dissolve.covered);
           await expect(page.locator('.pwa-tab-panel[data-leaving]')).toHaveCount(0);
         }

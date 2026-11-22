@@ -26,7 +26,7 @@ export const PWA_NAVIGATION_SPRING = {
  * durations are seconds. Mirrors --pwa-motion-fade-duration and --pwa-motion-fade-ease in
  * ../styles/_navigation-motion.scss. Keyboard timing remains separate because it follows
  * viewport displacement rather than app navigation. */
-export const PWA_FADE = { duration: 0.27, ease: [0.22, 1, 0.36, 1] as const };
+export const PWA_FADE = { duration: 0.27, ease: [0.3, 0.3, 0.2, 1] as const };
 /** PWA_FADE for Web Animations, which take milliseconds and CSS easing strings. */
 export const PWA_FADE_TIMING = { duration: PWA_FADE.duration * 1000, easing: `cubic-bezier(${PWA_FADE.ease.join(', ')})` } as const;
 export const PWA_CONTROL_SPRING = {
