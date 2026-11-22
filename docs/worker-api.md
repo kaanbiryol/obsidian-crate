@@ -728,7 +728,9 @@ Cloudflare Free plan:
 - Each saved image writes about 3 D1 rows and reads about 45, against 100,000 rows written and
   5 million read per day.
 - In an encrypted vault, `POST /reading/encrypted-extract` returns every image in one response and
-  they commit beside the new note, under the 24 MiB encrypted commit limit.
+  they commit beside the new note, under the 24 MiB encrypted commit limit. Images stop downloading
+  16 seconds after the request arrives, so the article answers within the web app's 20 second wait;
+  an unfinished image keeps its web link. **Try again** sends `images: false` and gets none.
 
 The Paid plan allows 10,000 subrequests, but the limits stay the same on every plan. Saving more
 on Free would need each group of images in its own invocation, for example a Durable Object

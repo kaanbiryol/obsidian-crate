@@ -58,12 +58,16 @@ export async function fetchImage(source: string, maxBytes: number, signal: Abort
 /** For an encrypted vault, which the server cannot write: an article's images as bytes the
  * web app encrypts and commits with its note. Small enough to fit one encrypted commit. */
 export const ENCRYPTED_IMAGE_LIMITS: ReadingImageLimits = { count: 10, bytes: 2 * 1024 * 1024, totalBytes: 8 * 1024 * 1024 };
-export async function downloadImagesForEncryptedReading(article: CapturedArticle, fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string, articleRequests = 1): Promise<Array<{ url: string; type: string; data: string }>> {
+/** `deadline` ends image downloads early: an image not finished by then keeps its web link,
+ * so the article still answers before the web app stops waiting. */
+export async function downloadImagesForEncryptedReading(article: CapturedArticle, fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string, articleRequests = 1,
+	deadline?: AbortSignal): Promise<Array<{ url: string; type: string; data: string }>> {
 	if (article.transcript) return [];
 	// The folder and ID are the web app's to choose; only the bytes leave here.
 	const files = await downloadArticleImages(article.markdown, { folder: 'Reading', id: '00000000-0000-4000-8000-000000000000', signal: AbortSignal.timeout(30_000),
 		// An image here costs up to two fetches; nothing is stored.
-		limits: afterArticleRequests(ENCRYPTED_IMAGE_LIMITS, articleRequests, 2), fetchImage: (url, maxBytes, abort) => fetchImage(url, maxBytes, abort, fetchPublic, ownOrigin) }).catch(() => []);
+		limits: afterArticleRequests(ENCRYPTED_IMAGE_LIMITS, articleRequests, 2),
+		fetchImage: (url, maxBytes, abort) => fetchImage(url, maxBytes, deadline ? AbortSignal.any([abort, deadline]) : abort, fetchPublic, ownOrigin) }).catch(() => []);
 	return files.map(file => ({ url: file.url, type: file.type, data: base64(file.bytes) }));
 }
 function base64(bytes: Uint8Array): string {

@@ -37,7 +37,8 @@ interface EncryptedReadingOptions {
 	folderPath: string; wireFolder: string; paths: PathTags; generation: number; authority: FileEncryptionAuthority;
 	/** Hashes search terms (`src/encryption/reading-search.ts`). */
 	searchKey: CryptoKey;
-	captureArticle?(url: string): Promise<ServerCapturedArticle>;
+	/** `images: false` asks the server for none: only a new note saves them. */
+	captureArticle?(url: string, options?: { images?: boolean }): Promise<ServerCapturedArticle>;
 	request(path: string, body?: string, headers?: Record<string, string>): Promise<Response>;
 	readAttempt(id: string): Promise<unknown>;
 	writeAttempt(id: string, attempt: Attempt): Promise<void>;
@@ -222,7 +223,7 @@ export class EncryptedReadingApi {
 		if ((action === 'capture' && body.fetchArticle !== false || action === 'retry') && this.options.captureArticle) {
 			const item = parseReadingNote(content)!;
 			try {
-				const { images: downloaded, ...article } = await this.options.captureArticle(item.source_url);
+				const { images: downloaded, ...article } = await this.options.captureArticle(item.source_url, { images: action === 'capture' });
 				// Images the server downloaded are saved beside a new note; the server stored none of them.
 				if (downloaded?.length && action === 'capture') {
 					images = await downloadArticleImages(article.markdown, { folder: this.options.folderPath, id: itemId, signal: new AbortController().signal,

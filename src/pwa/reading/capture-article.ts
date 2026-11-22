@@ -27,8 +27,8 @@ const text = (value: unknown) => value === undefined || typeof value === 'string
 
 /** Browsers cannot read most sites across origins, so the server downloads the page
  * without storing the link. The article is encrypted on this device before upload. */
-export async function captureServerArticle(url: string, request: (body: string) => Promise<Response>): Promise<ServerCapturedArticle> {
-	const response = await request(JSON.stringify({ url }));
+export async function captureServerArticle(url: string, request: (body: string) => Promise<Response>, { images: wanted = true } = {}): Promise<ServerCapturedArticle> {
+	const response = await request(JSON.stringify(wanted ? { url } : { url, images: false }));
 	if (!response.ok) throw new Error('Article download unavailable.');
 	const answer = (await response.json()) as { article?: unknown; images?: unknown };
 	const article = answer.article as Record<string, unknown> | undefined;

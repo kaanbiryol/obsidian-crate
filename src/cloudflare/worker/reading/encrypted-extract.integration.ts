@@ -21,7 +21,7 @@ async function setup(encrypted = true, scope = 'reminders', fetching = true) {
 	]);
 	const fetch = vi.fn(async (request: Request) => request.url === link
 		? new Response(article, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }) : new Response('Missing', { status: 404 }));
-	const extract = (url: string) => worker.fetch(new Request('https://test/reading/encrypted-extract', { method: 'POST', body: JSON.stringify({ url }),
+	const extract = (url: string, options: { images?: boolean } = {}) => worker.fetch(new Request('https://test/reading/encrypted-extract', { method: 'POST', body: JSON.stringify({ url, ...options }),
 		headers: { Authorization: 'Bearer reader-token', 'X-Crate-Protocol': '1', ...(encrypted ? { 'X-Crate-Encryption-Vault': state.vaultId, 'X-Crate-Encryption-Generation': String(state.generation) } : {}) } }),
 	// The edge limiter is per source address and shared; these tests check the per-credential limit.
 	{ ...env, READING_FETCH: { fetch }, NOTIFICATION_REQUEST_LIMITER: { limit: async () => ({ success: true }) } });
@@ -89,4 +89,30 @@ it('limits downloads per credential like other Reading saves', async () => {
 	expect(limited.status).toBe(429);
 	expect(limited.headers.get('Retry-After')).toBe('60');
 	expect(fetch).toHaveBeenCalledTimes(30);
+});
+
+it('returns the images finished by the deadline and leaves a slow one on its link', async () => {
+	const { downloadImagesForEncryptedReading } = await import('./extraction/images');
+	const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
+	const fetchPublic = vi.fn(async (request: Request) => request.url.endsWith('/fast.png')
+		? new Response(png, { headers: { 'Content-Type': 'image/png' } })
+		// A slow image server answers only once the request is aborted.
+		: new Promise<Response>((_resolve, reject) => request.signal.addEventListener('abort', () => reject(request.signal.reason as Error))));
+	const started = Date.now();
+	const images = await downloadImagesForEncryptedReading({ markdown: '![](https://images.example/slow.png) ![](https://images.example/fast.png)' },
+		fetchPublic, undefined, 1, AbortSignal.timeout(100));
+	expect(Date.now() - started).toBeLessThan(2_000);
+	expect(images.map(image => image.url)).toEqual(['https://images.example/fast.png']);
+});
+
+it('downloads no images for a retry, which keeps its note\'s images', async () => {
+	const { fetch, extract } = await setup();
+	const withImages = article.replace('</article>', '<img src="https://images.example/a.png" alt="Chart"></article>');
+	fetch.mockImplementation(async (request: Request) => request.url === link
+		? new Response(withImages, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }) : new Response('Missing', { status: 404 }));
+	expect((await extract(link)).status).toBe(200);
+	expect(fetch.mock.calls.map(([request]) => request.url)).toEqual([link, 'https://images.example/a.png']);
+	fetch.mockClear();
+	expect((await extract(link, { images: false })).status).toBe(200);
+	expect(fetch.mock.calls.map(([request]) => request.url)).toEqual([link]);
 });

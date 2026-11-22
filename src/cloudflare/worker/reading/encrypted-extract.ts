@@ -4,10 +4,14 @@ import type { Env } from '../types';
 import { ReadingError, readingResponse } from './common';
 import { fetchReadingCapture } from './extraction/transport';
 
+/** Images stop downloading this long after the request arrived, inside the web app's 20 second wait. */
+const IMAGE_DEADLINE_MS = 16_000;
+
 /** Browsers cannot read most sites across origins, so an unlocked web app sends one
  * link here and encrypts the returned article itself. The link travels in the body,
  * never the URL, and neither it nor the article is stored, queued or logged. */
 export async function extractForEncryptedReading(request: Request, env: Env, saveImages = false): Promise<Response> {
+	const started = Date.now();
 	// Room for the longest saved link (8,192 characters), as Reading capture allows.
 	const parsed = await parseJsonObject(request, SMALL_JSON_BODY_BYTES);
 	if (!parsed.ok) return parsed.response;
@@ -15,8 +19,9 @@ export async function extractForEncryptedReading(request: Request, env: Env, sav
 	try {
 		const fetchPublic = env.READING_FETCH ? (request: Request) => env.READING_FETCH!.fetch(request) : fetch;
 		const { article, requests } = await fetchReadingCapture(url, fetchPublic, env.CRATE_PUBLIC_ORIGIN);
-		// Images are optional; older web apps ignore them.
-		const images = saveImages ? await (await import('./extraction/images')).downloadImagesForEncryptedReading(article, fetchPublic, env.CRATE_PUBLIC_ORIGIN, requests) : [];
+		// Images are optional; older web apps ignore them, and a retry asks for none.
+		const images = saveImages && parsed.value.images !== false ? await (await import('./extraction/images')).downloadImagesForEncryptedReading(article, fetchPublic, env.CRATE_PUBLIC_ORIGIN, requests,
+			AbortSignal.timeout(Math.max(0, started + IMAGE_DEADLINE_MS - Date.now()))) : [];
 		return readingResponse({ article, ...(images.length ? { images } : {}) });
 	} catch {
 		// The web app saves the link as a bookmark with Try again.
