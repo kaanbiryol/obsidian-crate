@@ -37,10 +37,16 @@ test('stops, backs up, installs, checks and restarts the service', async () => {
 	assert.deepEqual(calls, ['stop', 'backup /backups/before-update-1.1.0-20261121T100000Z', 'install 1.1.0', 'check-upgrade --json', 'start']);
 });
 
-test('migrates with its own backup when the new release needs it', async () => {
+test('migrates from the before-update backup instead of copying the data again', async () => {
+	/** @type {string[][]} */
+	const commands = [];
 	const { calls, fake } = steps({ check: { requiresMigration: true } });
+	const crate = fake.crate;
+	fake.crate = async args => { commands.push(args); return crate(args); };
 	await updateGlobalInstall(options, fake);
-	assert.deepEqual(calls.slice(3), ['check-upgrade --json', 'upgrade --output', 'start']);
+	assert.deepEqual(calls.filter(call => call.startsWith('backup')), ['backup /backups/before-update-1.1.0-20261121T100000Z']);
+	assert.deepEqual(calls.slice(3), ['check-upgrade --json', 'upgrade --backup', 'start']);
+	assert.deepEqual(commands[1], ['upgrade', '--backup', '/backups/before-update-1.1.0-20261121T100000Z', '--data-dir', '/data']);
 });
 
 test('does nothing when up to date, and refuses a server running in a terminal', async () => {
@@ -70,7 +76,7 @@ test('keeps the new release when a migration fails after it started', async () =
 		if (args[0] === 'upgrade') throw new Error('Migration step failed');
 		return JSON.stringify({ requiresMigration: true });
 	} });
-	await assert.rejects(updateGlobalInstall(options, fake), /could not finish migrating[^]*upgrade --output[^]*restore \/backups\/before-update/);
+	await assert.rejects(updateGlobalInstall(options, fake), /could not finish migrating[^]*upgrade --backup \/backups\/before-update[^]*restore \/backups\/before-update/);
 	assert.ok(!calls.includes('install 1.0.0'));
 	assert.ok(!calls.includes('start'));
 });

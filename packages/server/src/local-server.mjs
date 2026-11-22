@@ -30,6 +30,7 @@ npm run server -- backup --output PATH [--data-dir PATH]
 npm run server -- auto-backup --output DIR [--keep 7] [--data-dir PATH]
 npm run server -- auto-backup --off [--data-dir PATH]
 npm run server -- upgrade --output NEW_BACKUP_PATH [--data-dir PATH]
+npm run server -- upgrade --backup LATEST_BACKUP_PATH [--data-dir PATH]
 npm run server -- restore --backup PATH --data-dir EMPTY_PATH
 npm run server -- check-upgrade [--data-dir PATH]
 npm run server -- service [--keep-awake] [--max-file-size MB] [--data-dir PATH]

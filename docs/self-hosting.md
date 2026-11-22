@@ -797,7 +797,7 @@ With a global npm install, `crate-server update` does every step:
 2. Stops the service, then makes a verified backup in the automatic backup folder,
    or `~/.crate/backups`.
 3. Installs the release and runs its read-only `check-upgrade`. If the database
-   needs a migration, it runs `upgrade`, which makes its own verified backup first.
+   needs a migration, it runs `upgrade --backup` with that backup, so the data is copied once.
 4. Starts the service again and waits for it to answer.
 
 If installing, the check, or the first start fails before data changed, it
