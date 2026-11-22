@@ -17,6 +17,13 @@ import type { Env } from '../../types';
 export const WORKER_IMAGE_LIMITS: ReadingImageLimits = { count: 10, bytes: 5 * 1024 * 1024, totalBytes: 20 * 1024 * 1024 };
 const TIMEOUT_MS = 10_000, MAX_REDIRECTS = 1;
 
+/** `limits` with fewer images once the article's download made `requests` requests: the limits
+ * assume one, for the page. Extra ones, such as gists, each take a share of an image, which may
+ * cost `perImage` subrequests. */
+function afterArticleRequests(limits: ReadingImageLimits, requests: number, perImage: number): ReadingImageLimits {
+	return { ...limits, count: Math.max(0, limits.count! - Math.ceil(Math.max(0, requests - 1) / perImage)) };
+}
+
 /** An image stored in R2 under an upload lease, waiting for its note to publish. JSON-safe,
  * so the coordinator receives object keys rather than bytes. */
 export interface StagedReadingImage { url: string; path: string; hash: string; size: number; objectKey: string; leaseId: string; type: string }
@@ -51,11 +58,12 @@ export async function fetchImage(source: string, maxBytes: number, signal: Abort
 /** For an encrypted vault, which the server cannot write: an article's images as bytes the
  * web app encrypts and commits with its note. Small enough to fit one encrypted commit. */
 export const ENCRYPTED_IMAGE_LIMITS: ReadingImageLimits = { count: 10, bytes: 2 * 1024 * 1024, totalBytes: 8 * 1024 * 1024 };
-export async function downloadImagesForEncryptedReading(article: CapturedArticle, fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string): Promise<Array<{ url: string; type: string; data: string }>> {
+export async function downloadImagesForEncryptedReading(article: CapturedArticle, fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string, articleRequests = 1): Promise<Array<{ url: string; type: string; data: string }>> {
 	if (article.transcript) return [];
 	// The folder and ID are the web app's to choose; only the bytes leave here.
 	const files = await downloadArticleImages(article.markdown, { folder: 'Reading', id: '00000000-0000-4000-8000-000000000000', signal: AbortSignal.timeout(30_000),
-		limits: ENCRYPTED_IMAGE_LIMITS, fetchImage: (url, maxBytes, abort) => fetchImage(url, maxBytes, abort, fetchPublic, ownOrigin) }).catch(() => []);
+		// An image here costs up to two fetches; nothing is stored.
+		limits: afterArticleRequests(ENCRYPTED_IMAGE_LIMITS, articleRequests, 2), fetchImage: (url, maxBytes, abort) => fetchImage(url, maxBytes, abort, fetchPublic, ownOrigin) }).catch(() => []);
 	return files.map(file => ({ url: file.url, type: file.type, data: base64(file.bytes) }));
 }
 function base64(bytes: Uint8Array): string {
@@ -67,10 +75,11 @@ function base64(bytes: Uint8Array): string {
 /** Downloads an article's images and stores them in R2 under one lease. Nothing is
  * published: an image the publication does not commit is cleaned up with its lease. */
 export async function stageArticleImages(env: Env, article: CapturedArticle, folder: string, id: string,
-	fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string): Promise<StagedReadingImage[]> {
+	fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string, articleRequests = 1): Promise<StagedReadingImage[]> {
 	if (article.transcript) return [];
 	const signal = AbortSignal.timeout(30_000);
-	const files = await downloadArticleImages(article.markdown, { folder, id, signal, limits: WORKER_IMAGE_LIMITS,
+	// Staging an image costs up to two fetches and an R2 write.
+	const files = await downloadArticleImages(article.markdown, { folder, id, signal, limits: afterArticleRequests(WORKER_IMAGE_LIMITS, articleRequests, 3),
 		fetchImage: (url, maxBytes, abort) => fetchImage(url, maxBytes, abort, fetchPublic, ownOrigin) });
 	if (!files.length) return [];
 	const prepared = await Promise.all(files.map(async file => {

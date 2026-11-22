@@ -14,9 +14,9 @@ export async function extractForEncryptedReading(request: Request, env: Env, sav
 	let url: string; try { url = readingUrl(parsed.value.url); } catch { throw new ReadingError('Enter a complete HTTP or HTTPS link without credentials.'); }
 	try {
 		const fetchPublic = env.READING_FETCH ? (request: Request) => env.READING_FETCH!.fetch(request) : fetch;
-		const { article } = await fetchReadingCapture(url, fetchPublic, env.CRATE_PUBLIC_ORIGIN);
+		const { article, requests } = await fetchReadingCapture(url, fetchPublic, env.CRATE_PUBLIC_ORIGIN);
 		// Images are optional; older web apps ignore them.
-		const images = saveImages ? await (await import('./extraction/images')).downloadImagesForEncryptedReading(article, fetchPublic, env.CRATE_PUBLIC_ORIGIN) : [];
+		const images = saveImages ? await (await import('./extraction/images')).downloadImagesForEncryptedReading(article, fetchPublic, env.CRATE_PUBLIC_ORIGIN, requests) : [];
 		return readingResponse({ article, ...(images.length ? { images } : {}) });
 	} catch {
 		// The web app saves the link as a bookmark with Try again.

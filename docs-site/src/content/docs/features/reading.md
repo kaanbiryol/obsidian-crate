@@ -103,7 +103,7 @@ Crate's reader blocks active content inside articles. It shows images saved in y
 - **The YouTube player:** it loads only when you select the play icon or a timed transcript passage. It contacts YouTube, may use YouTube's cookies, and may see the web app's address as the referring page. It never receives your Crate sign-in or note contents.
 - **Article downloads on the server:** these use your hosting resources.
 
-For some sites, such as X and Reddit, Crate may also ask a public service for the article, sending only the saved link. The [README](https://github.com/kaanbiryol/obsidian-crate#accounts-costs-and-network-use) lists every service Crate contacts.
+For some sites, such as X and Reddit, Crate may also ask a public service for the article, sending only the saved link. Code snippets embedded from GitHub Gist are downloaded from GitHub and saved as code blocks; an article saves up to 16, and later ones stay links. The [README](https://github.com/kaanbiryol/obsidian-crate#accounts-costs-and-network-use) lists every service Crate contacts.
 
 ## Pause or resume Reading
 

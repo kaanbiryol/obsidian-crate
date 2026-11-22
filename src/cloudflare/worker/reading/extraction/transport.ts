@@ -13,17 +13,22 @@ export async function fetchArticle(source: string, fetchPublic: (request: Reques
 	return fetchResource(source, fetchPublic, ownOrigin);
 }
 
-/** Metadata uses the same bounded, public-only transport as article extraction. */
-export async function fetchReadingCapture(source: string, fetchPublic: (request: Request) => Promise<Response> = fetch, ownOrigin?: string): Promise<{ article: CapturedArticle; url: string }> {
+/** Metadata uses the same bounded, public-only transport as article extraction. `requests`
+ * counts every request the capture made, so image downloads can fit the rest of the Worker's
+ * subrequest budget. */
+export async function fetchReadingCapture(source: string, fetchPublic: (request: Request) => Promise<Response> = fetch, ownOrigin?: string): Promise<{ article: CapturedArticle; url: string; requests: number }> {
+	let requests = 0;
+	const counted = (request: Request) => { requests++; return fetchPublic(request); };
 	const url = extractionUrl(source).href, videoId = youtubeVideoId(url);
-	const resource = videoId ? await fetchResource(youtubeMetadataUrl(videoId), fetchPublic, ownOrigin, true) : await fetchArticle(url, fetchPublic, ownOrigin);
+	const resource = videoId ? await fetchResource(youtubeMetadataUrl(videoId), counted, ownOrigin, true) : await fetchArticle(url, counted, ownOrigin);
 	if (videoId) {
 		const { withYoutubeTranscript } = await import('@/reading/extraction/youtube-transcript');
-		return { article: await withYoutubeTranscript(youtubeMetadata(resource.html), videoId, fetchPublic), url };
+		return { article: await withYoutubeTranscript(youtubeMetadata(resource.html), videoId, counted), url, requests };
 	}
 	// Failed downloads and video metadata need no DOM parser.
 	const { extractDocument } = await import('@/reading/extraction/document');
-	return { article: await extractDocument(resource.html, resource.url, fetchPublic), url: resource.url };
+	const article = await extractDocument(resource.html, resource.url, counted);
+	return { article, url: resource.url, requests };
 }
 
 async function fetchResource(source: string, fetchPublic: (request: Request) => Promise<Response>, ownOrigin?: string, json = false): Promise<{ html: string; url: string }> {

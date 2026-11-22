@@ -116,9 +116,10 @@ export async function runReadingExtraction(state: DurableObjectState, env: Env):
 				// article, so a note that cannot take its article stops refetching it.
 				if (job.attempts < MAX_FETCH_ATTEMPTS) {
 					const fetchPublic = env.READING_FETCH ? (request: Request) => env.READING_FETCH!.fetch(request) : fetch;
-					try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, fetchPublic, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; }
+					let requests = 1;
+					try { const { fetchReadingCapture } = await import('./transport'); const capture = await fetchReadingCapture(job.url, fetchPublic, env.CRATE_PUBLIC_ORIGIN); result = capture.article; resolvedUrl = capture.url; requests = capture.requests; }
 					catch { if (job.attempts < MAX_FETCH_ATTEMPTS - 1) return; }
-					images = result && saveImages ? await stageImages(env, result, job.item_id, fetchPublic) : undefined;
+					images = result && saveImages ? await stageImages(env, result, job.item_id, fetchPublic, requests) : undefined;
 				}
 				if (!await publishReading(env, { job, result, resolvedUrl, ...(images?.length ? { images } : {}) } satisfies Publication)) throw new Error('Reading publication unavailable');
 			}

@@ -65,7 +65,7 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
 	await env.DB.prepare(`UPDATE reading_captures SET available_at=CASE WHEN attempts+1>=${MAX_CAPTURE_ATTEMPTS} THEN ? ELSE ? END,
 		attempts=attempts+1 WHERE id=?`).bind(Date.now() + EXHAUSTED_CAPTURE_RETRY_MS, Date.now() + 60_000, capture.id).run();
 	await state.storage.setAlarm(Date.now() + 60_000);
-	let result: Publication['result'] = null, resolvedUrl: string | undefined, images: StagedReadingImage[] | undefined;
+	let result: Publication['result'] = null, resolvedUrl: string | undefined, images: StagedReadingImage[] | undefined, requests = 1;
 	// After its fetch attempts, a capture that still cannot publish retries as a bookmark only.
 	if (enabled && capture.attempts < MAX_FETCH_ATTEMPTS) {
 		const fetchPublic = env.READING_FETCH ? (request: Request) => env.READING_FETCH!.fetch(request) : fetch;
@@ -73,19 +73,20 @@ export async function runCapture(env: Env, state: DurableObjectState, enabled: b
 		try {
 			const { fetchReadingCapture } = await import('./extraction/transport');
 			const captureResult = await fetchReadingCapture(item.source_url, fetchPublic, env.CRATE_PUBLIC_ORIGIN);
-			result = captureResult.article; resolvedUrl = captureResult.url;
+			result = captureResult.article; resolvedUrl = captureResult.url; requests = captureResult.requests;
 		} catch { if (capture.attempts < MAX_FETCH_ATTEMPTS - 1) return true; }
-		images = result && saveImages ? await stageImages(env, result, item.crate_reading_id, fetchPublic) : undefined;
+		images = result && saveImages ? await stageImages(env, result, item.crate_reading_id, fetchPublic, requests) : undefined;
 	}
 	const publication: CapturePublication = { captureId: capture.id, generation: capture.generation, result, resolvedUrl, ...(images?.length ? { images } : {}) };
 	if (!await publishReading(env, publication)) throw new Error('Reading capture publication unavailable');
 	return true;
 }
 
-/** Images are optional: a failed download or R2 write leaves the article with its links. */
-export async function stageImages(env: Env, article: NonNullable<Publication['result']>, id: string, fetchPublic: (request: Request) => Promise<Response>): Promise<StagedReadingImage[] | undefined> {
+/** Images are optional: a failed download or R2 write leaves the article with its links.
+ * `articleRequests` is how many requests the article's download made in this invocation. */
+export async function stageImages(env: Env, article: NonNullable<Publication['result']>, id: string, fetchPublic: (request: Request) => Promise<Response>, articleRequests: number): Promise<StagedReadingImage[] | undefined> {
 	const current = await policy(env.DB);
 	if (!current) return undefined;
 	const { stageArticleImages } = await import('./extraction/images');
-	return stageArticleImages(env, article, current.folder_path, id, fetchPublic, env.CRATE_PUBLIC_ORIGIN).catch(() => undefined);
+	return stageArticleImages(env, article, current.folder_path, id, fetchPublic, env.CRATE_PUBLIC_ORIGIN, articleRequests).catch(() => undefined);
 }

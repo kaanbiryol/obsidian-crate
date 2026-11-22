@@ -13,7 +13,7 @@ it('fetches metadata and optionally a transcript through the public binding', as
 		seen.push(request);
 		return Response.json({ type: 'video', title: 'A video', author_name: 'A channel', html: '<iframe>untrusted</iframe>' });
 	});
-	expect(result).toEqual({ article: { markdown: '', title: 'A video', author: 'A channel' }, url: 'https://youtu.be/jNQXAC9IVRw?t=42' });
+	expect(result).toEqual({ article: { markdown: '', title: 'A video', author: 'A channel' }, url: 'https://youtu.be/jNQXAC9IVRw?t=42', requests: 2 });
 	expect(seen).toHaveLength(2);
 	expect(seen[1]!.url).toBe('https://www.youtube.com/watch?v=jNQXAC9IVRw');
 	expect(seen[1]!.redirect).toBe('error');

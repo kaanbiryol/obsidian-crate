@@ -7,6 +7,7 @@ import { handleReadingRoute } from '../test-support/reading-route-test-harness';
 import { publishCapture, type PendingCapture } from './captures';
 import { runReadingExtraction } from './extraction/jobs';
 import { stageArticleImages, WORKER_IMAGE_LIMITS } from './extraction/images';
+import { MAX_GISTS } from '@/reading/extraction/gist';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
 import { getStoredFileRow } from '../sync/storage';
 import { createReadingNote } from '@/reading/core/notes';
@@ -22,6 +23,12 @@ const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2
 const images = Array.from({ length: WORKER_IMAGE_LIMITS.count! + 5 }, (_, i) => i + 1);
 const page = `<!doctype html><html><head><title>Pictures</title></head><body><article><h1>Pictures</h1>${
 	images.map(i => `<p>Paragraph ${i} of an article that has a picture after every paragraph, long enough to read as prose.</p><img src="https://cdn.example/${i}.png" alt="Picture ${i}">`).join('')}</article></body></html>`;
+
+// The most gists an article downloads, each beside a picture.
+const gistIds = Array.from({ length: MAX_GISTS }, (_, i) => (i + 1).toString(16).padStart(32, '0'));
+const gistPage = `<!doctype html><html><head><title>Snippets</title></head><body><article><h1>Snippets</h1>${
+	images.map(i => `<p>Paragraph ${i} of an article that shows code and pictures throughout, long enough to read as prose.</p><img src="https://cdn.example/${i}.png" alt="Picture ${i}">`).join('')
+}${gistIds.map(id => `<p>The next snippet shows one more step of the example.</p><script src="https://gist.github.com/someone/${id}.js"></script>`).join('')}</article></body></html>`;
 
 beforeEach(async () => {
 	vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -57,6 +64,8 @@ function metered(fetch: (request: Request) => Promise<Response>) {
 async function publicWeb(request: Request): Promise<Response> {
 	const url = new URL(request.url);
 	if (url.href === 'https://example.com/article') return new Response(page, { headers: { 'Content-Type': 'text/html' } });
+	if (url.href === 'https://example.com/snippets') return new Response(gistPage, { headers: { 'Content-Type': 'text/html' } });
+	if (url.hostname === 'gist.githubusercontent.com') return new Response(`print("${url.pathname.split('/')[2]}")`, { headers: { 'Content-Type': 'text/plain' } });
 	if (url.hostname === 'cdn.example') return new Response(null, { status: 302, headers: { Location: `https://images.example${url.pathname}` } });
 	if (url.hostname === 'images.example') return new Response(png.slice().buffer, { headers: { 'Content-Type': 'image/png' } });
 	return new Response('Not found', { status: 404 });
@@ -94,4 +103,18 @@ it('saves an article\'s images within the free plan\'s subrequests in each invoc
 	await publishCapture(publish.env, row.id, row.generation, article, undefined, staged);
 	expect(publish.count()).toBeLessThanOrEqual(FREE_PLAN_SUBREQUESTS);
 	console.warn(`subrequests: alarm ${alarm.count() + 1}, publish ${publish.count()}`);
+}, 30_000);
+
+it('saves fewer images when an article\'s gists use part of the free plan\'s subrequests', async () => {
+	expect((await command('capture', { url: 'https://example.com/snippets', operationId: operation() })).status).toBe(200);
+	const fetched = vi.fn(publicWeb);
+	const alarm = metered(fetched);
+	await runReadingExtraction({ storage: { setAlarm: async () => {} } } as unknown as DurableObjectState, alarm.env);
+	expect(alarm.count() + 1).toBeLessThanOrEqual(FREE_PLAN_SUBREQUESTS);
+	const note = (await env.DB.prepare("SELECT path FROM files WHERE path LIKE 'Reading/Snippets%.md'").first<{ path: string }>())!;
+	const content = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, note.path))!.content;
+	expect(content.match(/^```/gm)).toHaveLength(MAX_GISTS * 2);
+	// Each gist request takes a third of an image's share: an image costs two fetches and an R2 write.
+	expect(content.match(/\]\(attachments\//g)).toHaveLength(WORKER_IMAGE_LIMITS.count! - Math.ceil(MAX_GISTS / 3));
+	console.warn(`subrequests with gists: alarm ${alarm.count() + 1}`);
 }, 30_000);

@@ -7,6 +7,7 @@ import { articleMarkdown } from './markdown';
 import { extractServerRenderedPost, isXPost } from './x-post';
 import { discoverFaviconUrl } from './favicon';
 import { extractorFetch, type ExtractorTransport } from './defuddle-fetch';
+import { expandGistEmbeds } from './gist';
 
 const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
 
@@ -52,6 +53,7 @@ export async function extractDocument(html: string, url: string, transport?: Ext
 	Object.defineProperty(document, 'defaultView', { value: null });
 	lowercaseHtmlAttributes(document);
 	linkYoutubeEmbeds(document, url);
+	await expandGistEmbeds(document, transport);
 	const faviconUrl = discoverFaviconUrl(document, url);
 	const post = extractServerRenderedPost(document, url);
 	// First request HTML so we can validate links/media before passing it to
