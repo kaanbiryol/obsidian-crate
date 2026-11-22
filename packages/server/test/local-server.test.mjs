@@ -55,6 +55,35 @@ test('starting after a reboot replaces a lock left by the previous boot', async 
 	await reclaimed();
 });
 
+test('two starts that find the same stale lock leave exactly one owner', async t => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-lock-race-'));
+	t.after(() => rm(dataDir, { recursive: true, force: true }));
+	const path = join(dataDir, 'server.lock');
+	const exited = spawn(process.execPath, ['-e', '']);
+	await once(exited, 'exit');
+	await writeFile(path, JSON.stringify({ pid: exited.pid, startedAt: new Date().toISOString() }));
+	const slow = ms => ({ listWorkerd: async () => { await delay(ms); return []; } });
+	const results = await Promise.allSettled([lockLocalData(dataDir, slow(10)), lockLocalData(dataDir, slow(40))]);
+	const owners = results.filter(result => result.status === 'fulfilled');
+	assert.equal(owners.length, 1);
+	assert.match(String(results.find(result => result.status === 'rejected')?.reason), /locked/);
+	// The loser's failed takeover leaves the owner's lock in place.
+	assert.equal(JSON.parse(await readFile(path, 'utf8')).pid, process.pid);
+	assert.deepEqual((await readdir(dataDir)).sort(), ['server.lock']);
+	await owners[0].value();
+	assert.deepEqual(await readdir(dataDir), []);
+});
+
+test('releasing a lock leaves a lock another start took over in place', async t => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-unlock-'));
+	t.after(() => rm(dataDir, { recursive: true, force: true }));
+	const unlock = await lockLocalData(dataDir);
+	const other = JSON.stringify({ pid: 1, startedAt: new Date().toISOString() });
+	await writeFile(join(dataDir, 'server.lock'), other);
+	await unlock();
+	assert.equal(await readFile(join(dataDir, 'server.lock'), 'utf8'), other);
+});
+
 test('without a reboot, a lock is abandoned only when its process is gone and no workerd is left without a parent', async () => {
 	const lock = JSON.stringify({ pid: 4242, startedAt: new Date().toISOString() });
 	const options = (running, workerd) => ({ isRunning: () => running, listWorkerd: async () => workerd });

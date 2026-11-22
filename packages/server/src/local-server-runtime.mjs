@@ -2,7 +2,7 @@ import { assertLocalMigrationPath, migrateLocalDatabase } from './local-server-m
 import { watchRuntime } from './local-server-watchdog.mjs';
 import { coordinatorPath, packaged, revocationPath, runtimeVersion, serverAssetPath, workerPath } from './assets.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
+import { link, mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { uptime as osUptime } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -254,6 +254,7 @@ export async function isAbandonedLock(text, { isRunning = pidIsRunning, listWork
 export async function lockLocalData(dataDir, options) {
 	await mkdir(dataDir, { recursive: true, mode: 0o700 });
 	const path = join(dataDir, 'server.lock');
+	const locked = () => new Error(`Data directory is locked. Stop its Crate server first. After a crash, verify no Crate/workerd process uses this directory before removing ${path}.`);
 	/** @type {import('node:fs/promises').FileHandle | undefined} */
 	let handle;
 	for (let attempt = 0; !handle; attempt++) {
@@ -261,13 +262,32 @@ export async function lockLocalData(dataDir, options) {
 		catch (error) {
 			if (error.code !== 'EEXIST') throw error;
 			const previous = await readFile(path, 'utf8').catch(() => '');
-			if (attempt === 0 && (isLockFromEarlierBoot(previous) || await isAbandonedLock(previous, options))) { await unlink(path).catch(() => {}); continue; }
-			throw new Error(`Data directory is locked. Stop its Crate server first. After a crash, verify no Crate/workerd process uses this directory before removing ${path}.`);
+			if (attempt === 0 && (isLockFromEarlierBoot(previous) || await isAbandonedLock(previous, options))) {
+				if (!await removeStaleLock(path, previous)) throw locked();
+				continue;
+			}
+			throw locked();
 		}
 	}
-	await handle.writeFile(`${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`);
+	const lock = `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`;
+	await handle.writeFile(lock);
 	await handle.close();
-	return () => unlink(path);
+	// Another start may have taken the lock over after a crash; only our own is removed.
+	return async () => { if (await readFile(path, 'utf8').catch(() => null) === lock) await unlink(path); };
+}
+
+/** Removes the stale lock that was checked, not one another start wrote after removing it first.
+ * Moving it aside is atomic, so only one start can take each lock file.
+ * @param {string} path @param {string} previous @returns {Promise<boolean>} False when another start owns the lock. */
+async function removeStaleLock(path, previous) {
+	const claimed = `${path}.stale-${randomUUID()}`;
+	try { await rename(path, claimed); }
+	catch (error) { if (error.code === 'ENOENT') return true; throw error; }
+	try {
+		if (await readFile(claimed, 'utf8') === previous) return true;
+		await link(claimed, path).catch(() => {});
+		return false;
+	} finally { await unlink(claimed).catch(() => {}); }
 }
 
 /**
