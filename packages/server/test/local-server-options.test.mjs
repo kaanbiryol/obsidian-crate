@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { MAX_FILE_MB, MIN_FILE_MB, resolveMaxFileBytes, resolveServerOrigin, resolveStartMode, validateCommandOptions } from '../src/local-server-options.mjs';
+import { MAX_FILE_MB, MIN_FILE_MB, replacesQuickTunnel, resolveMaxFileBytes, resolveServerOrigin, resolveStartMode, validateCommandOptions } from '../src/local-server-options.mjs';
 
 test('rejects unknown commands and conflicting options before opening data', () => {
 	const rejects = (positionals, values, message, environment) => assert.throws(() => validateCommandOptions(positionals, values, environment), { message });
@@ -49,6 +49,19 @@ test('rejects start modes that conflict with saved remote settings', () => {
 	rejects('start', { host: '0.0.0.0' }, named, saved);
 	rejects('start', { origin: 'https://other.example.com' }, named, saved);
 	assert.equal(resolveStartMode('start', { origin: 'https://crate.example.com' }, named).port, 8787);
+});
+
+test('setup replaces a saved Quick Tunnel only with a stable address', () => {
+	const quick = { mode: 'quick', port: 4100 };
+	assert.deepEqual(resolveStartMode('setup', { tailscale: true }, quick), { quick: false, tailscale: true, port: 8787, host: '127.0.0.1' });
+	assert.deepEqual(resolveStartMode('setup', { hostname: 'crate.example.com' }, quick), { quick: false, tailscale: false, port: 8787, host: '127.0.0.1' });
+	assert.deepEqual(resolveStartMode('setup', {}, quick), { quick: true, tailscale: false, port: 4100, host: '127.0.0.1' });
+	assert.equal(replacesQuickTunnel('setup', { tailscale: true }, quick), true);
+	assert.equal(replacesQuickTunnel('setup', { hostname: 'crate.example.com' }, quick), true);
+	assert.equal(replacesQuickTunnel('setup', {}, quick), false);
+	assert.equal(replacesQuickTunnel('start', { tailscale: true }, quick), false);
+	assert.equal(replacesQuickTunnel('setup', { tailscale: true }, { mode: 'tailscale', hostname: 'crate.example.ts.net', port: 8787 }), false);
+	assert.equal(replacesQuickTunnel('setup', { hostname: 'crate.example.com' }, null), false);
 });
 
 test('resolves the public origin and keeps plain HTTP on loopback', () => {

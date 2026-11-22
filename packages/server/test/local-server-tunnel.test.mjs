@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
-import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, remotePaths, setupRemoteAccess } from '../src/local-server-tunnel.mjs';
+import { ensureCloudflared, normalizeTunnelHostname, readRemoteSettings, remotePaths, saveQuickSettings, saveTailscaleSettings, setupRemoteAccess } from '../src/local-server-tunnel.mjs';
 import { tunnelEnvironment } from '../src/local-server-process.mjs';
 
 const tunnelId = '11111111-1111-4111-8111-111111111111';
@@ -58,6 +58,27 @@ test('setup resumes a failed DNS route and reuses the tunnel without overwriting
 	await assert.rejects(readRemoteSettings(dataDir), /Invalid saved/);
 	await rm(paths.settings);
 	await assert.rejects(setup(), /without remote.json/);
+});
+
+test('a stable address replaces saved Quick Tunnel settings, but Funnel and named tunnels never replace each other', async t => {
+	const directory = await mkdtemp(join(tmpdir(), 'crate-tunnel-switch-'));
+	t.after(() => rm(directory, { recursive: true, force: true }));
+	const run = async (command, args) => { if (args.includes('create')) await writeFile(args[args.indexOf('--credentials-file') + 1], JSON.stringify(credentials)); };
+
+	const toFunnel = join(directory, 'funnel');
+	await saveQuickSettings(toFunnel, 0);
+	await saveTailscaleSettings(toFunnel, 'my-mac.tail1234.ts.net', 8787);
+	assert.deepEqual(await readRemoteSettings(toFunnel), { format: 1, mode: 'tailscale', hostname: 'my-mac.tail1234.ts.net', port: 8787 });
+	await assert.rejects(setupRemoteAccess({ dataDir: toFunnel, hostname: 'crate.example.com', port: 8787, run }), /already has/);
+	await assert.rejects(saveQuickSettings(toFunnel, 0), /saved stable address/);
+
+	const toNamed = join(directory, 'named');
+	await saveQuickSettings(toNamed, 4100);
+	const named = await setupRemoteAccess({ dataDir: toNamed, hostname: 'crate.example.com', port: 8787, run });
+	assert.equal(named.hostname, 'crate.example.com');
+	assert.equal(named.ready, true);
+	assert.deepEqual(await readRemoteSettings(toNamed), named);
+	await assert.rejects(saveTailscaleSettings(toNamed, 'my-mac.tail1234.ts.net', 8787), /another remote access setup/);
 });
 
 test('mac setup installs a missing cloudflared with Homebrew and other platforms give installation instructions', async () => {

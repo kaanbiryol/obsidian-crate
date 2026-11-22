@@ -298,7 +298,9 @@ With a service, setup provisions the address, installs the service, and shows
 its log until the address is public and a pairing QR code is on screen.
 **Ctrl+C** then closes only that view. Without one, Crate runs in the terminal as
 before. Options (`--tailscale`, `--hostname`, `--quick`) and a non-interactive
-terminal skip the questions; Docker never asks.
+terminal skip the questions; Docker never asks. Without a terminal or an option,
+setup starts a Quick Tunnel and says so. For daily use, choose
+[Tailscale Funnel](#stable-address-without-a-domain-tailscale-funnel) instead.
 
 Setup builds the server from a checkout, initializes an empty database or
 validates existing data, and prints the public HTTPS address with a QR code and
@@ -330,6 +332,13 @@ does not move to the new origin. For ongoing daily use with an installed PWA,
 use a stable HTTPS endpoint. Cloudflare describes
 [Quick Tunnels](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)
 as testing/development infrastructure with no uptime guarantee.
+
+To move a Quick Tunnel data directory to a stable address, stop Crate and run
+setup again with `--tailscale` or `--hostname crate.example.com`. Setup replaces
+the saved Quick Tunnel settings and keeps data and device tokens. On each device,
+select **Server details → Update server address** once, and enroll the PWA again. A
+Tailscale Funnel or named tunnel directory cannot switch to the other mode,
+because installed PWAs depend on its address.
 
 ### Standalone npx package
 

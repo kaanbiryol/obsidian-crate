@@ -7,7 +7,7 @@ import { hostname as computerName } from 'node:os';
 import { listenLocalServer } from '../local-server-http.mjs';
 import { crateCommand, installKind } from '../local-server-install.mjs';
 import { keepAwake } from '../local-server-service.mjs';
-import { resolveMaxFileBytes, resolveServerOrigin, resolveStartMode } from '../local-server-options.mjs';
+import { replacesQuickTunnel, resolveMaxFileBytes, resolveServerOrigin, resolveStartMode } from '../local-server-options.mjs';
 import { createPairing, startLocalControl } from '../local-server-pairing.mjs';
 import { startQuickServer } from '../local-server-quick.mjs';
 import { monitorPublicReadiness } from '../local-server-readiness.mjs';
@@ -57,11 +57,15 @@ export async function start(context, resources) {
 		if (maxFileBytes > 100_000_000 && (quick || (remote && !tailscale))) console.log('Cloudflare Tunnel refuses single uploads over 100 MB, so encrypted files and Markdown notes over 100 MB fail to sync through it. Other files travel in smaller parts.');
 	}
 	if (quick) {
+		if (command === 'setup' && !remote && !values.quick) console.log('Quick Tunnel chosen by default. Its address changes on restart. For a stable address, run setup with --tailscale or --hostname.');
 		await serveQuickTunnel(context, port, resources, maxFileBytes);
 		return;
 	}
+	const replacingQuick = replacesQuickTunnel(command, values, remote);
 	if (command === 'setup') {
+		if (replacingQuick) remote = null;
 		remote = tailscale ? await setupTailscale(context, remote, port, resources) : await setupNamedTunnel(context, remote, port, resources);
+		if (replacingQuick) console.log('Replaced the Quick Tunnel with this stable address. On each device, select Server details → Update server address once, and enroll the PWA again.');
 	}
 	await serve(context, { remote, tailscale, port, host, maxFileBytes }, resources);
 }
@@ -69,7 +73,7 @@ export async function start(context, resources) {
 /** @param {CommandContext} context @param {number} port @param {CommandResources} resources @param {number | undefined} maxFileBytes */
 async function serveQuickTunnel({ command, values, dataDir, docker, signal, stopped }, port, resources, maxFileBytes) {
 	console.log('Starting Crate with a Cloudflare Quick Tunnel. Files stay on this computer; public HTTPS traffic passes through Cloudflare.');
-	console.log('This temporary address changes on restart. Keep the server computer awake and online.');
+	console.log('This Quick Tunnel address changes on restart. For a stable address, run setup again with --tailscale or --hostname; see "Stable address without a domain: Tailscale Funnel" in the self-hosting guide. Keep the server computer awake and online.');
 	if (command === 'setup') await buildIfSource(signal);
 	const quickServer = resources.quickServer = await startQuickServer({ dataDir, port, name: values.name, signal, onReadiness: readinessChanged, maxFileBytes });
 	await saveQuickSettings(dataDir, port);

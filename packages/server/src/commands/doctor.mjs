@@ -61,7 +61,7 @@ export async function diagnose(probes) {
 	else check(service.running ? 'pass' : 'fail', 'Start at login', service.running ? 'Installed and running.' : `Installed but not running. Reinstall it with ${probes.command('service')}.`);
 	const remote = await probes.remote().catch(error => { check('fail', 'Remote access', error.message); return undefined; });
 	if (remote === null) check('warn', 'Remote access', `Only this computer can connect. For phones, run ${probes.command('setup --tailscale')}.`);
-	else if (remote?.mode === 'quick') check('warn', 'Remote access', 'A temporary address changes on every restart. Run setup --tailscale in a new data directory for a permanent one.');
+	else if (remote?.mode === 'quick') check('warn', 'Remote access', 'A temporary address changes on every restart. Run setup --tailscale or setup --hostname for a permanent one.');
 	else if (remote?.mode === 'tailscale') {
 		await probes.tailscale().then(name => check(name === remote.hostname ? 'pass' : 'fail', 'Tailscale', name === remote.hostname ? `Funnel serves ${name}.`
 			: `This computer is now ${name} in Tailscale; rename it back to ${remote.hostname}.`), error => check('fail', 'Tailscale', error.message));

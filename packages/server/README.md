@@ -17,6 +17,10 @@ In a terminal, setup asks a few questions; Enter accepts each suggestion:
 3. Whether to keep this Mac awake while Crate runs.
 4. Where to keep daily verified backups.
 
+`--tailscale`, `--hostname` or `--quick` skip the questions. Without a terminal,
+setup uses a Quick Tunnel. Run setup again with `--tailscale` or `--hostname` to
+move it to a stable address.
+
 It then prints the server address with a QR code and a link. Install the Crate
 Obsidian plugin, then scan the code with a phone or open the link on a computer,
 and Obsidian connects the vault. You can also paste the address and pairing code

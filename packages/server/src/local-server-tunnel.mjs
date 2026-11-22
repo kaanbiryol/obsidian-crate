@@ -94,7 +94,8 @@ export async function saveQuickSettings(dataDir, port) {
 /** A Funnel address belongs to this computer's Tailscale name, so it is saved once and then reused.
  * @param {string} dataDir @param {string} hostname @param {number} port */
 export async function saveTailscaleSettings(dataDir, hostname, port) {
-	const existing = await readRemoteSettings(dataDir);
+	// Saved Quick Tunnel settings hold no address devices keep, so a Funnel replaces them.
+	const existing = await readRemoteSettings(dataDir).then(saved => saved?.mode === 'quick' ? null : saved);
 	if (existing && existing.mode !== 'tailscale') throw new Error('This directory already uses another remote access setup. Keep it or choose another data directory.');
 	if (existing && (existing.hostname !== hostname || existing.port !== port)) {
 		throw new Error('This data directory already has a saved address and port. Reuse them; changing the PWA origin requires a deliberate migration.');
@@ -151,7 +152,8 @@ export async function ensureCloudflared({ signal, run = runProcess, platform = p
 /** @param {{ dataDir: string, hostname?: string, port?: number, signal?: AbortSignal, run?: typeof runProcess }} options */
 export async function setupRemoteAccess({ dataDir, hostname, port, signal, run = runProcess }) {
 	const paths = remotePaths(dataDir);
-	let settings = await readRemoteSettings(dataDir);
+	// Saved Quick Tunnel settings hold no address devices keep, so a named tunnel replaces them.
+	let settings = await readRemoteSettings(dataDir).then(saved => saved?.mode === 'quick' ? null : saved);
 	hostname = normalizeTunnelHostname(hostname ?? settings?.hostname);
 	port ??= settings?.port ?? 8787;
 	if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be between 1 and 65535.');

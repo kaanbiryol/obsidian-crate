@@ -91,6 +91,8 @@ export function resolveMaxFileBytes(values, env = process.env) {
  * @param {CommandOptions} values
  * @param {import('./local-server-tunnel.mjs').RemoteSettings | null} remote */
 export function resolveStartMode(command, values, remote) {
+	// A Quick Tunnel address never outlives a restart, so setup may replace it with a stable one.
+	if (replacesQuickTunnel(command, values, remote)) remote = null;
 	const quick = values.quick || remote?.mode === 'quick' || (command === 'setup' && !remote && !values.hostname && !values.tailscale);
 	if (values.tailscale && remote && remote.mode !== 'tailscale') throw new Error('This directory already uses another remote access setup. Keep it or choose another data directory.');
 	const tailscale = values.tailscale || remote?.mode === 'tailscale';
@@ -103,6 +105,14 @@ export function resolveStartMode(command, values, remote) {
 		throw new Error('Saved tunnel settings require their original hostname, port, and loopback listener. Use --local for an independent reverse proxy.');
 	}
 	return { quick, tailscale, port, host };
+}
+
+/** Whether setup is moving a saved Quick Tunnel to Tailscale Funnel or a named tunnel.
+ * @param {string} command
+ * @param {CommandOptions} values
+ * @param {import('./local-server-tunnel.mjs').RemoteSettings | null} remote */
+export function replacesQuickTunnel(command, values, remote) {
+	return command === 'setup' && remote?.mode === 'quick' && Boolean(values.tailscale || values.hostname);
 }
 
 /** The server's public origin once any setup has saved `remote`. A listener beyond
