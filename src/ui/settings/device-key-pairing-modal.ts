@@ -5,6 +5,7 @@ import { offerFeatureChoice } from '../../plugin/feature-settings';
 import { startVaultReplacement } from '../../plugin/sync-integration';
 import { openDeviceKeyRequest } from '../../plugin/web-app-pairing';
 import { PairingEndedError } from '../../encryption/pairing/protocol';
+import { EncryptionModal } from './encryption/encryption-modal';
 
 /** Asks a device that holds the vault keys to send them, after both screens show the same code. */
 export class DeviceKeyPairingModal extends SharedModal {
@@ -21,14 +22,20 @@ export class DeviceKeyPairingModal extends SharedModal {
 		const instructions = status.createEl('p', { cls: 'crate-encryption-intro', text: 'This vault is encrypted. On an unlocked device, keep ' });
 		instructions.createEl('strong', { text: 'Add a device' }); instructions.appendText(' open or select ');
 		instructions.createEl('strong', { text: 'Manage encryption' }); instructions.appendText(' → ');
-		instructions.createEl('strong', { text: 'Connect web app' }); instructions.appendText(' to approve this device.');
+		instructions.createEl('strong', { text: 'Connect web app' }); instructions.appendText(' to approve this device. No unlocked device nearby? Select ');
+		instructions.createEl('strong', { text: 'Use recovery key' }); instructions.appendText('.');
 		const codePanel = this.bodyEl.createDiv({ cls: 'crate-web-pairing-verification' });
 		codePanel.createSpan({ text: 'Verification code' });
 		const code = codePanel.createEl('output', { cls: 'crate-web-pairing-code', attr: { 'aria-label': 'Verification code' } });
 		codePanel.hidden = true;
 		const actions = createModalFooter(this.contentEl);
 		actions.addClass('crate-encryption-footer');
-		const addCancel = (setting: Setting) => setting.addButton(button => button.setButtonText('Cancel').onClick(() => this.close()));
+		const addCancel = (setting: Setting) => setting
+			.addButton(button => button.setButtonText('Use recovery key').onClick(() => {
+				this.close();
+				new EncryptionModal(this.plugin, () => this.plugin.refreshSettingsTab(), 'Manage encryption').open();
+			}))
+			.addButton(button => button.setButtonText('Cancel').onClick(() => this.close()));
 		addCancel(createModalActions(actions));
 
 		const request = openDeviceKeyRequest(this.plugin, this.controller.signal);
