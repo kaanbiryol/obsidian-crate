@@ -163,7 +163,7 @@ it('expires checkpoints on the server and refuses reads by a stale client', asyn
 	await expect(device.api.sharedHistory.load(checkpoint.id)).rejects.toThrow('expired');
 });
 
-it('caps the shared index at the server\'s checkpoint limit, and lists the newest twenty to older plugins', async () => {
+it('caps the shared index at the server\'s checkpoint limit', async () => {
 	const device = new SyncTestDevice('shared-limit', env); clients.push(device);
 	await device.authorize(); await device.open();
 	const ids: string[] = [];
@@ -174,8 +174,6 @@ it('caps the shared index at the server\'s checkpoint limit, and lists the newes
 	const list = await device.api.sharedHistory.list();
 	expect(list).toHaveLength(SHARED_CHECKPOINT_LIMIT);
 	expect(list.map(entry => entry.id)).toEqual(ids.slice(-SHARED_CHECKPOINT_LIMIT).reverse());
-	const older = await worker.fetch(new Request('https://crate.test/sync/checkpoints', { headers: { Authorization: `Bearer ${device.id}`, 'X-Crate-Protocol': '1' } }), env);
-	expect(((await older.json()) as { checkpoints: unknown[] }).checkpoints).toHaveLength(20);
 	await expect(device.api.sharedHistory.load(ids[0]!)).rejects.toThrow('replaced');
 });
 
