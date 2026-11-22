@@ -5,11 +5,11 @@ import { findReminderIdMarker } from '../core/reminderIdentity';
 /** A task with text. Only these can gain an ID, so leaving any other line skips reading the whole note. */
 export const TASK_WITH_TEXT = /^\s*-\s*\[[ xX]\]\s*\S/;
 
-const RULE_MARKERS_REGEX = /<!-- crate-rule:[^>]*? -->/g;
+const RULE_MARKERS_REGEX = /<!-- crate-(?:rule|done):[^>]*? -->/g;
 const DESCRIPTION_PREFIX = '<!-- crate-desc:';
 
 /**
- * A line's ID and rule markers, each with the one space it is written after,
+ * A line's ID, rule and completion markers, each with the one space it is written after,
  * merged where they touch. Other spaces before a marker stay visible, so a space
  * typed at the end of a reminder shows.
  */

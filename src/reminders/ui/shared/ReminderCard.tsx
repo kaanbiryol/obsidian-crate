@@ -5,7 +5,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import { getProjectColor, type ProjectColorScheme } from '../format/projectColors';
-import { formatDueDate } from '../format/dateFormatting';
+import { formatCompletedAt, formatDueDate } from '../format/dateFormatting';
 import { isReminderOverdue } from '../../core/dates/reminderDate';
 import { parseMarkdownLinks, isSafeUrl, readableWikiLinks } from '../../core/grammar/markdownLinks';
 import type { AnimationConfig } from '../../../ui/shared/component-adapter';
@@ -57,6 +57,7 @@ interface ReminderData {
 	content: string;
 	description?: string;
 	completed: boolean;
+	completedAt?: string;
 	dueDatetime?: string;
 	dueDate?: string;
 	priority?: number;
@@ -103,8 +104,10 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
 	const projectColors = reminder.project ? getProjectColor(reminder.project) : null;
 	const projectThemeColors = projectColors?.[colorScheme];
 
+	const completedLabel = reminder.completed && reminder.completedAt ? formatCompletedAt(reminder.completedAt, undefined, clock.now) : null;
+
 	// Check if we have metadata pills to display
-	const hasPills = dueDate || reminder.recurrence || (reminder.project && !hideProject);
+	const hasPills = completedLabel || dueDate || reminder.recurrence || (reminder.project && !hideProject);
 
 	// Wrapper component based on animation config
 	const Wrapper = animationsEnabled ? motion.div : 'div';
@@ -191,6 +194,13 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
 					{/* Metadata pills */}
 					{hasPills && (
 						<div className="premium-reminder-pills">
+							{completedLabel && (
+								<span className="premium-pill" title="Completed">
+									<ThemeIcon size="xs" id="circle-check" />
+									<span>{completedLabel}</span>
+								</span>
+							)}
+
 							{/* Due date / recurrence pill */}
 							{(dueDate || reminder.recurrence) && (
 								<span

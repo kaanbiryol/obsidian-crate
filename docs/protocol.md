@@ -32,7 +32,7 @@ The PWA stores the exact attempted request separately from its editable draft. A
 
 Update, completion, and delete require `expectedRevision`, a semantic digest captured when the editor or action begins, and the original source `filePath`. Moving a line or editing another reminder does not invalidate the semantic digest. Changes to the target reminder do. The server also applies file preconditions at commit. A cross-project move publishes both file updates and the receipt atomically.
 
-Timed values persist UTC ISO instants, including seconds/milliseconds. Recurrence metadata stores timezone, count, end date, and progress in `crate-rule` comments. A manual change to the visible recurrence text invalidates hidden metadata. All-day values remain calendar dates; the saved server timezone determines notification time.
+Timed values persist UTC ISO instants, including seconds/milliseconds. Recurrence metadata stores timezone, count, end date, and progress in `crate-rule` comments. A checked reminder stores when it was completed as a UTC ISO instant in a `<!-- crate-done:… -->` comment; a marker on an unchecked line is ignored. A manual change to the visible recurrence text invalidates hidden metadata. All-day values remain calendar dates; the saved server timezone determines notification time.
 
 The web index reads at most 20 files and 2 MiB in aggregate per warming request, with a 1 MiB limit per note. Oversized notes, malformed reminder metadata, and oversized cache records produce persistent per-file issues, while other reminders remain available. Warming responses use 202 with progress counts and bounded retry delays. Web edits cannot grow a note beyond the 1 MiB index limit.
 

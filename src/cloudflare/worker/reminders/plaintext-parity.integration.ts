@@ -116,10 +116,10 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 		['moves a repeating reminder', 'update', seeded, files => edit(files, 'r-repeat', { project: 'Work' })],
 		['moves a completed reminder', 'update', seeded, files => edit(files, 'r-done', { project: 'Work' })],
 		['moves and adds a repeat to an undated reminder', 'update', seeded, files => edit(files, 'r-undated', { project: 'Work', recurrence })],
-		['completes a reminder', 'set-completed', seeded, files => edit(files, 'r-plain', { completed: true })],
-		['advances a repeating reminder', 'set-completed', seeded, files => edit(files, 'r-repeat', { completed: true })],
+		['completes a reminder', 'set-completed', seeded, files => edit(files, 'r-plain', { completed: true, completedAt: '2026-11-22T10:15:00.000Z' })],
+		['advances a repeating reminder', 'set-completed', seeded, files => edit(files, 'r-repeat', { completed: true, completedAt: '2026-11-22T10:15:00.000Z' })],
 		['reopens a completed reminder', 'set-completed', seeded, files => edit(files, 'r-done', { completed: false })],
-		['keeps an unchanged completion', 'set-completed', seeded, files => edit(files, 'r-done', { completed: true })],
+		['keeps an unchanged completion', 'set-completed', seeded, files => edit(files, 'r-done', { completed: true, completedAt: '2026-11-22T10:15:00.000Z' })],
 		['deletes a reminder and its description', 'delete', seeded, files => edit(files, 'r-timed')],
 		['reorders active reminders', 'reorder', seeded, files => reorder(files, inbox, ['r-undated', 'r-plain', 'r-repeat', 'r-timed'])],
 	])('%s identically', async (_name, action, files, body) => {
@@ -153,6 +153,10 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 			worker: { status: 400, body: { error: 'Invalid project' } },
 			core: { status: 400, body: { error: 'Enter a valid reminder project.', code: 'invalid_reminder_input' } },
 		}],
+		['rejects an invalid completion time', 'set-completed', seeded, files => edit(files, 'r-plain', { completed: true, completedAt: 'now' }), {
+			worker: { status: 400, body: { error: 'id and completed required, with completedAt when completing' } },
+			core: { status: 400, body: { error: 'Choose a valid completion time', code: 'invalid_reminder_input' } },
+		}],
 		['rejects an edit in an oversized note', 'update', { [inbox]: oversizedNote }, files => edit(files, 'r-big-1', { content: 'Changed' }), {
 			worker: { status: 413, body: { error: sizeError } },
 			core: { status: 413, body: { error: sizeError, code: 'file_too_large' } },
@@ -173,7 +177,7 @@ describe('plaintext Worker routes and the shared reminder command', () => {
 			worker: { status: 409, body: { error: revisionError, code: 'version_conflict' } },
 			core: { status: 409, body: { error: `${revisionError}.`, code: 'version_conflict' } },
 		}],
-		['requires a revision', 'set-completed', seeded, async files => ({ ...await edit(files, 'r-plain', { completed: true }), expectedRevision: undefined }), {
+		['requires a revision', 'set-completed', seeded, async files => ({ ...await edit(files, 'r-plain', { completed: true, completedAt: '2026-11-22T10:15:00.000Z' }), expectedRevision: undefined }), {
 			worker: { status: 428, body: { error: 'Reload the reminder before saving', code: 'revision_required' } },
 			core: { status: 409, body: { error: `${revisionError}.`, code: 'version_conflict' } },
 		}],

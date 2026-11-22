@@ -34,6 +34,18 @@ describe('sortRemindersByFileOrder', () => {
 			reminder('first', { lineNumber: 1 }),
 		]))).toEqual(['first', 'third', 'unplaced', 'done']);
 	});
+
+	it('orders completed reminders most recent first, then those without a time by source line', () => {
+		const completed = [
+			reminder('untimed-late', { completed: true, lineNumber: 5 }),
+			reminder('older', { completed: true, completedAt: '2026-01-01T09:00:00.000Z', lineNumber: 0 }),
+			reminder('untimed-early', { completed: true, lineNumber: 1 }),
+			reminder('newer', { completed: true, completedAt: '2026-01-02T09:00:00.000Z', lineNumber: 3 }),
+			reminder('open', { lineNumber: 9 }),
+		];
+		expect(ids(sortRemindersByFileOrder(completed))).toEqual(['open', 'newer', 'older', 'untimed-early', 'untimed-late']);
+		expect(ids(sortReminders(completed)).slice(0, 3)).toEqual(['open', 'newer', 'older']);
+	});
 });
 
 describe('selectTodayReminders', () => {

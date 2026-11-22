@@ -6,9 +6,18 @@
 import type { Reminder } from './model';
 import { formatLocalDateKey, isDateOnlyString, isReminderDueToday, isReminderOverdue, parseReminderDateValue } from './dates/reminderDate';
 
+/** Incomplete first; completed ones most recently completed first, then those without a time. 0 leaves the order to the caller. */
+function compareCompletion(a: Reminder, b: Reminder): number {
+	if (a.completed !== b.completed) return a.completed ? 1 : -1;
+	if (!a.completed || a.completedAt === b.completedAt) return 0;
+	if (!a.completedAt || !b.completedAt) return a.completedAt ? -1 : 1;
+	return a.completedAt < b.completedAt ? 1 : -1;
+}
+
 /**
  * Sort reminders by:
- * 1. Completion status (incomplete first)
+ * 1. Completion status (incomplete first); completed ones most recently completed
+ *    first, and those without a completion time after them
  * 2. Due date/time (earliest first, null dates last)
  * 3. Priority (highest priority first: 1 > 2 > 3 > 4)
  *
@@ -22,10 +31,9 @@ export function sortReminders(reminders: Reminder[]): Reminder[] {
 		times.set(reminder, date ? parseReminderDateValue(date, !isDateOnlyString(date))?.getTime() ?? 0 : null);
 	}
 	return [...reminders].sort((a, b) => {
-		// 1. Sort by completion status (incomplete first)
-		if (a.completed !== b.completed) {
-			return a.completed ? 1 : -1;
-		}
+		// 1. Sort by completion status and time
+		const completion = compareCompletion(a, b);
+		if (completion !== 0) return completion;
 
 		// 2. Sort by due date (earliest first, no date goes last)
 		const timeA = times.get(a)!;
@@ -48,13 +56,12 @@ export function sortReminders(reminders: Reminder[]): Reminder[] {
 
 /**
  * Sort reminders by file line order (for manual sort mode).
- * Incomplete reminders first, then by line number ascending.
+ * Incomplete reminders first, completed ones by completion time, then by line number ascending.
  */
 export function sortRemindersByFileOrder(reminders: Reminder[]): Reminder[] {
 	return [...reminders].sort((a, b) => {
-		if (a.completed !== b.completed) {
-			return a.completed ? 1 : -1;
-		}
+		const completion = compareCompletion(a, b);
+		if (completion !== 0) return completion;
 		return (a.lineNumber ?? Infinity) - (b.lineNumber ?? Infinity);
 	});
 }

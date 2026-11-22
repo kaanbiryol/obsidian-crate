@@ -4,6 +4,7 @@ import { formatLocalDateKey } from './dates/reminderDate';
 import { calculateFirstOccurrence } from './recurrence/recurrenceCalculator';
 import { anchorRecurrence, recurrenceCalendarDate } from './recurrence/recurrenceCalendar';
 import { appendRecurrenceMetadata } from './recurrence/recurrenceMetadata';
+import { appendCompletionMetadata } from './completionMetadata';
 import { setReminderIdMarker } from './reminderIdentity';
 import { recurrenceToText } from './recurrence/recurrenceText';
 
@@ -42,7 +43,7 @@ export function normalizeReminderScheduleLine(
 		content = `${content} ${dateText}`;
 	}
 	if (recurrence && parsed.recurrencePart) content = content.replace(parsed.recurrencePart, recurrenceToText(recurrence));
-	const normalized = appendRecurrenceMetadata(`${checkbox.indentation}- [${checkbox.isCompleted ? 'x' : ' '}] ${content}`, recurrence);
+	const normalized = appendCompletionMetadata(appendRecurrenceMetadata(`${checkbox.indentation}- [${checkbox.isCompleted ? 'x' : ' '}] ${content}`, recurrence), checkbox.completedAt);
 	const rebuilt = checkbox.reminderId ? setReminderIdMarker(normalized, checkbox.reminderId) : normalized;
 	// The parsed content excludes a CRLF note's CR; keep the line's ending.
 	return line.endsWith('\r') ? `${rebuilt}\r` : rebuilt;

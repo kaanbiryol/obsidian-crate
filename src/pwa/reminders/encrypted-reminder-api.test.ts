@@ -342,7 +342,7 @@ it('commits a semantic revision to the listed note sealed with the vault key', a
 	fake.fetch.mockClear();
 	const response = await api.handle('/reminders/set-completed', { method: 'POST', body: JSON.stringify({
 		operationId: crypto.randomUUID(), folderPath: 'Reminders', id: reminder.id, filePath: reminder.filePath,
-		expectedRevision: reminder.revision, completed: true,
+		expectedRevision: reminder.revision, completed: true, completedAt: '2026-11-22T10:15:00.000Z',
 	}) });
 	expect(response!.status).toBe(200);
 	// The change checks the kept inventory with one conditional request and reads the cached note.

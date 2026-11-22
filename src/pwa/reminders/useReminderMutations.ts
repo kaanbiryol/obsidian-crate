@@ -77,7 +77,8 @@ export function useReminderMutations(options: {
 			try {
 				const previous = getSnapshot().reminders.find(item => item.id === id);
 				if (!previous) throw new Error('Refresh reminders before changing this reminder.');
-				const change = await recordChange(id, 'complete', { completed: !completed }, predictReminderCompletion(previous, !completed));
+				const completedAt = new Date().toISOString();
+				const change = await recordChange(id, 'complete', { completed: !completed, ...(!completed ? { completedAt } : {}) }, predictReminderCompletion(previous, !completed, completedAt));
 				if (current()) {
 					enqueue(change);
 					showToast('success', completed ? 'Reminder reopened' : 'Reminder completed');

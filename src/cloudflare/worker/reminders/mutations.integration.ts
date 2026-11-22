@@ -52,7 +52,7 @@ describe('transactional reminder retries and revisions', () => {
 	});
 	it('replays recurring completion without advancing a second occurrence, including after a move', async () => {
 		const { reminder } = await payload(await handleCreateReminder(request({ ...createBody(), dueDatetime: '2099-01-01T09:00:00Z', recurrence: { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0 } }), env));
-		const body = { id: reminder.id, filePath: path, expectedRevision: reminder.revision, operationId: newOperationId(), completed: true };
+		const body = { id: reminder.id, filePath: path, expectedRevision: reminder.revision, operationId: newOperationId(), completed: true, completedAt: '2026-11-22T10:15:00.000Z' };
 		loseCommit();
 		await expect(handleSetReminderCompleted(request(body), env)).rejects.toThrow('Lost commit response');
 		const first = await payload(await handleSetReminderCompleted(request(body), env));
@@ -76,7 +76,7 @@ describe('transactional reminder retries and revisions', () => {
 		let { reminder } = await payload(await handleCreateReminder(request({ ...createBody(), dueDatetime: '2099-01-01T09:00:00Z',
 			recurrence: { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0, count: 1 } }), env));
 		const setCompleted = async (completed: boolean, loseResponse = false) => {
-			const body = { id: reminder.id, filePath: path, expectedRevision: reminder.revision, operationId: newOperationId(), completed };
+			const body = { id: reminder.id, filePath: path, expectedRevision: reminder.revision, operationId: newOperationId(), completed, completedAt: '2026-11-22T10:15:00.000Z' };
 			if (loseResponse) {
 				loseCommit();
 				await expect(handleSetReminderCompleted(request(body), env)).rejects.toThrow('Lost commit response');

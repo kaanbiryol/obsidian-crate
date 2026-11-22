@@ -5,6 +5,7 @@ import type { RichTextInputHandle } from '../../shared/RichTextInput';
 import type { ReminderDraft } from './useReminderDraft';
 import { getProjectColor } from '../../format/projectColors';
 import { ReminderActionChips } from '../../reminder-editor/ReminderActionChips';
+import { ReminderCompletedNote } from '../../reminder-editor/ReminderCompletedNote';
 import { PluginReminderEditorFields as ReminderEditorFields } from '../PluginReminderEditorFields';
 
 interface AddReminderModalBodyProps {
@@ -17,6 +18,7 @@ interface AddReminderModalBodyProps {
 	richTextInputRef: React.RefObject<RichTextInputHandle | null>;
 	descriptionInputRef: React.RefObject<RichTextInputHandle | null>;
 	defaultProject: string;
+	completedAt?: string;
 	onOpenDatePicker: () => void;
 	onOpenProjectPicker: () => void;
 	onOpenRecurrencePicker: () => void;
@@ -33,6 +35,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
 	richTextInputRef,
 	descriptionInputRef,
 	defaultProject,
+	completedAt,
 	onOpenDatePicker,
 	onOpenProjectPicker,
 	onOpenRecurrencePicker,
@@ -78,6 +81,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
 				onOpenRecurrencePicker={onOpenRecurrencePicker}
 				onTogglePriority={onTogglePriority}
 			/>
+			<ReminderCompletedNote completedAt={completedAt} />
 		</div>
 	);
 };

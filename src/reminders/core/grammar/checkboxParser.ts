@@ -15,6 +15,7 @@ import { formatLocalDateKey, formatReminderDateText } from '../dates/reminderDat
 import { recurrenceToText } from '../recurrence/recurrenceText';
 import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../reminderIdentity';
 import { appendRecurrenceMetadata, readRecurrenceMetadata } from '../recurrence/recurrenceMetadata';
+import { appendCompletionMetadata, readCompletionMetadata } from '../completionMetadata';
 
 export interface ParsedCheckbox {
 	/** Original line content */
@@ -27,6 +28,8 @@ export interface ParsedCheckbox {
 	rawContent: string;
 	/** Stable reminder ID persisted in markdown metadata */
 	reminderId: string | null;
+	/** When a checked reminder was completed, from its completion marker */
+	completedAt?: string;
 	/** Parsed reminder data from the content */
 	parsed: ParsedReminder;
 }
@@ -128,7 +131,8 @@ function readCheckboxLine(line: string, options: { persisted?: boolean }): Parse
 	}
 	const isCompleted = state.toLowerCase() === 'x';
 	const reminderId = extractReminderId(rawContentWithMetadata);
-	const metadata = readRecurrenceMetadata(stripReminderIdMarker(rawContentWithMetadata), options);
+	const completion = readCompletionMetadata(stripReminderIdMarker(rawContentWithMetadata));
+	const metadata = readRecurrenceMetadata(completion.content, options);
 	const rawContent = metadata.content;
 	// Stored recurrence metadata distinguishes an explicit repeat rule plus its
 	// next occurrence from earlier repeat words retained as literal title text.
@@ -145,6 +149,8 @@ function readCheckboxLine(line: string, options: { persisted?: boolean }): Parse
 		isCompleted,
 		rawContent,
 		reminderId,
+		// An unchecked line keeps no completion time, even if a marker was left behind.
+		...(isCompleted && completion.completedAt ? { completedAt: completion.completedAt } : {}),
 		parsed,
 	};
 }
@@ -185,13 +191,15 @@ export interface CheckboxLineOptions {
 	recurrence?: RecurrenceRule;
 	hasTime?: boolean;
 	reminderId?: string;
+	/** Written only for a completed line. */
+	completedAt?: string;
 	/** Write a date-only due as `2026-10-30` instead of `Oct 30, 2026`. */
 	isoDate?: boolean;
 }
 
 /** Rebuilds a checkbox line with updated data. */
 export function rebuildCheckboxLine({
-	indentation = '', completed: isCompleted, content: cleanContent, dueDate, priority, recurrence, hasTime, reminderId, isoDate = false,
+	indentation = '', completed: isCompleted, content: cleanContent, dueDate, priority, recurrence, hasTime, reminderId, completedAt, isoDate = false,
 }: CheckboxLineOptions): string {
 	const checkbox = isCompleted ? '[x]' : '[ ]';
 
@@ -219,6 +227,6 @@ export function rebuildCheckboxLine({
 		content += ' !';
 	}
 
-	const line = appendRecurrenceMetadata(`${indentation}- ${checkbox} ${content}`, recurrence);
+	const line = appendCompletionMetadata(appendRecurrenceMetadata(`${indentation}- ${checkbox} ${content}`, recurrence), isCompleted ? completedAt : undefined);
 	return reminderId ? setReminderIdMarker(line, reminderId) : line;
 }

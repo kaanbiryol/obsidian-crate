@@ -18,8 +18,10 @@ it.each([
 	['completes the last occurrence', saved(false, { frequency: 'daily', count: 1 }), true],
 	['reopens a counted occurrence', saved(true, { frequency: 'daily', completedCount: 2 }), false],
 ])('plans the same completion state with and without Markdown: %s', (_name, reminder, completed) => {
-	const { checkboxLine, ...state } = buildReminderCompletionPlan(reminder, completed);
-	expect(planReminderCompletion(reminder, completed)).toEqual(state);
+	const at = '2026-11-22T10:15:00.000Z';
+	const { checkboxLine, ...state } = buildReminderCompletionPlan(reminder, completed, undefined, undefined, at);
+	expect(planReminderCompletion(reminder, completed, at)).toEqual(state);
+	expect(checkboxLine.includes(`<!-- crate-done:${at} -->`)).toBe(state.completed);
 	expect(checkboxLine.startsWith('  - [')).toBe(true);
 	expect(checkboxLine).toContain(state.completed ? '- [x]' : '- [ ]');
 	expect(checkboxLine.endsWith('<!-- crate-id:one -->')).toBe(true);

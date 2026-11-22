@@ -4,6 +4,7 @@ import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../http/request-validation';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
 import { commitReminderCommand } from '../command';
+import { isCompletionInstant } from '@/reminders/core/completionMetadata';
 
 /** Update, deletion and completion edit one existing reminder in its source note.
  * They validate in the same order, so a request reports the same first error. */
@@ -39,5 +40,6 @@ export function handleDeleteReminder(request: Request, env: Env, arm?: () => Pro
 
 export function handleSetReminderCompleted(request: Request, env: Env, arm?: () => Promise<void>): Promise<Response> {
 	return handleExistingReminder(request, env, arm, 'complete', 'set-completed',
-		{ valid: body => typeof body.completed === 'boolean', required: 'id and completed required' });
+		{ valid: body => typeof body.completed === 'boolean' && (!body.completed || isCompletionInstant(body.completedAt)),
+			required: 'id and completed required, with completedAt when completing' });
 }

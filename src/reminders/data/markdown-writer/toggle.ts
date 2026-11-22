@@ -16,9 +16,11 @@ export async function toggleReminderCompletionInMarkdown(
 
 	const requestedCompleted = !reminder.completed;
 	const currentDue = parseStoredReminderDate(reminder) ?? new Date();
-	const planned = buildReminderCompletionPlan(reminder, requestedCompleted, reminder.rawLine, currentDue);
+	const completedAt = new Date().toISOString();
+	const planned = buildReminderCompletionPlan(reminder, requestedCompleted, reminder.rawLine, currentDue, completedAt);
 	context.index.applyOptimisticUpdate(reminder.id, {
 		completed: planned.completed,
+		completedAt: planned.completedAt,
 		dueDate: planned.dueDate,
 		dueDatetime: planned.dueDatetime,
 		recurrence: planned.recurrence,
@@ -28,7 +30,7 @@ export async function toggleReminderCompletionInMarkdown(
 		const resultHolder: { value?: ReminderCompletionMutation } = {};
 		await processVaultMarkdown(context.app.vault, file, (fileContent) => {
 			context.moveJournal?.assertActive();
-			const result = setReminderCompletionInContent(fileContent, reminder, requestedCompleted, currentDue);
+			const result = setReminderCompletionInContent(fileContent, reminder, requestedCompleted, currentDue, completedAt);
 			resultHolder.value = result;
 			return result.content;
 		});

@@ -216,6 +216,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
 					richTextInputRef={richTextInputRef}
 					descriptionInputRef={descriptionInputRef}
 					defaultProject={defaultProject}
+					completedAt={reminder?.completed ? reminder.completedAt : undefined}
 					onOpenDatePicker={() => transitionToView('date')}
 					onOpenProjectPicker={() => transitionToView('project')}
 					onOpenRecurrencePicker={() => transitionToView('recurrence')}

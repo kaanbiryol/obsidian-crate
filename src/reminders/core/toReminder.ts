@@ -14,6 +14,7 @@ export function toReminder(source: ReminderSource): Reminder {
 		dueDatetime: source.dueDatetime,
 		priority: source.priority,
 		completed: source.completed,
+		completedAt: source.completedAt,
 		project: reminderProject(source),
 		recurrence: normalizeRecurrenceRule(source.recurrence),
 		lineNumber: source.lineNumber,

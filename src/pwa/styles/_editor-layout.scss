@@ -159,6 +159,7 @@
     // The shared compact layout permits shrinking, which can overlap text/chips.
     .reminder-editor-fields,
     .reminder-action-chips,
+    .reminder-completed-note,
     .reminder-description-wrap,
     .rich-text-input-shell {
       flex: none;

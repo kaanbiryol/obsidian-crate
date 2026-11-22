@@ -26,6 +26,7 @@ export interface Reminder {
 	dueDatetime?: string; // ISO datetime string
 	priority: Priority;
 	completed: boolean;
+	completedAt?: string; // ISO instant the reminder was completed, when known
 	project?: string; // Project tag for organizing reminders (defaults to "Inbox")
 	recurrence?: RecurrenceRule; // Optional recurrence rule for recurring reminders
 	lineNumber?: number; // Line position in source markdown file (for manual ordering)

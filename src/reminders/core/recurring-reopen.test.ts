@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { buildCreatedReminderBlock } from './markdownReminderMutation';
 import { setReminderCompletionInContent } from './reminderCompletion';
 import { scanReminderMarkdownContent } from './markdownScan';
@@ -14,6 +14,8 @@ function source(timed: boolean, count = 3) {
 
 describe('reopening a recurring occurrence', () => {
 	it.each([false, true])('preserves the final occurrence date and restores its count when recompleted (timed=%s)', timed => {
+		vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-22T10:15:00Z') });
+		onTestFinished(() => { vi.useRealTimers(); });
 		let content = source(timed);
 		content = setReminderCompletionInContent(content, read(content), true).content;
 		const completed = read(content);

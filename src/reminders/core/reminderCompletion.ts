@@ -7,9 +7,12 @@ import { normalizeRecurrenceRule } from '@/reminders/core/recurrence/recurrenceR
 import { setReminderIdMarker } from './reminderIdentity';
 import { assertReminderBlockUnchanged, findReminderLineNumber, matchLineEnding } from './markdownReminderFile';
 import type { MarkdownReminderRecord } from './markdownReminderMutation';
+import { setCompletionMarker } from './completionMetadata';
 
 export interface ReminderCompletionState {
 	completed: boolean;
+	/** Set while the line stays checked; an occurrence that moves on to the next one has none. */
+	completedAt?: string;
 	dueDate?: string;
 	dueDatetime?: string;
 	recurrence: RecurrenceRule | undefined;
@@ -28,7 +31,7 @@ export interface ReminderCompletionMutation extends ReminderCompletionPlan {
 	lineNumber: number;
 }
 
-type CompletionStateInput = Pick<MarkdownReminderRecord, 'completed' | 'dueDate' | 'dueDatetime' | 'recurrence'>;
+type CompletionStateInput = Pick<MarkdownReminderRecord, 'completed' | 'completedAt' | 'dueDate' | 'dueDatetime' | 'recurrence'>;
 /** How the checkbox line changes: flip its marker, or rewrite it for a new occurrence. */
 type CompletionLine = { kind: 'check' } | { kind: 'uncheck' } | { kind: 'rebuild'; completed: boolean; due: Date };
 
@@ -36,6 +39,7 @@ function completionTransition(
 	reminder: CompletionStateInput,
 	completed: boolean,
 	currentDue: Date,
+	completedAt: string,
 ): { state: ReminderCompletionState; line: CompletionLine } {
 	const currentHasTime = reminderHasTime(reminder) ?? false;
 	let recurrence = normalizeRecurrenceRule(reminder.recurrence);
@@ -76,20 +80,23 @@ function completionTransition(
 		line = { kind: 'check' };
 	}
 
+	// Completing an already completed line keeps the time it was first completed.
+	const nextCompletedAt = !nextCompleted ? undefined : reminder.completed ? reminder.completedAt ?? completedAt : completedAt;
 	return {
-		state: { completed: nextCompleted, dueDate, dueDatetime, recurrence, recurringInstanceCompleted },
+		state: { completed: nextCompleted, ...(nextCompletedAt ? { completedAt: nextCompletedAt } : {}), dueDate, dueDatetime, recurrence, recurringInstanceCompleted },
 		line,
 	};
 }
 
-/** The completion state transition alone: completion, dates and recurrence.
- * Hosts that predict a toggle without Markdown use this. */
+/** The completion state transition alone: completion, completion time, dates and
+ * recurrence. Hosts that predict a toggle without Markdown use this. */
 export function planReminderCompletion(
 	reminder: CompletionStateInput,
 	completed: boolean,
+	completedAt = new Date().toISOString(),
 	currentDue = parseStoredReminderDate(reminder) ?? new Date(),
 ): ReminderCompletionState {
-	return completionTransition(reminder, completed, currentDue).state;
+	return completionTransition(reminder, completed, currentDue, completedAt).state;
 }
 
 export function buildReminderCompletionPlan(
@@ -97,11 +104,12 @@ export function buildReminderCompletionPlan(
 	completed: boolean,
 	sourceLine = reminder.rawLine,
 	currentDue = parseStoredReminderDate(reminder) ?? new Date(),
+	completedAt = new Date().toISOString(),
 ): ReminderCompletionPlan {
-	const { state, line } = completionTransition(reminder, completed, currentDue);
-	const nextLine = line.kind === 'check' ? sourceLine.replace(/\[ \]/, '[x]')
-		: line.kind === 'uncheck' ? sourceLine.replace(/\[x\]/i, '[ ]')
-		: rebuildCheckboxLine({ indentation: sourceLine.match(/^(\s*)/)?.[1] ?? '', completed: line.completed, content: reminder.content,
+	const { state, line } = completionTransition(reminder, completed, currentDue, completedAt);
+	const nextLine = line.kind === 'check' ? setCompletionMarker(sourceLine.replace(/\[ \]/, '[x]'), state.completedAt)
+		: line.kind === 'uncheck' ? setCompletionMarker(sourceLine.replace(/\[x\]/i, '[ ]'), undefined)
+		: rebuildCheckboxLine({ indentation: sourceLine.match(/^(\s*)/)?.[1] ?? '', completed: line.completed, completedAt: state.completedAt, content: reminder.content,
 			dueDate: line.due, priority: reminder.priority, recurrence: state.recurrence, hasTime: reminderHasTime(reminder) ?? false, reminderId: reminder.id });
 	return { checkboxLine: setReminderIdMarker(nextLine, reminder.id), ...state };
 }
@@ -111,6 +119,7 @@ export function setReminderCompletionInContent(
 	reminder: MarkdownReminderRecord,
 	completed: boolean,
 	currentDue?: Date,
+	completedAt?: string,
 ): ReminderCompletionMutation {
 	const lines = fileContent.split('\n');
 	const lineNumber = findReminderLineNumber(lines, reminder);
@@ -123,7 +132,7 @@ export function setReminderCompletionInContent(
 		throw new Error(`Cannot read reminder line in ${reminder.filePath}`);
 	}
 
-	const plan = buildReminderCompletionPlan(reminder, completed, line, currentDue);
+	const plan = buildReminderCompletionPlan(reminder, completed, line, currentDue, completedAt);
 	lines[lineNumber] = matchLineEnding([plan.checkboxLine], line)[0]!;
 	return {
 		...plan,

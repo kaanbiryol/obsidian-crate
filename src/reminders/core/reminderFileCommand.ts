@@ -5,6 +5,7 @@ import { getReminderProjectFilePath, normalizeReminderProjectPath } from './remi
 import { buildCreateReminderArgs, buildReminderUpdate } from './reminderMutationPlan';
 import { appendCreatedReminderBlock, buildCreatedReminderBlock, buildMovedReminderBlock, buildUpdatedReminderBlock, replaceUpdatedReminderBlock, unreadableReminderTitle } from './markdownReminderMutation';
 import { setReminderCompletionInContent } from './reminderCompletion';
+import { isCompletionInstant } from './completionMetadata';
 import { deleteReminderBlockFromContent, getInitialProjectFileContent, noteContainsReminderId, reorderReminderBlocksInContent } from './markdownReminderFile';
 import { DEFAULT_PROJECT, MAX_REMINDER_NOTE_BYTES, MAX_REMINDERS_PER_NOTE } from './constants';
 import { UnresolvedReminderScheduleError } from './grammar/reminderParser';
@@ -28,6 +29,7 @@ export async function reminderCommandPayload(reminder: ScannedReminderRecord) {
 		dueDatetime: reminder.dueDatetime,
 		priority: reminder.priority,
 		completed: reminder.completed,
+		completedAt: reminder.completedAt,
 		project: reminder.project,
 		recurrence: reminder.recurrence,
 		filePath: reminder.filePath,
@@ -112,7 +114,9 @@ export async function applyReminderFileCommand(action: string, body: Record<stri
 		if (action === 'delete') changes.set(path, deleteReminderBlockFromContent(content, current).content);
 		else if (action === 'set-completed') {
 			if (typeof body.completed !== 'boolean') throw new ReminderCommandError('Choose a completion state', 400, 'invalid_reminder_input');
-			changes.set(path, current.completed === body.completed ? content : setReminderCompletionInContent(content, current, body.completed).content);
+			// The client picks the time, so a resent request writes the same bytes.
+			if (body.completed && !isCompletionInstant(body.completedAt)) throw new ReminderCommandError('Choose a valid completion time', 400, 'invalid_reminder_input');
+			changes.set(path, current.completed === body.completed ? content : setReminderCompletionInContent(content, current, body.completed, undefined, body.completed ? body.completedAt as string : undefined).content);
 		} else if (action === 'update') {
 			const update = buildReminderUpdate(parseReminderUpdateParams(body));
 			if (update.project && update.project !== current.project) {

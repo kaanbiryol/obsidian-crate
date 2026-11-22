@@ -285,6 +285,8 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [],
 				}
 
 				current.completed = Boolean(body.completed);
+				if (current.completed && typeof body.completedAt === 'string') current.completedAt = body.completedAt;
+				else if (!current.completed) delete current.completedAt;
 				current.revision = randomUUID();
 				acknowledge({ success: true, reminder: current });
 				return;

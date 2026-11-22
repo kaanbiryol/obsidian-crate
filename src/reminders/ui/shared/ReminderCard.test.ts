@@ -28,6 +28,21 @@ describe('ReminderCard', () => {
 		expect(markup).not.toContain('premium-reminder-title is-completed');
 	});
 
+	it('shows when a completed reminder was completed before its due date', () => {
+		const completedAt = new Date().toISOString();
+		const markup = renderToStaticMarkup(React.createElement(ReminderCard, {
+			reminder: { ...reminder, completed: true, completedAt, dueDate: '2026-01-05' },
+			colorScheme: 'light',
+			animationConfig: { enabled: false },
+		}));
+
+		expect(markup).toMatch(/title="Completed".*data-icon="circle-check".*Today, \d\d:\d\d.*data-icon="calendar"/);
+		const reopened = renderToStaticMarkup(React.createElement(ReminderCard, {
+			reminder: { ...reminder, completedAt }, colorScheme: 'light', animationConfig: { enabled: false },
+		}));
+		expect(reopened).not.toContain('title="Completed"');
+	});
+
 	it('renders important status as a labeled title-row indicator', () => {
 		const markup = renderToStaticMarkup(React.createElement(ReminderCard, {
 			reminder: { ...reminder, priority: 1 },

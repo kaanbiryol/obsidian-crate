@@ -66,7 +66,7 @@ it('never advances recurring completion again after a lost response, expiry, pru
 		dueDatetime: '2099-01-01T09:00:00Z', recurrence: { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0 } }), env));
 	const before = (await readCommittedMarkdownFileVersion(bucket, db, path))!;
 	const issued = day - REMINDER_RETRY_DAYS + 1;
-	const body = { id, operationId: createReminderOperationId(issued), filePath: path, expectedRevision: reminder.revision, completed: true };
+	const body = { id, operationId: createReminderOperationId(issued), filePath: path, expectedRevision: reminder.revision, completed: true, completedAt: '2026-11-22T10:15:00.000Z' };
 	const batch = db.batch.bind(db);
 	vi.spyOn(db, 'batch').mockImplementationOnce(async statements => { await batch(statements); throw new Error('Lost commit response'); });
 	await expect(handleSetReminderCompleted(request(body), env)).rejects.toThrow('Lost commit response');
@@ -86,7 +86,7 @@ it.each(['completion', 'move'] as const)('rolls back the entire %s publication i
 	const before = (await readCommittedMarkdownFileVersion(bucket, db, path))!;
 	const operationId = createReminderOperationId(day);
 	const body = { id, operationId, filePath: path, expectedRevision: reminder.revision,
-		...(kind === 'move' ? { project: 'Work', content: 'Moved' } : { completed: true }) };
+		...(kind === 'move' ? { project: 'Work', content: 'Moved' } : { completed: true, completedAt: '2026-11-22T10:15:00.000Z' }) };
 	const batch = db.batch.bind(db);
 	vi.spyOn(db, 'batch').mockImplementationOnce(async statements => { await setFloor(day + 1); return batch(statements); });
 	const mutate = kind === 'move' ? handleUpdateReminder : handleSetReminderCompleted;

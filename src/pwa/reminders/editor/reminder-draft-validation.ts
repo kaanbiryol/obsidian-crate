@@ -13,6 +13,7 @@ const modalSchema = storedObject({
 	expectedRevision: optionalString,
 	recovery: v.optional(v.boolean()),
 	filePath: optionalString,
+	completedAt: optionalString,
 	pendingSave: v.optional(v.never()),
 });
 

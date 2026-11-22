@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, onTestFinished, vi } from 'vitest';
 import { applyReminderFileCommand, reminderCommandPayload } from './reminderFileCommand';
 import { scanReminderMarkdownContent } from './markdownScan';
 import { createReminderOperationId } from '../../protocol/reminder-operation';
@@ -54,12 +54,14 @@ it('creates with a stable identity and guards reorder against concurrent additio
 });
 
 it('advances recurring completion once, stops at its count, and reopens the final occurrence', async () => {
+	vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-22T10:15:00Z') });
+	onTestFinished(() => { vi.useRealTimers(); });
 	const recurring = buildCreatedReminderBlock({ content: 'Daily task', reminderId: 'r1', priority: 4,
 		dueDate: new Date('2099-01-01T09:00:00Z'), hasTime: true,
 		recurrence: { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0, count: 2 } }).checkboxLine;
 	let content = `# Private notes\n\n${recurring}\n\nKeep this paragraph\n`;
 	const complete = async (completed: boolean) => {
-		const result = await applyReminderFileCommand('set-completed', { ...await request(content), completed }, folder, async () => content);
+		const result = await applyReminderFileCommand('set-completed', { ...await request(content), completed, completedAt: new Date().toISOString() }, folder, async () => content);
 		content = result.files[0]!.content;
 		if (!('reminder' in result.response)) throw new Error('Missing saved reminder');
 		return result.response.reminder;
@@ -96,7 +98,7 @@ it('answers only the listed wire fields of a scanned reminder', async () => {
 	const scanned = scanReminderMarkdownContent(path, note, folder).reminders[0]!;
 	const payload = await reminderCommandPayload({ ...scanned, futureField: 'private' } as typeof scanned);
 	expect(Object.keys(payload)).toEqual(['revision', 'id', 'content', 'description', 'dueDate', 'dueDatetime', 'priority',
-		'completed', 'project', 'recurrence', 'filePath', 'lineNumber']);
+		'completed', 'completedAt', 'project', 'recurrence', 'filePath', 'lineNumber']);
 	expect(payload).not.toHaveProperty('rawLine');
 });
 

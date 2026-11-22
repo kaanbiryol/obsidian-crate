@@ -34,6 +34,8 @@ export interface ModalState {
 	expectedRevision?: string;
 	operationId?: string;
 	filePath?: string;
+	/** When the edited reminder was completed, shown read-only. */
+	completedAt?: string;
 	draft: ModalDraft;
 }
 

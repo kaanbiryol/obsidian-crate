@@ -16,6 +16,7 @@ export interface ScannedReminderRecord {
 	dueDatetime?: string;
 	priority: Priority;
 	completed: boolean;
+	completedAt?: string;
 	project: string;
 	recurrence?: RecurrenceRule;
 	filePath: string;
@@ -77,6 +78,7 @@ export function scanReminderMarkdownContent(
 			dueDatetime: storedDates.dueDatetime,
 			priority: parsed.parsed.priority,
 			completed: parsed.isCompleted,
+			...(parsed.completedAt ? { completedAt: parsed.completedAt } : {}),
 			project,
 			recurrence: normalizeRecurrenceRule(parsed.parsed.recurrence),
 			filePath,

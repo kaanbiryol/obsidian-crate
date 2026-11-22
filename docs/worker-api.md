@@ -438,11 +438,11 @@ Reminder handlers live in `src/cloudflare/worker/reminders/handlers/`. Mutations
 
 ### Reminder mutation responses
 
-Create, update and set-completed respond with the saved reminder as `{ success: true, reminder }`. `reminder` has the fields of a listed reminder: `revision`, `id`, `content`, optional `description`, `dueDate` and `dueDatetime`, `priority`, `completed`, `project`, optional `recurrence`, `filePath` and `lineNumber`. A retried operation returns its original response.
+Create, update and set-completed respond with the saved reminder as `{ success: true, reminder }`. `reminder` has the fields of a listed reminder: `revision`, `id`, `content`, optional `description`, `dueDate` and `dueDatetime`, `priority`, `completed`, optional `completedAt`, `project`, optional `recurrence`, `filePath` and `lineNumber`. A retried operation returns its original response.
 
 Mutation failures respond with `{ error }` and, where listed, a stable `code`. Nothing is written on any failure.
 
-- `400` `invalid_reminder_input`, with the rejected `field`: invalid reminder fields. This includes a title containing Crate's `<!-- crate-id:` or `<!-- crate-rule:` comments, and a title that would not read back as the saved reminder, such as an undated title consisting only of a date or priority marker, or a date-only reminder whose title ends in a time that would join the written date (`Lunch at 1pm`). A date-only due is written as `Oct 30, 2026`, or as `2026-10-30` when only that form reads back. Clients should treat it as a definite rejection that needs a corrected request, not a retry.
+- `400` `invalid_reminder_input`, with the rejected `field`: invalid reminder fields. This includes a title containing Crate's `<!-- crate-id:`, `<!-- crate-rule:` or `<!-- crate-done:` comments, and a title that would not read back as the saved reminder, such as an undated title consisting only of a date or priority marker, or a date-only reminder whose title ends in a time that would join the written date (`Lunch at 1pm`). A date-only due is written as `Oct 30, 2026`, or as `2026-10-30` when only that form reads back. Clients should treat it as a definite rejection that needs a corrected request, not a retry.
 - `400` without a code: route checks such as a missing `folderPath`, `id` or `filePath`, an invalid project on create, an invalid repeat, or unreadable `orderedIds` or `expectedOrder`.
 - `404`: the reminder or project note no longer exists.
 - `409` `version_conflict` for a stale `expectedRevision`; `reminder_markdown_context` for duplicate identities or Markdown that cannot be edited safely; `reminder_order_conflict` for a reorder the note cannot apply safely, such as one that includes completed or nested reminders; `duplicate_reminder_identity` when the identity occurs more than once in the reminders folder; `operation_mismatch` when an operation ID is reused for different changes. A create whose identity already exists, a changed project order and a concurrent note write return `409` without a code.
@@ -480,9 +480,9 @@ Response: `{ success: true, reminder }`. After a move, `reminder.filePath` and `
 
 ### POST /reminders/set-completed
 
-Request: `{ operationId, expectedRevision, folderPath, filePath, id, completed }`
+Request: `{ operationId, expectedRevision, folderPath, filePath, id, completed, completedAt? }`. `completedAt` is required when `completed` is `true`: the UTC ISO instant the client completed the reminder, so a retried request writes the same note.
 
-Response: `{ success: true, reminder }`. Completing a repeating reminder with later occurrences returns the next one, still open.
+Response: `{ success: true, reminder }`. Completing a repeating reminder with later occurrences returns the next one, still open, with no `completedAt`. A completed reminder keeps its first completion time when completed again; reopening clears it.
 
 ### DELETE /reminders/delete
 

@@ -13,6 +13,7 @@ export interface ReminderLineRecord {
 	dueDatetime?: string;
 	priority: Priority;
 	completed: boolean;
+	completedAt?: string;
 	recurrence?: RecurrenceRule;
 	lineNumber: number;
 	rawLine: string;

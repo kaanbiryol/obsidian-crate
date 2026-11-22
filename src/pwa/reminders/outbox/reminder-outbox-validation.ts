@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import { isStoredReminderDraft, isStoredReminderRecord, storedObject, storedStringChoice } from '../cache/reminder-storage-validation';
 import { isReminderOperationId } from '../../../protocol/reminder-operation';
+import { isCompletionInstant } from '@/reminders/core/completionMetadata';
 
 const operationIdSchema = v.pipe(v.string(), v.check(value => isReminderOperationId(value)));
 const nonNegativeNumber = v.pipe(v.number(), v.check(value => Number.isFinite(value) && value >= 0));
@@ -36,7 +37,7 @@ const changeSchema = v.variant('kind', [
 ]);
 const bodySchema = storedObject({ operationId: v.string(), folderPath: v.string() });
 const saveBodySchema = storedObject({ content: v.string(), project: v.string() });
-const completeBodySchema = storedObject({ completed: v.boolean() });
+const completeBodySchema = storedObject({ completed: v.boolean(), completedAt: v.optional(v.custom<string>(isCompletionInstant)) });
 const reorderBodySchema = storedObject({ expectedOrder: v.array(v.string()) });
 
 export const storedChangeSchema = storedObject({ version: v.literal(1), createdAt: nonNegativeNumber, change: v.unknown() });

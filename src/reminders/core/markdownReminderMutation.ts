@@ -104,6 +104,7 @@ export function buildCreatedReminderBlock(params: {
 	recurrence?: RecurrenceRule;
 	hasTime?: boolean;
 	completed?: boolean;
+	completedAt?: string;
 	reminderId: string;
 }): ReminderBlockMutation {
 	const rule = normalizeRecurrenceRule(params.recurrence);
@@ -123,7 +124,7 @@ export function buildCreatedReminderBlock(params: {
 		hasTime,
 		priority: params.priority,
 		recurrence,
-	}, isoDate => rebuildCheckboxLine({ completed: params.completed ?? false, content: params.content, dueDate, priority: params.priority, recurrence, hasTime, reminderId: params.reminderId, isoDate }));
+	}, isoDate => rebuildCheckboxLine({ completed: params.completed ?? false, completedAt: params.completedAt, content: params.content, dueDate, priority: params.priority, recurrence, hasTime, reminderId: params.reminderId, isoDate }));
 }
 
 export function appendCreatedReminderBlock(
@@ -173,7 +174,7 @@ export function buildUpdatedReminderBlock(
 		hasTime,
 		priority,
 		recurrence,
-	}, isoDate => rebuildCheckboxLine({ indentation, completed: reminder.completed, content, dueDate, priority, recurrence, hasTime, reminderId: reminder.id, isoDate }));
+	}, isoDate => rebuildCheckboxLine({ indentation, completed: reminder.completed, completedAt: reminder.completedAt, content, dueDate, priority, recurrence, hasTime, reminderId: reminder.id, isoDate }));
 }
 
 /** A project move writes the edited reminder as a new block in the destination
@@ -191,6 +192,7 @@ export function buildMovedReminderBlock(
 		recurrence: mutation.recurrence,
 		hasTime: mutation.hasTime,
 		completed: reminder.completed,
+		completedAt: reminder.completedAt,
 		reminderId: reminder.id,
 	});
 }

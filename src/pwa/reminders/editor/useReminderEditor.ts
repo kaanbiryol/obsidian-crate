@@ -37,6 +37,7 @@ export function useReminderEditor(setSettingsOpen: (open: boolean) => void) {
 		openEditor({
 			mode, reminderId: reminder?.id, expectedRevision: reminder?.revision,
 			filePath: reminder?.filePath, operationId: crypto.randomUUID(),
+			...(reminder?.completed && reminder.completedAt ? { completedAt: reminder.completedAt } : {}),
 			draft: buildModalDraft(reminder, defaultProject),
 		}, synchronous);
 	}, [openEditor]);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { TFile } from 'obsidian';
 import { createMockAppWithVault } from '@/test/factories/obsidian';
 import { createReminderIndex } from './reminder-index';
@@ -57,6 +57,8 @@ describe('partial reminder updates', () => {
 		expect(files.get(path)).not.toContain('crate-desc:');
 	});
 	it('returns the actual next recurring occurrence, final completion and reopened count', async () => {
+		vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-22T10:15:00Z') });
+		onTestFinished(() => { vi.useRealTimers(); });
 		const { repository, index } = await workspace();
 		const compare = async (result: ReturnType<typeof repository.complete>) => {
 			const returned = await result;

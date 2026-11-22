@@ -110,7 +110,7 @@ export function strayIdChanges(doc: Text, lineNumbers: Iterable<number>): Change
 	});
 }
 
-const RULE_MARKER = /<!-- crate-rule:[^>]*? -->/g;
+const RULE_MARKER = /<!-- crate-(?:rule|done):[^>]*? -->/g;
 
 /**
  * Identifies reminder lines the cursor just left, so a new reminder gets its ID

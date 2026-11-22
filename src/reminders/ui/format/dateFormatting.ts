@@ -102,3 +102,22 @@ export function formatDateHeader(date: Date, locale = getUiLocale(), now = new D
 		day: 'numeric',
 	}).format(date);
 }
+
+/**
+ * Format when a reminder was completed: "Today, 10:15", "Yesterday, 18:40",
+ * "Nov 18, 09:02", with the year when it is not this year. `sentence` gives
+ * the form that follows "Completed": "today at 10:15".
+ */
+export function formatCompletedAt(completedAt: string, locale = getUiLocale(), now = new Date(), sentence = false): string | null {
+	const date = new Date(completedAt);
+	if (Number.isNaN(date.getTime())) return null;
+	const yesterday = new Date(now);
+	yesterday.setDate(yesterday.getDate() - 1);
+	const offset = formatLocalDateKey(date) === formatLocalDateKey(now) ? 0
+		: formatLocalDateKey(date) === formatLocalDateKey(yesterday) ? -1 : null;
+	const day = offset !== null
+		? sentence ? getRelativeFormatter(locale).format(offset, 'day') : formatRelativeDay(offset, locale)
+		: getDateFormatter(locale, { month: 'short', day: 'numeric', ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) }).format(date);
+	const time = getDateFormatter(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+	return sentence ? `${day} at ${time}` : `${day}, ${time}`;
+}

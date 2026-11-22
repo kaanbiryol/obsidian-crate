@@ -14,6 +14,7 @@ import { usePreserveFieldFocus } from '@/ui/shared/usePreserveFieldFocus';
 import type { RichTextInputHandle } from '@/reminders/ui/shared/RichTextInput';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-editor/ReminderEditorFields';
 import { ReminderActionChips } from '@/reminders/ui/reminder-editor/ReminderActionChips';
+import { ReminderCompletedNote } from '@/reminders/ui/reminder-editor/ReminderCompletedNote';
 import { useKeyboardDoneSave } from './useKeyboardDoneSave';
 import { useEditorSheetHeight } from './useEditorSheetHeight';
 import { useEditorFocus } from './useEditorFocus';
@@ -256,6 +257,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 					onOpenRecurrencePicker={() => onOpenPicker('recurrence')}
 					onTogglePriority={togglePriority}
 				/>
+				<ReminderCompletedNote completedAt={modal.completedAt} />
 			</form>
 
 		</div>

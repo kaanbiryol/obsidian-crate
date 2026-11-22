@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { formatDateHeader, formatDueDate, resetDateFormatterCache } from './dateFormatting';
+import { formatCompletedAt, formatDateHeader, formatDueDate, resetDateFormatterCache } from './dateFormatting';
 
 describe('localized reminder date formatting', () => {
 	it('includes recurring wall-clock time for date-only occurrences', () => {
@@ -13,6 +13,17 @@ describe('localized reminder date formatting', () => {
 	});
 
 	afterEach(() => vi.useRealTimers());
+
+	it('formats completion times relative to today, with the year only when it differs', () => {
+		const now = new Date(2026, 10, 22, 12);
+		const at = (...parts: [number, number, number, number, number]) => new Date(...parts).toISOString();
+		expect(formatCompletedAt(at(2026, 10, 22, 10, 15), 'en-US', now)).toBe('Today, 10:15');
+		expect(formatCompletedAt(at(2026, 10, 21, 18, 40), 'en-US', now)).toBe('Yesterday, 18:40');
+		expect(formatCompletedAt(at(2026, 10, 18, 9, 2), 'en-US', now)).toBe('Nov 18, 09:02');
+		expect(formatCompletedAt(at(2025, 10, 18, 9, 2), 'en-US', now)).toBe('Nov 18, 2025, 09:02');
+		expect(formatCompletedAt(at(2026, 10, 22, 10, 15), 'en-US', now, true)).toBe('today at 10:15');
+		expect(formatCompletedAt('not a date', 'en-US', now)).toBeNull();
+	});
 
 	it('uses localized relative dates and time conventions', () => {
 		vi.useFakeTimers();

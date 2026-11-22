@@ -7,7 +7,7 @@ const REMINDER_TITLE_MAX_LENGTH = 1024;
 const REMINDER_DESCRIPTION_MAX_LENGTH = 4096;
 // The identity and repeat comments Crate writes on a reminder line. In a title
 // they are read back as metadata, which can hide the reminder.
-const CRATE_LINE_MARKER = /<!--\s*crate-(?:id|rule):/;
+const CRATE_LINE_MARKER = /<!--\s*crate-(?:id|rule|done):/;
 
 export class ReminderInputError extends Error {
 	constructor(readonly field: string, message: string) {

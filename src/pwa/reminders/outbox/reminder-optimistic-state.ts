@@ -24,9 +24,9 @@ export function predictSavedReminder(id: string, input: ReminderMutationBody, pr
 	};
 }
 
-export function predictReminderCompletion(reminder: ReminderRecord, completed: boolean): ReminderRecord {
-	const plan = planReminderCompletion(reminder, completed);
-	return { ...reminder, completed: plan.completed, dueDate: plan.dueDate, dueDatetime: plan.dueDatetime, recurrence: plan.recurrence };
+export function predictReminderCompletion(reminder: ReminderRecord, completed: boolean, completedAt?: string): ReminderRecord {
+	const plan = planReminderCompletion(reminder, completed, completedAt);
+	return { ...reminder, completed: plan.completed, completedAt: plan.completedAt, dueDate: plan.dueDate, dueDatetime: plan.dueDatetime, recurrence: plan.recurrence };
 }
 
 /** Render pending changes over confirmed data; rollback never restores an old list snapshot. */

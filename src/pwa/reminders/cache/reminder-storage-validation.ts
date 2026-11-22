@@ -5,6 +5,7 @@ import type { RecurrenceRule } from '@/reminders/core/model';
 import type { ModalDraft, ModalPickerId, ReminderRecord } from '../types';
 import { isSyncPath } from '@/protocol/sync-validation';
 import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-paths';
+import { isCompletionInstant } from '@/reminders/core/completionMetadata';
 
 const prioritySchema = v.picklist([1, 4]);
 // Validate existing metadata without normalizing or replacing the stored value.
@@ -27,6 +28,7 @@ export const reminderRecordSchema = v.object({
 	content: v.string(),
 	project: v.string(),
 	completed: v.boolean(),
+	completedAt: v.optional(v.custom<string>(isCompletionInstant)),
 	priority: prioritySchema,
 	filePath: v.pipe(v.string(), v.check(value => isMarkdownPath(value) && isSyncPath(value))),
 	description: optionalString,
