@@ -50,7 +50,7 @@ async function listEncrypted(): Promise<unknown> {
 		return { path, sealed: await sealFile({ path, content: new TextEncoder().encode(content), publicData: { version: 1, reminders: [] } }, authority) };
 	}));
 	// The server lists the notes by their tags, in tag order.
-	const files = (await Promise.all(sealed.map(async ({ path, sealed }) => ({ path: await paths.wire(path), hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash }))))
+	const files = (await Promise.all(sealed.map(async ({ path, sealed }) => ({ path: await paths.wire(path), hash: sealed.hash, size: sealed.bytes.length, revision: sealed.hash, modified: '2026-11-22T00:00:00.000Z' }))))
 		.sort((a, b) => a.path.localeCompare(b.path));
 	const fetch = async (route: string, init?: RequestInit) => {
 		if (route !== '/reminders/encrypted-files/download') {

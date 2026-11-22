@@ -42,10 +42,10 @@ export const OWN_FIRST_UPLOAD_UNFINISHED = 'The first upload of this vault has n
 
 type ImportManifest = Pick<LocalManifest, 'getEntry' | 'getInitialImportToken'>;
 
-/** Without the token, an import is this device's only while it has uploaded nothing: this
- * device saves the token before its first upload. */
-function importIsEmpty(remote: Record<string, FileEntry>): boolean {
-	return Object.keys(remote).length === 0;
+/** Without the token, an import is this device's only while it holds every server file's
+ * revision: the import is empty, or this device replaced the server files itself. */
+function holdsServerFiles(remote: Record<string, FileEntry>, manifest: Pick<ImportManifest, 'getEntry'>): boolean {
+	return Object.entries(remote).every(([path, entry]) => !!entry.revision && manifest.getEntry(path)?.revision === entry.revision);
 }
 
 /** Resuming a first upload prunes server files the importing device lacks, so
@@ -56,7 +56,7 @@ export async function assertNoOpenInitialImport(
 ): Promise<void> {
 	const session = await api.initialImport?.begin();
 	if (session?.state !== 'importing') return;
-	const own = manifest.getInitialImportToken() === session.token || importIsEmpty((await api.getManifest()).files);
+	const own = manifest.getInitialImportToken() === session.token || holdsServerFiles((await api.getManifest()).files, manifest);
 	throw new Error(own ? OWN_FIRST_UPLOAD_UNFINISHED : FIRST_UPLOAD_UNFINISHED);
 }
 
@@ -90,7 +90,7 @@ export async function runInitialImport(context: ImportContext, result: SyncResul
 	const remote = await context.api.getManifest();
 	// Only the device that started an import prunes or replaces its files.
 	if (context.getImportToken() !== session.token) {
-		if (!importIsEmpty(remote.files)) throw new Error(ANOTHER_DEVICE_IMPORTING);
+		if (!holdsServerFiles(remote.files, transfer.localManifest)) throw new Error(ANOTHER_DEVICE_IMPORTING);
 		context.setImportToken(session.token);
 		await context.save();
 	}
