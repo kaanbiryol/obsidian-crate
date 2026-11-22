@@ -448,6 +448,17 @@ describe('reminder ID marker protection', () => {
 			expect(edit(doc, 0, { changes: { from: 0, to: textTo }, userEvent: 'delete.selection' }, textTo).text).toBe('\nNext');
 		});
 
+		it('keeps the comment closed when a selection from the end of a description reaches the next line', () => {
+			const textTo = block.length - ' -->'.length;
+			// Shift+Right twice from the end of the shown text, or a mouse selection to the next line's start.
+			for (const next of ['- [ ] Next <!-- crate-id:b -->', 'Next']) {
+				const doc = `${block}\n${next}`;
+				for (const userEvent of ['delete.selection', 'delete.cut', 'delete.forward']) {
+					expect(edit(doc, block.length + 1, { changes: { from: textTo, to: block.length + 1 }, userEvent }, textTo).text).toBe(doc);
+				}
+			}
+		});
+
 		it('takes a later reminder’s description along when a selection from a description covers its whole line', () => {
 			const later = '- [ ] Eggs <!-- crate-id:b -->\n<!-- crate-desc:Free range -->';
 			const doc = `${block}\n${later}\nNext`, textTo = block.length - ' -->'.length, laterEnd = block.length + 1 + later.indexOf('\n');

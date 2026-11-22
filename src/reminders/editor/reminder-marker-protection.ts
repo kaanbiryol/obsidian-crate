@@ -13,8 +13,8 @@ function breaksDescription(transaction: Transaction): boolean {
 		// An edit may also reach into the comment from the reminder's line above it.
 		const before = broken ? null : editableDescriptionAt(doc, fromA) ?? (toA > fromA ? editableDescriptionAt(doc, toA) : null);
 		// An edit starting where the comment ends is after it, one ending where it starts is before it,
-		// and one covering all of it removes it.
-		if (!before || toA > before.to || fromA === before.to || (fromA < before.from && (toA <= before.from || toA === before.to))) return;
+		// and one covering all of it removes it. One starting inside it and ending past it can join the next line onto it.
+		if (!before || (toA > before.to && fromA <= before.from) || fromA === before.to || (fromA < before.from && (toA <= before.from || toA === before.to))) return;
 		const reminder = transaction.newDoc.lineAt(transaction.changes.mapPos(before.reminder.from));
 		const after = editableDescription(transaction.newDoc, reminder);
 		broken = !after || after.to !== transaction.changes.mapPos(before.to, -1);
