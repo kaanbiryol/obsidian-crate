@@ -112,7 +112,8 @@ export async function queryReadingTags(session: ReadingSession, section: Reading
 export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
 	const page = await queryReadingItems(session, { section: 'inbox' });
 	if (new Set(page.items.map(item => item.crate_reading_id)).size !== page.items.length) throw new Error('Reading library response is unreadable.');
-	await removeEarlierSessionCopies(session);
+	// Best effort: a failed cleanup must not hide a library the server just returned.
+	await removeEarlierSessionCopies(session).catch(() => {});
 	return { items: page.items, issues: page.issues, savedAt: Date.now(), cursor: page.cursor };
 }
 

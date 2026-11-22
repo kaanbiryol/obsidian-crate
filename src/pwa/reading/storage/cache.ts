@@ -65,8 +65,10 @@ export async function removeEarlierSessionCopies(session: ReadingSession): Promi
 		for (const key of await tx.store.getAllKeys()) {
 			if (isArticleImageReadingKey(key)) { images.push(key.slice('article-image:'.length)); continue; }
 			if (!isArticleReadingKey(key)) continue;
+			// Only earlier sessions' copies can go, so this session's are never read or decrypted.
+			if (key.startsWith(mine)) { copies.push(key.slice('article:'.length)); continue; }
 			const copy = readableCopy(key, await tx.store.get(key));
-			if (copy && !key.startsWith(mine)) await tx.store.delete(key);
+			if (copy) await tx.store.delete(key);
 			else copies.push(key.slice('article:'.length));
 		}
 		for (const image of images) if (!copies.some(copy => image.startsWith(`${copy}:`))) await tx.store.delete(`article-image:${image}`);

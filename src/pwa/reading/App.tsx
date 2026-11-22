@@ -193,11 +193,13 @@ function ReadingNotices({ recovery, error, showError, connectionText, retrying, 
 	</>;
 }
 
-/** The articles saved on this device, read again when the app goes offline or a copy is saved or removed. */
+/** The articles saved on this device, read only while the library shows them: offline, read-only
+ * or unreachable. Read again when a copy is saved or removed. */
 function useOfflineReadingItems(session: ReadingSession | null, offline: boolean, savedChanged: unknown): ReadingItem[] {
 	const [items, setItems] = useState<ReadingItem[]>([]);
 	useEffect(() => {
-		if (!session) { setItems([]); return; }
+		// Each read decrypts every saved copy, so skip it while the server's library is shown.
+		if (!session || !offline) { setItems([]); return; }
 		let active = true;
 		readOfflineReadingItems(session).then(next => { if (active) setItems(next); }, () => { if (active) setItems([]); });
 		return () => { active = false; };

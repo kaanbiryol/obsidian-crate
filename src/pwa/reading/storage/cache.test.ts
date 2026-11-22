@@ -64,6 +64,15 @@ it('removes only readable copies an earlier sign-in saved, never queues, drafts 
 	expect([...values.keys()].filter(key => !key.startsWith('article:')).sort()).toEqual([`attempt:${session.id}:a`, `draft:${session.id}`, `pending:${session.id}`].sort());
 });
 
+it('never reads this session\'s copies while removing earlier ones', async () => {
+	await cacheReadingArticle(session, item(1), 'Mine');
+	const read = vi.spyOn(values, 'get');
+	await removeEarlierSessionCopies(session);
+	expect(read.mock.calls.map(([key]) => key)).not.toContain(articleKey(1));
+	expect(articleKeys()).toEqual([articleKey(1)]);
+	read.mockRestore();
+});
+
 it('refreshes only copies the user saved', async () => {
 	expect(await cacheReadingArticle(session, item(1), 'Online text', { refresh: true, etag: '"e"' })).toBe(false);
 	expect(values.has(articleKey(1))).toBe(false);
