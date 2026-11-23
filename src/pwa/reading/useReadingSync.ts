@@ -18,7 +18,7 @@ const FETCH_CHECKS_MS = [2_000, 5_000, 10_000, 20_000, 40_000, 80_000];
 const FETCH_WATCH_AGE_MS = 10 * 60_000;
 
 /** When the list next checks on a link it first listed as fetching at `since`, or Infinity. */
-export function nextFetchCheck(since: number, now: number): number {
+function nextFetchCheck(since: number, now: number): number {
 	for (const delay of FETCH_CHECKS_MS) if (since + delay > now) return since + delay;
 	return Infinity;
 }
