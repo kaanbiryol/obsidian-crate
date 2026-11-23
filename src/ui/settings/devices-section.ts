@@ -98,7 +98,7 @@ export function renderDevicesSection(context: Omit<SettingsSectionContext, 'rere
 					} catch (error) {
 						log.warn(`Could not remove ${label}:`, errorMessage(error));
 						if (isActive()) {
-							new Notice('Failed to remove device');
+							new Notice(`Failed to remove device. Check your server connection, then try again. Details: ${errorMessage(error)}`, 10000);
 							button.setDisabled(false);
 						}
 					}

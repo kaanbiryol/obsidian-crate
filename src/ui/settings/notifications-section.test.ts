@@ -400,7 +400,7 @@ describe('renderNotificationsSection', () => {
 		// Before: the old rows stayed, with one more error line per failed refresh.
 		const list = containerEl.querySelector('.crate-push-subscriptions')!;
 		expect(list.collectText()).not.toContain('iPhone');
-		expect(list.collectText().match(/Failed to load subscriptions\./g)).toHaveLength(1);
+		expect(list.collectText().match(/Failed to load subscriptions\. Check your server connection/g)).toHaveLength(1);
 		expect(getSettingByName('Test notification').buttons[0]?.buttonEl.classNames.has('is-disabled')).toBe(true);
 	});
 

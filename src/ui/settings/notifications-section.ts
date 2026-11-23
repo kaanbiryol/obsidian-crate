@@ -158,8 +158,8 @@ function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, api
 					} else {
 						new Notice('No enabled devices found. Enable notifications in the web app first.');
 					}
-				} catch {
-					new Notice('Failed to send test notification');
+				} catch (error) {
+					new Notice(`Failed to send test notification. Check your server connection, then try again. Details: ${errorMessage(error)}`, 10000);
 				} finally {
 					if (isActive()) button.setButtonText('Send test').setDisabled(enabledCount === 0);
 				}
@@ -209,12 +209,12 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin, ap
 					});
 				});
 		}
-	} catch {
+	} catch (error) {
 		if (!isActive()) return;
 		container.empty();
 		onCount(0);
 		container.createEl('p', {
-			text: 'Failed to load subscriptions.',
+			text: `Failed to load subscriptions. Check your server connection, then reopen Crate settings. Details: ${errorMessage(error)}`,
 			cls: 'setting-item-description',
 		});
 	}
