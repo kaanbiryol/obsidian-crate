@@ -87,7 +87,7 @@ export async function diagnose(probes) {
 		check(least < LOW_DISK_BYTES ? 'fail' : 'pass', 'Disk space', `${(least / 1024 ** 3).toFixed(1)} GB free${least < LOW_DISK_BYTES ? '. Free some space so sync and backups keep working.' : '.'}`);
 	}
 	const sleep = await probes.sleepMinutes();
-	if (sleep && !(managed && service.keepAwake)) check('warn', 'Sleep', `This Mac sleeps after ${sleep} minutes idle, which pauses sync. Run ${probes.command('service --keep-awake')}, or change it in System Settings → Energy.`);
+	if (sleep && !(managed && service.keepAwake)) check('warn', 'Sleep', `This Mac sleeps after ${sleep} minute${sleep === 1 ? '' : 's'} idle, which pauses sync. Run ${probes.command('service --keep-awake')}, or change it in System Settings → Energy.`);
 	return checks;
 }
 

@@ -210,7 +210,9 @@ npm run server -- add-device --name "My phone" --data-dir /path/to/crate-data
 npm run server -- start --data-dir /path/to/crate-data
 ```
 
-Stop the server with **Ctrl+C** before issuing another token, then restart it.
+To connect another device while the server runs, use
+`npm run server -- pair --name "My phone"`. **add-device** opens the data
+directly, so stop the server with **Ctrl+C** first, then restart it.
 Existing devices keep their credentials. Administrative commands do not run
 reminder alarms. An exclusive directory lock prevents multiple server or
 administration processes from opening the same data simultaneously.

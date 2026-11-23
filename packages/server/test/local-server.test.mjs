@@ -488,7 +488,7 @@ test('a raised file limit reaches the Worker and its upload timeout', { timeout:
 		const info = await (await runtime.mf.dispatchFetch('http://localhost:8787/.well-known/crate')).json();
 		assert.deepEqual(info.limits.maxFileBytes, maxFileBytes);
 		assert.equal(info.limits.batch.uploadFiles, 100);
-		assert.equal(info.protocol.oldestCompatible, 2);
+		assert.equal(info.protocol.oldestCompatible, 1);
 		assert.equal(server.requestTimeout, 400_000);
 	} finally {
 		await new Promise(resolve => server.close(resolve));
