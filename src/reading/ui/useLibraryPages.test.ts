@@ -2,7 +2,7 @@ import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { renderHook } from '../../test/react-hooks';
 import type { ReadingItem } from '../core/model';
-import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
+import { createLibraryPageCache, prefetchLibrarySection, useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
 
 const item = { crate_reading_id: 'found', title: 'Found' } as ReadingItem;
 
@@ -286,4 +286,42 @@ it('never renders a loading state when returning to a section read before', asyn
 		expect(renders).toEqual(renders.map(() => ({ section: 'inbox', loading: false })));
 		expect(load).toHaveBeenCalledTimes(2);
 	} finally { vi.useRealTimers(); }
+});
+
+it('shows a prefetched section at once and reloads it only for a new revision', async () => {
+	const load = vi.fn(async () => ({ items: [item], cursor: null }));
+	const loadTags = vi.fn(async () => [{ name: 'tag', count: 1 }]);
+	const cache = createLibraryPageCache();
+	let revision = 1;
+	const source = () => ({ load, loadTags, revision, present: (items: ReadingItem[]) => items, cache });
+	await prefetchLibrarySection(source(), 'favorites');
+	// A second prefetch finds the section and asks nothing.
+	await prefetchLibrarySection(source(), 'favorites');
+	expect(load).toHaveBeenCalledTimes(1);
+	expect(loadTags).toHaveBeenCalledTimes(1);
+	const hook = renderHook(() => useLibraryPages(source(), 'favorites', '', null));
+	// The list mounts with the prefetched page instead of a loading state.
+	expect(hook.current).toMatchObject({ items: [item], loading: false, answered: true });
+	await flush();
+	expect(load).toHaveBeenCalledTimes(1);
+	// A new library keeps the page on screen while it reloads.
+	revision = 2;
+	hook.rerender();
+	expect(hook.current.items).toEqual([item]);
+	await flush();
+	expect(load).toHaveBeenCalledTimes(2);
+});
+
+it('keeps pages the list read while a prefetch was answering', async () => {
+	const cache = createLibraryPageCache();
+	let answer!: () => void;
+	const slow = vi.fn(() => new Promise<{ items: ReadingItem[]; cursor: string | null }>(resolve => { answer = () => resolve({ items: [], cursor: null }); }));
+	const prefetch = prefetchLibrarySection({ load: slow, loadTags: async () => [], revision: 1, present: items => items, cache }, 'archived');
+	const read = { crate_reading_id: 'read', title: 'Read' } as ReadingItem;
+	const hook = renderHook(() => useLibraryPages({ load: async () => ({ items: [read], cursor: null }), loadTags: async () => [], revision: 1, present: items => items, cache }, 'archived', '', null));
+	await flush();
+	answer();
+	await prefetch;
+	expect(cache.pages.get(JSON.stringify(['archived', '', null]))?.items).toEqual([read]);
+	expect(hook.current.items).toEqual([read]);
 });

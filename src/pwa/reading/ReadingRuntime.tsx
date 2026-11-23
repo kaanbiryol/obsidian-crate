@@ -16,6 +16,12 @@ import { readingEncryptionKeys, readingNoteFolder } from './session/encryption-s
 import { readingNeedsAttention } from './outbox';
 import { ShortcutSetup } from './ShortcutSetup';
 import { ReadingSettingsIssues } from './ReadingSettingsIssues';
+import { readingConnectionView } from './connection-view';
+import { useReadingLibrarySource } from './useReadingLibrarySource';
+import { usePwaPreferences } from '../settings/usePwaPreferences';
+import type { DockTab } from '../settings/dock-preferences';
+
+const NO_DOCK_TABS: DockTab[] = [];
 
 function useReadingController() {
 	const enabled = useSharedFeatures().reading;
@@ -23,9 +29,15 @@ function useReadingController() {
 	const app = useAppConnection();
 	const connection = useReadingSession(app.reading);
 	const { session, lockedSession, ready, connecting, cache, pending, error, recovery, connectionState,
-		adding, connect, resetSession, refreshRecovery, publishPending } = connection;
+		adding, connect, resetSession, refreshRecovery, publishPending, readOnly, libraryFailed } = connection;
 	useConnectionReset(resetSession);
 	const { refresh, refreshManually, syncing, syncedSession, isOffline, retryAt } = useReadingSync(connection, enabled);
+	// A refresh made offline read no library, so reconnecting loads one instead of listing an empty inbox.
+	const library = cache?.offline ? null : cache;
+	const { savedOnly } = readingConnectionView({ isOffline, readOnly, hasSession: !!session, hasCache: !!library, libraryFailed, error, connectionState });
+	const { dockTabs } = usePwaPreferences().preferences;
+	// A paused Reading feature prefetches nothing.
+	const librarySource = useReadingLibrarySource({ session, savedOnly, library, pending, dockTabs: enabled ? dockTabs : NO_DOCK_TABS });
 	const { saving, preparingChange, canApplyUpdate, queueChange, saveLink, updateItem, retryArticle, deleteItem } = useReadingMutations(connection, { refresh, showToast });
 	const [, setSettingsOpen] = useSettingsOpen();
 	const previousSession = useRef(session);
@@ -66,7 +78,7 @@ function useReadingController() {
 		issues,
 	});
 
-	return { connection, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, claimFailure, saving, queueChange, saveLink, updateItem, retryArticle, deleteItem };
+	return { connection, librarySource, sync: { refresh, refreshManually, syncing, syncedSession, isOffline }, showToast, claimFailure, saving, queueChange, saveLink, updateItem, retryArticle, deleteItem };
 }
 const ReadingRuntimeContext = createContext<ReturnType<typeof useReadingController> | null>(null);
 export function ReadingRuntimeProvider({ children }: { children: ReactNode }) {

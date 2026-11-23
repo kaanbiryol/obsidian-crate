@@ -36,8 +36,6 @@ import { useSharedFeatures } from '../shared-features';
 import { pendingReadingHighlights, readerStatus, readingItemSyncStatus } from './reader-feedback';
 import { useReaderSyncFeedback } from './useReaderSyncFeedback';
 import type { PendingReading } from './outbox';
-import type { ReadingLibrarySource } from '@/reading/ui/useLibraryPages';
-import { queryReadingItems, queryReadingTags } from './api';
 import { readOfflineReadingItems } from './storage/storage';
 import type { ReadingItem } from '@/reading/core/model';
 import type { ReadingSession } from './session/session';
@@ -54,7 +52,7 @@ function ReadingAppContent() {
 	const captureFormId = useId();
 	const featureNavigation = useContext(FeatureNavigationContext);
 	const active = featureNavigation?.active !== false;
-	const { connection, sync, showToast, claimFailure, saving, saveLink, updateItem, retryArticle, deleteItem } = useReadingRuntime();
+	const { connection, librarySource: source, sync, showToast, claimFailure, saving, saveLink, updateItem, retryArticle, deleteItem } = useReadingRuntime();
 	const { session, readOnly, ready, connecting, cache, pending, error, libraryFailed, recovery, connectionState, adding, url, setUrl, run, connect,
 		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture, sharedLinkReady, takeSharedLink } = connection;
 	const { refreshManually, isOffline } = sync;
@@ -74,16 +72,6 @@ function ReadingAppContent() {
 	const offlineItems = useOfflineReadingItems(session, savedOnly, reader?.availableOffline);
 	const confirmedItems = savedOnly ? offlineItems ?? NO_ITEMS : library?.items;
 	const visibleItems = useMemo(() => presentReadingItems(confirmedItems ?? [], pending), [confirmedItems, pending]);
-	const source = useMemo<ReadingLibrarySource | undefined>(() => session && !savedOnly && library ? {
-		load: async ({ section, q, tag, cursor }) => {
-			// The sync just read the first inbox page; the library shows it without asking again.
-			if (section === 'inbox' && !q.trim() && !tag && !cursor) return { items: library.items, cursor: library.cursor ?? null };
-			const page = await queryReadingItems(session, { section, q, tag: tag ?? undefined, cursor: cursor ?? undefined });
-			return { items: page.items, cursor: page.cursor };
-		},
-		loadTags: section => queryReadingTags(session, section),
-		revision: library, present: items => presentReadingItems(items, pending),
-	} : undefined, [session, savedOnly, library, pending]);
 	// A shared link saves at once, like the iPhone shortcut. Its draft keeps it until
 	// the save succeeds, and a failure opens the form with the error beside the link.
 	useEffect(() => {
