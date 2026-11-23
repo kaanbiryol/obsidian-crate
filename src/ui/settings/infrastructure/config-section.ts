@@ -6,7 +6,7 @@ import { isCloudflareServerUpdateAvailable } from '../../../cloudflare/deploymen
 import { startCloudflareDeployment } from '../../../plugin/cloudflare/operations';
 import { disconnectDevice } from '../../../plugin/sync-connection';
 import { openConfirmationModal } from '../../plugin/confirmation-modal';
-import { createSettingsSectionHeading, type SettingsSectionContext } from '../section-helpers';
+import { createSettingsSectionHeading, createSettingsSubsectionHeading, type SettingsSectionContext } from '../section-helpers';
 import { renderSelfHostedSetting, renderSelfHostedAddressSetting } from './self-hosted-setting';
 import { openExternalBrowserModal } from '../external-browser-modal';
 import { SECRET_KEYS } from '../../../platform/secret-keys';
@@ -24,6 +24,7 @@ export function renderConfigSection(context: SettingsSectionContext, showHeading
 	if (!isConfigured) {
 		const rememberedServer = Boolean(deployment?.accountId && deployment.d1DatabaseId);
 		const connectionLabel = rememberedServer ? 'Reconnect' : 'Connect with Cloudflare';
+		createSettingsSubsectionHeading(containerEl, 'Cloudflare');
 		new Setting(containerEl)
 			.setName(connectionLabel)
 			.setDesc(rememberedServer
@@ -37,16 +38,20 @@ export function renderConfigSection(context: SettingsSectionContext, showHeading
 				.onClick(() => {
 					void startCloudflareDeployment(plugin);
 				}));
+		renderServerBackupSetting(context);
+		if (!deployment) {
+			createSettingsSubsectionHeading(containerEl, 'Self-hosted');
+			renderSelfHostedSetting(context);
+		}
+		createSettingsSubsectionHeading(containerEl, 'Another device');
 		let pairingLink = '';
 		new Setting(containerEl)
 			.setName('Pairing link')
-			.setDesc('Paste the pairing link from your other device.')
+			.setDesc('Paste the pairing link from a device that is already connected.')
 			.addText(text => text.setPlaceholder('Pairing link').onChange(value => { pairingLink = value; }))
 			.addButton(button => button.setButtonText('Connect').onClick(() => {
 				void import('../../../plugin/device-pairing').then(({ handleDevicePairingLink }) => handleDevicePairingLink(plugin, pairingLink));
 			}));
-		renderSelfHostedSetting(context);
-		renderServerBackupSetting(context);
 	}
 }
 
