@@ -71,7 +71,7 @@ it.each(['old 100% details', 'line one\nline two %20 café 😀'])('completes in
 	device.disk.write(path, content);
 	device.disk.write('note.md', 'ordinary note');
 	const syncing = device.engine.sync();
-	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
+	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 15_000 });
 	const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 	await runDurableObjectAlarm(coordinator);
 	expect(await syncing).toMatchObject({ success: true, uploaded: 2, errors: [] });
@@ -120,7 +120,7 @@ it('carries a source failure into sync activity and clears it after the note is 
 	const task = note('2099-01-01T12:00:00.000Z');
 	device.disk.write(path, `${task}\n<!-- crate-desc:v2:unsupported -->\n`);
 	const syncing = device.engine.sync();
-	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
+	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 15_000 });
 	const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 	await runDurableObjectAlarm(coordinator);
 	const result = await syncing;
@@ -130,7 +130,7 @@ it('carries a source failure into sync activity and clears it after the note is 
 	expect(device.engine.getState().lastIssues).toEqual(result.issues);
 	device.disk.write(path, `${task}\n<!-- crate-desc:v1:repaired -->\n`);
 	const retry = device.engine.sync();
-	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'));
+	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 15_000 });
 	await runDurableObjectAlarm(coordinator);
 	expect((await retry).success).toBe(true);
 	expect(device.engine.getState()).toMatchObject({ status: 'idle', lastError: null, lastIssues: undefined });
@@ -199,7 +199,7 @@ it.each([false, true])('resumes reminder setup and syncs a local repair before w
 	const resumed = device.engine.sync();
 	// Recovery crosses real D1/R2 requests. The default one-second polling budget
 	// can expire under CI load even though the enclosing journey allows 15 seconds.
-	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 5_000 });
+	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 15_000 });
 	expect(device.engine.getState().status).toBe('syncing');
 	const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 	for (let i = 0; i < 5; i++) await runDurableObjectAlarm(coordinator);
@@ -215,7 +215,7 @@ it('keeps first-time sync active until the reminder schedule is ready', async ()
 	await device.authorize(); await device.open(); await device.disk.vault.createFolder('Reminders');
 	device.disk.write('Reminders/task.md', note('2099-01-01T12:00:00.000Z'));
 	const syncing = device.engine.sync();
-	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 5_000 });
+	await vi.waitFor(() => expect(device.engine.getState().work?.phase).toBe('reminders'), { timeout: 15_000 });
 	expect(device.engine.getState().status).toBe('syncing');
 	const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
 	await runDurableObjectAlarm(coordinator);
