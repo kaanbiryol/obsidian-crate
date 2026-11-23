@@ -8,16 +8,22 @@ import { pairingLink, terminalQr } from '../local-server-qr.mjs';
 
 /** @typedef {import('../local-server-options.mjs').Command} Command */
 
-/** Prints a link and QR code that connect Obsidian in one step, and the code for pasting.
+/** A link and QR code that connect Obsidian in one step, and the code for pasting.
+ * Callers print the server address first, so the code can refer to it.
  * @param {{ code: string }} pairing @param {string} origin */
-export function printPairing(pairing, origin) {
+export function formatPairing(pairing, origin) {
 	const link = pairingLink(origin, pairing.code);
 	// A loopback address means the phone itself, so a QR code could never reach this server.
 	const local = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(origin).hostname);
 	const open = local
-		? `This address only works on this computer. Open the link here:\n${link}`
-		: `On a phone or tablet, scan this code with the camera. On a computer, open the link:\n${terminalQr(link)}\n${link}`;
-	console.log(`\nConnect Obsidian (single use, expires in 10 minutes). Keep this private.\n${open}\nOr paste the server address and this pairing code into Crate → Connect to your server:\n${pairing.code}\n`);
+		? `This address only works on this computer. Open this link here:\n${link}`
+		: `Scan this with your phone's camera, or open the link on a computer:\n${terminalQr(link)}\n${link}`;
+	return `\nConnect Obsidian. This code works once, for 10 minutes. Keep it private.\n${open}\nOr in Crate → Connect to your server, paste the address above and this code:\n${pairing.code}\n`;
+}
+
+/** @param {{ code: string }} pairing @param {string} origin */
+export function printPairing(pairing, origin) {
+	console.log(formatPairing(pairing, origin));
 }
 
 /** Uses the running server's control socket, or opens the stopped server's data.
