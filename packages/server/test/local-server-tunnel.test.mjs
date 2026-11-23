@@ -134,7 +134,7 @@ if (args.includes('run')) {
 	async function launch(args) {
 		await rm(`${paths.config}.pid`, { force: true });
 		child = spawn(process.execPath, [cli, ...args, '--data-dir', dataDir], {
-			stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+			stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, CRATE_PAIR_BEFORE_READY: '1' },
 		});
 		const exited = once(child, 'exit');
 		let output = '';

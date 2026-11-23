@@ -68,7 +68,7 @@ setInterval(() => {}, 1000);
 	t.after(async () => { if (child?.exitCode === null) { child.kill('SIGTERM'); await exited; } });
 	async function launch(args = []) {
 		child = spawn(process.execPath, [cli, ...args, '--data-dir', dataDir], { cwd: directory,
-			env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, stdio: ['ignore', 'pipe', 'pipe'] });
+			env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, CRATE_PAIR_BEFORE_READY: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
 		exited = once(child, 'exit');
 		let output = '';
 		let errors = '';

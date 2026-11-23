@@ -43,6 +43,8 @@ setInterval(() => {}, 1000);
 `, { mode: 0o755 });
 	await writeFile(override, JSON.stringify({ services: { crate: {
 		network_mode: 'none',
+		// The stand-in tunnel is never reachable, so show the first code without waiting.
+		environment: { CRATE_PAIR_BEFORE_READY: '1' },
 		volumes: [{ type: 'bind', source: connector, target: '/usr/local/bin/cloudflared', read_only: true }],
 		healthcheck: { interval: '1s', timeout: '5s', start_period: '1s', retries: 20 },
 	} } }));

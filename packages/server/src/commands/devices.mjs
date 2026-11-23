@@ -5,6 +5,7 @@ import { resolveServerOrigin, resolveStartMode } from '../local-server-options.m
 import { requestLocalControl, requestLocalPairing } from '../local-server-pairing.mjs';
 import { issueLocalDevice, listLocalDevices, openLocalRuntime, revokeLocalDevice } from '../local-server-runtime.mjs';
 import { pairingLink, terminalQr } from '../local-server-qr.mjs';
+import { bold } from '../local-server-style.mjs';
 
 /** @typedef {import('../local-server-options.mjs').Command} Command */
 
@@ -18,7 +19,7 @@ export function formatPairing(pairing, origin) {
 	const open = local
 		? `This address only works on this computer. Open this link here:\n${link}`
 		: `Scan this with your phone's camera, or open the link on a computer:\n${terminalQr(link)}\n${link}`;
-	return `\nConnect Obsidian. This code works once, for 10 minutes. Keep it private.\n${open}\nOr in Crate → Connect to your server, paste the address above and this code:\n${pairing.code}\n`;
+	return `\n${bold('Connect Obsidian')}. This code works once, for 10 minutes. Keep it private.\n${open}\nOr in Crate → Connect to your server, paste the address above and this code:\n${pairing.code}\n`;
 }
 
 /** @param {{ code: string }} pairing @param {string} origin */
@@ -78,7 +79,7 @@ export async function revoke({ dataDir, values }) {
 /** Asks the running server for a pairing code. @type {Command} */
 export async function pair({ dataDir, values }) {
 	const pairing = await requestLocalPairing(dataDir, values.name);
-	console.log(`Server address to paste into Obsidian: ${pairing.origin}`);
+	console.log(`Server address to paste into Obsidian: ${bold(pairing.origin)}`);
 	printPairing(pairing, pairing.origin);
 }
 

@@ -98,7 +98,7 @@ writeFileSync(process.env.FAKE_FUNNEL_PID, String(process.pid));
 	async function launch(args) {
 		await rm(pidFile, { force: true });
 		child = spawn(process.execPath, [cli, ...args, '--data-dir', dataDir], {
-			stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_FUNNEL_PID: pidFile },
+			stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_FUNNEL_PID: pidFile, CRATE_PAIR_BEFORE_READY: '1' },
 		});
 		const exited = once(child, 'exit');
 		let output = '';

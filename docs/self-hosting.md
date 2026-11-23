@@ -46,7 +46,8 @@ checksum-verified `cloudflared` are included. You do not need Node or npm on the
 host. From a checkout, `docker compose up -d --build` builds the same image from
 source instead.
 
-Logs show **Server address to paste into Obsidian**, a QR code and a link. Scan
+Logs show **Server address to paste into Obsidian**. Once that address works, a
+QR code and a link follow it. Scan
 the code with a phone, or open the link on a computer, and Obsidian connects the
 vault after you confirm. You can also enter the address and **Pairing code** in
 **Settings → Crate → Connect to your server**. Select **Sync now**, then
@@ -55,9 +56,9 @@ ten minutes and can be redeemed once. The long-lived device token is returned
 directly to Obsidian, not printed in the container's startup logs. Ctrl+C exits
 the log viewer while Crate continues running.
 
-Wait for **Ready: the public HTTPS address reaches this Crate server**. Until
-then, Crate reports that it is waiting for public access and retries DNS/tunnel
-checks. The check verifies this running instance, not just any successful web
+Wait for **Ready: the public HTTPS address reaches this Crate server**. The first
+connection code prints with it, so a code is never shown before it can work. Until
+then, Crate reports that it is checking the address and retries DNS/tunnel checks. The check verifies this running instance, not just any successful web
 response. It continues monitoring and reports loss of public access without
 restarting the tunnel or discarding data. A local Docker health check can pass
 while public access is still waiting.

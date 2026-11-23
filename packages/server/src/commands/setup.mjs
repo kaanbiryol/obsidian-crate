@@ -158,8 +158,8 @@ async function startAsService({ dataDir, signal, values }, keepAwake) {
 		}
 		ready ||= /^Ready: /m.test(shown);
 		paired ||= shown.includes('crate-pair-');
-		// The server prints the address after any first pairing code; existing devices mean none.
-		if (!paired && shown.includes('Server address to paste into Obsidian:') && await requestLocalControl(dataDir, 'GET', '/status').then(() => true, () => false)) {
+		// The server prints its first code with the ready line; existing devices mean none.
+		if (!paired && ready && shown.includes('Server address to paste into Obsidian:') && await requestLocalControl(dataDir, 'GET', '/status').then(() => true, () => false)) {
 			const pairing = await requestLocalPairing(dataDir, computerName().slice(0, 128));
 			printPairing(pairing, pairing.origin);
 			paired = true;

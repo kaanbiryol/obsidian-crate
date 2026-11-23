@@ -17,6 +17,7 @@ import { startTailscaleFunnel } from '../local-server-tailscale.mjs';
 import { readRemoteSettings, saveQuickSettings, startTunnel } from '../local-server-tunnel.mjs';
 import { migrateBeforeStart } from './data.mjs';
 import { formatPairing } from './devices.mjs';
+import { bold, dim, green } from '../local-server-style.mjs';
 import { buildIfSource, runWizardSetup, setupNamedTunnel, setupTailscale, wizardApplies } from './setup.mjs';
 
 /** @typedef {import('../local-server-options.mjs').Command} Command */
@@ -26,10 +27,43 @@ import { buildIfSource, runWizardSetup, setupNamedTunnel, setupTailscale, wizard
 
 const pairCommand = () => crateCommand(installKind(), 'pair --name "My phone"');
 
-/** @param {boolean} ready */
-function readinessChanged(ready) {
-	console.log(ready ? 'Ready: the public HTTPS address reaches this Crate server.'
-		: 'Checking that the address is reachable. This can take a few minutes the first time.');
+const READY = 'Ready: the public HTTPS address reaches this Crate server.';
+const CHECKING = 'Checking that the address is reachable. This can take a few minutes the first time.';
+// Tests serve through stand-in tunnels that never become reachable.
+const pairBeforeReady = process.env.CRATE_PAIR_BEFORE_READY === '1';
+
+/** Reports readiness changes and shows the first connection code only once the address
+ * works, since a code scanned earlier fails and expires while Tailscale or DNS catches up.
+ * The code prints in the same write as the ready line, so setup's log follower sees both.
+ * @param {boolean} [reachable] True when there is no public address to wait for. */
+export function readinessReport(reachable = pairBeforeReady) {
+	let ready = reachable;
+	/** @type {(() => string) | null} */
+	let pending = null;
+	return {
+		/** @param {boolean} next */
+		changed(next) {
+			ready = next || pairBeforeReady;
+			const code = next && pending ? pending() : '';
+			if (next) pending = null;
+			console.log(`${next ? green(READY) : dim(CHECKING)}${code}`);
+		},
+		/** Returns the code to print now, or holds it until the address works.
+		 * @param {() => string} text */
+		pair(text) {
+			if (ready) return text();
+			pending = text;
+			return '';
+		},
+		get waiting() { return Boolean(pending); },
+	};
+}
+
+/** What to expect under the address: the connection code, a wait for it, or nothing new.
+ * @param {boolean} pairing @param {boolean} waiting */
+function addressStatus(pairing, waiting) {
+	if (!pairing) return 'Devices you connected before still work. If this address is new, select Server details → Update server address in Crate.\n';
+	return waiting ? `${dim('The connection code appears below once the address works.')}\n` : '';
 }
 
 /** The tips and footer printed under the address and any pairing code.
@@ -41,8 +75,8 @@ async function startFooter({ dataDir, docker, listener, addressTip }) {
 		backups ? `Daily backups go to ${backups.dir}.` : `Daily backups are off. Turn them on with: ${crateCommand(installKind(), 'auto-backup --output PATH')}`,
 		`Add another device with: ${pairCommand()}`,
 		`Data: ${dataDir}. Internal listener (diagnostics only): ${listener}`,
-	].filter(Boolean).map(tip => `- ${tip}`);
-	return `Good to know:\n${tips.join('\n')}\n\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Keep this terminal open. Press Ctrl+C to stop safely.'}`;
+	].filter(Boolean).map(tip => dim(`- ${tip}`));
+	return `${bold('Good to know')}\n${tips.join('\n')}\n\n${docker ? 'Crate runs in the background. Stop it with docker compose stop.' : 'Keep this terminal open. Press Ctrl+C to stop safely.'}`;
 }
 
 /** Runs setup and start. Setup first saves a stable address when one is asked for or
@@ -85,15 +119,17 @@ export async function start(context, resources) {
 async function serveQuickTunnel({ command, values, dataDir, docker, signal, stopped }, port, resources, maxFileBytes) {
 	console.log('Starting Crate on a temporary Cloudflare address. Your files stay on this computer.');
 	if (command === 'setup') await buildIfSource(signal);
-	const quickServer = resources.quickServer = await startQuickServer({ dataDir, port, name: values.name, signal, onReadiness: readinessChanged, maxFileBytes });
+	const report = readinessReport();
+	const quickServer = resources.quickServer = await startQuickServer({ dataDir, port, name: values.name, signal, onReadiness: ready => report.changed(ready), maxFileBytes });
 	await saveQuickSettings(dataDir, port);
 	const origin = quickServer.runtime.origin;
 	const listener = `127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (quickServer.server.address()).port}`;
 	const addressTip = `This address changes each time Crate restarts, and the web app then needs a new setup link. ${docker
 		? 'For a permanent address, see "Stable address without a domain: Tailscale Funnel" in the self-hosting guide.'
 		: `For a permanent address, run: ${crateCommand(installKind(), 'setup --tailscale')}`}`;
-	console.log(`\nServer address to paste into Obsidian: ${origin}\n${quickServer.pairingCode ? formatPairing(quickServer.pairingCode, origin)
-		: 'Devices you connected before still work. In Crate, select Server details → Update server address and paste the address above.\n'}\n${await startFooter({ dataDir, docker, listener, addressTip })}`);
+	const code = quickServer.pairingCode;
+	const shown = code ? report.pair(() => formatPairing(code, origin)) : '';
+	console.log(`\nServer address to paste into Obsidian: ${bold(origin)}\n${shown}${addressStatus(Boolean(code), report.waiting)}\n${await startFooter({ dataDir, docker, listener, addressTip })}\n`);
 	const result = await Promise.race([stopped.then(() => null), quickServer.tunnel.exited, quickServer.runtime.failed]);
 	if (result && !signal.aborted) throw new Error(`Cloudflare Quick Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Restart Crate to get a new address.`);
 }
@@ -113,15 +149,17 @@ async function serve({ values, dataDir, docker, signal, stopped }, { remote, tai
 	const control = resources.control = await startLocalControl({ dataDir, pairing, origin, runtime });
 	/** @type {{ count: number }} */
 	const existing = await runtime.db.prepare("SELECT COUNT(*) AS count FROM auth_tokens WHERE scope = 'vault'").first();
-	const firstPairing = existing.count === 0 ? pairing.issue(values.name?.trim() || computerName().slice(0, 128)) : null;
+	const pairNew = existing.count === 0;
 	signal.throwIfAborted();
 	/** @type {import('../local-server-process.mjs').StartedProcess | undefined} */
 	let tunnel;
 	if (remote) tunnel = resources.tunnel = tailscale ? await startTailscaleFunnel(remote, signal) : await startTunnel(dataDir, remote, signal);
-	// One write, so setup's log follower sees the pairing code together with the address.
-	console.log(`\nServer address to paste into Obsidian: ${runtime.origin}\n${firstPairing ? formatPairing(firstPairing, origin) : ''}\n${await startFooter({ dataDir, docker, listener: `${host}:${port}` })}`);
+	const report = readinessReport(!origin.startsWith('https://') || pairBeforeReady);
+	// Issued when shown, so its 10 minutes start once the address works.
+	const shown = pairNew ? report.pair(() => formatPairing(pairing.issue(values.name?.trim() || computerName().slice(0, 128)), origin)) : '';
+	console.log(`\nServer address to paste into Obsidian: ${bold(runtime.origin)}\n${shown}${addressStatus(pairNew, report.waiting)}\n${await startFooter({ dataDir, docker, listener: `${host}:${port}` })}\n`);
 	if (origin.startsWith('https://')) {
-		resources.readiness = monitorPublicReadiness({ origin, instance, signal, onChange: ready => { control.onReadiness(ready); readinessChanged(ready); } });
+		resources.readiness = monitorPublicReadiness({ origin, instance, signal, onChange: ready => { control.onReadiness(ready); report.changed(ready); } });
 	}
 	if (remote) console.log(tailscale ? 'Tailscale Funnel is starting. The first time, approve Funnel at the link Tailscale prints; a new address can take up to 10 minutes to work.'
 		: 'The tunnel is starting. A new address can take a few minutes to work.');
