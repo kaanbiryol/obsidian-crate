@@ -29,8 +29,13 @@ it('stores the recovered vault keys once for every feature', async () => {
 });
 it('rejects another vault before persisting any keys', async () => {
 	const f = await fixture(); f.expected.vaultId = crypto.randomUUID();
-	await expect(rememberRecoveryKey(f.code, f.expected, () => true)).rejects.toThrow('does not match');
+	await expect(rememberRecoveryKey(f.code, f.expected, () => true)).rejects.toThrow('doesn’t unlock this vault');
 	expect(rememberVaultKeys).not.toHaveBeenCalled();
+});
+it.each(['mistyped', 'wrong'])('explains a %s recovery key with a next step', async kind => {
+	const f = await fixture();
+	f.code = kind === 'mistyped' ? f.code.slice(0, -2) : await generateRecoveryCode();
+	await expect(rememberRecoveryKey(f.code, f.expected, () => true)).rejects.toThrow('copy the Recovery key again');
 });
 it.each(['reminders', 'reading', 'caller'])('stops a stale import when the %s session changes', async feature => {
 	const f = await fixture(); let active = true;
