@@ -18,7 +18,7 @@ import { assertFunnelPortFree, currentTailscaleHostname, findTailscale, tailscal
 import { ensureCloudflared, normalizeTunnelHostname, saveTailscaleSettings, setupRemoteAccess } from '../local-server-tunnel.mjs';
 import { runSetupWizard } from '../local-server-wizard.mjs';
 import { printPairing } from './devices.mjs';
-import { bold, dim, green } from '../local-server-style.mjs';
+import { bold, cyan, dim, green, red } from '../local-server-style.mjs';
 import { describeAutoBackup } from './status.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -40,7 +40,7 @@ export async function buildIfSource(signal) {
  * @param {CommandResources} resources
  * @returns {Promise<RemoteSettings>} */
 export async function setupTailscale({ dataDir, signal }, remote, port, resources) {
-	console.log('Setting up Tailscale Funnel. Files stay on this computer; public HTTPS traffic passes through Tailscale.');
+	console.log(dim('Setting up Tailscale Funnel. Files stay on this computer; public HTTPS traffic passes through Tailscale.'));
 	await buildIfSource(signal);
 	// Lock and validate storage before exposing anything.
 	const runtime = resources.runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
@@ -70,7 +70,7 @@ export async function setupNamedTunnel({ dataDir, values, signal }, remote, port
 	}
 	hostname = normalizeTunnelHostname(hostname);
 	if (remote && remote.hostname !== hostname) throw new Error('This directory already has a saved hostname. Reuse it to preserve installed PWA connections.');
-	console.log(`Setting up https://${hostname}. Files stay on this computer; public HTTPS traffic passes through Cloudflare.`);
+	console.log(dim(`Setting up https://${hostname}. Files stay on this computer; public HTTPS traffic passes through Cloudflare.`));
 	await buildIfSource(signal);
 	// Lock and validate storage before installing or provisioning anything.
 	const runtime = resources.runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
@@ -114,7 +114,7 @@ export async function runWizardSetup(context, resources) {
 		const offset = await stat(logPath).then(info => info.size, () => 0);
 		await installService({ dataDir, keepAwake: choices.keepAwake, script, maxFileSize: values['max-file-size'] });
 		const origin = `https://${remote.hostname}`;
-		console.log(`\n${green('✓')} ${choices.access === 'tailscale' ? 'Tailscale Funnel' : 'Cloudflare Tunnel'} address: ${bold(origin)}`
+		console.log(`\n${green('✓')} ${choices.access === 'tailscale' ? 'Tailscale Funnel' : 'Cloudflare Tunnel'} address: ${cyan(origin)}`
 			+ `\n${green('✓')} Starts when you log in${choices.keepAwake ? ' and keeps this Mac awake' : ''}`
 			+ `\n${green('✓')} ${backups ? `Daily backups to ${backups.dir}` : 'Daily backups are off'}`);
 		await followService({ dataDir, origin, logPath, offset, signal });
@@ -135,7 +135,7 @@ export async function runWizardSetup(context, resources) {
  * @param {AbortSignal} signal @returns {Promise<string>} */
 async function lastingScript(signal) {
 	if (installKind() !== 'npx') return process.argv[1];
-	console.log(`Installing Crate so it can start at login: npm install -g ${PACKAGE_NAME}@${packageVersion}`);
+	console.log(dim(`Installing Crate so it can start at login: npm install -g ${PACKAGE_NAME}@${packageVersion}`));
 	await runProcess('npm', ['install', '-g', `${PACKAGE_NAME}@${packageVersion}`], { signal });
 	const root = (await execFileAsync('npm', ['root', '-g'])).stdout.trim();
 	return join(root, PACKAGE_NAME, 'scripts/crate-server.mjs');
@@ -146,7 +146,7 @@ async function lastingScript(signal) {
  * @param {string} log @returns {string[]} */
 export function serviceNotices(log) {
 	return [
-		...[...log.matchAll(/https:\/\/login\.tailscale\.com\/\S+/g)].map(([link]) => `Turn on Tailscale Funnel for your tailnet: ${bold(link)}`),
+		...[...log.matchAll(/https:\/\/login\.tailscale\.com\/\S+/g)].map(([link]) => `Turn on Tailscale Funnel for your tailnet: ${cyan(link)}`),
 		...[...log.matchAll(/^Error: .+$/gm)].map(([error]) => error),
 	];
 }
@@ -176,19 +176,19 @@ async function followService({ dataDir, origin, logPath, offset, signal }) {
 			} finally { await file.close(); }
 		}
 		for (const notice of serviceNotices(shown)) {
-			if (!surfaced.has(notice)) { surfaced.add(notice); console.log(notice); }
+			if (!surfaced.has(notice)) { surfaced.add(notice); console.log(notice.startsWith('Error: ') ? red(notice) : notice); }
 		}
 		ready = /^Ready: /m.test(shown) && await requestLocalControl(dataDir, 'GET', '/status').then(() => true, () => false);
 		if (!ready) await delay(1000, undefined, { signal }).catch(() => {});
 	}
 	if (signal.aborted) return;
 	if (!ready) {
-		console.log(`\nCrate is still waiting for ${origin} to work. It keeps trying in the background; check with: ${doctor}\nLog: ${logPath}`);
+		console.log(`\nCrate is still waiting for ${origin} to work. It keeps trying in the background; check with: ${cyan(doctor)}\n${dim(`Log: ${logPath}`)}`);
 		return;
 	}
 	console.log(`${green('✓')} ${origin} is reachable`);
 	// The server shows its first code in the log once ready; with devices connected, ask for one.
 	const code = /crate-pair-[a-f0-9]{64}/.exec(shown)?.[0];
 	printPairing(code ? { code } : await requestLocalPairing(dataDir, computerName().slice(0, 128)), origin);
-	console.log(`Crate keeps running in the background. Check on it with: ${doctor}\n${dim(`Log: ${logPath}`)}`);
+	console.log(`${bold('Crate keeps running in the background.')} Check on it with: ${cyan(doctor)}\n${dim(`Log: ${logPath}`)}`);
 }

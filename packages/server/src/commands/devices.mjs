@@ -5,21 +5,24 @@ import { resolveServerOrigin, resolveStartMode } from '../local-server-options.m
 import { requestLocalControl, requestLocalPairing } from '../local-server-pairing.mjs';
 import { issueLocalDevice, listLocalDevices, openLocalRuntime, revokeLocalDevice } from '../local-server-runtime.mjs';
 import { pairingLink, terminalQr } from '../local-server-qr.mjs';
-import { bold } from '../local-server-style.mjs';
+import { bold, cyan, dim } from '../local-server-style.mjs';
 
 /** @typedef {import('../local-server-options.mjs').Command} Command */
 
-/** A link and QR code that connect Obsidian in one step, and the code for pasting.
- * Callers print the server address first, so the code can refer to it.
+/** The link, the code for pasting and a QR code that connect Obsidian, spaced apart so
+ * each can be found at a glance.
  * @param {{ code: string }} pairing @param {string} origin */
 export function formatPairing(pairing, origin) {
 	const link = pairingLink(origin, pairing.code);
 	// A loopback address means the phone itself, so a QR code could never reach this server.
 	const local = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(origin).hostname);
-	const open = local
-		? `This address only works on this computer. Open this link here:\n${link}`
-		: `Scan this with your phone's camera, or open the link on a computer:\n${terminalQr(link)}\n${link}`;
-	return `\n${bold('Connect Obsidian')}. This code works once, for 10 minutes. Keep it private.\n${open}\nOr in Crate → Connect to your server, paste the address above and this code:\n${pairing.code}\n`;
+	const sections = [
+		`${bold('Connect Obsidian')}\n${dim('This code works once, for 10 minutes. Keep it private.')}`,
+		`${local ? 'This address only works on this computer. Open this link here:' : 'On a computer, open this link:'}\n  ${cyan(link)}`,
+		`Or in Crate → ${bold('Connect to your server')}, paste:\n  Address  ${cyan(new URL(origin).origin)}\n  Code     ${cyan(pairing.code)}`,
+		...(local ? [] : [`On a phone or tablet, scan this with the camera:\n\n${terminalQr(link)}`]),
+	];
+	return `\n${sections.join('\n\n')}\n`;
 }
 
 /** @param {{ code: string }} pairing @param {string} origin */

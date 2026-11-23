@@ -8,3 +8,5 @@ const style = (open, close) => (/** @type {string} */ text) => styled ? `\x1b[${
 export const bold = style(1, 22);
 export const dim = style(2, 22);
 export const green = style(32, 39);
+export const red = style(31, 39);
+export const cyan = style(36, 39);

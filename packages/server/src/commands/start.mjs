@@ -17,7 +17,7 @@ import { startTailscaleFunnel } from '../local-server-tailscale.mjs';
 import { readRemoteSettings, saveQuickSettings, startTunnel } from '../local-server-tunnel.mjs';
 import { migrateBeforeStart } from './data.mjs';
 import { formatPairing } from './devices.mjs';
-import { bold, dim, green } from '../local-server-style.mjs';
+import { bold, cyan, dim, green } from '../local-server-style.mjs';
 import { buildIfSource, runWizardSetup, setupNamedTunnel, setupTailscale, wizardApplies } from './setup.mjs';
 
 /** @typedef {import('../local-server-options.mjs').Command} Command */
@@ -117,7 +117,7 @@ export async function start(context, resources) {
 
 /** @param {CommandContext} context @param {number} port @param {CommandResources} resources @param {number | undefined} maxFileBytes */
 async function serveQuickTunnel({ command, values, dataDir, docker, signal, stopped }, port, resources, maxFileBytes) {
-	console.log('Starting Crate on a temporary Cloudflare address. Your files stay on this computer.');
+	console.log(dim('Starting Crate on a temporary Cloudflare address. Your files stay on this computer.'));
 	if (command === 'setup') await buildIfSource(signal);
 	const report = readinessReport();
 	const quickServer = resources.quickServer = await startQuickServer({ dataDir, port, name: values.name, signal, onReadiness: ready => report.changed(ready), maxFileBytes });
@@ -129,7 +129,7 @@ async function serveQuickTunnel({ command, values, dataDir, docker, signal, stop
 		: `For a permanent address, run: ${crateCommand(installKind(), 'setup --tailscale')}`}`;
 	const code = quickServer.pairingCode;
 	const shown = code ? report.pair(() => formatPairing(code, origin)) : '';
-	console.log(`\nServer address to paste into Obsidian: ${bold(origin)}\n${shown}${addressStatus(Boolean(code), report.waiting)}\n${await startFooter({ dataDir, docker, listener, addressTip })}\n`);
+	console.log(`\nServer address to paste into Obsidian: ${bold(cyan(origin))}\n${shown}${addressStatus(Boolean(code), report.waiting)}\n${await startFooter({ dataDir, docker, listener, addressTip })}\n`);
 	const result = await Promise.race([stopped.then(() => null), quickServer.tunnel.exited, quickServer.runtime.failed]);
 	if (result && !signal.aborted) throw new Error(`Cloudflare Quick Tunnel stopped (${result.error?.code ?? result.signal ?? result.code}). Restart Crate to get a new address.`);
 }
@@ -157,7 +157,7 @@ async function serve({ values, dataDir, docker, signal, stopped }, { remote, tai
 	const report = readinessReport(!origin.startsWith('https://') || pairBeforeReady);
 	// Issued when shown, so its 10 minutes start once the address works.
 	const shown = pairNew ? report.pair(() => formatPairing(pairing.issue(values.name?.trim() || computerName().slice(0, 128)), origin)) : '';
-	console.log(`\nServer address to paste into Obsidian: ${bold(runtime.origin)}\n${shown}${addressStatus(pairNew, report.waiting)}\n${await startFooter({ dataDir, docker, listener: `${host}:${port}` })}\n`);
+	console.log(`\nServer address to paste into Obsidian: ${bold(cyan(runtime.origin))}\n${shown}${addressStatus(pairNew, report.waiting)}\n${await startFooter({ dataDir, docker, listener: `${host}:${port}` })}\n`);
 	if (origin.startsWith('https://')) {
 		resources.readiness = monitorPublicReadiness({ origin, instance, signal, onChange: ready => { control.onReadiness(ready); report.changed(ready); } });
 	}
