@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
-import { findTailscale, socketTailscaleHostname, startTailscaleFunnel, tailscaleHostname } from '../src/local-server-tailscale.mjs';
+import { assertFunnelPortFree, findTailscale, socketTailscaleHostname, startTailscaleFunnel, tailscaleHostname } from '../src/local-server-tailscale.mjs';
 import { readRemoteSettings, remotePaths, saveTailscaleSettings } from '../src/local-server-tunnel.mjs';
 
 const missing = () => Object.assign(new Error('missing'), { code: 'ENOENT' });
@@ -132,4 +132,14 @@ writeFileSync(process.env.FAKE_FUNNEL_PID, String(process.pid));
 	conflict.stderr.on('data', chunk => { errors += chunk; });
 	assert.equal((await once(conflict, 'exit'))[0], 1);
 	assert.match(errors, /uses Tailscale Funnel/);
+});
+
+test('names another app that already holds the Funnel address before Tailscale refuses', async () => {
+	const serve = (/** @type {unknown} */ config) => async () => ({ stdout: JSON.stringify(config) });
+	const host = 'my-mac.tail1234.ts.net';
+	await assertFunnelPortFree('tailscale', host, 8800, { run: serve({}) });
+	await assertFunnelPortFree('tailscale', host, 8800, { run: serve({ TCP: { 443: { HTTPS: true } }, Web: { [`${host}:443`]: { Handlers: { '/': { Proxy: 'http://127.0.0.1:8800' } } } } }) });
+	await assertFunnelPortFree('tailscale', host, 8800, { run: async () => { throw new Error('old Tailscale'); } });
+	await assert.rejects(assertFunnelPortFree('tailscale', host, 8800, { run: serve({ TCP: { 443: { HTTPS: true } }, Web: { [`${host}:443`]: { Handlers: { '/': { Proxy: 'http://127.0.0.1:4000' } } } } }) }),
+		/serves http:\/\/127\.0\.0\.1:4000 at https:\/\/my-mac.*tailscale serve --https=443 off/);
 });

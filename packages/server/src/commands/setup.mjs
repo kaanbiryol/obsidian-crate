@@ -14,7 +14,7 @@ import { requestLocalControl, requestLocalPairing } from '../local-server-pairin
 import { runProcess } from '../local-server-process.mjs';
 import { openLocalRuntime } from '../local-server-runtime.mjs';
 import { installService, servicePaths } from '../local-server-service.mjs';
-import { currentTailscaleHostname, findTailscale } from '../local-server-tailscale.mjs';
+import { assertFunnelPortFree, currentTailscaleHostname, findTailscale, tailscaleSocket } from '../local-server-tailscale.mjs';
 import { ensureCloudflared, normalizeTunnelHostname, saveTailscaleSettings, setupRemoteAccess } from '../local-server-tunnel.mjs';
 import { runSetupWizard } from '../local-server-wizard.mjs';
 import { printPairing } from './devices.mjs';
@@ -45,6 +45,7 @@ export async function setupTailscale({ dataDir, signal }, remote, port, resource
 	// Lock and validate storage before exposing anything.
 	const runtime = resources.runtime = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false });
 	const hostname = await currentTailscaleHostname(signal);
+	if (!tailscaleSocket()) await assertFunnelPortFree(await findTailscale(), hostname, port);
 	if (remote && remote.hostname !== hostname) throw new Error(`This directory was set up for https://${remote.hostname}. Rename this computer back in Tailscale to keep connected devices and PWAs.`);
 	const saved = await saveTailscaleSettings(dataDir, hostname, port);
 	await runtime.close();

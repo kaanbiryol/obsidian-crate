@@ -86,6 +86,22 @@ export async function currentTailscaleHostname(signal) {
 	return socket ? socketTailscaleHostname(socket, { signal }) : tailscaleHostname(await findTailscale());
 }
 
+/** Funnel serves Crate on port 443, which `tailscale serve` can already give to another app
+ * on this computer. Tailscale then refuses with "listener already exists", so say which.
+ * @param {string} command @param {string} hostname @param {number} port
+ * @param {{ run?: (command: string, args: string[]) => Promise<{ stdout: string }> }} [options] */
+export async function assertFunnelPortFree(command, hostname, port, { run = execFileAsync } = {}) {
+	/** @type {{ TCP?: Record<string, unknown>, Web?: Record<string, { Handlers?: Record<string, { Proxy?: string }> }> }} */
+	let config;
+	try { config = JSON.parse((await run(command, ['serve', 'status', '--json'])).stdout || '{}'); }
+	catch { return; }
+	if (!config?.TCP?.['443']) return;
+	const handlers = Object.values(config.Web?.[`${hostname}:443`]?.Handlers ?? {});
+	if (handlers.length && handlers.every(handler => handler.Proxy === `http://127.0.0.1:${port}`)) return;
+	const other = handlers.map(handler => handler.Proxy).filter(Boolean).join(', ');
+	throw new Error(`Tailscale already serves ${other || 'another app'} at https://${hostname}, and Funnel needs that address for Crate. Turn it off with: tailscale serve --https=443 off, then run setup again. To keep it, choose your own domain on Cloudflare instead.`);
+}
+
 /** Runs Funnel in the foreground, so stopping Crate also takes its public address offline.
  * The first run prints a Tailscale link to approve Funnel for this tailnet.
  * @param {import('./local-server-tunnel.mjs').RemoteSettings} settings
@@ -101,5 +117,6 @@ export async function startTailscaleFunnel(settings, signal, { run = execFileAsy
 	}
 	// The Tailscale container's serve configuration publishes Funnel; it outlives Crate restarts.
 	if (socket) return { exited: new Promise(() => {}), async stop() {} };
+	await assertFunnelPortFree(/** @type {string} */ (command), hostname, settings.port, { run });
 	return start(/** @type {string} */ (command), ['funnel', '--https=443', `http://127.0.0.1:${settings.port}`], { signal });
 }
