@@ -128,7 +128,7 @@ try {
           const input = page.getByLabel('Recovery key', { exact: true });
           await input.fill(wrong);
           await page.getByRole('button', { name: 'Unlock Crate', exact: true }).click();
-          await expect(page.locator('.crate-field__error')).toHaveText('This key couldn’t unlock your vault. Check your saved recovery key.');
+          await expect(page.locator('.crate-field__error')).toHaveText('This recovery key doesn’t unlock this vault. In Obsidian, copy the Recovery key again from Crate settings → Sync → Manage encryption.');
           await expect(setup).toBeVisible();
           await page.setViewportSize({ width: 320, height: 568 });
           assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
