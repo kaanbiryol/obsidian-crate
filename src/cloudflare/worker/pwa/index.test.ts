@@ -293,8 +293,8 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('transform:scale(1.025)');
 		expect(html).toContain('.crate-reminders-ui .premium-checkbox{');
 		expect(html).toContain('box-shadow:var(--crate-checkbox-checked-shadow, none)');
-		expect(html).toContain('.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:pwa-completion-check var(--pwa-motion-control-duration) var(--pwa-motion-control-ease)}');
-		expect(html).toContain('@keyframes pwa-completion-check{0%{transform:scale(0.92)}100%{transform:scale(1)}}');
+		expect(html).toContain('.crate-reminders-ui .premium-checkbox.is-completing .premium-checkbox-visual{animation:crate-checkbox-complete');
+		expect(html).not.toContain('pwa-completion-check');
 		expect(html).toContain('--reminders-fab-gap:16px;--reminders-fab-size:44px;');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab{position:absolute;bottom:');
 		expect(html).not.toContain('.pwa-header-add-button');

@@ -187,10 +187,48 @@
     }
 }
 
+// Completing: the circle fills, the check draws itself and the row softly
+// dims, while it holds in place (COMPLETION_HOLD_MS) before moving.
+.premium-checkbox.is-completing {
+    .premium-checkbox-visual {
+        animation: crate-checkbox-complete 220ms cubic-bezier(.2, 0, 0, 1);
+    }
+
+    .premium-checkbox-icon {
+        animation: none;
+
+        :is(path, polyline) {
+            stroke-dasharray: 24;
+            stroke-dashoffset: 24;
+            animation: crate-checkmark-draw 200ms 40ms cubic-bezier(.2, 0, 0, 1) forwards;
+        }
+    }
+}
+
+.premium-reminder-card.is-completing .premium-reminder-content {
+    opacity: 0.6;
+    transition: opacity 240ms 60ms var(--crate-motion-easing);
+}
+
+@keyframes crate-checkbox-complete {
+    from { transform: scale(.92); }
+    to { transform: scale(1); }
+}
+
+@keyframes crate-checkmark-draw {
+    to { stroke-dashoffset: 0; }
+}
+
 // Keep this beside the animation: shared card styles load after host theme rules.
-.is-reduced-motion .premium-checkbox-icon { animation: none; }
+.is-reduced-motion {
+    .premium-checkbox-icon,
+    .premium-checkbox.is-completing .premium-checkbox-visual,
+    .premium-checkbox.is-completing .premium-checkbox-icon :is(path, polyline) { animation: none; stroke-dashoffset: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
-    .premium-checkbox-icon { animation: none; }
+    .premium-checkbox-icon,
+    .premium-checkbox.is-completing .premium-checkbox-visual,
+    .premium-checkbox.is-completing .premium-checkbox-icon :is(path, polyline) { animation: none; stroke-dashoffset: 0; }
     .premium-checkbox:is(:hover, [data-press-active]) .premium-checkbox-visual { transform: none; }
 }
 

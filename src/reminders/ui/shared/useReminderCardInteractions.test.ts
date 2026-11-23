@@ -1,7 +1,10 @@
 import React, { act } from 'react';
-import { expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { renderHook } from '@/test/react-hooks';
-import { useReminderCardInteractions } from './useReminderCardInteractions';
+import { COMPLETION_HOLD_MS, useReminderCardInteractions } from './useReminderCardInteractions';
+
+beforeEach(() => { vi.useFakeTimers(); });
+afterEach(() => { vi.useRealTimers(); });
 
 function renderCard(completed: boolean, onToggleComplete: () => Promise<void>) {
 	const state = { preview: false, checkbox: null as HTMLElement | null };
@@ -21,16 +24,20 @@ it('previews completion and ignores clicks until the toggle settles', async () =
 	const card = renderCard(false, () => { calls++; return new Promise<void>(resolve => { settle = resolve; }); });
 	await act(async () => { card.checkbox!.click(); });
 	expect(card.preview).toBe(true);
+	expect(calls).toBe(0);
 	await act(async () => { card.checkbox!.click(); });
+	await act(async () => { await vi.advanceTimersByTimeAsync(COMPLETION_HOLD_MS); });
 	expect(calls).toBe(1);
 	await act(async () => { settle(); });
 	expect(card.preview).toBe(false);
 });
 
-it('does not preview reopening a completed reminder', async () => {
+it('reopens a completed reminder at once without a preview', async () => {
 	let settle = () => {};
-	const card = renderCard(true, () => new Promise<void>(resolve => { settle = resolve; }));
+	let calls = 0;
+	const card = renderCard(true, () => { calls++; return new Promise<void>(resolve => { settle = resolve; }); });
 	await act(async () => { card.checkbox!.click(); });
 	expect(card.preview).toBe(false);
+	expect(calls).toBe(1);
 	await act(async () => { settle(); });
 });

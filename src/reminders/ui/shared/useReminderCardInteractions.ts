@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useIsPresent } from 'motion/react';
+import { prefersReducedMotion } from '@/ui/shared/reduced-motion';
 
 interface ReminderCardInteractionsOptions {
 	completed: boolean;
@@ -19,6 +20,14 @@ const CHECKBOX_SELECTOR = [
 	'[data-slot="wrapper"]',
 	'input[type="checkbox"]',
 ].join(', ');
+
+/** How long a just-checked row stays in place so its check animation can play before it moves. */
+export const COMPLETION_HOLD_MS = 350;
+
+function waitForCompletionAnimation(): Promise<void> {
+	if (prefersReducedMotion()) return Promise.resolve();
+	return new Promise(resolve => window.setTimeout(resolve, COMPLETION_HOLD_MS));
+}
 
 /**
  * Connects a reminder card to native capture-phase interactions and runs one
@@ -57,7 +66,7 @@ export function useReminderCardInteractions({
 		if (isCompletingRef.current) return;
 		isCompletingRef.current = true;
 		if (!completed) setCompletionPreview(true);
-		void Promise.resolve()
+		void (completed ? Promise.resolve() : waitForCompletionAnimation())
 			.then(onToggleComplete)
 			.finally(() => {
 				isCompletingRef.current = false;

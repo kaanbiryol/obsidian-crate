@@ -131,7 +131,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
 
 	return (
 		<Wrapper
-			className={`premium-reminder-card ${reminder.completed ? 'is-completed' : ''} ${className}`}
+			className={`premium-reminder-card ${reminder.completed ? 'is-completed' : ''}${completionPreview ? ' is-completing' : ''} ${className}`}
 			data-reminder-list-style={listStyle}
 			{...wrapperProps}
 			{...pressEvents}
