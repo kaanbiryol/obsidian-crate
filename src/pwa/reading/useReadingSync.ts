@@ -11,8 +11,8 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { FOREGROUND_REFRESH_GAP_MS, onAppResume, type AppResumeReason } from '../shell/app-resume';
 
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
-export function useReadingSync({ session, ready, readOnly, pending, publishSyncResult, isCurrentSession, run, resetSession, retryVerification }: Pick<ReturnType<typeof useReadingSession>,
-	'session' | 'ready' | 'readOnly' | 'pending' | 'publishSyncResult' | 'isCurrentSession' | 'run' | 'resetSession' | 'retryVerification'>, enabled = true) {
+export function useReadingSync({ session, ready, readOnly, pending, publishSyncResult, reportLibraryFailure, isCurrentSession, run, resetSession, retryVerification }: Pick<ReturnType<typeof useReadingSession>,
+	'session' | 'ready' | 'readOnly' | 'pending' | 'publishSyncResult' | 'reportLibraryFailure' | 'isCurrentSession' | 'run' | 'resetSession' | 'retryVerification'>, enabled = true) {
 	const enabledRef = useRef(enabled);
 	enabledRef.current = enabled;
 	const [syncing, setSyncing] = useState(false), [syncedSession, setSyncedSession] = useState<ReadingSession | null>(null);
@@ -53,7 +53,7 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 				else if (navigator.onLine && enabledRef.current) {
 					data = await loadReading(current);
 				// Offline, nothing of the library is stored: the app lists saved articles instead.
-				} else data = { items: [], issues: [], savedAt: Date.now() };
+				} else data = { items: [], issues: [], savedAt: Date.now(), offline: true };
 				completed = true;
 			} finally {
 				// Publish the latest durable queue even when refreshing the list fails.
@@ -65,6 +65,10 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 					if (completed && enabledRef.current && navigator.onLine && data) { setSyncedSession(current); completedAt.current = { session: current, at: Date.now() }; }
 				});
 			}
+		} catch (cause) {
+			// The library keeps its saved list and banner until a refresh succeeds.
+			reportLibraryFailure(current);
+			throw cause;
 		} finally {
 			refreshing.current = false;
 			setSyncing(false);
@@ -72,7 +76,7 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 			refreshQueued.current = null;
 			if (queued && isCurrentSession(queued.session)) void run(() => refresh(queued.session, queued.mode));
 		}
-	}, [session, readOnly, run, isCurrentSession, publishSyncResult, resetSession, retryVerification]);
+	}, [session, readOnly, run, isCurrentSession, publishSyncResult, reportLibraryFailure, resetSession, retryVerification]);
 	const retryAt = Math.min(...pending.map(op => readingRetryAt(op) ?? Infinity));
 	useEffect(() => {
 		if (!enabled || !session || !ready || readOnly || isOffline || !Number.isFinite(retryAt)) return;

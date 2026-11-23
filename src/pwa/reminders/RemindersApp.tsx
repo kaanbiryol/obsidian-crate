@@ -73,6 +73,52 @@ export function RemindersApp() {
 		/>
 	), [editReminder, toggleReminderCompleted, preferences.listStyle, colorScheme]);
 
+	// The shell memoizes project detail props on these, so keep them stable.
+	const renderHeaderRight = useCallback((isProjectDetail: boolean) => (
+		<PwaHeaderActions
+			settingsOpen={settingsOpen}
+			onToggleSettings={toggleSettings}
+			showSettings={!isProjectDetail}
+		>
+			<AppSyncIndicator />
+		</PwaHeaderActions>
+	), [settingsOpen, toggleSettings]);
+	const renderBelowHeader = useCallback((isProjectDetail: boolean) => (
+		<>
+			<PwaPullRefreshIndicator
+				enabled={Boolean(!loading && !modal && !settingsOpen && !reorderDragging)}
+				onRefresh={handlePullRefresh}
+			/>
+			<PwaTopNotices
+				statusText={statusText}
+				onRetry={isOffline ? undefined : () => { void handlePullRefresh(); }}
+				retrying={refreshing}
+				showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
+				onEnableNotifications={enablePushNotifications}
+			>
+				<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
+				<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
+				{(changes.some(change => change.status !== 'pending') || storageError) && <ReminderSyncNotice
+					changes={changes}
+					isOffline={isOffline}
+					storageError={storageError}
+					onRetryInitialization={retryInitialization}
+					onRetry={retryChange}
+					onEdit={editFailedChange}
+					onDiscard={discardChange}
+				/>}
+				<ReminderRecoveryNotices recoveryChanges={recoveryChanges} quarantinedChanges={quarantinedChanges} folderPath={config.folderPath}
+					onResume={recoverChanges} onRemove={removeQuarantinedChanges} />
+			</PwaTopNotices>
+		</>
+	), [
+		loading, modal, settingsOpen, reorderDragging, handlePullRefresh, statusText, isOffline, refreshing,
+		canShowNotificationPrompt, enablePushNotifications, issues, loadReminders, rebuildOfflineCache, changes,
+		storageError, retryInitialization, retryChange, editFailedChange, discardChange, recoveryChanges,
+		quarantinedChanges, config.folderPath, recoverChanges, removeQuarantinedChanges,
+	]);
+	const handleAdd = useCallback((defaultProject: string) => openModal('create', undefined, defaultProject), [openModal]);
+
 	// Resolve the launch destination first, then keep the real chrome mounted
 	// while data, pending changes, and notification state finish loading.
 
@@ -88,7 +134,6 @@ export function RemindersApp() {
 		>
 			<PwaRemindersAppShell
 				listStyle={preferences.listStyle}
-				key={`pwa-shell-${selectedProject ?? startTab}`}
 				initializing={!initialContentReady}
 				reminders={initialContentReady ? sharedReminders : []}
 				projects={initialContentReady ? visibleProjects : []}
@@ -99,52 +144,15 @@ export function RemindersApp() {
 				showLoadingIndicator={!initialContentReady || (sharedReminders.length === 0 && (loading || (dataMode === 'cached' && !isOffline && !error)))}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
-				initialProject={selectedProject ?? undefined}
+				requestedProject={selectedProject ?? undefined}
 				upcomingDays={config.upcomingDays}
 				className="app-shell pwa-reminders-view"
-				headerRightContent={authToken ? (isProjectDetail) => (
-					<PwaHeaderActions
-						settingsOpen={settingsOpen}
-						onToggleSettings={toggleSettings}
-						showSettings={!isProjectDetail}
-					>
-						<AppSyncIndicator />
-					</PwaHeaderActions>
-				) : undefined}
-
-				belowHeaderContent={initialContentReady && authToken ? (isProjectDetail) => (
-					<>
-						<PwaPullRefreshIndicator
-							enabled={Boolean(!loading && !modal && !settingsOpen && !reorderDragging)}
-							onRefresh={handlePullRefresh}
-						/>
-						<PwaTopNotices
-							statusText={statusText}
-							onRetry={isOffline ? undefined : () => { void handlePullRefresh(); }}
-							retrying={refreshing}
-							showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
-							onEnableNotifications={enablePushNotifications}
-						>
-							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
-							<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
-							{(changes.some(change => change.status !== 'pending') || storageError) && <ReminderSyncNotice
-								changes={changes}
-								isOffline={isOffline}
-								storageError={storageError}
-								onRetryInitialization={retryInitialization}
-								onRetry={retryChange}
-								onEdit={editFailedChange}
-								onDiscard={discardChange}
-							/>}
-							<ReminderRecoveryNotices recoveryChanges={recoveryChanges} quarantinedChanges={quarantinedChanges} folderPath={config.folderPath}
-								onResume={recoverChanges} onRemove={removeQuarantinedChanges} />
-						</PwaTopNotices>
-					</>
-				) : undefined}
+				headerRightContent={authToken ? renderHeaderRight : undefined}
+				belowHeaderContent={initialContentReady && authToken ? renderBelowHeader : undefined}
 				backgroundInert={Boolean(modal) || settingsOpen}
 				addBlocked={Boolean(statusText)}
 				renderCard={renderSharedCard}
-				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
+				onAdd={handleAdd}
 				onReorder={persistReorder}
 				onReorderDragActiveChange={setReorderDragging}
 			>

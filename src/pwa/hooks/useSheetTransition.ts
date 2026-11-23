@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export function useSheetTransition(onClosed: () => void): {
 	isClosing: boolean;
@@ -8,6 +8,10 @@ export function useSheetTransition(onClosed: () => void): {
 } {
 	const [isClosing, setIsClosing] = useState(false);
 	const closingRef = useRef(false);
+	// Callers often pass an inline callback. Read the latest one so a render
+	// while closing does not restart the fallback timer below.
+	const onClosedRef = useRef(onClosed);
+	useLayoutEffect(() => { onClosedRef.current = onClosed; }, [onClosed]);
 
 	const cancelClose = useCallback(() => {
 		closingRef.current = false;
@@ -24,8 +28,8 @@ export function useSheetTransition(onClosed: () => void): {
 		if (!closingRef.current) return;
 		closingRef.current = false;
 		setIsClosing(false);
-		onClosed();
-	}, [onClosed]);
+		onClosedRef.current();
+	}, []);
 
 	useEffect(() => {
 		if (!isClosing) return;

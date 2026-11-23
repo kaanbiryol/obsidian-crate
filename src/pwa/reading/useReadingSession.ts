@@ -18,10 +18,14 @@ export function useReadingSession(connection: ReadingConnection) {
 	const [cache, setCache] = useState<ReadingCache | null>(null), [pending, setPending] = useState<PendingReading[]>([]);
 	const [error, setError] = useState<string | null>(null), [storageError, setStorageError] = useState<string | null>(null);
 	const [recovery, setRecovery] = useState(false), [draftReady, setDraftReady] = useState(false);
+	// The last library refresh failed; kept apart from `error`, which forms and opening articles also clear.
+	const [libraryFailed, setLibraryFailed] = useState(false);
 	const [adding, setAdding] = useState(false), [url, setUrl] = useState('');
 	const [sharedLinkReady, setSharedLinkReady] = useState(false);
 	const alive = useRef(true), generation = useRef(0);
 	const authority = useRef<ReadingSession | null>(null);
+	// The session and mode the shown state was read for.
+	const hydratedFor = useRef<{ target: ReadingSession | null; readOnly: boolean } | null>(null);
 	const isCurrentSession = useCallback((expected: ReadingSession) => {
 		return alive.current && sameReadingSession(authority.current, expected) && isReadingSessionCurrent(expected);
 	}, []);
@@ -34,8 +38,11 @@ export function useReadingSession(connection: ReadingConnection) {
 		if (!isCurrentSession(expected)) return false;
 		if (result.cache) setCache(result.cache);
 		setPending(result.pending);
-		if (result.completed) setError(null);
+		if (result.completed) { setError(null); setLibraryFailed(false); }
 		return true;
+	}, [isCurrentSession]);
+	const reportLibraryFailure = useCallback((expected: ReadingSession) => {
+		if (isCurrentSession(expected)) setLibraryFailed(true);
 	}, [isCurrentSession]);
 	const refreshRecovery = useCallback(async () => {
 		const expected = authority.current;
@@ -47,9 +54,10 @@ export function useReadingSession(connection: ReadingConnection) {
 	}, [isCurrentSession]);
 	const finishCapture = useCallback((expected: ReadingSession) => {
 		if (!isCurrentSession(expected)) return false;
-		setUrl('');
+		// An open form keeps its link while it closes; closing it clears the link.
+		if (!adding) setUrl('');
 		return true;
-	}, [isCurrentSession]);
+	}, [isCurrentSession, adding]);
 	const openCapture = useCallback(() => { setError(null); setAdding(true); }, []);
 	// Dismissing the form discards its link, like the reminder sheet; the next open starts empty.
 	const closeCapture = useCallback(() => { setAdding(false); setUrl(''); }, []);
@@ -62,9 +70,9 @@ export function useReadingSession(connection: ReadingConnection) {
 	}, []);
 	const resetConnection = connection.resetSession;
 	const resetSession = useCallback((message?: string) => {
-		generation.current++; authority.current = null; resetConnection();
+		generation.current++; authority.current = null; hydratedFor.current = null; resetConnection();
 		setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
-		setUrl(''); setAdding(false); setSharedLinkReady(false);
+		setUrl(''); setAdding(false); setSharedLinkReady(false); setLibraryFailed(false);
 		if (message) setError(message);
 	}, [resetConnection]);
 	// An unanswered check on a device without encryption evidence shows the plaintext
@@ -80,8 +88,14 @@ export function useReadingSession(connection: ReadingConnection) {
 		const revision = ++lifetime.current;
 		const current = target;
 		authority.current = current;
-		setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
-		setUrl(''); setAdding(false); setSharedLinkReady(false); setError(null);
+		// A read-only copy that passes its encryption check keeps what it shows, including an open
+		// article, and only gains its queue and draft below; another session starts empty.
+		const writable = !!current && !readOnly && hydratedFor.current?.target === current && hydratedFor.current.readOnly;
+		hydratedFor.current = { target: current, readOnly };
+		if (!writable) {
+			setSession(null); setHydrated(null); setCache(null); setPending([]); setDraftReady(false); setStorageError(null);
+			setUrl(''); setAdding(false); setSharedLinkReady(false); setError(null); setLibraryFailed(false);
+		}
 		const currentRequest = () => {
 			if (!alive.current || revision !== generation.current) return false;
 			if (current) assertReadingSession(current);
@@ -143,6 +157,6 @@ export function useReadingSession(connection: ReadingConnection) {
 		if (session && ready && draftReady) void run(() => saveReadingDraft(session, { url }));
 	}, [session, ready, draftReady, url, run]);
 	return { ...connection, session, readOnly, ready, resetSession, cache, pending,
-		error: storageError ?? error ?? connection.error, recovery, adding, url, setUrl, sharedLinkReady, takeSharedLink, run,
-		isCurrentSession, publishPending, publishSyncResult, refreshRecovery, reportSessionError, finishCapture, openCapture, closeCapture };
+		error: storageError ?? error ?? connection.error, libraryFailed, recovery, adding, url, setUrl, sharedLinkReady, takeSharedLink, run,
+		isCurrentSession, publishPending, publishSyncResult, reportLibraryFailure, refreshRecovery, reportSessionError, finishCapture, openCapture, closeCapture };
 }

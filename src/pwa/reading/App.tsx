@@ -26,6 +26,8 @@ import { ReadingOpening } from './ReadingOpening';
 import { useReadingRuntime } from './ReadingRuntime';
 import { useReadingAppearance } from './appearance';
 import { blockedReadingItemIds, presentReadingItems } from './pending-view';
+import { useHeldPending } from './useHeldPending';
+import { useReaderArticleKey } from './useReaderArticleKey';
 import { exportReadingData } from './storage/storage';
 import { useDocumentReaderScroll } from './useDocumentReaderScroll';
 import { useReadingArticle } from './useReadingArticle';
@@ -40,6 +42,8 @@ import { readOfflineReadingItems } from './storage/storage';
 import type { ReadingItem } from '@/reading/core/model';
 import type { ReadingSession } from './session/session';
 
+const NO_ITEMS: ReadingItem[] = [];
+
 export default function ReadingApp() {
 	return <ReadingDialogHost.Provider value={PwaReadingDialog}><ReadingAppContent /></ReadingDialogHost.Provider>;
 }
@@ -51,7 +55,7 @@ function ReadingAppContent() {
 	const featureNavigation = useContext(FeatureNavigationContext);
 	const active = featureNavigation?.active !== false;
 	const { connection, sync, showToast, claimFailure, saving, saveLink, updateItem, retryArticle, deleteItem } = useReadingRuntime();
-	const { session, readOnly, ready, connecting, cache, pending, error, recovery, connectionState, adding, url, setUrl, run, connect,
+	const { session, readOnly, ready, connecting, cache, pending, error, libraryFailed, recovery, connectionState, adding, url, setUrl, run, connect,
 		isCurrentSession, reportSessionError, openCapture: openCaptureForm, closeCapture, sharedLinkReady, takeSharedLink } = connection;
 	const { refreshManually, isOffline } = sync;
 	const { reader, readerClosing, readerMotion, open, closeReader, finishReaderClose, setOffline } = useReadingArticle({ session, cache, pending, isCurrentSession, reportSessionError, run });
@@ -62,22 +66,24 @@ function ReadingAppContent() {
 	const canSaveLink = (() => {
 		try { readingUrl(url); return !saving; } catch { return false; }
 	})();
+	// A refresh made offline read no library, so reconnecting loads one instead of listing an empty inbox.
+	const library = cache?.offline ? null : cache;
 	// Offline, the library is the articles saved on this device; online, the server lists it page by page.
 	const { savedOnly, readingDisabled, connectionText, libraryError } = readingConnectionView({
-		isOffline, readOnly, hasSession: !!session, hasCache: !!cache, error, connectionState });
+		isOffline, readOnly, hasSession: !!session, hasCache: !!library, libraryFailed, error, connectionState });
 	const offlineItems = useOfflineReadingItems(session, savedOnly, reader?.availableOffline);
-	const confirmedItems = savedOnly ? offlineItems : cache?.items;
+	const confirmedItems = savedOnly ? offlineItems ?? NO_ITEMS : library?.items;
 	const visibleItems = useMemo(() => presentReadingItems(confirmedItems ?? [], pending), [confirmedItems, pending]);
-	const source = useMemo<ReadingLibrarySource | undefined>(() => session && !savedOnly && cache ? {
+	const source = useMemo<ReadingLibrarySource | undefined>(() => session && !savedOnly && library ? {
 		load: async ({ section, q, tag, cursor }) => {
 			// The sync just read the first inbox page; the library shows it without asking again.
-			if (section === 'inbox' && !q.trim() && !tag && !cursor) return { items: cache.items, cursor: cache.cursor ?? null };
+			if (section === 'inbox' && !q.trim() && !tag && !cursor) return { items: library.items, cursor: library.cursor ?? null };
 			const page = await queryReadingItems(session, { section, q, tag: tag ?? undefined, cursor: cursor ?? undefined });
 			return { items: page.items, cursor: page.cursor };
 		},
 		loadTags: section => queryReadingTags(session, section),
-		revision: cache, present: items => presentReadingItems(items, pending),
-	} : undefined, [session, savedOnly, cache, pending]);
+		revision: library, present: items => presentReadingItems(items, pending),
+	} : undefined, [session, savedOnly, library, pending]);
 	// A shared link saves at once, like the iPhone shortcut. Its draft keeps it until
 	// the save succeeds, and a failure opens the form with the error beside the link.
 	useEffect(() => {
@@ -94,7 +100,10 @@ function ReadingAppContent() {
 		flushSync(openCaptureForm);
 	};
 	// A pending delete hides the item, but the reader keeps it while it closes.
-	const visibleReader = useMemo(() => reader && (presentReadingItems([reader.item], pending)[0] ?? reader.item), [reader, pending]);
+	// Its confirmed changes stay shown until the reader reads the article again.
+	const readerPending = useHeldPending(reader?.item, pending);
+	const readerKey = useReaderArticleKey(reader?.item);
+	const visibleReader = useMemo(() => reader && (presentReadingItems([reader.item], readerPending)[0] ?? reader.item), [reader, readerPending]);
 	const blockedItemIds = useMemo(() => blockedReadingItemIds(visibleItems, pending), [pending, visibleItems]);
 	const updateFromReader = useReaderSyncFeedback({ itemId: reader?.item.crate_reading_id, pending, showToast, claimFailure,
 		retry: () => void run(refreshManually), review: () => setSettingsOpen(true),
@@ -115,13 +124,13 @@ function ReadingAppContent() {
 			<ReadingLibraryPanel images={imageLoader} listStyle={preferences.listStyle} initialSection={featureNavigation?.readingTab}
 				renderLibraryContent={(section, content) => <TabTransition viewKey={section}>{content}</TabTransition>}
 				renderNavigation={props => <PwaDock {...props} section="reading" className="crate-reading__mobile-nav" inert={adding || settingsOpen || !!reader || readerClosing} addBlocked={readOnly} onAdd={openCapture} />}
-				source={source} snapshot={{ items: visibleItems, issues: cache?.issues ?? [], loading: !cache && !error && !visibleItems.length,
+				source={source} snapshot={{ items: visibleItems, issues: library?.issues ?? [], loading: (savedOnly ? offlineItems === null : !library && !error) && !visibleItems.length,
 					error: libraryError }}
 				onAdd={openCapture} onOpen={(item, highlight, section) => { setFocusHighlight(highlight); return open(item, true, section); }}
 				onRefresh={refreshManually} onSettings={() => setSettingsOpen(true)} settingsLabel="Open settings" headerActions={<FeatureSwitcherButton />}
 				notice={!reader && notices} activeId={reader?.item.crate_reading_id} readerClosing={readerClosing} onReaderClosed={finishReaderClose}
 				readerMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : readerMotion}
-				listContent={!readingDisabled && savedOnly && !visibleItems.length ? <EmptyState className="crate-reading__empty" icon="book-open"
+				listContent={!readingDisabled && savedOnly && offlineItems !== null && !visibleItems.length ? <EmptyState className="crate-reading__empty" icon="book-open"
 					title="Your library isn’t on this device" description="Connect to see it. Articles you save for offline show up here." />
 				: readingDisabled ? <EmptyState className="crate-reading__empty crate-reading-disabled" icon="book-open"
 					title="Connect your Reading folder"
@@ -134,7 +143,7 @@ function ReadingAppContent() {
 				headerStatus={<><PwaUpdateButton /><AppSyncIndicator /></>}
 				reader={session && reader && visibleReader && <ReadingReader appearance={appearance} onAppearanceChange={updateAppearance} images={images}
 					revealContentTogether deferContentUntilEntered={readerMotion === 'slide'} floatingHighlights autoHideNavigation focusHighlight={focusHighlight}
-					item={visibleReader} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }}
+					item={visibleReader} articleKey={readerKey} markdown={reader.markdown} loadingError={reader.error} onRetryOpen={() => { void open(reader.item); }}
 					status={readerStatus(reader, cache)} notice={notices}
 					savedOffline={reader.availableOffline} onOfflineChange={reader.item.path ? setOffline : undefined}
 					mutationPending={blockedItemIds.has(reader.item.crate_reading_id)} highlightsPending={blockedItemIds.has(reader.item.crate_reading_id)}
@@ -188,12 +197,12 @@ function ReadingNotices({ recovery, error, showError, connectionText, retrying, 
 }
 
 /** The articles saved on this device, read only while the library shows them: offline, read-only
- * or unreachable. Read again when a copy is saved or removed. */
-function useOfflineReadingItems(session: ReadingSession | null, offline: boolean, savedChanged: unknown): ReadingItem[] {
-	const [items, setItems] = useState<ReadingItem[]>([]);
+ * or unreachable. Read again when a copy is saved or removed; null until the first read answers. */
+function useOfflineReadingItems(session: ReadingSession | null, offline: boolean, savedChanged: unknown): ReadingItem[] | null {
+	const [items, setItems] = useState<ReadingItem[] | null>(null);
 	useEffect(() => {
 		// Each read decrypts every saved copy, so skip it while the server's library is shown.
-		if (!session || !offline) { setItems([]); return; }
+		if (!session || !offline) { setItems(null); return; }
 		let active = true;
 		readOfflineReadingItems(session).then(next => { if (active) setItems(next); }, () => { if (active) setItems([]); });
 		return () => { active = false; };

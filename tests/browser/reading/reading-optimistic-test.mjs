@@ -67,7 +67,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(readingUrl);
     const sync = page.locator('.pwa-reading-root .pwa-tab-panel:not([data-leaving]) .pwa-sync-indicator');
-    const toast = page.locator('.toast');
+    const toast = page.locator('.toast:not([aria-hidden="true"])');
     // The article text is shown once its offline action is available.
     // The offline action sits in the reader's More menu and is enabled once the article has loaded.
     const articleShown = async () => {

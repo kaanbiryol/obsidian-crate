@@ -255,7 +255,7 @@ feature. Errors use assertive alerts; other feedback uses polite status messages
 Both features share bottom-center positioning above the dock and safe area.
 Toasts use the chrome surface raised by the `--pwa-toast-*` tokens (a lighter dark fill, stronger border and shadow) so they stand out from cards.
 Toasts fade in and out with the shared fade without moving; reduced motion skips the fade.
-Replacing feedback updates the current toast instead of stacking another one.
+Replacing feedback cross-fades the new toast in place of the current one instead of stacking another.
 Reading confirms explicit link, tag, and highlight-note saves after local
 persistence; offline confirmations say they are saved on this device. Favorite
 and passage-highlight changes use their immediate visual state: an unsent

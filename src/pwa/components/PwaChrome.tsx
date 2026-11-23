@@ -1,6 +1,6 @@
 import { PwaUpdateButton } from '../update/PwaUpdateNotice';
 import { LoadingSpinner } from '@/ui/shared/LoadingIndicator';
-import React, { useContext, useState } from 'react';
+import React, { type RefObject, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { useIsPresent } from 'motion/react';
 import { PwaButton as Button } from './PwaButton';
@@ -14,6 +14,8 @@ import { resolvePwaOpeningDestination } from '../navigation/opening-destination'
 import { loadPwaPreferences } from '../settings/preferences';
 import { createPwaUpdateScreenHtml } from '../shell/update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
+import { useReducedMotion } from '@/ui/shared/useReducedMotion';
+import { PWA_FADE_TIMING } from '@/ui/shared/navigation/motion';
 
 function PwaSettingsButton({
 	settingsOpen,
@@ -93,10 +95,15 @@ export function PwaTopNotices({
 	);
 }
 
+/** Matches .pwa-pull-refresh__inner in host/reminders-view.scss. */
+const PULL_GLYPH_SIZE = 28;
+/** The release and refresh settle; tokens.$easing-settle is the same curve. */
+const PULL_SETTLE_TIMING = { duration: 380, easing: PWA_FADE_TIMING.easing };
+
 export function PwaPullRefreshIndicator({
 	enabled,
 	onRefresh,
-	scrollSelector,
+	scrollSelector = '.pwa-reminders-view .ios-scroll',
 }: {
 	enabled: boolean;
 	onRefresh: () => Promise<void>;
@@ -105,6 +112,9 @@ export function PwaPullRefreshIndicator({
 	const isPresent = useIsPresent();
 	const pullRefresh = usePullToRefresh(enabled && isPresent, onRefresh, scrollSelector);
 	const visible = pullRefresh.distance > 0 || pullRefresh.refreshing;
+	const pulling = visible && !pullRefresh.refreshing;
+	const indicator = useRef<HTMLDivElement>(null), glyph = useRef<HTMLDivElement>(null);
+	usePullOffset(indicator, glyph, pullRefresh.distance, pulling, scrollSelector);
 	const label = pullRefresh.refreshing
 		? 'Refreshing'
 		: pullRefresh.ready
@@ -113,17 +123,71 @@ export function PwaPullRefreshIndicator({
 
 	return (
 		<div
-			className={`pwa-pull-refresh${visible ? ' is-visible' : ''}${pullRefresh.ready ? ' is-ready' : ''}${pullRefresh.refreshing ? ' is-refreshing' : ''}${visible && !pullRefresh.refreshing ? ' is-pulling' : ''}`}
-			style={{ height: pullRefresh.distance }}
+			ref={indicator}
+			className={`pwa-pull-refresh${visible ? ' is-visible' : ''}${pullRefresh.ready ? ' is-ready' : ''}${pullRefresh.refreshing ? ' is-refreshing' : ''}${pulling ? ' is-pulling' : ''}`}
 			role="status"
 			aria-label={visible ? label : undefined}
 			aria-hidden={!visible}
 		>
-			<div className="pwa-pull-refresh__inner" aria-hidden="true">
+			<div ref={glyph} className="pwa-pull-refresh__inner" aria-hidden="true">
 				<LoadingSpinner className="pwa-pull-refresh__glyph" progress={pullRefresh.refreshing ? undefined : pullRefresh.progress} />
 			</div>
 		</div>
 	);
+}
+
+/** Moves the content after the indicator down by `distance` and keeps the glyph centered in
+ * the gap, with transforms only: the indicator takes no layout space, so a pull never reflows
+ * the list. The finger drives each frame; a release or refresh settles from where it shows. */
+function usePullOffset(indicatorRef: RefObject<HTMLDivElement | null>, glyphRef: RefObject<HTMLDivElement | null>,
+	distance: number, pulling: boolean, scrollSelector: string): void {
+	const reduceMotion = useReducedMotion();
+	const shifted = useRef<HTMLElement[]>([]);
+	const settling = useRef<Animation[]>([]);
+	const shown = useRef(0);
+	useLayoutEffect(() => {
+		const indicator = indicatorRef.current, glyph = glyphRef.current;
+		if (!indicator || !glyph) return;
+		const owner = indicator.ownerDocument.defaultView ?? window;
+		if (!shifted.current.length && distance > 0) shifted.current = contentAfter(indicator, scrollSelector, owner);
+		const moves: Array<[HTMLElement, string]> = [
+			[glyph, `translateY(${(distance - PULL_GLYPH_SIZE) / 2}px)`],
+			...shifted.current.map(node => [node, `translateY(${distance}px)`] as [HTMLElement, string]),
+		];
+		const settle = !pulling && !reduceMotion && shown.current !== distance;
+		shown.current = distance;
+		// A settle still running continues from where it shows.
+		const from = settle ? moves.map(([node]) => owner.getComputedStyle(node).transform) : [];
+		for (const animation of settling.current) animation.cancel();
+		settling.current = [];
+		for (const [node, to] of moves) node.style.setProperty('transform', to);
+		const release = () => {
+			if (distance) return;
+			// At rest the content keeps no transform, so it is no containing block for fixed layers.
+			for (const node of shifted.current) node.style.removeProperty('transform');
+			shifted.current = [];
+		};
+		if (!settle) { release(); return; }
+		settling.current = moves.map(([node, to], index) => node.animate([{ transform: from[index]! }, { transform: to }], PULL_SETTLE_TIMING));
+		settling.current[0]!.onfinish = release;
+	}, [indicatorRef, glyphRef, distance, pulling, scrollSelector, reduceMotion]);
+	useLayoutEffect(() => () => {
+		for (const animation of settling.current) animation.cancel();
+		for (const node of shifted.current) node.style.removeProperty('transform');
+	}, []);
+}
+
+/** The in-flow content after `indicator`, at each level up to the one that holds the pulled
+ * scroller: what a pull moves down. Positioned layers, like a floating add button, stay. */
+function contentAfter(indicator: HTMLElement, scrollSelector: string, owner: Window): HTMLElement[] {
+	const after: HTMLElement[] = [];
+	for (let level: Element = indicator; level.parentElement; level = level.parentElement) {
+		for (let next = level.nextElementSibling; next; next = next.nextElementSibling) {
+			if (!/absolute|fixed/.test(owner.getComputedStyle(next).position)) after.push(next as HTMLElement);
+		}
+		if (level.parentElement.querySelector(scrollSelector)) return after;
+	}
+	return [];
 }
 
 export function PwaLaunchSplash({ updating = false }: { updating?: boolean }) {

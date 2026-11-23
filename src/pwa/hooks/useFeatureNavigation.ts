@@ -2,8 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPushedScreenHistory } from '../navigation/pushed-screen-history';
 import { cancelDetailHistoryOpen, installDetailHistory } from '../navigation/detail-history';
 import { dockDestinationIndex } from '../settings/dock-preferences';
-import type { CrateSection, DockDestination } from '../navigation/feature-navigation';
-import type { ReadingSection } from '@/reading/core/reading-presentation';
+import { createRememberedTabs, type CrateSection, type DockDestination } from '../navigation/feature-navigation';
 import type { SharedFeatures } from '@/protocol/feature-policy';
 import { loadPwaPreferences } from '../settings/preferences';
 import { resolvePwaOpeningDestination } from '../navigation/opening-destination';
@@ -26,10 +25,14 @@ export function useFeatureNavigation(features: SharedFeatures) {
 	useEffect(() => { if (!settingsOpen) settingsNavigation.reset(); }, [settingsOpen, settingsNavigation]);
 	const [shortcutLaunch] = useState(() => new URL(location.href).searchParams.get('setup') === 'shortcut');
 	const openedShortcut = useRef(false);
-	const [reminderDockIndex, rememberReminderDockIndex] = useState<number | null>(null);
 	const { preferences } = usePwaPreferences();
-	const [readingTab, rememberReadingTab] = useState<ReadingSection>(() => launch.tab === 'reading' ? launch.readingTab : 'inbox');
-	const dockIndex = section === 'reading' ? dockDestinationIndex(preferences.dockTabs, 'reading', readingTab) : reminderDockIndex;
+	// Docks remember their tab on every switch. Keep it outside state so only the docks re-render.
+	const [remembered] = useState(() => createRememberedTabs(launch.tab === 'reading' ? launch.readingTab : 'inbox'));
+	const dockTabs = preferences.dockTabs;
+	const dockIndex = useCallback(() => {
+		const { readingTab, reminderDockIndex } = remembered.get();
+		return section === 'reading' ? dockDestinationIndex(dockTabs, 'reading', readingTab) : reminderDockIndex;
+	}, [remembered, section, dockTabs]);
 	const [leavingSection, setLeavingSection] = useState<CrateSection | null>(null);
 	// Keep the painted front layer in place through reversals. Swapping the
 	// layers mid-fade would replace the current mixture with an opaque screen.
@@ -123,7 +126,7 @@ export function useFeatureNavigation(features: SharedFeatures) {
 		retry();
 		return () => { observer.disconnect(); cancelAnimationFrame(frame); };
 	}, [section]);
-	const switchSection = (next: CrateSection) => {
+	const switchSection = useCallback((next: CrateSection) => {
 		if (!features[next]) return;
 		const previous = sectionRef.current;
 		if (next === previous) return;
@@ -132,15 +135,15 @@ export function useFeatureNavigation(features: SharedFeatures) {
 		cancelDetailHistoryOpen();
 		restoreFocus.current = true;
 		showSection(next);
-	};
-	const navigate = (next: DockDestination) => {
+	}, [features, showSection]);
+	const navigate = useCallback((next: DockDestination) => {
 		// The loading header, dock and first library render share this selection.
 		// Set it before entering, rather than waiting for the loaded dock's effect.
-		if (next.section === 'reading') rememberReadingTab(next.tab);
+		if (next.section === 'reading') remembered.rememberReadingTab(next.tab);
 		setDestination(next);
 		switchSection(next.section);
-	};
-	const toggle = () => { switchSection(sectionRef.current === 'reading' ? 'reminders' : 'reading'); };
+	}, [remembered, switchSection]);
+	const toggle = useCallback(() => { switchSection(sectionRef.current === 'reading' ? 'reminders' : 'reading'); }, [switchSection]);
 	const panelStyle = (panel: CrateSection) => ({
 		zIndex: panel === frontSection ? 2 : 1,
 		opacity: panel === frontSection ? Number(section === frontSection) : Number(leavingSection !== null),
@@ -148,6 +151,6 @@ export function useFeatureNavigation(features: SharedFeatures) {
 	return {
 		root, section, destination, settingsOpen, settingsNavigation, settingsOpened,
 		frontSection, leavingSection, visited, panelStyle, finishSettledSection,
-		switchSection, navigate, toggle, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab,
+		switchSection, navigate, toggle, dockIndex, remembered,
 	};
 }

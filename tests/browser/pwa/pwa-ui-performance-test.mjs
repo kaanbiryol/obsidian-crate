@@ -112,10 +112,12 @@ for (const browserType of [chromium, webkit]) {
 			});
 			await expect(page.locator('.pwa-pull-refresh')).toHaveClass(/is-ready/);
 			const pulled = await page.locator('#scroll').boundingBox();
-			const indicator = await page.locator('.pwa-pull-refresh').boundingBox();
+			const glyph = await page.locator('.pwa-pull-refresh__inner').boundingBox();
 			assert.equal(pulled.width, before.width, 'pull must retain list width');
 			assert.equal(pulled.height, before.height, 'pull must retain list height');
-			assert.ok(Math.abs(pulled.y - before.y - indicator.height) < 1, 'pull should reveal the indicator above the list');
+			// The list moves down with a transform, and the indicator's glyph sits centered in the gap it opens.
+			assert.ok(pulled.y - before.y > 40, 'pull should move the list down');
+			assert.ok(Math.abs(glyph.y + glyph.height / 2 - (before.y + (pulled.y - before.y) / 2)) < 1, 'pull should reveal the indicator above the list');
 			await page.evaluate(() => document.getElementById('scroll').dispatchEvent(new Event('touchend', { bubbles: true })));
 			await expect(page.locator('#refreshes')).toHaveText('1');
 			await expect(page.locator('.pwa-pull-refresh')).not.toHaveClass(/is-visible/);

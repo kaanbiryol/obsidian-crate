@@ -14,6 +14,7 @@ export function useToast(): {
 } {
 	const [toast, setToast] = useState<ToastState | null>(null);
 	const timerRef = useRef<number | null>(null);
+	const nextId = useRef(0);
 
 	const clearToast = useCallback(() => {
 		if (timerRef.current !== null) {
@@ -24,7 +25,7 @@ export function useToast(): {
 	}, []);
 
 	const showToast = useCallback<ShowToast>((kind, message, syncState, action) => {
-		setToast({ kind, message, syncState, action });
+		setToast({ id: ++nextId.current, kind, message, syncState, action });
 		if (timerRef.current !== null) window.clearTimeout(timerRef.current);
 		const duration = getToastDuration(kind, Boolean(action));
 		timerRef.current = window.setTimeout(() => {

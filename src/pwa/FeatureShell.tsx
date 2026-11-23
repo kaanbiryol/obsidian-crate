@@ -4,7 +4,7 @@ import { PwaSyncProvider } from './sync/PwaSyncProvider';
 import { SharedFeaturesContext, useServerFeatures } from './shared-features';
 import { Button } from '@/ui/shared/Button';
 import { PwaUpdateProvider } from './update/PwaUpdateProvider';
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState, type ContextType } from 'react';
 import { FeatureNavigationContext, type CrateSection } from './navigation/feature-navigation';
 import { ThemeIconProvider } from '@/ui/shared/ThemeIcon';
 import { PwaThemeProvider } from './components/PwaThemeProvider';
@@ -30,8 +30,16 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	const {
 		root, section, destination, settingsOpen, settingsNavigation, settingsOpened,
 		frontSection, leavingSection, visited, panelStyle, finishSettledSection,
-		switchSection, navigate, toggle, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab,
+		switchSection, navigate, toggle, dockIndex, remembered,
 	} = useFeatureNavigation(features);
+	// Stable per panel, so its consumers re-render only when navigation changes.
+	const navigationValue = useCallback((panel: CrateSection): NonNullable<ContextType<typeof FeatureNavigationContext>> => ({
+		section: panel, active: section === panel, toggle, destination, navigate, dockIndex,
+		subscribeDockIndex: remembered.subscribe, rememberReminderDockIndex: remembered.rememberReminderDockIndex,
+		get readingTab() { return remembered.get().readingTab; }, rememberReadingTab: remembered.rememberReadingTab,
+	}), [section, toggle, destination, navigate, dockIndex, remembered]);
+	const readingNavigation = useMemo(() => navigationValue('reading'), [navigationValue]);
+	const reminderNavigation = useMemo(() => navigationValue('reminders'), [navigationValue]);
 	useDocumentScrollScreens();
 	const paused = (feature: CrateSection) => <div className="crate-reading__empty pwa-feature-paused" role="status">
 		<h2>{feature === 'reading' ? 'Reading' : 'Reminders'} paused</h2>
@@ -44,8 +52,8 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 		if (event.propertyName === 'opacity' && panel.dataset.crateSection === frontSection) finishSettledSection();
 	}}>
 		<div className="crate-modal-canvas">
-		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" style={panelStyle('reading')} data-front={frontSection === 'reading'} data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading' || settingsOpen} aria-hidden={section !== 'reading' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reading', active: section === 'reading', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{features.reading ? visited.has('reading') && <ReadingApp /> : paused('reading')}</FeatureNavigationContext.Provider></div>
-		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" style={panelStyle('reminders')} data-front={frontSection === 'reminders'} data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={{ section: 'reminders', active: section === 'reminders', toggle, destination, navigate, dockIndex, rememberReminderDockIndex, readingTab, rememberReadingTab }}>{features.reminders ? visited.has('reminders') && reminders : paused('reminders')}</FeatureNavigationContext.Provider></div>
+		<div className="crate-feature-panel crate-reminders-ui pwa-reading-root" data-crate-section="reading" style={panelStyle('reading')} data-front={frontSection === 'reading'} data-active={section === 'reading'} data-leaving={leavingSection === 'reading'} data-entering={section === 'reading' && leavingSection !== null} inert={section !== 'reading' || settingsOpen} aria-hidden={section !== 'reading' || settingsOpen}><FeatureNavigationContext.Provider value={readingNavigation}>{features.reading ? visited.has('reading') && <ReadingApp /> : paused('reading')}</FeatureNavigationContext.Provider></div>
+		<div className="crate-feature-panel crate-reminders-ui" data-crate-section="reminders" style={panelStyle('reminders')} data-front={frontSection === 'reminders'} data-active={section === 'reminders'} data-leaving={leavingSection === 'reminders'} data-entering={section === 'reminders' && leavingSection !== null} inert={section !== 'reminders' || settingsOpen} aria-hidden={section !== 'reminders' || settingsOpen}><FeatureNavigationContext.Provider value={reminderNavigation}>{features.reminders ? visited.has('reminders') && reminders : paused('reminders')}</FeatureNavigationContext.Provider></div>
 		</div>
 		{settingsOpen && <div className="crate-reminders-ui pwa-shadow-root pwa-settings-root"><SettingsSheet navigation={settingsNavigation} onOpenEnd={settingsOpened} onReviewReminders={() => navigate({ section: 'reminders', tab: 'today' })} /></div>}
 	</div></AppConnectionGate></PwaSyncProvider></PwaUpdateProvider></ThemeIconProvider></SharedFeaturesContext.Provider></DockMorphContext.Provider>;

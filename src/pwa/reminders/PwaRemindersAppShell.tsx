@@ -37,7 +37,8 @@ interface PwaRemindersAppShellProps {
 	projects: string[];
 	isDarkMode: boolean;
 	initialTab: TabId;
-	initialProject?: string;
+	/** Seeds the first screen; later changes push that project or close it. */
+	requestedProject?: string;
 	upcomingDays: number;
 	headerRightContent?: (isProjectDetail: boolean) => React.ReactNode;
 	headerMetaContent?: React.ReactNode;
@@ -72,7 +73,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	projects,
 	isDarkMode,
 	initialTab,
-	initialProject,
+	requestedProject,
 	upcomingDays,
 	headerRightContent,
 	headerMetaContent,
@@ -95,7 +96,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	const reduceMotion = useReducedMotion();
 	const { viewMode, selectedProject, navigationMotion, projectOpen, canGoBack,
 		handleViewModeChange, handleProjectSelect, handleBackToProjects, finishProjectClose } = useReminderProjectNavigation({
-		initialTab: requested?.section === 'reminders' ? requested.tab : initialTab, initialProject, reduceMotion,
+		initialTab: requested?.section === 'reminders' ? requested.tab : initialTab, requestedProject, reduceMotion,
 	});
 	const shell = useRef<HTMLDivElement>(null);
 

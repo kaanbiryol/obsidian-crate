@@ -71,10 +71,12 @@ browser) still stops the edit instead of attaching a highlight to the wrong text
 
 Releasing an article selection saves its highlight and opens a menu with **Copy**,
 **Share**, **Note**, and **Delete highlight**. Copy and Share operate on the excerpt text;
-Share falls back to copying when native sharing is unavailable. **Note** opens the
+Share falls back to copying when native sharing is unavailable. A completed copy or
+share closes the menu; a cancelled share keeps it open. **Note** opens the
 highlight's note sheet once its save has finished. Scrolling, tapping
 outside, or Escape dismisses the controls while retaining the highlight. Tapping
-a saved highlight reopens the menu and custom resize handles. A pending save does
+a saved highlight reopens the menu and custom resize handles; tapping the open
+highlight again keeps them in place. A pending save does
 not disable Copy or Share, and a late completion never reopens a dismissed menu.
 
 The shared reader offers **Article** and **Highlights**, with personal notes and

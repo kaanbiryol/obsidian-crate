@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readingConnectionView, type ReadingConnectionInput } from './connection-view';
 
-const connected: ReadingConnectionInput = { isOffline: false, readOnly: false, hasSession: true, hasCache: true, error: null, connectionState: 'available' };
+const connected: ReadingConnectionInput = { isOffline: false, readOnly: false, hasSession: true, hasCache: true, libraryFailed: false, error: null, connectionState: 'available' };
 const view = (patch: Partial<ReadingConnectionInput>) => readingConnectionView({ ...connected, ...patch });
 
 describe('readingConnectionView', () => {
@@ -15,8 +15,14 @@ describe('readingConnectionView', () => {
 	});
 
 	it('treats a library that never loaded on a reported-online network like being offline', () => {
-		expect(view({ hasCache: false, error: 'Network request failed' }))
+		expect(view({ hasCache: false, libraryFailed: true, error: 'Network request failed' }))
 			.toMatchObject({ savedOnly: true, connectionText: 'Couldn’t connect · showing saved articles', libraryError: null });
+	});
+
+	it('keeps the saved list and banner when another error clears or replaces the failed refresh\'s', () => {
+		// Before: opening the add form cleared the error, which swapped the saved list for a spinner.
+		expect(view({ hasCache: false, libraryFailed: true, error: null })).toMatchObject({ savedOnly: true, connectionText: 'Couldn’t connect · showing saved articles' });
+		expect(view({ hasCache: false, libraryFailed: false, error: 'This article could not be opened.' })).toMatchObject({ savedOnly: false, connectionText: null });
 	});
 
 	it('names why an unanswered encryption check left the app read-only', () => {

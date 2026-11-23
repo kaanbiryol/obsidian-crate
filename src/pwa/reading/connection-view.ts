@@ -7,6 +7,8 @@ export interface ReadingConnectionInput {
 	hasSession: boolean;
 	/** The first inbox page loaded. */
 	hasCache: boolean;
+	/** The last library refresh failed. Other errors, like an article that could not open, leave the library as it is. */
+	libraryFailed: boolean;
 	error: string | null;
 	connectionState: string;
 }
@@ -23,10 +25,10 @@ export interface ReadingConnectionView {
 }
 
 /** What the Reading web app shows for its connection, from the state the runtime reports. */
-export function readingConnectionView({ isOffline, readOnly, hasSession, hasCache, error, connectionState }: ReadingConnectionInput): ReadingConnectionView {
+export function readingConnectionView({ isOffline, readOnly, hasSession, hasCache, libraryFailed, error, connectionState }: ReadingConnectionInput): ReadingConnectionView {
 	const readingDisabled = !hasSession && connectionState !== 'available';
 	// A request that failed on a network the browser still reports as online shows saved articles too.
-	const neverLoaded = hasSession && !hasCache && !!error;
+	const neverLoaded = hasSession && !hasCache && libraryFailed;
 	const savedOnly = isOffline || readOnly || neverLoaded;
 	const connectionText = readingDisabled ? null
 		: isOffline && (hasSession || readOnly) ? 'Offline · showing saved articles'

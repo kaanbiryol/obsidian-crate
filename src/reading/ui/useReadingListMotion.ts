@@ -7,16 +7,19 @@ type SectionLists = RefObject<Map<ReadingSection, HTMLDivElement>>;
 
 /** Collapses rows that left `section`'s list, unless `hold` keeps them in place (as while the
  * reader that archived one closes), then `settle`s them so the rows below slide up. Rows that
- * left while the list was not `listed`, as behind a loading state, settle at once. */
+ * left while the list was not `listed`, as behind a loading state, settle at once.
+ * A departing row fades in place while the content after it slides up over its space with a
+ * transform; layout changes once, when `settle` removes the row and the slide is dropped. */
 export function useCollapseDepartedRows(lists: SectionLists, section: ReadingSection, departed: ReadonlySet<string>,
 	settle: (ids: readonly string[]) => void, hold: boolean, listed: boolean): void {
-	const collapsing = useRef(new Map<HTMLElement, Animation>());
+	const collapsing = useRef(new Map<HTMLElement, Animation[]>());
 	useLayoutEffect(() => {
-		// A collapse holds its node at zero height until the node leaves. A node that stays, as a
+		// A collapse holds its node faded, and the content below slid up, until the node leaves;
+		// dropping the slide in the same commit keeps that content still. A node that stays, as a
 		// date group that gains a new row (a saved link replacing its pending copy), shows again.
-		for (const [node, animation] of collapsing.current) {
+		for (const [node, animations] of collapsing.current) {
 			if (node.isConnected && node.dataset.departing === 'true') continue;
-			animation.cancel();
+			for (const animation of animations) animation.cancel();
 			collapsing.current.delete(node);
 		}
 		if (hold || !departed.size) return;
@@ -32,15 +35,29 @@ export function useCollapseDepartedRows(lists: SectionLists, section: ReadingSec
 			const ids = node.dataset.departed ? [node.dataset.departed] : [...node.querySelectorAll<HTMLElement>('[data-departed]')].map(row => row.dataset.departed!);
 			if (!duration) { settle(ids); continue; }
 			const style = owner.getComputedStyle(node);
-			const animation = node.animate([
-				{ height: `${node.offsetHeight}px`, paddingTop: style.paddingTop, paddingBottom: style.paddingBottom, marginBottom: style.marginBottom, opacity: 1 },
-				{ height: '0px', paddingTop: '0px', paddingBottom: '0px', marginBottom: '0px', opacity: 0 },
-			], { duration, easing, fill: 'forwards' });
-			collapsing.current.set(node, animation);
-			animation.onfinish = () => settle(ids);
+			const space = node.offsetHeight + (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0);
+			const timing: KeyframeAnimationOptions = { duration, easing, fill: 'forwards' };
+			const fade = node.animate([{ opacity: 1, scale: '1' }, { opacity: 0, scale: '0.96' }], timing);
+			// Rows that depart together each add their own slide to the content below them.
+			const slides = contentAfter(node, list).map(follower => follower.animate(
+				[{ translate: '0 0' }, { translate: `0 ${-space}px` }], { ...timing, composite: 'add' }));
+			collapsing.current.set(node, [fade, ...slides]);
+			fade.onfinish = () => settle(ids);
 		}
 	}, [lists, hold, listed, departed, section, settle]);
-	useEffect(() => () => { for (const animation of collapsing.current.values()) animation.cancel(); }, []);
+	useEffect(() => () => {
+		for (const animations of collapsing.current.values()) for (const animation of animations) animation.cancel();
+	}, []);
+}
+
+/** The elements after `node` inside `list`, at each level up to the list: the content that
+ * moves up once `node` leaves. */
+function contentAfter(node: HTMLElement, list: HTMLElement): HTMLElement[] {
+	const after: HTMLElement[] = [];
+	for (let level: Element = node; level !== list && level.parentElement; level = level.parentElement) {
+		for (let next = level.nextElementSibling; next; next = next.nextElementSibling) after.push(next as HTMLElement);
+	}
+	return after;
 }
 
 /** Crossfades a tag change in place. Call the returned function as a tag is selected, after the

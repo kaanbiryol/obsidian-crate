@@ -159,7 +159,7 @@ try {
 				await expect(page.getByRole('heading', { name: 'Connect to Crate' })).toBeVisible();
 				await expect(page.locator('.pwa-reminders-view')).toHaveCount(0);
 				release();
-				await expect(page.locator('.toast')).toContainText('Remote session cleanup could not finish');
+				await expect(page.locator('.toast:not([aria-hidden="true"])')).toContainText('Remote session cleanup could not finish');
 				expect(errors).toEqual([]); await context.close();
 			}
 			console.log(`${engine.name()}: cross-feature delivery, shared status, failure isolation, paused queues, resume and logout feedback passed`);

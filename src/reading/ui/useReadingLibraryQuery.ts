@@ -1,8 +1,10 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import type { ReadingSnapshot } from '../data/library';
 import { countReadingTags, filterReadingHighlights, filterReadingItems, settledHighlights, type ReadingSection } from '../core/reading-presentation';
 import { matchesReadingQuery, searchableQuery } from '../core/search-terms';
 import { useLibraryPages, type ReadingLibrarySource } from './useLibraryPages';
+
+type Present = ReadingLibrarySource['present'];
 import { useMinimumLoading } from './useMinimumLoading';
 import { LOADING_INDICATOR_DELAY_MS } from '@/ui/shared/LoadingIndicator';
 
@@ -40,7 +42,22 @@ export function useReadingLibraryQuery({ snapshot, source, section, query, tag, 
 	const holding = holdPrevious && !!source && shown.section !== section && pages.answered && !pages.slow;
 	const listedSection = holding ? shown.section : section;
 	const otherSection = shown.section !== listedSection;
-	const loaded = useMemo(() => present ? (otherSection ? [] : present(pages.items)) : snapshot.items, [present, otherSection, pages.items, snapshot.items]);
+	// Pages keep every local change shown over them since their request until they reload, so a
+	// change that settles in between, like a delete, never brings back the row it changed.
+	const [shownOver, setShownOver] = useState({ items: pages.items, base: pages.present, overlays: [] as Present[] });
+	const reloaded = shownOver.items !== pages.items || shownOver.base !== pages.present;
+	const kept = reloaded ? [] : shownOver.overlays;
+	if (reloaded || (present && present !== pages.present && !kept.includes(present))) {
+		// React renders again before committing, so this render's list is never shown.
+		setShownOver({ items: pages.items, base: pages.present, overlays: present && present !== pages.present ? [...kept, present] : kept });
+	}
+	const { overlays } = shownOver;
+	const loaded = useMemo(() => {
+		if (!present) return snapshot.items;
+		if (otherSection) return [];
+		// Each overlay's changes are idempotent, so the current one may apply again last.
+		return [pages.present, ...overlays].reduce((items, overlay) => overlay ? overlay(items) : items, pages.items);
+	}, [present, overlays, otherSection, pages.items, pages.present, snapshot.items]);
 	const items = useMemo(() => present
 		? filterReadingItems(loaded, listedSection, '', null).filter(item => matchesReadingQuery(item, { query: shown.q, tag: shown.tag, highlights: listedSection === 'highlights' }))
 		: filterReadingItems(snapshot.items, section, listQuery, tag), [present, loaded, snapshot.items, section, listedSection, listQuery, tag, shown.q, shown.tag]);

@@ -9,6 +9,8 @@ type ReaderMode = 'article' | 'highlights';
 
 interface ReaderHighlightsOptions {
 	item: ReadingMetadata;
+	/** Which article is open; see the reader's `articleKey`. */
+	articleKey: string;
 	markdown: string | null;
 	/** Rendered article content; passages are focused again once it changes. */
 	content: unknown;
@@ -28,7 +30,7 @@ function findCurrent(item: ReadingMetadata, target: ReadingHighlight): ReadingHi
 }
 
 /** Highlight sheets, the note and delete dialogs, and passage focus for one open reading item. */
-export function useReaderHighlights({ item, markdown, content, body, article, mode, setMode, onUpdate, focusHighlight, floatingHighlights, setError, disabled }: ReaderHighlightsOptions) {
+export function useReaderHighlights({ item, articleKey, markdown, content, body, article, mode, setMode, onUpdate, focusHighlight, floatingHighlights, setError, disabled }: ReaderHighlightsOptions) {
 	const [highlightsOpen, setHighlightsOpen] = useState(false);
 	// An action chosen in the Highlights sheet runs once the sheet has closed.
 	const sheetAction = useRef<(() => void) | null>(null);
@@ -40,7 +42,7 @@ export function useReaderHighlights({ item, markdown, content, body, article, mo
 	const [noteOverHighlights, setNoteOverHighlights] = useState(false);
 	useEffect(() => {
 		setAnnotation(null); setPendingDelete(null); setHighlightsOpen(false); sheetAction.current = null;
-	}, [item.crate_reading_id]);
+	}, [articleKey]);
 	useEffect(() => { if (focusHighlight) { setMode('article'); setTarget(focusHighlight); } }, [focusHighlight, setMode]);
 	useEffect(() => {
 		if (!target || mode !== 'article' || markdown === null) return;

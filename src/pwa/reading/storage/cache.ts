@@ -12,7 +12,11 @@ import { readingNoteFolder } from '../session/encryption-session';
 
 /** The library's first inbox page and its issues, kept in memory only. The library stays on
  * the server; this device stores only articles saved for offline. */
-export interface ReadingCache { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; cursor?: string | null }
+export interface ReadingCache {
+	items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; cursor?: string | null;
+	/** Offline, no library was read; the app lists the articles saved on this device instead. */
+	offline?: true;
+}
 
 /** An image an offline copy shows: its type and base64 bytes. */
 interface OfflineReadingImage { type: string; data: string }

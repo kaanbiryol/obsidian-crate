@@ -33,8 +33,11 @@ import { ReadingSourceIcon } from './ReadingSourceIcon';
 import { LoadingIndicator } from '../../ui/shared/LoadingIndicator';
 import { EmptyState } from '../../ui/shared/EmptyState';
 
+// Stable, so an item without highlights skips the body's highlight check on unrelated renders.
+const NO_HIGHLIGHTS: ReadingHighlight[] = [];
+
 export function ReadingReader({
-	item, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onDelete,
+	item, articleKey = item.crate_reading_id, markdown: loadedMarkdown, deferContentUntilEntered = false, revealContentTogether = false, onBack, onEdit, onUpdate, onDelete,
 	onSaveComplete, onCopyComplete, onFeedback, status, onRetry, notice, pendingMessage = 'Your link is saved. Article text is on its way.',
 	mutationPending = false, highlightsPending = mutationPending, loadingError, onRetryOpen, focusHighlight, autoHideNavigation = false,
 	floatingHighlights = false, highlightCode = highlightReadingCode, appearance, onAppearanceChange, syncStatus, pendingHighlights, savedOffline, onOfflineChange, images,
@@ -42,7 +45,10 @@ export function ReadingReader({
 	/** Shows the article's images; without it the reader shows none and loads nothing. */
 	images?: ReadingImageHost;
 	appearance?: ReadingAppearance; onAppearanceChange?: (appearance: ReadingAppearance) => void;
-	item: ReadingMetadata; markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
+	item: ReadingMetadata;
+	/** Which article is open, by default its ID. A host keeps it when one article gets a new ID, like a pending link becoming its saved note, so the reader keeps its place and open sheets. */
+	articleKey?: string;
+	markdown: string | null; onBack: () => void; onEdit?: () => void; onUpdate?: (changes: ReadingChanges) => Promise<void>;
 	/** Deletes the note; the caller closes the reader. */
 	onDelete?: () => Promise<void>;
 	/** Keep article parsing and layout out of the host's opening slide. */
@@ -68,7 +74,7 @@ export function ReadingReader({
 }) {
 	const body = useRef<HTMLDivElement>(null);
 	const tagsFormId = useId(), noteFormId = useId(), deleteFormId = useId(), deleteItemFormId = useId();
-	const { error, setError, busy, sharing, copied, run, shareLink } = useReadingReaderActions(item.crate_reading_id);
+	const { error, setError, busy, sharing, copied, run, shareLink } = useReadingReaderActions(articleKey);
 	const [dialog, setDialog] = useState<'appearance' | 'tags' | 'delete' | null>(null);
 	const [localAppearance, setLocalAppearance] = useState(DEFAULT_READING_APPEARANCE);
 	const { fontSize, serif } = appearance ?? localAppearance;
@@ -79,7 +85,7 @@ export function ReadingReader({
 	};
 	const [mode, setMode] = useState<'article' | 'highlights'>('article');
 	const article = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
-	const markdown = useDeferredEntry(article, deferContentUntilEntered, item.crate_reading_id) ? loadedMarkdown : null;
+	const markdown = useDeferredEntry(article, deferContentUntilEntered, articleKey) ? loadedMarkdown : null;
 	const videoId = youtubeVideoId(item.source_url);
 	const kind = videoId ? 'video' : 'article';
 	const segments = useMemo(() => videoId && markdown !== null ? transcriptSegments(markdown) : [], [videoId, markdown]);
@@ -89,11 +95,11 @@ export function ReadingReader({
 	const showHeader = !revealContentTogether || markdown !== null || Boolean(loadingError);
 	// Article actions wait for the article; Back stays available.
 	const loading = markdown === null && !loadingError;
-	useReaderNavigation(article, autoHideNavigation && (!segments.length || !videoPinned), item.crate_reading_id);
+	useReaderNavigation(article, autoHideNavigation && (!segments.length || !videoPinned), articleKey);
 	useEffect(() => {
 		if (article.current) readerScrollElement(article.current).scrollTo({ top: 0 }); (heading.current ?? article.current)?.focus({ preventScroll: true });
 		setDialog(null); setVideoSeek(null); setVideoPinned(true); setMode('article');
-	}, [item.crate_reading_id]);
+	}, [articleKey]);
 	useEffect(() => {
 		// Transfer opening focus without taking it from a control used while loading.
 		if (showHeader && article.current?.ownerDocument.activeElement === article.current) heading.current?.focus({ preventScroll: true });
@@ -109,7 +115,7 @@ export function ReadingReader({
 	const {
 		highlightsOpen, openHighlights, closeHighlights, annotation, note, setNote, noteOverHighlights, openNote, closeNote, canSaveNote,
 		pendingDelete, requestDelete, cancelDelete, saveHighlights, saveNote, deleteHighlight, perform, view,
-	} = useReaderHighlights({ item, markdown, content, body, article, mode, setMode, onUpdate, focusHighlight, floatingHighlights, setError, disabled: busy || highlightsPending });
+	} = useReaderHighlights({ item, articleKey, markdown, content, body, article, mode, setMode, onUpdate, focusHighlight, floatingHighlights, setError, disabled: busy || highlightsPending });
 	const saveNoteAndClose = (close: () => void) => {
 		void run(async isCurrent => { await saveNote(); if (!isCurrent()) return; onSaveComplete?.('note'); if (isCurrent()) close(); });
 	};
@@ -204,7 +210,7 @@ export function ReadingReader({
 			</div>}
 			{!floatingHighlights && mode === 'highlights' && renderHighlights()}
 			<div hidden={mode !== 'article'}>
-			{videoId && showHeader && <ReadingVideo key={item.crate_reading_id} id={videoId} source={item.source_url} body={body} content={content}
+			{videoId && showHeader && <ReadingVideo key={articleKey} id={videoId} source={item.source_url} body={body} content={content}
 				hasTranscript={segments.length > 0} pinned={videoPinned} onPinnedChange={setVideoPinned} seekTarget={videoSeek} />}
 			{markdown !== null && item.extraction_status !== 'ready' && <p className="crate-reading__notice">
 				{extractionNotice(item, Boolean(videoId), pendingMessage)}
@@ -219,7 +225,7 @@ export function ReadingReader({
 			{markdown === null ? <div className="pwa-reading-article-opening__body">
 				{loadingError ? <><p role="alert">{loadingError}</p><Button variant="outline" onClick={onRetryOpen}>Retry</Button></>
 					: <LoadingIndicator label={videoId ? "Loading video details" : "Loading article"} />}
-			</div> : <ReadingBody body={body} article={article} content={content} highlights={item.highlights ?? []} pendingHighlights={pendingHighlights} />}
+			</div> : <ReadingBody body={body} article={article} content={content} highlights={item.highlights ?? NO_HIGHLIGHTS} pendingHighlights={pendingHighlights} />}
 			{markdown !== null && (videoId || item.extraction_status === 'ready') && <footer className="crate-reading-reader__end">
 				{!videoId && <><span aria-hidden="true">✦</span><p>You’ve reached the end.</p></>}
 				{onUpdate && item.reading_status === 'inbox' && <Button variant="outline" disabled={mutationPending} aria-disabled={busy || mutationPending}
@@ -229,8 +235,8 @@ export function ReadingReader({
 			</footer>}
 			</div>
 		</div>
-		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={item.crate_reading_id} body={body} article={article} content={content}
-			highlights={item.highlights ?? []} disabled={busy || highlightsPending} onSave={saveHighlights} onAnnotate={openNote} onCopyComplete={onCopyComplete} onFeedback={onFeedback}
+		{onUpdate && markdown !== null && mode === 'article' && <ReadingHighlightActions key={articleKey} body={body} article={article} content={content}
+			highlights={item.highlights ?? NO_HIGHLIGHTS} disabled={busy || highlightsPending} onSave={saveHighlights} onAnnotate={openNote} onCopyComplete={onCopyComplete} onFeedback={onFeedback}
 			onSelect={videoId ? seekToHighlight : undefined} />}
 		{floatingHighlights && highlightsOpen && <ReadingDialog title="Highlights" fullHeight onClose={closeHighlights}>{close => renderHighlights(close)}</ReadingDialog>}
 		{!(floatingHighlights && highlightsOpen && noteOverHighlights) && noteDialog}

@@ -1,7 +1,7 @@
 import { ReadingDuplicates } from './ReadingDuplicates';
 import { DEFAULT_LIST_STYLE, type ListStyle } from '@/ui/shared/list-style';
 import { TextField } from '../../ui/shared/TextField';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ViewHeader } from '../../ui/shared/ViewHeader';
@@ -76,7 +76,12 @@ export function ReadingLibraryPanel({
 	const [query, setQuery] = useState(''), [tag, setTag] = useState<string | null>(null);
 	const [visible, setVisible] = useState(PAGE_SIZE);
 	const [busy, setBusy] = useState<ReadonlySet<string>>(new Set()), [error, setError] = useState<string | null>(null);
-	const [exitingReader, setExitingReader] = useState<React.ReactNode>(null);
+	// Whether a reader opened with motion has not finished closing. The host renders a new
+	// reader element each time, so keep the last one shown in a ref rather than in state.
+	const [exitingReader, setExitingReader] = useState(false);
+	const lastReader = useRef<React.ReactNode>(null);
+	useLayoutEffect(() => { if (reader) lastReader.current = reader; });
+	const readerOpen = !!reader, readerAnimated = readerMotion !== undefined;
 	const retainReaderOnClose = readerMotion === 'slide';
 	// A history swipe reveals the PWA tab bar immediately. Keep its indicator
 	// parked at the selected tab while the reader covers an unfinished spring.
@@ -103,19 +108,19 @@ export function ReadingLibraryPanel({
 		if (!readerClosing) previousArticle.current = activeId;
 	}, [activeId, readerClosing, shownSection]);
 	useEffect(() => {
-		if (reader) {
-			if (readerMotion !== undefined) setExitingReader(reader);
+		if (readerOpen) {
+			if (readerAnimated) setExitingReader(true);
 			return;
 		}
-		if (!retainReaderOnClose || !exitingReader) { setExitingReader(null); onReaderClosed?.(); return; }
+		if (!retainReaderOnClose || !exitingReader) { setExitingReader(false); onReaderClosed?.(); return; }
 		// transitionend owns normal cleanup; this also handles rotation or a cancelled transition.
-		const timer = window.setTimeout(() => { setExitingReader(null); onReaderClosed?.(); }, 1000);
+		const timer = window.setTimeout(() => { setExitingReader(false); onReaderClosed?.(); }, 1000);
 		return () => window.clearTimeout(timer);
-	}, [reader, readerMotion, retainReaderOnClose, exitingReader, onReaderClosed]);
+	}, [readerOpen, readerAnimated, retainReaderOnClose, exitingReader, onReaderClosed]);
 	// A row that leaves the list, like an article archived in the reader, stays in place until
 	// the reader has closed, then collapses so the rows below slide up rather than jump.
 	const { rows, departed, settle } = useDepartedRows(items, JSON.stringify([shownSection, listQuery, shownTag]));
-	const holdDeparted = !!reader || readerClosing || !!exitingReader;
+	const holdDeparted = !!reader || readerClosing || exitingReader;
 	useCollapseDepartedRows(lists, shownSection, departed, settle, holdDeparted, !loading && !listContent);
 	const groups = useMemo(() => groupReadingItems(rows.slice(0, visible)), [rows, visible]);
 	// A section that had to load fades its count, tags and list in instead of popping in.
@@ -232,8 +237,8 @@ export function ReadingLibraryPanel({
 				</>)}
 			</div>
 			<div className="crate-reading__reader-pane" inert={readerMotion !== undefined && !reader} aria-hidden={readerMotion !== undefined && !reader} onTransitionEnd={event => {
-				if (event.target === event.currentTarget && event.propertyName === 'transform' && !reader) { setExitingReader(null); onReaderClosed?.(); }
-			}}>{reader ?? (retainReaderOnClose ? exitingReader : null)}</div>
+				if (event.target === event.currentTarget && event.propertyName === 'transform' && !reader) { setExitingReader(false); onReaderClosed?.(); }
+			}}>{reader ?? (retainReaderOnClose && exitingReader ? lastReader.current : null)}</div>
 		</div>
 	</section>;
 }

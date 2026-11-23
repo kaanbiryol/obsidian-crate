@@ -16,9 +16,12 @@ export interface ReadingLibrarySource {
 
 /** The query that `items` and `tags` answer, which trails the asked query until it loads. */
 interface ShownLibraryQuery { section: ReadingSection; q: string; tag: string | null }
-interface Pages extends ShownLibraryQuery { key: string; items: ReadingItem[]; cursor: string | null; tags: ReadingTag[]; loading: boolean; error: string | null; reloading?: boolean }
+type Present = ReadingLibrarySource['present'];
+/** `present` is the source's at request time: changes confirmed since then are in the next
+ * reload's items, not these, so they stay shown over these items until it answers. */
+interface Pages extends ShownLibraryQuery { key: string; items: ReadingItem[]; present?: Present; cursor: string | null; tags: ReadingTag[]; loading: boolean; error: string | null; reloading?: boolean }
 /** What a query or section answered, and the library revision it answered for. */
-interface Cached { items: ReadingItem[]; cursor: string | null; revision: unknown; browse: boolean }
+interface Cached { items: ReadingItem[]; present: Present; cursor: string | null; revision: unknown; browse: boolean }
 interface CachedTags { tags: ReadingTag[]; revision: unknown }
 interface Cache { revision: unknown; pages: Map<string, Cached>; tags: Map<ReadingSection, CachedTags> }
 // Typing waits this long before a search reaches the server.
@@ -74,7 +77,7 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 	// A query read before shows in the same render, so returning to it never paints a loading state.
 	const known = cache.current.pages.get(key), knownTags = cache.current.tags.get(section);
 	const pages: Pages = enabled && loaded.key !== key && known && knownTags
-		? { key, section, q: query, tag, items: known.items, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null }
+		? { key, section, q: query, tag, items: known.items, present: known.present, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null }
 		: loaded;
 	const current = useRef(key), latest = useRef(source), shown = useRef(pages), stored = useRef(loaded), requests = useRef(0);
 	current.current = key; latest.current = source; shown.current = pages; stored.current = loaded;
@@ -111,9 +114,11 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 			const listed = !replace ? appendNew(previous.items, items) : previous.key === requested ? reuseUnchanged(previous.items, items) : items;
 			// Unchanged tags keep the shown row.
 			const kept = previous.section === section && sameJson(previous.tags, sectionTags) ? previous.tags : sectionTags;
-			remember(saved.pages, requested, { items: listed, cursor: page.cursor, revision: answering, browse: !query && !tag });
+			// More pages carry no older changes than the first, so the first page's request time stays.
+			const present = !replace && previous.key === requested ? previous.present ?? source.present : source.present;
+			remember(saved.pages, requested, { items: listed, present, cursor: page.cursor, revision: answering, browse: !query && !tag });
 			if (replace && !tagsFailed) saved.tags.set(section, { tags: kept, revision: answering });
-			setPages({ key: requested, section, q: query, tag, items: listed, cursor: page.cursor, tags: kept, loading: false, error: null });
+			setPages({ key: requested, section, q: query, tag, items: listed, present, cursor: page.cursor, tags: kept, loading: false, error: null });
 		} catch (cause) {
 			if (stale()) return;
 			const error = cause instanceof Error ? cause.message : 'Your library is unavailable. Retry when connected.';
@@ -128,7 +133,7 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 		// an older answer stays on screen while it reloads in the background.
 		const known = cache.current.pages.get(key), knownTags = cache.current.tags.get(section);
 		if (known && knownTags) {
-			if (stored.current.key !== key) setPages({ key, section, q: query, tag, items: known.items, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null });
+			if (stored.current.key !== key) setPages({ key, section, q: query, tag, items: known.items, present: known.present, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null });
 			if (known.revision === revision && knownTags.revision === revision) return;
 		}
 		const timer = window.setTimeout(() => { void fetchPage(null, true); }, query ? SEARCH_DELAY_MS : 0);
@@ -146,7 +151,7 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 	}, [settled, key, query]);
 	const loadMore = useCallback(() => { if (settled && pages.cursor && !pages.loading) void fetchPage(pages.cursor, false); }, [fetchPage, settled, pages.cursor, pages.loading]);
 	// Until a first page answers, the empty initial state is not the library's answer.
-	return { items: pages.items, shown: { section: pages.section, q: pages.q, tag: pages.tag }, tags: pages.tags, answered: !!pages.key,
+	return { items: pages.items, present: pages.present, shown: { section: pages.section, q: pages.q, tag: pages.tag }, tags: pages.tags, answered: !!pages.key,
 		cursor: settled ? pages.cursor : null, loading: pages.loading || !settled, loadingMore: settled && pages.loading && !pages.reloading,
 		slow: !settled && slowKey === key, waiting: enabled && !settled, error: settled ? pages.error : null, loadMore };
 }

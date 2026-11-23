@@ -1,8 +1,8 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
-import { PWA_CONTROL_SPRING, PWA_FADE, PWA_SURFACE_SPRING } from '../../ui/shared/navigation/motion';
+import { PWA_FADE, PWA_PICKER_EXIT, PWA_SURFACE_SPRING } from '../../ui/shared/navigation/motion';
 import { readingHighlights, sameHighlight, type ReadingHighlight } from '../core/highlights';
 import { highlightRange, highlightTextRects } from './reader-highlights';
 import { readingHighlightGeometry, type HighlightGeometry } from './reading-highlight-geometry';
@@ -29,6 +29,13 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 	const commands = useRef({ copy: () => {}, share: () => {}, highlight: () => {}, annotate: () => {}, remove: () => {}, retry: () => {} });
 	const [transferBusy, setTransferBusy] = useState(false);
 	const [layout, setLayout] = useState(0);
+	// Each opening gets its own surface, so reopening while the last one fades out never revives or removes the wrong one.
+	const [opening, setOpening] = useState(0);
+	// A fading surface unmounts after its replacement mounts; only the current one may clear the ref.
+	const attachControls = useCallback((node: HTMLDivElement) => {
+		controls.current = node;
+		return () => { if (controls.current === node) controls.current = null; };
+	}, []);
 
 	useLayoutEffect(() => {
 		const reader = article.current, text = body.current;
@@ -55,7 +62,10 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		const document = reader.ownerDocument, window = document.defaultView;
 		if (!window) return;
 		let alive = true, transferring = false, failedRemove = false;
-		const edit = (value: HighlightEdit | null) => { editing.current = value; setDraft(value); };
+		const edit = (value: HighlightEdit | null) => {
+			if (value && !editing.current) setOpening(count => count + 1);
+			editing.current = value; setDraft(value);
+		};
 		const fail = (message: string) => latest.current.onFeedback?.('error', message);
 		const clearFailure = () => { failedRemove = false; setFailed(false); };
 		const persistFailed = (remove: boolean, message: string) => { failedRemove = remove; setFailed(true); fail(message); };
@@ -87,6 +97,7 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 				// Invoke directly from the button press, before awaiting anything else.
 				if (share) {
 					await window.navigator.share({ text: value.highlight.text });
+					if (current()) dismiss();
 				} else {
 					if (!window.navigator.clipboard) throw new Error('Clipboard unavailable');
 					await window.navigator.clipboard.writeText(value.highlight.text);
@@ -137,14 +148,21 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 	// Obsidian desktop has no native share sheet, so offer Copy only.
 	const canShare = typeof article.current?.ownerDocument.defaultView?.navigator.share === 'function';
 	const reduceMotion = useReducedMotion();
-	// The editor fades as one surface; the toolbar also grows from the edge facing the passage.
+	// The toolbar grows from the edge facing the passage and shrinks back into it; the surface fade supports
+	// that, and the exit eases in so the menu stays readable as it leaves.
 	// Moving between highlights or dragging a handle keeps it mounted, so only show and hide animate.
+	const surfaceMotion = {
+		hidden: { opacity: 0 },
+		shown: { opacity: 1, transition: PWA_FADE },
+		leaving: { opacity: 0, transition: PWA_PICKER_EXIT },
+	} as const;
 	const toolbarMotion = {
-		hidden: { scale: reduceMotion ? 1 : .9, transition: PWA_SURFACE_SPRING },
-		shown: { scale: 1, transition: PWA_CONTROL_SPRING },
+		hidden: { scale: reduceMotion ? 1 : .9 },
+		shown: { scale: 1, transition: PWA_SURFACE_SPRING },
+		leaving: { scale: reduceMotion ? 1 : .94, transition: PWA_PICKER_EXIT },
 	};
-	return <AnimatePresence>{draft && geometry && <PresenceSurface key="editor" ref={controls} className="crate-reading-reader__highlight-editor"
-		variants={{ hidden: { opacity: 0, transition: PWA_FADE }, shown: { opacity: 1, transition: PWA_FADE } }} initial="hidden" animate="shown" exit="hidden">
+	return <AnimatePresence>{draft && geometry && <PresenceSurface key={opening} ref={attachControls} className="crate-reading-reader__highlight-editor"
+		variants={surfaceMotion} initial="hidden" animate="shown" exit="leaving">
 		<div aria-hidden="true">{geometry.boxes.map((box, index) => <span key={index} className="crate-reading-reader__highlight-preview" style={box} />)}</div>
 		{!image && (['start', 'end'] as const).map(edge => {
 			const box = geometry[edge];

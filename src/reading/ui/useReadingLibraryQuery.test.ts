@@ -116,3 +116,36 @@ it('keeps the previous section listed until another section answers, then shows 
 		expect(hook.current).toMatchObject({ section: 'favorites', items: [], loading: true });
 	} finally { vi.useRealTimers(); }
 });
+
+it('keeps a settled delete hidden until the pages answered before it reload', async () => {
+	vi.useFakeTimers();
+	try {
+		// The page answered before the delete was sent; the settled sync drops the queued delete
+		// and starts a reload. Before: the row came back for that moment, then left without its collapse.
+		let answer: () => void = () => {};
+		let reloaded = false;
+		const load = vi.fn(async () => {
+			if (reloaded) await new Promise<void>(resolve => { answer = resolve; });
+			return { items: reloaded ? [cooking] : [systems, cooking], cursor: null };
+		});
+		const hideSystems = (items: ReadingItem[]) => items.filter(item => item.crate_reading_id !== 'systems');
+		let source: ReadingLibrarySource = { load, loadTags: async () => [], revision: 1, present: items => items };
+		const hook = renderHook(() => useReadingLibraryQuery({ snapshot: { items: [], loading: false }, source, section: 'inbox', query: '', tag: null }));
+		const ids = () => hook.current.items.map(item => item.crate_reading_id).sort();
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+		expect(ids()).toEqual(['cooking', 'systems']);
+		// Queued: the delete shows over the answered page.
+		source = { ...source, present: hideSystems };
+		hook.rerender();
+		expect(ids()).toEqual(['cooking']);
+		// Settled: a new revision without the queued delete, while the page reloads.
+		reloaded = true;
+		source = { ...source, revision: 2, present: items => items };
+		hook.rerender();
+		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+		expect(load).toHaveBeenCalledTimes(2);
+		expect(ids()).toEqual(['cooking']);
+		await act(async () => { answer(); await vi.runAllTimersAsync(); });
+		expect(ids()).toEqual(['cooking']);
+	} finally { vi.useRealTimers(); }
+});

@@ -14,6 +14,8 @@ export interface StoredConfig {
 }
 
 export interface ToastState {
+	/** New for each message, so a replacement fades in on its own. */
+	id: number;
 	syncState?: SyncIndicatorState;
 	kind: ToastKind;
 	message: string;

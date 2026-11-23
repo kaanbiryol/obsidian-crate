@@ -37,7 +37,7 @@ it('does not re-render the open project detail when shell props are unchanged', 
 	const hook = renderHook(() => null, () => {
 		Object.assign(window, { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });
 	}, () => React.createElement(PwaRemindersAppShell, {
-		reminders, projects, isDarkMode: false, initialTab: 'browse', initialProject: 'Work', upcomingDays: 7,
+		reminders, projects, isDarkMode: false, initialTab: 'browse', requestedProject: 'Work', upcomingDays: 7,
 		headerRightContent, belowHeaderContent, renderCard, onAdd, onReorder,
 	}));
 	const rendered = projectDetailRenders.count;

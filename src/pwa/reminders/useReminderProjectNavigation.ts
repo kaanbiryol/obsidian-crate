@@ -4,9 +4,10 @@ import type { NavigationMotion } from '../../ui/shared/navigation/NavigationScre
 import { dismissProjectHistory, hasProjectHistory, openProjectHistory } from '../navigation/project-history';
 
 /** Own project history, exit completion and focus restoration as one lifetime. */
-export function useReminderProjectNavigation({ initialTab, initialProject, reduceMotion }: {
-	initialTab: ViewMode; initialProject?: string; reduceMotion: boolean;
+export function useReminderProjectNavigation({ initialTab, requestedProject, reduceMotion }: {
+	initialTab: ViewMode; requestedProject?: string; reduceMotion: boolean;
 }) {
+	const [initialProject] = useState(requestedProject);
 	// Seed the screen from the launch destination. Applying it later via the dock
 	// would show the default tab as an outgoing fade.
 	const [viewMode, setViewMode] = useState<ViewMode>(() => initialProject ? 'browse' : initialTab);
@@ -53,16 +54,22 @@ export function useReminderProjectNavigation({ initialTab, initialProject, reduc
 		setViewMode(mode);
 	}, [selectedProject]);
 
-	const handleProjectSelect = useCallback(async (project: string) => {
-		if (selectedProject || closingProject.current) return;
+	// An open detail is replaced in place, so a request can switch projects.
+	const showProject = useCallback(async (project: string) => {
 		const stack = await openProjectHistory(project);
 		if (!stack || new URL(location.href).searchParams.get('project') !== project) return;
 		projectStack.current = stack;
 		lastProject.current = project;
 		setSkipProjectMotion(false);
 		setDirection(1);
+		setViewMode('browse');
 		setSelectedProject(project);
-	}, [selectedProject]);
+	}, []);
+
+	const handleProjectSelect = useCallback(async (project: string) => {
+		if (selectedProject || closingProject.current) return;
+		await showProject(project);
+	}, [selectedProject, showProject]);
 
 	const handleBackToProjects = useCallback(() => {
 		if (closingProject.current || !selectedProject) return;
@@ -77,6 +84,20 @@ export function useReminderProjectNavigation({ initialTab, initialProject, reduc
 		if (hasProjectHistory()) history.back();
 		else closingProject.current = false;
 	}, []);
+
+	// Follow later app requests (a launch reminder's project, a deleted project)
+	// with the same push and pop as a tap, so the root screen stays mounted.
+	const appliedProject = useRef(initialProject);
+	useEffect(() => {
+		const previous = appliedProject.current;
+		if (requestedProject === previous) return;
+		appliedProject.current = requestedProject;
+		if (!requestedProject) {
+			if (selectedProject && selectedProject === previous) handleBackToProjects();
+		} else if (requestedProject !== selectedProject && !closingProject.current) {
+			void showProject(requestedProject);
+		}
+	}, [requestedProject, selectedProject, handleBackToProjects, showProject]);
 
 	return { viewMode, selectedProject, navigationMotion,
 		projectOpen: Boolean(selectedProject) || closingProject.current,

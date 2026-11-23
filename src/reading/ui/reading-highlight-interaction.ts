@@ -43,7 +43,11 @@ export function registerReadingHighlightInteraction(options: {
 	const settle = () => { window.clearTimeout(timer); timer = window.setTimeout(finishNativeSelection, 120); };
 	const selectionChanged = () => {
 		if (controls.current?.contains(activeElement())) return;
-		if (selectedHighlight(text)) nativeIntent = true;
+		if (selectedHighlight(text)) {
+			nativeIntent = true;
+			// A native selection started on a highlight replaces its editor.
+			if (options.getState().editing) options.onDismiss();
+		}
 		if (nativeIntent && !held) settle();
 	};
 	const activate = (event: MouseEvent | KeyboardEvent) => {
@@ -105,7 +109,10 @@ export function registerReadingHighlightInteraction(options: {
 			handle.setPointerCapture(event.pointerId); frame = window.requestAnimationFrame(autoScroll); return;
 		}
 		if (controls.current?.contains(target)) return;
-		dismiss(); suppressClickUntil = 0; held = true; nativeIntent = text.contains(target);
+		// A tap on a highlight or image switches the editor in `activate`. Dismissing here first
+		// would fade the editor out and back in, and a native selection dismisses it instead.
+		if (!text.contains(target) || !target.closest('.crate-reading-reader__highlight, img')) dismiss();
+		suppressClickUntil = 0; held = true; nativeIntent = text.contains(target);
 	};
 	const move = (event: PointerEvent) => {
 		if (!drag || drag.pointer !== event.pointerId) return;

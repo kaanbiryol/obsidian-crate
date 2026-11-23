@@ -1,4 +1,3 @@
-@use "../../../ui/shared/styles/tokens";
 
 /* Obsidian reminders view parity. Keep this standalone PWA visually aligned with the plugin UI. */
 html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);color:var(--text-normal)}
@@ -49,10 +48,13 @@ html,body{background:var(--pwa-launch-bg);font-family:var(--font-interface);colo
 .pwa-notification-prompt{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 6px 6px 12px;border:0;border-radius:8px}
 .pwa-notification-prompt__icon{flex-shrink:0;color:var(--text-faint)}
 .pwa-notification-prompt__copy{flex:1;min-width:0;font-size:13px;line-height:1.35;color:var(--text-muted)}
-.pwa-pull-refresh{position:relative;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:height .38s tokens.$easing-settle,opacity .2s ease}
+/* The indicator takes no layout space: PwaPullRefreshIndicator moves the content after it
+   down and the glyph within it by transform. The box spans the furthest pull (120px) and clips
+   the glyph at the top of the content, under the header. */
+.pwa-pull-refresh{position:relative;flex-shrink:0;height:120px;margin-bottom:-120px;overflow:hidden;display:flex;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s ease}
 .pwa-pull-refresh.is-visible{opacity:1}
 .pwa-pull-refresh.is-pulling{transition:none}
-.pwa-pull-refresh__inner{display:flex;align-items:center;justify-content:center;min-height:28px;color:var(--text-muted)}
+.pwa-pull-refresh__inner{position:absolute;top:0;display:flex;align-items:center;justify-content:center;height:28px;color:var(--text-muted);transform:translateY(-14px)}
 .pwa-pull-refresh__glyph{width:24px;height:24px;display:block}
 .pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph{animation:pwa-spin 1s steps(12) infinite}
 

@@ -209,6 +209,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await share.click();
     assert.deepEqual(await page.evaluate(() => window.sharedExcerpt), { text: 'A useful article excerpt.' });
     assert.equal(await page.evaluate(() => window.shareActivated), true, 'Native share is invoked inside the user gesture');
+    // A completed share closes the menu, like Copy; a cancelled or failed one keeps it.
+    await expect(actions).toHaveCount(0);
+    await marks.nth(1).tap();
     await page.evaluate(() => { window.rejectShare = 'AbortError'; });
     await share.click();
     await expect(page.getByRole('alert')).toHaveCount(0);
@@ -230,6 +233,23 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.evaluate(() => window.scrollTo(0, 0));
     await marks.nth(1).tap();
     await expect(copy).toBeEnabled();
+    // Pressing the open highlight keeps its editor instead of fading it out and back in.
+    const editor = page.locator('.crate-reading-reader__highlight-editor');
+    await expect(editor).toHaveCSS('opacity', '1');
+    const surface = await editor.elementHandle();
+    const point = await marks.nth(1).evaluate(mark => {
+      const rect = mark.getClientRects()[0], x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+      return { x, y, hit: mark.contains(document.elementFromPoint(x, y)) };
+    });
+    assert.ok(point.hit, 'The press lands on the highlight, not its handles or menu');
+    await page.mouse.move(point.x, point.y);
+    await page.mouse.down();
+    await page.waitForTimeout(150);
+    assert.equal(await editor.evaluate(element => getComputedStyle(element).opacity), '1');
+    await page.mouse.up();
+    await expect(copy).toBeEnabled();
+    assert.equal(await surface.evaluate(element => element.isConnected), true);
+    await surface.dispose();
     await page.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); });
     await page.locator('.crate-reading-reader__header h1').tap();
     await expect(actions).toHaveCount(0);

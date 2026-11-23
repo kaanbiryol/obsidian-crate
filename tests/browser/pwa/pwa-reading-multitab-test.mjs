@@ -51,7 +51,7 @@ async function saveOffline(page, url) {
 	await page.getByLabel('Link', { exact: true }).fill(url);
 	await page.getByRole('button', { name: 'Save link', exact: true }).click();
 	await expect(page.getByRole('dialog')).toHaveCount(0);
-	await expect(page.locator('.toast')).toHaveText('Link saved on this device');
+	await expect(page.locator('.toast:not([aria-hidden="true"])')).toHaveText('Link saved on this device');
 }
 
 async function verifySharedQueue(browser, { api, origin, runtime, readingAppUrl }) {
