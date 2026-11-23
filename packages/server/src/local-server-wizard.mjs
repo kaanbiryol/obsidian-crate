@@ -27,14 +27,14 @@ import { join } from 'node:path';
  * leave it only when the person chooses a synced folder such as iCloud Drive.
  * @param {{ home?: string }} [options] */
 export function defaultBackupDir({ home = homedir() } = {}) {
-	return join(home, 'Crate backups');
+	return join(home, 'crate_backups');
 }
 
 /** The iCloud Drive backup folder, when this Mac has iCloud Drive.
  * @param {{ platform?: NodeJS.Platform, home?: string }} [options] @returns {Promise<string | null>} */
 export async function icloudBackupDir({ platform = process.platform, home = homedir() } = {}) {
 	const icloud = join(home, 'Library/Mobile Documents/com~apple~CloudDocs');
-	return platform === 'darwin' && await access(icloud).then(() => true, () => false) ? join(icloud, 'Crate backups') : null;
+	return platform === 'darwin' && await access(icloud).then(() => true, () => false) ? join(icloud, 'crate_backups') : null;
 }
 
 /** @param {WizardEnvironment['ask']} ask @param {string} question @param {string[]} options @returns {Promise<number>} */
@@ -85,8 +85,16 @@ export async function runSetupWizard({ ask, log = console.log, platform = proces
 	const keepAwake = platform === 'darwin' && await confirm(ask, 'Keep this Mac awake while Crate runs, so devices can always sync?', true);
 	const suggested = defaultBackupDir({ home });
 	const icloud = await icloudBackupDir({ platform, home });
-	if (icloud) log(`To also keep backups off this computer, type ${icloud}. Backups hold your vault and server credentials, so iCloud stores those too.`);
-	const backup = (await ask(`Back up daily to this folder (type none to skip) [${suggested}]: `)).trim();
-	const backupDir = backup.toLowerCase() === 'none' ? null : backup || suggested;
+	const shown = (/** @type {string} */ path) => path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+	const folders = [suggested, ...(icloud ? [icloud] : [])];
+	const index = await choose(ask, 'Where should Crate save daily backups?', [
+		`${shown(suggested)} on this computer`,
+		...(icloud ? [`iCloud Drive (${shown(icloud)}), so a copy is also off this computer. Backups include your vault and server credentials.`] : []),
+		'Another folder',
+		"Don't back up",
+	]);
+	/** @type {string | null} */
+	let backupDir = folders[index] ?? null;
+	if (index === folders.length) while (!backupDir) backupDir = (await ask('Backup folder: ')).trim() || null;
 	return { access, ...(hostname ? { hostname } : {}), service, keepAwake, backupDir };
 }

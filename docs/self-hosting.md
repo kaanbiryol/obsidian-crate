@@ -293,9 +293,10 @@ suggestion:
    version, so the service survives npx's cache.
 3. **Keep this Mac awake** (macOS): `--keep-awake` runs `caffeinate -i` for as
    long as Crate runs.
-4. **Daily backups to a folder:** `~/Crate backups` on this computer. On a Mac with
-   iCloud Drive, setup names its folder too; backups hold vault contents and server
-   credentials, so choose it only if iCloud may store them. Type `none` to skip. See [automatic backups](#automatic-backups).
+4. **Daily backups to a folder:** `~/crate_backups` on this computer. On a Mac with
+   iCloud Drive, setup also offers `crate_backups` there; backups hold vault contents and
+   server credentials, so choose it only if iCloud may store them. You can also pick
+   another folder or skip backups. See [automatic backups](#automatic-backups).
 
 With a service, setup provisions the address, installs the service, and shows
 its log until the address is public and a pairing QR code is on screen.
