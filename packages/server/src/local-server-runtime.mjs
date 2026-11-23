@@ -2,7 +2,7 @@ import { assertLocalMigrationPath, migrateLocalDatabase } from './local-server-m
 import { watchRuntime } from './local-server-watchdog.mjs';
 import { coordinatorPath, packaged, revocationPath, runtimeVersion, serverAssetPath, workerPath } from './assets.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { link, mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
+import { link, mkdir, open, readFile, readdir, readlink, realpath, rename, unlink } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { uptime as osUptime } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -228,16 +228,45 @@ async function listProcesses() {
 	return processes;
 }
 
+/** Whether a process has files open under `directory`, or null when that cannot be read.
+ * @param {number} pid @param {string} directory @returns {Promise<boolean | null>} */
+async function processUsesDirectory(pid, directory) {
+	const inside = (/** @type {string} */ path) => path === directory || path.startsWith(`${directory}/`);
+	try {
+		if (process.platform === 'linux') {
+			const fds = await readdir(`/proc/${pid}/fd`);
+			const paths = await Promise.all(fds.map(fd => readlink(`/proc/${pid}/fd/${fd}`).catch(() => '')));
+			return paths.some(inside);
+		}
+		if (process.platform === 'darwin') {
+			// lsof exits 1 when it lists nothing for a running process.
+			/** @type {string} */
+			const stdout = await promisify(execFile)('lsof', ['-w', '-Fn', '-p', String(pid)]).then(result => result.stdout, error => {
+				if (error.code === 1 && typeof error.stdout === 'string') return error.stdout;
+				throw error;
+			});
+			return stdout.split('\n').some(line => line.startsWith('n') && inside(line.slice(1)));
+		}
+	} catch { /* Unreadable: the caller assumes it may use the directory. */ }
+	return null;
+}
+
 /** Running workerd processes that lost their parent, or null where processes cannot be
  * listed. A force-quit server leaves its workerd running on the same files, adopted by
  * init or a subreaper. Workerd whose parent is a live Node process belongs to another
- * server or tool that still runs, never to the dead lock holder.
- * @returns {Promise<number[] | null>} */
-async function otherWorkerdProcesses() {
+ * server or tool that still runs, never to the dead lock holder. With `dataDir`, only
+ * workerd with files open in its storage counts, so another server's leftover runtime
+ * never blocks this one; one whose files cannot be read still counts.
+ * @param {string} [dataDir] @returns {Promise<number[] | null>} */
+async function otherWorkerdProcesses(dataDir) {
 	const processes = await listProcesses();
 	if (!processes) return null;
 	const names = new Map(processes.map(entry => [entry.pid, entry.name]));
-	return processes.filter(entry => entry.name === 'workerd' && names.get(entry.ppid) !== 'node').map(entry => entry.pid);
+	const orphans = processes.filter(entry => entry.name === 'workerd' && names.get(entry.ppid) !== 'node').map(entry => entry.pid);
+	if (dataDir === undefined || !orphans.length) return orphans;
+	const storage = join(await realpath(dataDir).catch(() => resolve(dataDir)), 'resources');
+	const uses = await Promise.all(orphans.map(pid => processUsesDirectory(pid, storage)));
+	return orphans.filter((_, index) => uses[index] !== false);
 }
 
 /** The workerd processes a server started on its data directory (`workerd.json`), so a
@@ -320,7 +349,7 @@ export async function lockLocalData(dataDir, options) {
 		catch (error) {
 			if (error.code !== 'EEXIST') throw error;
 			const previous = await readFile(path, 'utf8').catch(() => '');
-			if (attempt === 0 && (isLockFromEarlierBoot(previous) || await isAbandonedLock(previous, { record: await readWorkerdRecord(dataDir), ...options }))) {
+			if (attempt === 0 && (isLockFromEarlierBoot(previous) || await isAbandonedLock(previous, { record: await readWorkerdRecord(dataDir), listWorkerd: () => otherWorkerdProcesses(dataDir), ...options }))) {
 				if (!await removeStaleLock(path, previous)) throw locked();
 				continue;
 			}

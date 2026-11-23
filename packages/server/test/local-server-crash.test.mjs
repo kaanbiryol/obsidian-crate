@@ -149,3 +149,49 @@ test('a server killed mid-write recovers its data and the next start stops the w
 		await rm(dataDir, { recursive: true, force: true });
 	}
 });
+
+test('another server\'s leftover workerd does not stop a force-quit server from starting again', { timeout: 120_000, skip: !['darwin', 'linux'].includes(process.platform) }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-crash-'));
+	const otherDir = await mkdtemp(join(tmpdir(), 'crate-local-crash-other-'));
+	/** @type {Awaited<ReturnType<typeof startServer>> | undefined} */
+	let server;
+	/** @type {number[]} */
+	const others = [];
+	/** @type {number[]} */
+	let own = [];
+	try {
+		// Another server is force-quit and leaves its workerd running on its own data.
+		const other = await startServer(otherDir, await freePort());
+		assert.ok(other.started, other.output);
+		others.push(...await workerdChildren(/** @type {number} */ (other.child.pid)));
+		assert.ok(others.length, 'The other server runs workerd as its child');
+		other.child.kill('SIGKILL');
+		await other.exited;
+		await delay(500);
+		assert.ok(others.every(running), 'workerd outlives the other killed server');
+
+		const port = await freePort();
+		server = await startServer(dataDir, port);
+		assert.ok(server.started, server.output);
+		own = await workerdChildren(/** @type {number} */ (server.child.pid));
+		server.child.kill('SIGKILL');
+		await server.exited;
+		await delay(500);
+		server = await startServer(dataDir, port);
+		assert.ok(server.started, server.output);
+		assert.ok(own.every(pid => !running(pid)), 'The start stops the workerd its own data directory left running');
+		assert.ok(others.every(running), 'The start leaves the other server\'s workerd alone');
+		server.child.kill('SIGTERM');
+		const [code] = await server.exited;
+		assert.equal(code, 0, server.output);
+		server = undefined;
+	} finally {
+		if (server?.child.exitCode === null) {
+			own.push(...await workerdChildren(/** @type {number} */ (server.child.pid)));
+			server.child.kill('SIGKILL');
+		}
+		for (const pid of [...own, ...others]) if (running(pid)) process.kill(pid, 'SIGKILL');
+		await rm(dataDir, { recursive: true, force: true });
+		await rm(otherDir, { recursive: true, force: true });
+	}
+});
