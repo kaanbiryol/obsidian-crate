@@ -119,7 +119,7 @@ export function ReadingLibraryPanel({
 	}, [readerOpen, readerAnimated, retainReaderOnClose, exitingReader, onReaderClosed]);
 	// A row that leaves the list, like an article archived in the reader, stays in place until
 	// the reader has closed, then collapses so the rows below slide up rather than jump.
-	const { rows, departed, settle } = useDepartedRows(items, JSON.stringify([shownSection, listQuery, shownTag]));
+	const { rows, departed, settle, rowKey } = useDepartedRows(items, JSON.stringify([shownSection, listQuery, shownTag]));
 	const holdDeparted = !!reader || readerClosing || exitingReader;
 	useCollapseDepartedRows(lists, shownSection, departed, settle, holdDeparted, !loading && !listContent);
 	const groups = useMemo(() => groupReadingItems(rows.slice(0, visible)), [rows, visible]);
@@ -220,7 +220,7 @@ export function ReadingLibraryPanel({
 							<h3>{group.label}</h3>
 							<ul className="crate-reading__list">{group.items.map(item => {
 								const departs = departed.has(item.crate_reading_id);
-								return <li className="crate-reading__item" key={item.crate_reading_id} data-selected={activeId === item.crate_reading_id}
+								return <li className="crate-reading__item" key={rowKey(item.crate_reading_id)} data-selected={activeId === item.crate_reading_id}
 									inert={departs} data-departed={departs ? item.crate_reading_id : undefined} data-departing={departs && !groupDeparts || undefined}>
 								<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`}
 									aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, shownSection))}>

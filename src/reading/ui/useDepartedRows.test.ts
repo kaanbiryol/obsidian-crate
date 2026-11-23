@@ -41,3 +41,23 @@ it('lists a row that returns before it settles as live again', () => {
 	expect(ids(hook.current.rows)).toEqual(['a', 'b']);
 	expect(hook.current.departed.size).toBe(0);
 });
+
+it('lets a saved link take over its pending copy in place', () => {
+	const copy = { ...note('pending-op'), path: '', source_url: 'https://example.com/saved#intro', extraction_status: 'pending' as const };
+	const saved = { ...note('server-id'), source_url: 'https://example.com/saved' };
+	expect(ids(keepDeparted([copy, a, b], [saved, a, b]))).toEqual(['server-id', 'a', 'b']);
+	// A removed note, even of the same link, still collapses.
+	expect(ids(keepDeparted([{ ...a, source_url: saved.source_url }, b], [saved, b]))).toEqual(['a', 'server-id', 'b']);
+	let items = [copy, a];
+	const hook = renderHook(() => useDepartedRows(items, 'inbox'));
+	expect(hook.current.rowKey('pending-op')).toBe('pending-op');
+	items = [saved, a];
+	hook.rerender();
+	expect(ids(hook.current.rows)).toEqual(['server-id', 'a']);
+	expect(hook.current.departed.size).toBe(0);
+	expect([hook.current.rowKey('server-id'), hook.current.rowKey('a')]).toEqual(['pending-op', 'a']);
+	// The row keeps its key through later refreshes.
+	items = [{ ...saved, title: 'Saved' }, a];
+	hook.rerender();
+	expect(hook.current.rowKey('server-id')).toBe('pending-op');
+});

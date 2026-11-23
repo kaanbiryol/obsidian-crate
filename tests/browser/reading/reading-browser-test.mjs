@@ -825,11 +825,21 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await page.getByRole('button',{name:'Save link',exact:true}).click();
   await expect(readingSync.getByRole('button')).toHaveAccessibleName('Sync status: Syncing 2 changes');
   await assertNoPendingBanner(page);
+  const savingRow = page.getByRole('button',{name:/pending.example.invalid pending.example.invalid/});
+  const queuedId = await savingRow.getAttribute('data-reading-id');
+  await savingRow.evaluate(button => {
+    window.__queuedRow = button.closest('li');
+    window.__savingRows = 1;
+    const count = () => { window.__savingRows = Math.max(window.__savingRows, document.querySelectorAll('.crate-reading__open[aria-label^="pending.example.invalid"]').length); };
+    new MutationObserver(count).observe(document.body, { childList: true, subtree: true, attributes: true });
+  });
   favoriteUpdate.release();
   await assertNoPendingBanner(page);
   await expect(readingSync).toHaveAttribute('data-sync-state','synced');
-  // The queued row collapses as the saved one replaces it.
-  await expect(page.getByRole('button',{name:/pending.example.invalid pending.example.invalid/})).toHaveCount(1);
+  // The saved row takes over the queued one in place: one row throughout, never a second
+  // arriving below while the first collapses.
+  await expect.poll(() => savingRow.getAttribute('data-reading-id')).not.toBe(queuedId);
+  assert.deepEqual(await page.evaluate(() => [window.__savingRows, window.__queuedRow.isConnected]), [1, true]);
   // A committed save with a lost response must resend exactly the persisted operation.
   sent.length = 0; fixture.faults.loseCaptureReply = true;
   await page.getByRole('button',{name:'Save a link',exact:true}).click();
