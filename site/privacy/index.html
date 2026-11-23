@@ -26,11 +26,11 @@
 			</section>
 			<section>
 				<h2>Where your data lives</h2>
-				<p class="privacy-copy">After you connect Crate and start syncing, vault files and attachments are stored in your Cloudflare R2 bucket. Automatic sync is off by default. Crate still checks your server for changes from your other devices every five minutes and shows them without syncing. Once you turn automatic sync on, Crate syncs after edits, on startup and resume, and at that check interval. You can change both in Crate settings. Sync metadata, device credential hashes, reminder indexes, and web or push subscriptions are stored in your Cloudflare D1 database. Scheduled reminder state is stored in your Cloudflare Durable Objects. If you host Crate on your own computer instead, the same data is stored on that computer's disk, and a Cloudflare Quick Tunnel or Tailscale Funnel you choose during setup relays traffic to it.</p>
+				<p class="privacy-copy">After you connect Crate and start syncing, vault files and attachments are stored in your Cloudflare R2 bucket. This includes your other plugins and their settings, which can contain credentials such as API keys; exclude any you don't want synced in Crate's sync settings. Automatic sync is off by default. Crate still checks your server for changes from your other devices every five minutes and shows them without syncing. Once you turn automatic sync on, Crate syncs after edits, on startup and resume, and at that check interval. You can change both in Crate settings. Sync metadata, device credential hashes, reminder indexes, and web or push subscriptions are stored in your Cloudflare D1 database. Scheduled reminder state is stored in your Cloudflare Durable Objects. If you host Crate on your own computer instead, the same data is stored on that computer's disk, and a Cloudflare Quick Tunnel or Tailscale Funnel you choose during setup relays traffic to it.</p>
 			</section>
 			<section>
 				<h2>Account usage</h2>
-				<p class="privacy-copy">Crate saves OAuth access and refresh tokens with server management and analytics permissions in Obsidian secret storage. Selecting Refresh renews access if needed and sends the access token and account ID directly to Cloudflare Analytics to retrieve account-wide usage. It sends no vault contents or filenames and does not poll in the background. The latest usage snapshot is saved in plugin settings for display when you reopen the panel. You can revoke Crate’s authorization in Cloudflare. Previously pasted API tokens must be revoked separately in Cloudflare.</p>
+				<p class="privacy-copy">Crate saves OAuth access and refresh tokens with server management and analytics permissions in Obsidian secret storage. Selecting Refresh renews access if needed and sends the access token and account ID directly to Cloudflare Analytics to retrieve account-wide usage. It sends no vault contents or filenames and does not poll in the background. The latest usage snapshot is saved in plugin settings for display when you reopen the panel. You can revoke Crate’s authorization in Cloudflare.</p>
 			</section>
 			<section>
 				<h2>Reading and pasted links</h2>
@@ -54,7 +54,7 @@
 			</section>
 			<section>
 				<h2>Removing your data</h2>
-				<p class="privacy-copy">Disconnecting a device removes its local credential but does not delete remote data. To erase the remote copy, delete the Crate Worker, R2 bucket, D1 database, and Durable Object resources in Cloudflare. Clear the Crate site's browser data to remove a local reminders web session.</p>
+				<p class="privacy-copy">Disconnecting a device removes its local credential but does not delete remote data. Selecting <strong>Forget saved connection</strong> also removes the saved Cloudflare login from that device. To erase a Cloudflare server, open <strong>Settings → Crate → Server → Advanced server actions</strong> on a desktop and select <strong>Delete server and all data</strong>. This deletes the Crate Worker, R2 bucket, D1 database and Durable Objects, then revokes Crate's Cloudflare authorization. For a server on your own computer, stop it and delete its data directory or Docker volume. <a href="/docs/features/move-or-remove/">Move or remove Crate</a> has the steps. Sign out of the reminders web app, or clear the Crate site's browser data, to remove a local web session.</p>
 			</section>
 			<footer><a class="button" href="/">Back to Crate</a></footer>
 		</article>
