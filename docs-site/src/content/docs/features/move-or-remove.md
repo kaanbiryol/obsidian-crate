@@ -43,8 +43,11 @@ This deletes the server's files, history, and settings for good. Use the same `-
 
 ## Uninstall Crate
 
-1. In **Settings → Crate → Account and devices**, select **Disconnect this device**. This stops sync on this device and removes its saved encryption keys, so save your recovery key first if you use encryption.
-2. Open **Settings → Community plugins**, find **Crate**, and uninstall it.
+1. If you use encryption, save your recovery key outside the vault first. Disconnecting removes this device's saved encryption keys.
+2. In **Settings → Crate → Account and devices**, select **Disconnect this device**.
+   - **Cloudflare server:** in the dialog, also select **Forget saved connection**, then **Disconnect**. Without it, the device keeps its Cloudflare sign-in in Obsidian's secret storage after Crate is gone. If you already disconnected, select **Forget saved connection** in Crate settings instead.
+   - **Your own server:** select **Disconnect**. Crate revokes the device's access token if the server is reachable.
+3. Open **Settings → Community plugins**, find **Crate**, and uninstall it.
 
 Your notes stay as they are. A few traces of Crate remain in them, all harmless:
 
