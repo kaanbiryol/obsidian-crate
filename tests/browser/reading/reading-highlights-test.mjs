@@ -326,12 +326,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.locator('.crate-reading-reader__highlight').first().tap();
     await expect(page.getByRole('group', { name: 'Highlight actions' })).toBeVisible();
     await expect(page.locator('.crate-reading-reader__highlight.is-editing')).not.toHaveCount(0);
+    // Listen once the passage has faded under the editor's preview.
+    await expect.poll(() => page.evaluate(() => [...document.querySelectorAll('.crate-reading-reader__highlight')].flatMap(mark => mark.getAnimations()).length)).toBe(0);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.evaluate(() => {
       window.markTransitions = 0;
       document.addEventListener('transitionrun', event => { if (event.target.closest?.('.crate-reading-reader__highlight:not(.is-editing)')) window.markTransitions++; }, true);
     });
     await page.keyboard.press('Escape');
     await expect(page.getByRole('group', { name: 'Highlight actions' })).toHaveCount(0);
+    // Transition events arrive with the next frames.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.equal(await page.evaluate(() => window.markTransitions), 0, 'a deselected highlight keeps its fill');
     const longArticle = await page.addStyleTag({ content: '.crate-reading-reader__body { padding-top: 1400px; min-height: 12000px; }' });
     await page.evaluate(() => window.scrollTo({ top: 6300, behavior: 'instant' }));
