@@ -60,69 +60,93 @@ function contentAfter(node: HTMLElement, list: HTMLElement): HTMLElement[] {
 	return after;
 }
 
-/** Crossfades a tag change in place. Call the returned function as a tag is selected, after the
- * list scrolls to the top: once that tag's results show, a copy of the departing rows fades out
- * over the new list, so rows both tags list stay steady. */
+/** Animates a tag change row by row. Call the returned function as a tag is selected, after the
+ * list scrolls to the top: once that tag's results show, rows only the old tag listed fade out
+ * where they were, then rows and date headers both tags list slide to their new place while
+ * rows new to the screen fade in. Only what is on screen moves, so the cost stays
+ * small however long the list is. */
 // The share of a tag switch's fade spent on the old rows leaving, and their curve.
 const FADE_THROUGH_OUT = 0.35;
 const FADE_THROUGH_OUT_EASE = 'cubic-bezier(0.4, 0, 1, 1)';
 
+interface ShownRow { top: number; left: number; width: number; copy: HTMLElement }
+
 export function useTagCrossfade(lists: SectionLists, section: ReadingSection, tag: string | null, loading: boolean): (next: string | null) => void {
 	const reduceMotion = useReducedMotion();
 	const shownFilter = useRef<{ section: ReadingSection; tag: string | null } | null>(null);
-	const departingList = useRef<{ tag: string | null; node: HTMLElement } | null>(null);
+	const departingRows = useRef<{ tag: string | null; rows: Map<string, ShownRow> } | null>(null);
 	useLayoutEffect(() => {
-		const previous = shownFilter.current, departing = departingList.current, list = lists.current.get(section);
+		const previous = shownFilter.current, departing = departingRows.current, list = lists.current.get(section);
 		shownFilter.current = loading ? null : { section, tag };
-		departingList.current = null;
+		departingRows.current = null;
 		if (!previous || loading || previous.section !== section || departing?.tag !== tag || !list) return;
 		const owner = list.ownerDocument.defaultView ?? window, style = owner.getComputedStyle(list);
 		const duration = parseFloat(style.getPropertyValue('--pwa-motion-fade-duration'));
 		if (!duration) return;
-		const { node } = departing;
-		Object.assign(node.style, {
-			position: 'absolute', top: `${list.offsetTop}px`, left: `${list.offsetLeft}px`, width: `${list.offsetWidth}px`, height: `${list.offsetHeight}px`,
-			boxSizing: 'border-box', pointerEvents: 'none', background: opaqueBackground(list, owner),
-		});
-		list.after(node);
-		// Fade through: the old rows leave before the new ones arrive, so two lists of text never
-		// show over each other mid-dissolve. The fade's whole duration covers both halves.
+		const ease = style.getPropertyValue('--pwa-motion-fade-ease').trim() || PWA_FADE_TIMING.easing;
 		const leave = duration * FADE_THROUGH_OUT;
+		const old = new Map(departing.rows), animations: Animation[] = [];
+		for (const [key, element, bounds] of shownRows(list, owner)) {
+			const before = old.get(key);
+			old.delete(key);
+			if (!before) {
+				// Arrive once the rows leaving this spot have gone, so no two rows of text overlap.
+				animations.push(element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: duration - leave, delay: leave, easing: ease, fill: 'backwards' }));
+			} else if (Math.abs(before.top - bounds.top) > 0.5) {
+				// Close the gaps once the rows leaving have gone, rather than sliding over them.
+				animations.push(element.animate([{ translate: `0 ${before.top - bounds.top}px` }, { translate: '0 0' }], { duration, delay: leave, easing: ease, fill: 'backwards' }));
+			}
+		}
+		if (!old.size && !animations.length) return;
+		// Rows only the old tag listed fade out where they were drawn, over the new list.
+		const node = list.ownerDocument.createElement('div');
+		// Row and date header styles apply inside a group's list.
+		node.className = 'crate-reading__group crate-reading__list';
+		node.inert = true;
+		node.setAttribute('aria-hidden', 'true');
+		node.dataset.departingList = 'true';
+		Object.assign(node.style, { position: 'absolute', top: `${list.offsetTop}px`, left: `${list.offsetLeft}px`, width: `${list.offsetWidth}px`, height: '0', pointerEvents: 'none' });
+		list.after(node);
+		// Offsets round to whole pixels; place the copies from where the overlay actually landed.
+		const origin = list.getBoundingClientRect(), landed = node.getBoundingClientRect();
+		for (const { top, left, width, copy } of old.values()) {
+			Object.assign(copy.style, { position: 'absolute', top: `${top + origin.top - landed.top}px`, left: `${left + origin.left - landed.left}px`, width: `${width}px`, margin: '0', boxSizing: 'border-box' });
+			node.append(copy);
+		}
 		const leaving = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: leave, easing: FADE_THROUGH_OUT_EASE, fill: 'forwards' });
-		const arriving = list.animate([{ opacity: 0 }, { opacity: 1 }], {
-			duration: duration - leave, delay: leave, fill: 'backwards',
-			easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || PWA_FADE_TIMING.easing,
-		});
 		leaving.onfinish = () => node.remove();
-		return () => { leaving.cancel(); arriving.cancel(); node.remove(); };
+		return () => { leaving.cancel(); for (const animation of animations) animation.cancel(); node.remove(); };
 	}, [lists, loading, section, tag]);
 	return useCallback((next: string | null) => {
-		// Copy the rows as they now show, scrolled to the top like the incoming list.
+		// Measure and copy the rows as they now show, scrolled to the top like the incoming list.
 		const list = lists.current.get(section);
-		departingList.current = list && !reduceMotion ? { tag: next, node: copyDepartingList(list) } : null;
+		if (!list || reduceMotion) { departingRows.current = null; return; }
+		const owner = list.ownerDocument.defaultView ?? window;
+		const rows = new Map<string, ShownRow>();
+		for (const [key, element, bounds] of shownRows(list, owner)) rows.set(key, { ...bounds, copy: copyRow(element) });
+		departingRows.current = { tag: next, rows };
 	}, [lists, section, reduceMotion]);
 }
 
-/** A static, hidden copy of a list's rows for a crossfade; it takes no focus, input or ids. */
-function copyDepartingList(list: HTMLElement): HTMLElement {
-	const node = list.cloneNode(true) as HTMLElement;
-	node.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
-	node.removeAttribute('tabindex');
-	// An iOS list that scrolls the document carries inline layout for that handoff (a margin
-	// past its pinned header, a fixed header cover); the copy would show them twice, lower down.
-	node.removeAttribute('style');
-	delete node.dataset.documentScroll;
-	node.inert = true;
-	node.setAttribute('aria-hidden', 'true');
-	node.dataset.departingList = 'true';
-	return node;
+/** The date headers and rows of `list` on screen, keyed so both tags' lists match up, with
+ * their place relative to the list. */
+function shownRows(list: HTMLElement, owner: Window): [string, HTMLElement, { top: number; left: number; width: number }][] {
+	const origin = list.getBoundingClientRect(), bottom = Math.min(origin.bottom, owner.innerHeight);
+	const rows: [string, HTMLElement, { top: number; left: number; width: number }][] = [];
+	for (const element of list.querySelectorAll<HTMLElement>('.crate-reading__group > h3, .crate-reading__item')) {
+		const bounds = element.getBoundingClientRect();
+		if (bounds.bottom <= Math.max(origin.top, 0) || bounds.top >= bottom) continue;
+		const id = element.querySelector<HTMLElement>('[data-reading-id]')?.dataset.readingId;
+		const key = id ? `row:${id}` : `group:${element.textContent ?? ''}`;
+		rows.push([key, element, { top: bounds.top - origin.top, left: bounds.left - origin.left, width: bounds.width }]);
+	}
+	return rows;
 }
 
-/** The first painted background behind `element`, so a copy over the list hides it. */
-function opaqueBackground(element: HTMLElement, owner: Window): string {
-	for (let node: HTMLElement | null = element; node; node = node.parentElement) {
-		const color = owner.getComputedStyle(node).backgroundColor;
-		if (color !== 'transparent' && color !== 'rgba(0, 0, 0, 0)') return color;
-	}
-	return 'Canvas';
+/** A static copy of a row for its exit; it takes no focus, input or ids. */
+function copyRow(row: HTMLElement): HTMLElement {
+	const node = row.cloneNode(true) as HTMLElement;
+	node.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+	node.removeAttribute('id');
+	return node;
 }

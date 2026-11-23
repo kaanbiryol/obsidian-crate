@@ -1067,7 +1067,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   }
 });
 
-test('Reading chromium: a tag change dissolves the departing rows over the new list', { timeout: 60000 }, async () => {
+test('Reading chromium: a tag change fades out only the rows that leave, then closes the gaps', { timeout: 60000 }, async () => {
   const { buildPwaPreviewAssets } = await import('../support/preview/pwa-preview-assets.mjs');
   const { listenPwaPreviewServer } = await import('../support/preview/pwa-preview-server.mjs');
   const { server, origin } = await listenPwaPreviewServer({ port: 0, assets: await buildPwaPreviewAssets() });
@@ -1091,39 +1091,42 @@ test('Reading chromium: a tag change dissolves the departing rows over the new l
     const list = page.locator('.crate-reading__list-scroll:not([data-departing-list])');
     await expect(list.getByRole('button', { name: /Tag fixture/ })).toHaveCount(3);
     await page.evaluate(() => {
-      const samples = window.__departingSamples = [];
-      new MutationObserver(records => {
-        for (const node of records.flatMap(record => [...record.addedNodes])) {
-          if (!(node instanceof HTMLElement) || !node.dataset.departingList) continue;
-          const real = node.previousElementSibling;
-          const sample = () => {
-            if (!node.isConnected) return;
-            const [copy, shown] = [node.getBoundingClientRect(), real.getBoundingClientRect()];
-            samples.push({ opacity: Number(getComputedStyle(node).opacity), shownOpacity: Number(getComputedStyle(real).opacity), background: getComputedStyle(node).backgroundColor,
-              rows: node.querySelectorAll('.crate-reading__item').length, shownRows: real.querySelectorAll('.crate-reading__item').length,
-              inert: node.inert, hidden: node.getAttribute('aria-hidden'), ids: node.querySelectorAll('[id]').length,
-              geometry: [copy.top - shown.top, copy.left - shown.left, copy.width - shown.width, copy.height - shown.height] });
-            requestAnimationFrame(sample);
-          };
-          sample();
-        }
-      }).observe(document.body, { childList: true, subtree: true });
+      const samples = window.__tagSamples = [];
+      const drawn = window.__drawnRows = Object.fromEntries([...document.querySelectorAll('.crate-reading__list-scroll [data-reading-id]')].map(row => [row.dataset.readingId, row.getBoundingClientRect().top]));
+      const sample = () => {
+        const copy = document.querySelector('[data-departing-list]');
+        const shown = Object.fromEntries([...document.querySelectorAll('.crate-reading__list-scroll:not([data-departing-list]) [data-reading-id]')].map(row => {
+          const item = row.closest('.crate-reading__item');
+          return [row.dataset.readingId, { opacity: Number(getComputedStyle(item).opacity), top: row.getBoundingClientRect().top }];
+        }));
+        samples.push({ shown, header: Number(getComputedStyle(document.querySelector('.crate-reading__list-scroll .crate-reading__group h3')).opacity),
+          copy: copy && { opacity: Number(getComputedStyle(copy).opacity), inert: copy.inert, hidden: copy.getAttribute('aria-hidden'), ids: copy.querySelectorAll('[id]').length,
+            rows: [...copy.querySelectorAll('[data-reading-id]')].map(row => ({ id: row.dataset.readingId, offset: row.getBoundingClientRect().top - drawn[row.dataset.readingId] })) } });
+        if (samples.length < 90) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
     });
     await page.getByRole('group', { name: 'Filter by tag' }).getByRole('button', { name: 'essays', exact: true }).click();
     await expect(list.getByRole('button', { name: /Tag fixture/ })).toHaveCount(2);
     await expect(page.locator('[data-departing-list]')).toHaveCount(0);
-    const samples = await page.evaluate(() => window.__departingSamples);
-    assert.ok(samples.length >= 3, `the departing rows stayed for the dissolve (${samples.length} frames)`);
-    const [first, last] = [samples[0], samples.at(-1)];
-    assert.ok(first.opacity > 0.8, `the dissolve starts from the old rows (${first.opacity})`);
-    assert.ok(last.opacity < first.opacity, 'the old rows fade out');
-    assert.deepEqual([first.rows, first.shownRows], [3, 2], 'the old rows cover the new list');
-    assert.notEqual(first.background, 'rgba(0, 0, 0, 0)', 'the copy hides the new rows beneath it');
-    assert.deepEqual([first.inert, first.hidden, first.ids], [true, 'true', 0], 'the copy takes no focus, input or ids');
-    assert.ok(first.geometry.every(delta => Math.abs(delta) < 1), `the copy sits over the list (${first.geometry})`);
-    // Before: both lists showed at half opacity mid-dissolve, so their rows read over each other.
-    const overlapping = samples.filter(sample => Math.min(sample.opacity, sample.shownOpacity) > 0.1);
-    assert.deepEqual(overlapping, [], 'the old rows leave before the new rows show');
+    await page.waitForFunction(() => window.__tagSamples.length >= 90);
+    const samples = await page.evaluate(() => window.__tagSamples);
+    const [kept, moved, left] = ['00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002'];
+    const copies = samples.map(sample => sample.copy).filter(Boolean);
+    assert.ok(copies.length >= 3, `the leaving row stayed for its fade (${copies.length} frames)`);
+    assert.ok(copies[0].opacity > 0.8 && copies.at(-1).opacity < copies[0].opacity, 'the leaving row fades out');
+    assert.deepEqual(copies[0].rows.map(row => row.id), [left], 'only the row the tag drops leaves');
+    assert.ok(Math.abs(copies[0].rows[0].offset) < 1, `the leaving row fades where it was drawn (${copies[0].rows[0].offset})`);
+    assert.deepEqual([copies[0].inert, copies[0].hidden, copies[0].ids], [true, 'true', 0], 'the copy takes no focus, input or ids');
+    // Before: the whole list, its date header and the rows both tags list blinked out and back in.
+    const after = samples.filter(sample => sample.shown[moved] && !sample.shown[left]);
+    assert.ok(after.every(sample => sample.header === 1 && sample.shown[kept].opacity === 1 && sample.shown[moved].opacity === 1), 'the header and the rows both tags list stay shown');
+    assert.ok(after.every(sample => Math.abs(sample.shown[kept].top - after[0].shown[kept].top) < 1), 'a row in the same place stays still');
+    // The row below the leaving one waits for it to go, then slides up into its place.
+    const tops = after.map(sample => sample.shown[moved].top);
+    const sliding = after.filter((sample, index) => index > 0 && tops[index] < tops[index - 1] - 0.5);
+    assert.ok(sliding.length >= 2, 'the gap closes with a slide');
+    assert.ok(sliding.every(sample => !sample.copy || sample.copy.opacity < 0.1), 'rows slide only once the leaving row has gone');
     await expect(list).toHaveCSS('opacity', '1');
   } finally {
     try { await browser?.close(); }

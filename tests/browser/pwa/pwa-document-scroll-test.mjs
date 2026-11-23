@@ -257,20 +257,20 @@ try {
   await expect.poll(async () => (await firstRow()).top).toBe(restingRow.top);
   await tagged.page.evaluate(() => {
     const samples = window.__departingSamples = [];
+    const drawn = Object.fromEntries([...document.querySelectorAll('.crate-feature-panel[data-active="true"] .crate-reading__list-scroll [data-reading-id]')].map(row => [row.dataset.readingId, row.getBoundingClientRect().top]));
     new MutationObserver(records => {
       for (const node of records.flatMap(record => [...record.addedNodes])) {
         if (!(node instanceof HTMLElement) || !node.dataset.departingList) continue;
-        samples.push({ top: Math.round(node.querySelector('.crate-reading__open').getBoundingClientRect().top), owner: node.dataset.documentScroll ?? null });
+        samples.push({ offsets: [...node.querySelectorAll('[data-reading-id]')].map(row => Math.round(row.getBoundingClientRect().top - drawn[row.dataset.readingId])), owner: node.dataset.documentScroll ?? null });
       }
     }).observe(document.body, { childList: true, subtree: true });
   });
-  const firstTop = (await firstRow()).top;
   await tagged.page.getByRole('group', { name: 'Filter by tag' }).getByRole('button', { name: 'essays', exact: true }).tap();
   await expect(readingList.locator('.crate-reading__open')).toHaveCount(articles.filter(item => item.tags.length).length);
   const departing = await tagged.page.evaluate(() => window.__departingSamples);
-  assert.equal(departing.length, 1, 'the tag switch fades the old rows out');
+  assert.equal(departing.length, 1, 'the tag switch fades the leaving rows out');
   assert.equal(departing[0].owner, null, 'the copy is not a second document scroller');
-  assert.ok(Math.abs(departing[0].top - firstTop) <= 1, `the old rows fade where they were drawn (${departing[0].top}, not ${firstTop})`);
+  assert.ok(departing[0].offsets.length > 0 && departing[0].offsets.every(offset => Math.abs(offset) <= 1), `the leaving rows fade where they were drawn (${departing[0].offsets})`);
   assert.deepEqual(tagged.errors, []);
   await tagged.context.close();
   console.log('PWA document scroll checks passed.');
