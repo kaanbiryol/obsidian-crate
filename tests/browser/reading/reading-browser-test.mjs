@@ -1089,7 +1089,7 @@ test('Reading chromium: a tag change dissolves the departing rows over the new l
           const sample = () => {
             if (!node.isConnected) return;
             const [copy, shown] = [node.getBoundingClientRect(), real.getBoundingClientRect()];
-            samples.push({ opacity: Number(getComputedStyle(node).opacity), background: getComputedStyle(node).backgroundColor,
+            samples.push({ opacity: Number(getComputedStyle(node).opacity), shownOpacity: Number(getComputedStyle(real).opacity), background: getComputedStyle(node).backgroundColor,
               rows: node.querySelectorAll('.crate-reading__item').length, shownRows: real.querySelectorAll('.crate-reading__item').length,
               inert: node.inert, hidden: node.getAttribute('aria-hidden'), ids: node.querySelectorAll('[id]').length,
               geometry: [copy.top - shown.top, copy.left - shown.left, copy.width - shown.width, copy.height - shown.height] });
@@ -1111,6 +1111,10 @@ test('Reading chromium: a tag change dissolves the departing rows over the new l
     assert.notEqual(first.background, 'rgba(0, 0, 0, 0)', 'the copy hides the new rows beneath it');
     assert.deepEqual([first.inert, first.hidden, first.ids], [true, 'true', 0], 'the copy takes no focus, input or ids');
     assert.ok(first.geometry.every(delta => Math.abs(delta) < 1), `the copy sits over the list (${first.geometry})`);
+    // Before: both lists showed at half opacity mid-dissolve, so their rows read over each other.
+    const overlapping = samples.filter(sample => Math.min(sample.opacity, sample.shownOpacity) > 0.1);
+    assert.deepEqual(overlapping, [], 'the old rows leave before the new rows show');
+    await expect(list).toHaveCSS('opacity', '1');
   } finally {
     try { await browser?.close(); }
     finally { await new Promise(resolve => server.close(resolve)); }

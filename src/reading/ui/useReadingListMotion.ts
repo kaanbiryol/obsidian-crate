@@ -63,6 +63,10 @@ function contentAfter(node: HTMLElement, list: HTMLElement): HTMLElement[] {
 /** Crossfades a tag change in place. Call the returned function as a tag is selected, after the
  * list scrolls to the top: once that tag's results show, a copy of the departing rows fades out
  * over the new list, so rows both tags list stay steady. */
+// The share of a tag switch's fade spent on the old rows leaving, and their curve.
+const FADE_THROUGH_OUT = 0.35;
+const FADE_THROUGH_OUT_EASE = 'cubic-bezier(0.4, 0, 1, 1)';
+
 export function useTagCrossfade(lists: SectionLists, section: ReadingSection, tag: string | null, loading: boolean): (next: string | null) => void {
 	const reduceMotion = useReducedMotion();
 	const shownFilter = useRef<{ section: ReadingSection; tag: string | null } | null>(null);
@@ -81,9 +85,16 @@ export function useTagCrossfade(lists: SectionLists, section: ReadingSection, ta
 			boxSizing: 'border-box', pointerEvents: 'none', background: opaqueBackground(list, owner),
 		});
 		list.after(node);
-		const animation = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || PWA_FADE_TIMING.easing });
-		animation.onfinish = () => node.remove();
-		return () => { animation.cancel(); node.remove(); };
+		// Fade through: the old rows leave before the new ones arrive, so two lists of text never
+		// show over each other mid-dissolve. The fade's whole duration covers both halves.
+		const leave = duration * FADE_THROUGH_OUT;
+		const leaving = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: leave, easing: FADE_THROUGH_OUT_EASE, fill: 'forwards' });
+		const arriving = list.animate([{ opacity: 0 }, { opacity: 1 }], {
+			duration: duration - leave, delay: leave, fill: 'backwards',
+			easing: style.getPropertyValue('--pwa-motion-fade-ease').trim() || PWA_FADE_TIMING.easing,
+		});
+		leaving.onfinish = () => node.remove();
+		return () => { leaving.cancel(); arriving.cancel(); node.remove(); };
 	}, [lists, loading, section, tag]);
 	return useCallback((next: string | null) => {
 		// Copy the rows as they now show, scrolled to the top like the incoming list.
