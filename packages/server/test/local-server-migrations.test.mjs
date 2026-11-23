@@ -108,3 +108,19 @@ test('Docker start migrates nothing on a fresh volume or current data', { timeou
 		await assert.rejects(migrateBeforeStart(join(dataDir, 'server'), join(dataDir, 'backups')));
 	} finally { await rm(dataDir, { recursive: true, force: true }); }
 });
+
+test('data from a different server version names its folder and how to start fresh', async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-incompatible-'));
+	try {
+		const runtime = await openLocalRuntime({ dataDir, administrative: true });
+		await runtime.close();
+		const metadataPath = join(dataDir, 'server.json');
+		const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
+		await writeFile(metadataPath, JSON.stringify({ ...metadata, runtimeVersion: '0.0.0-old' }));
+		await assert.rejects(openLocalRuntime({ dataDir, administrative: true }), error => {
+			assert.ok(error.message.includes(dataDir), error.message);
+			assert.match(error.message, /different Crate server version.*--data-dir/);
+			return true;
+		});
+	} finally { await rm(dataDir, { recursive: true, force: true }); }
+});

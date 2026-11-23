@@ -125,10 +125,10 @@ test('damaged metadata and missing storage cannot silently create a fresh server
 		const metadataPath = join(dataDir, 'server.json');
 		const metadata = await readFile(metadataPath, 'utf8');
 		await writeFile(metadataPath, 'null');
-		await assert.rejects(openLocalRuntime({ dataDir }), /matching schema\/runtime/);
+		await assert.rejects(openLocalRuntime({ dataDir }), /different Crate server version/);
 		// An upgrade reads the same metadata before it backs anything up.
 		const backup = `${dataDir}-upgrade-backup`;
-		await assert.rejects(openLocalRuntime({ dataDir, administrative: true, upgradeBackup: backup }), /matching schema\/runtime/);
+		await assert.rejects(openLocalRuntime({ dataDir, administrative: true, upgradeBackup: backup }), /different Crate server version/);
 		assert.equal(await stat(backup).catch(() => null), null);
 		await rm(metadataPath);
 		await assert.rejects(openLocalRuntime({ dataDir }), /without server.json/);

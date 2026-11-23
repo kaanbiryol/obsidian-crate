@@ -90,7 +90,7 @@ try {
 		await commands[command]({ command, values, dataDir, docker, signal: shutdown.signal, stopped }, resources);
 	}
 } catch (error) {
-	if (!shutdown.signal.aborted) { console.error(error.message); process.exitCode = 1; }
+	if (!shutdown.signal.aborted) { console.error(`\nError: ${error.message}`); process.exitCode = 1; }
 } finally {
 	try {
 		if (resources.quickServer) await resources.quickServer.close();

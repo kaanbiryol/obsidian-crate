@@ -113,7 +113,7 @@ test('rejects a database with an unknown schema without changing its data', { ti
     const currentMetadata = { ...metadata };
     metadata.schemaHash = 'old-development-schema';
     await writeFile(metadataPath, JSON.stringify(metadata));
-    await assert.rejects(openLocalRuntime({ dataDir: dir }), /tested migration/);
+    await assert.rejects(openLocalRuntime({ dataDir: dir }), /different Crate server version/);
     await assert.rejects(openLocalRuntime({ dataDir: dir, administrative: true, upgradeBackup: join(dir, 'backup') }), /tested migration/);
     assert.deepEqual(JSON.parse(await readFile(metadataPath, 'utf8')), metadata);
     // Restore only the test's fabricated marker and inspect the original rows.

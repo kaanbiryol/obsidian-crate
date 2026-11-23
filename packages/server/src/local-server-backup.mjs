@@ -60,7 +60,7 @@ export async function checkLocalUpgrade(dataDir) {
 	const next = await localBuildInfo();
 	const migration = current?.schemaHash !== next.schemaHash;
 	if (migration) assertLocalMigrationPath(current?.schemaVersion, next.release);
-  assertCompatibleLocalMetadata(migration ? { ...current, schemaHash: next.schemaHash } : current, next);
+  assertCompatibleLocalMetadata(migration ? { ...current, schemaHash: next.schemaHash } : current, next, dataDir);
 	return { from: current.serverRevision, to: next.serverRevision, runtime: next.runtimeVersion, requiresMigration: migration };
 }
 

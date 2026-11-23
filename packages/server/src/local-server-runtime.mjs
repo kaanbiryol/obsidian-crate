@@ -159,12 +159,15 @@ function localDeploymentFingerprint({ worker, schema, release }) {
 /**
  * @param {ServerMetadata | null | undefined} previous
  * @param {Pick<ServerMetadata, 'schemaHash' | 'runtimeVersion' | 'serverRevision'>} expected
+ * @param {string} [dataDir] The data directory being opened; omitted when checking a backup.
  */
-export function assertCompatibleLocalMetadata(previous, expected) {
+export function assertCompatibleLocalMetadata(previous, expected, dataDir) {
 	if (!previous || previous.format !== 1 || !Number.isSafeInteger(previous.serverRevision)
 		|| previous.serverRevision < 1 || typeof previous.instanceId !== 'string' || previous.schemaHash !== expected.schemaHash
 		|| previous.runtimeVersion !== expected.runtimeVersion || previous.serverRevision > expected.serverRevision) {
-		throw new Error('This data directory requires a matching schema/runtime and an equal or newer server revision. Keep the previous installation and backup; this change requires a tested migration. Do not edit server.json.');
+		throw new Error(dataDir
+			? `The server data in ${dataDir} is damaged or comes from a different Crate server version, so this version can't open it. To start fresh, choose another folder with --data-dir or move this one aside. To keep the data, run the version that created it. Don't edit server.json.`
+			: "This backup is damaged or comes from a different Crate server version, so this version can't restore it. Restore it with the version that created it.");
 	}
 }
 
@@ -434,11 +437,11 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
     const expected = { schemaHash: digest(schema), runtimeVersion, serverRevision: release.revision };
     if (previousText !== null) {
       // Damaged metadata (`null` included) fails the same way with or without an upgrade.
-      if (!upgradeBackup || !previous) assertCompatibleLocalMetadata(previous, expected);
+      if (!upgradeBackup || !previous) assertCompatibleLocalMetadata(previous, expected, dataDir);
       else {
         const current = /** @type {ServerMetadata} */ (previous);
         if (current.schemaHash !== expected.schemaHash) assertLocalMigrationPath(current.schemaVersion, release);
-        assertCompatibleLocalMetadata({ ...current, schemaHash: expected.schemaHash }, expected);
+        assertCompatibleLocalMetadata({ ...current, schemaHash: expected.schemaHash }, expected, dataDir);
         const { backupLocalServer, prepareMigrationBackup } = await import('./local-server-backup.mjs');
         // A retried migration keeps the backup taken before its first attempt while it still holds this data.
         if (reuseUpgradeBackup) await prepareMigrationBackup(dataDir, upgradeBackup);

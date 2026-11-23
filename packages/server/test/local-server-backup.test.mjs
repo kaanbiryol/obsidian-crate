@@ -74,7 +74,7 @@ test('verified backup restores files, credentials and durable alarm storage into
 		await assert.rejects(restoreLocalServer(join(directory, 'damaged'), backup), /missing, changed, or damaged/);
 		const metadata = JSON.parse(before);
 		await writeFile(join(source, 'server.json'), JSON.stringify({ ...metadata, runtimeVersion: 'incompatible' }));
-		await assert.rejects(checkLocalUpgrade(source), /tested migration/);
+		await assert.rejects(checkLocalUpgrade(source), /different Crate server version/);
 		assert.equal(JSON.parse(await readFile(join(source, 'server.json'), 'utf8')).runtimeVersion, 'incompatible');
 	} finally { await runtime?.close(); await rm(directory, { recursive: true, force: true }); }
 });
