@@ -9,10 +9,10 @@ export const bundleBudgets = {
 		// self-hosted servers, plus readable connection and pairing errors, conflict review
 		// links, the recovery key option when requesting keys and revoking replaced Cloudflare
 		// logins, with checkpoints saved as change numbers, the PWA's flicker fixes, the reminder
-		// completion animation, Reading title placeholders and errors with next steps, measure
-		// 5.0263 MB raw / 2.3233 MB gzip.
-		maxBytes: 5026300,
-		maxGzipBytes: 2323300,
+		// completion animation, Reading title placeholders, errors with next steps and the
+		// grouped connection options, measure 5.0264 MB raw / 2.3234 MB gzip.
+		maxBytes: 5026400,
+		maxGzipBytes: 2323400,
 	},
 	{
 		path: 'dist/styles.css',
