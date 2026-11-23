@@ -8,12 +8,14 @@ import { DOCK_TABS, type DockTab } from './dock-destinations';
 import { motion, useMotionTemplate, type MotionValue } from 'motion/react';
 
 /** Host-independent dock; the adapter owns destinations, preferences and routing. */
-export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, activeIndex = tabs.indexOf(activeTab), indicatorPosition, onSelect, onPin, onAdd, addBlocked = false, inert = false, disabled = false, className = '' }: {
+export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, activeIndex = tabs.indexOf(activeTab), enteringIndex = null, indicatorPosition, onSelect, onPin, onAdd, addBlocked = false, inert = false, disabled = false, className = '' }: {
 	section: 'reminders' | 'reading';
 	tabs: readonly DockTab[];
 	destinations?: readonly (typeof DOCK_TABS[number])[];
 	activeTab: DockTab;
 	activeIndex?: number;
+	/** Where a dock mounted mid-switch starts its indicator, so it slides in like a retained dock. */
+	enteringIndex?: number | null;
 	/** Retained feature docks can follow one shared animated position. */
 	indicatorPosition?: MotionValue<number>;
 	onSelect: (tab: DockTab) => void;
@@ -25,6 +27,15 @@ export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, ac
 	className?: string;
 }) {
 	const container = useRef<HTMLDivElement>(null);
+	const indicator = useRef<HTMLSpanElement>(null);
+	const [startIndex, setStartIndex] = useState(enteringIndex);
+	useLayoutEffect(() => {
+		if (startIndex === null) return;
+		// Commit the starting position first, so the move to the active tab transitions.
+		void indicator.current?.offsetWidth;
+		setStartIndex(null);
+	}, [startIndex]);
+	const indicatorIndex = startIndex ?? activeIndex;
 	const indicatorTransform = useMotionTemplate`translateX(${indicatorPosition ?? activeIndex * 100}%)`;
 	useLayoutEffect(() => {
 		if (!indicatorPosition) return;
@@ -92,7 +103,7 @@ export function AppDock({ section, tabs, destinations = DOCK_TABS, activeTab, ac
 		<Dialog.Root open={open} onOpenChange={value => { if (value) setOpen(true); else closeViews(); }} onOpenChangeComplete={value => { if (!value) setClosingTabs(null); }} modal={!dragging}>
 			<nav className="pwa-dock__bar" aria-label="Main navigation">
 				<span ref={surface} className="pwa-dock__surface" aria-hidden="true" />
-				<motion.span className="pwa-dock__indicator" aria-hidden="true" style={{ opacity: activeIndex < 0 ? 0 : undefined, width: `calc((100% - 8px) / ${tabs.length})`, transform: indicatorPosition ? indicatorTransform : `translateX(${activeIndex * 100}%)`, transition: indicatorPosition ? 'none' : undefined }} />
+				<motion.span ref={indicator} className="pwa-dock__indicator" aria-hidden="true" style={{ opacity: activeIndex < 0 ? 0 : undefined, width: `calc((100% - 8px) / ${tabs.length})`, transform: indicatorPosition ? indicatorTransform : `translateX(${indicatorIndex * 100}%)`, transition: indicatorPosition ? 'none' : undefined }} />
 				{tabs.map((tab, index) => {
 					const item = destinations.find(candidate => candidate.id === tab)!;
 					const readingView = tab === 'favorites' || tab === 'archive' || tab === 'highlights';

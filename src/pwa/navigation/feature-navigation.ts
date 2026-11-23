@@ -13,6 +13,8 @@ export const FeatureNavigationContext = createContext<{
 	/** The dock indicator shared by both features; read with `useSyncExternalStore`. */
 	dockIndex: () => number | null;
 	subscribeDockIndex: (onChange: () => void) => () => void;
+	/** While a switch is in progress, the leaving feature's dock index; otherwise null. */
+	enteringDockIndex: () => number | null;
 	rememberReminderDockIndex: (index: number) => void;
 	/** The last Reading tab, current whenever it is read. */
 	readingTab: ReadingSection;

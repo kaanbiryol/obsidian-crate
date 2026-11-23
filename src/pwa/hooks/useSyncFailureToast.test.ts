@@ -18,7 +18,7 @@ function render(operationIds: string[], scope: string | null = 'session', ready 
 	hook = renderHook(() => useSyncFailureToast(options), () => {
 		Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
 	}, children => createElement(FeatureNavigationContext.Provider, { value: {
-		section: 'reading', active, toggle: vi.fn(), destination: null, navigate: vi.fn(), dockIndex: () => null, subscribeDockIndex: () => () => {},
+		section: 'reading', active, toggle: vi.fn(), destination: null, navigate: vi.fn(), dockIndex: () => null, enteringDockIndex: () => null, subscribeDockIndex: () => () => {},
 		rememberReminderDockIndex: vi.fn(), readingTab: 'inbox', rememberReadingTab: vi.fn(),
 	} satisfies ContextType<typeof FeatureNavigationContext> }, children));
 }

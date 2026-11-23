@@ -29,11 +29,15 @@ export function useFeatureNavigation(features: SharedFeatures) {
 	// Docks remember their tab on every switch. Keep it outside state so only the docks re-render.
 	const [remembered] = useState(() => createRememberedTabs(launch.tab === 'reading' ? launch.readingTab : 'inbox'));
 	const dockTabs = preferences.dockTabs;
-	const dockIndex = useCallback(() => {
+	const sectionDockIndex = useCallback((panel: CrateSection) => {
 		const { readingTab, reminderDockIndex } = remembered.get();
-		return section === 'reading' ? dockDestinationIndex(dockTabs, 'reading', readingTab) : reminderDockIndex;
-	}, [remembered, section, dockTabs]);
+		return panel === 'reading' ? dockDestinationIndex(dockTabs, 'reading', readingTab) : reminderDockIndex;
+	}, [remembered, dockTabs]);
+	const dockIndex = useCallback(() => sectionDockIndex(section), [sectionDockIndex, section]);
 	const [leavingSection, setLeavingSection] = useState<CrateSection | null>(null);
+	const leavingSectionRef = useRef<CrateSection | null>(null);
+	// A dock first mounted by this switch starts at the leaving dock's position.
+	const enteringDockIndex = useCallback(() => leavingSectionRef.current && sectionDockIndex(leavingSectionRef.current), [sectionDockIndex]);
 	// Keep the painted front layer in place through reversals. Swapping the
 	// layers mid-fade would replace the current mixture with an opaque screen.
 	const [frontSection, setFrontSection] = useState(section);
@@ -63,6 +67,7 @@ export function useFeatureNavigation(features: SharedFeatures) {
 		const previous = sectionRef.current;
 		if (next === previous) return;
 		sectionRef.current = next;
+		leavingSectionRef.current = previous;
 		setLeavingSection(previous);
 		setVisited(current => new Set([...current, next]));
 		setSection(next);
@@ -77,6 +82,7 @@ export function useFeatureNavigation(features: SharedFeatures) {
 	}, [showSection, settings]);
 	const finishSectionTransition = useCallback(() => {
 		setFrontSection(section);
+		leavingSectionRef.current = null;
 		setLeavingSection(null);
 	}, [section]);
 	const finishSettledSection = useCallback(() => {
@@ -151,6 +157,6 @@ export function useFeatureNavigation(features: SharedFeatures) {
 	return {
 		root, section, destination, settingsOpen, settingsNavigation, settingsOpened,
 		frontSection, leavingSection, visited, panelStyle, finishSettledSection,
-		switchSection, navigate, toggle, dockIndex, remembered,
+		switchSection, navigate, toggle, dockIndex, enteringDockIndex, remembered,
 	};
 }

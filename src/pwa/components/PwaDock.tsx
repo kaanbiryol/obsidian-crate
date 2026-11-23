@@ -3,7 +3,7 @@ export { DockAddButton as PwaDockAddButton } from '@/ui/shared/navigation/AppDoc
 import { useSharedFeatures } from '../shared-features';
 import { DOCK_TABS, dockDestinationIndex, type DockTab } from '../settings/dock-preferences';
 import { usePwaPreferences } from '../settings/usePwaPreferences';
-import React, { useContext, useEffect, useEffectEvent, useLayoutEffect, useSyncExternalStore } from 'react';
+import React, { useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { useToast } from '../hooks/useToast';
 import { PwaToast } from './PwaToast';
 import type { NavigationItem } from '@/ui/shared/NavigationBar';
@@ -35,6 +35,7 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
 	const currentTab = section === 'reading' ? activeTab === 'inbox' ? 'reading' : activeTab === 'archived' ? 'archive' : activeTab : activeTab === 'upcoming' ? 'today' : activeTab;
 	const dockIndex = useSyncExternalStore(navigation?.subscribeDockIndex ?? noSubscription, navigation?.dockIndex ?? noDockIndex);
 	const indicatorIndex = dockIndex ?? activeIndex;
+	const [enteringIndex] = useState(() => navigation?.enteringDockIndex() ?? null);
 	const rememberReminderDockIndex = navigation?.rememberReminderDockIndex;
 	useLayoutEffect(() => {
 		if (section === 'reminders') rememberReminderDockIndex?.(activeIndex);
@@ -73,5 +74,5 @@ export function PwaDock<T extends string>({ section, items, activeTab, onTabChan
 		}
 		selectDockTab(tab);
 	};
-	return <><AppDock section={section} tabs={tabs} destinations={DOCK_TABS.filter(item => allowed(item.id))} activeTab={currentTab as DockTab} activeIndex={indicatorIndex} onSelect={selectDockTab} onPin={selectPickerTab} onAdd={onAdd} addBlocked={addBlocked} inert={inert || navigation?.active === false} disabled={disabled} className={className} /><PwaToast toast={inert ? null : toast} /></>;
+	return <><AppDock section={section} tabs={tabs} destinations={DOCK_TABS.filter(item => allowed(item.id))} activeTab={currentTab as DockTab} activeIndex={indicatorIndex} enteringIndex={enteringIndex} onSelect={selectDockTab} onPin={selectPickerTab} onAdd={onAdd} addBlocked={addBlocked} inert={inert || navigation?.active === false} disabled={disabled} className={className} /><PwaToast toast={inert ? null : toast} /></>;
 }

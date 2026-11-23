@@ -30,14 +30,14 @@ function FeatureShellContent({ reminders }: { reminders: React.ReactNode }) {
 	const {
 		root, section, destination, settingsOpen, settingsNavigation, settingsOpened,
 		frontSection, leavingSection, visited, panelStyle, finishSettledSection,
-		switchSection, navigate, toggle, dockIndex, remembered,
+		switchSection, navigate, toggle, dockIndex, enteringDockIndex, remembered,
 	} = useFeatureNavigation(features);
 	// Stable per panel, so its consumers re-render only when navigation changes.
 	const navigationValue = useCallback((panel: CrateSection): NonNullable<ContextType<typeof FeatureNavigationContext>> => ({
-		section: panel, active: section === panel, toggle, destination, navigate, dockIndex,
+		section: panel, active: section === panel, toggle, destination, navigate, dockIndex, enteringDockIndex,
 		subscribeDockIndex: remembered.subscribe, rememberReminderDockIndex: remembered.rememberReminderDockIndex,
 		get readingTab() { return remembered.get().readingTab; }, rememberReadingTab: remembered.rememberReadingTab,
-	}), [section, toggle, destination, navigate, dockIndex, remembered]);
+	}), [section, toggle, destination, navigate, dockIndex, enteringDockIndex, remembered]);
 	const readingNavigation = useMemo(() => navigationValue('reading'), [navigationValue]);
 	const reminderNavigation = useMemo(() => navigationValue('reminders'), [navigationValue]);
 	useDocumentScrollScreens();
