@@ -187,11 +187,24 @@
     }
 }
 
-// Completing: the circle fills, the check draws itself and the row softly
-// dims, while it holds in place (COMPLETION_HOLD_MS) before moving.
+// Completing: the circle squashes and springs back as it fills, a ring
+// ripples out, the check draws itself and the title strikes through, while
+// the row holds in place (COMPLETION_HOLD_MS) before moving.
 .premium-checkbox.is-completing {
     .premium-checkbox-visual {
-        animation: crate-checkbox-complete 220ms cubic-bezier(.2, 0, 0, 1);
+        position: relative;
+        animation: crate-checkbox-complete 510ms cubic-bezier(.3, 0, .2, 1);
+
+        &::after {
+            content: "";
+            position: absolute;
+            inset: calc(var(--premium-checkbox-border-width) * -1);
+            border-radius: 50%;
+            border: 2px solid var(--checkbox-color, var(--interactive-accent));
+            opacity: 0;
+            pointer-events: none;
+            animation: crate-checkbox-ripple 560ms 75ms cubic-bezier(.2, 0, 0, 1);
+        }
     }
 
     .premium-checkbox-icon {
@@ -200,34 +213,53 @@
         :is(path, polyline) {
             stroke-dasharray: 24;
             stroke-dashoffset: 24;
-            animation: crate-checkmark-draw 200ms 40ms cubic-bezier(.2, 0, 0, 1) forwards;
+            animation: crate-checkmark-draw 290ms 135ms cubic-bezier(.4, 0, .2, 1) forwards;
         }
     }
 }
 
-.premium-reminder-card.is-completing .premium-reminder-content {
-    opacity: 0.6;
-    transition: opacity 240ms 60ms var(--crate-motion-easing);
+.premium-reminder-card.is-completing .premium-reminder-title {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+    text-decoration-color: var(--text-faint);
+    animation: crate-title-strike 320ms 170ms var(--crate-motion-easing) backwards;
 }
 
 @keyframes crate-checkbox-complete {
-    from { transform: scale(.92); }
-    to { transform: scale(1); }
+    0% { transform: scale(1); }
+    25% { transform: scale(.8); }
+    60% { transform: scale(1.12); }
+    80% { transform: scale(.97); }
+    100% { transform: scale(1); }
+}
+
+@keyframes crate-checkbox-ripple {
+    0% { transform: scale(1); opacity: .5; }
+    100% { transform: scale(1.9); opacity: 0; }
 }
 
 @keyframes crate-checkmark-draw {
     to { stroke-dashoffset: 0; }
 }
 
+@keyframes crate-title-strike {
+    from { color: var(--text-normal); text-decoration-color: transparent; }
+}
+
 // Keep this beside the animation: shared card styles load after host theme rules.
 .is-reduced-motion {
     .premium-checkbox-icon,
     .premium-checkbox.is-completing .premium-checkbox-visual,
+    .premium-checkbox.is-completing .premium-checkbox-visual::after,
+    .premium-reminder-card.is-completing .premium-reminder-title,
     .premium-checkbox.is-completing .premium-checkbox-icon :is(path, polyline) { animation: none; stroke-dashoffset: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
     .premium-checkbox-icon,
     .premium-checkbox.is-completing .premium-checkbox-visual,
+    .premium-checkbox.is-completing .premium-checkbox-visual::after,
+    .premium-reminder-card.is-completing .premium-reminder-title,
     .premium-checkbox.is-completing .premium-checkbox-icon :is(path, polyline) { animation: none; stroke-dashoffset: 0; }
     .premium-checkbox:is(:hover, [data-press-active]) .premium-checkbox-visual { transform: none; }
 }

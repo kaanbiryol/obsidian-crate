@@ -22,7 +22,7 @@ const CHECKBOX_SELECTOR = [
 ].join(', ');
 
 /** How long a just-checked row stays in place so its check animation can play before it moves. */
-export const COMPLETION_HOLD_MS = 350;
+export const COMPLETION_HOLD_MS = 580;
 
 function waitForCompletionAnimation(): Promise<void> {
 	if (prefersReducedMotion()) return Promise.resolve();
