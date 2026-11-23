@@ -18,6 +18,7 @@ import { currentTailscaleHostname, findTailscale } from '../local-server-tailsca
 import { ensureCloudflared, normalizeTunnelHostname, saveTailscaleSettings, setupRemoteAccess } from '../local-server-tunnel.mjs';
 import { runSetupWizard } from '../local-server-wizard.mjs';
 import { printPairing } from './devices.mjs';
+import { bold, dim, green } from '../local-server-style.mjs';
 import { describeAutoBackup } from './status.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -103,10 +104,19 @@ export async function runWizardSetup(context, resources) {
 	const configured = { ...context, values };
 	if (choices.service) {
 		// Provisioning initializes storage and needs the interactive Tailscale or Cloudflare login.
-		if (choices.access === 'tailscale') await setupTailscale(configured, null, port, resources);
-		else await setupNamedTunnel(configured, null, port, resources);
-		if (choices.backupDir) console.log(describeAutoBackup(await saveAutoBackup(dataDir, { dir: choices.backupDir, keep: 7 })));
-		await startAsService(configured, choices.keepAwake);
+		const remote = choices.access === 'tailscale' ? await setupTailscale(configured, null, port, resources)
+			: await setupNamedTunnel(configured, null, port, resources);
+		const backups = choices.backupDir ? await saveAutoBackup(dataDir, { dir: choices.backupDir, keep: 7 }) : null;
+		const script = await lastingScript(signal);
+		const logPath = /** @type {{ log: string }} */ (servicePaths()).log;
+		// Only this run's log lines matter; earlier runs may have left codes and errors.
+		const offset = await stat(logPath).then(info => info.size, () => 0);
+		await installService({ dataDir, keepAwake: choices.keepAwake, script, maxFileSize: values['max-file-size'] });
+		const origin = `https://${remote.hostname}`;
+		console.log(`\n${green('✓')} ${choices.access === 'tailscale' ? 'Tailscale Funnel' : 'Cloudflare Tunnel'} address: ${bold(origin)}`
+			+ `\n${green('✓')} Starts when you log in${choices.keepAwake ? ' and keeps this Mac awake' : ''}`
+			+ `\n${green('✓')} ${backups ? `Daily backups to ${backups.dir}` : 'Daily backups are off'}`);
+		await followService({ dataDir, origin, logPath, offset, signal });
 		return null;
 	}
 	if (choices.backupDir) {
@@ -130,18 +140,28 @@ async function lastingScript(signal) {
 	return join(root, PACKAGE_NAME, 'scripts/crate-server.mjs');
 }
 
-/** Installs the service, then shows its log until the address is public and a pairing
- * code is on screen. Ctrl+C closes only this view; the service keeps running.
- * @param {CommandContext} context @param {boolean} keepAwake */
-async function startAsService({ dataDir, signal, values }, keepAwake) {
-	const script = await lastingScript(signal);
-	const logPath = /** @type {{ log: string }} */ (servicePaths()).log;
-	let offset = await stat(logPath).then(info => info.size, () => 0);
-	await installService({ dataDir, keepAwake, script, maxFileSize: values['max-file-size'] });
-	console.log(`\nCrate now runs in the background and starts when you log in. Its log follows; press Ctrl+C to close this view, Crate keeps running.\nLog: ${logPath}\n`);
-	let shown = '', paired = false, ready = false;
+/** The background server's log lines that need the person during setup: Tailscale's
+ * Funnel approval link and startup errors.
+ * @param {string} log @returns {string[]} */
+export function serviceNotices(log) {
+	return [
+		...[...log.matchAll(/https:\/\/login\.tailscale\.com\/\S+/g)].map(([link]) => `Turn on Tailscale Funnel for your tailnet: ${bold(link)}`),
+		...[...log.matchAll(/^Error: .+$/gm)].map(([error]) => error),
+	];
+}
+
+/** Waits for the background server to answer at its public address, then shows a code
+ * that connects Obsidian. The server's log stays in its file; this shows only what needs
+ * the person: Tailscale's approval link, startup errors, readiness and the code.
+ * Ctrl+C stops waiting; the service keeps running.
+ * @param {{ dataDir: string, origin: string, logPath: string, offset: number, signal: AbortSignal }} options */
+async function followService({ dataDir, origin, logPath, offset, signal }) {
+	const doctor = crateCommand(installKind(), 'doctor');
+	console.log(dim(`\nChecking that ${origin} is reachable. This can take a few minutes the first time.\nPress Ctrl+C to stop waiting; Crate keeps running in the background.`));
+	const surfaced = new Set();
+	let shown = '', ready = false;
 	const deadline = Date.now() + 15 * 60_000;
-	while (!signal.aborted && Date.now() < deadline && !(paired && ready)) {
+	while (!signal.aborted && Date.now() < deadline && !ready) {
 		const file = await open(logPath, 'r').catch(() => null);
 		if (file) {
 			try {
@@ -150,23 +170,24 @@ async function startAsService({ dataDir, signal, values }, keepAwake) {
 					const buffer = Buffer.alloc(size - offset);
 					await file.read(buffer, 0, buffer.length, offset);
 					offset = size;
-					const text = buffer.toString();
-					process.stdout.write(text);
-					shown += text;
+					shown += buffer.toString();
 				}
 			} finally { await file.close(); }
 		}
-		ready ||= /^Ready: /m.test(shown);
-		paired ||= shown.includes('crate-pair-');
-		// The server prints its first code with the ready line; existing devices mean none.
-		if (!paired && ready && shown.includes('Server address to paste into Obsidian:') && await requestLocalControl(dataDir, 'GET', '/status').then(() => true, () => false)) {
-			const pairing = await requestLocalPairing(dataDir, computerName().slice(0, 128));
-			printPairing(pairing, pairing.origin);
-			paired = true;
+		for (const notice of serviceNotices(shown)) {
+			if (!surfaced.has(notice)) { surfaced.add(notice); console.log(notice); }
 		}
-		await delay(1000, undefined, { signal }).catch(() => {});
+		ready = /^Ready: /m.test(shown) && await requestLocalControl(dataDir, 'GET', '/status').then(() => true, () => false);
+		if (!ready) await delay(1000, undefined, { signal }).catch(() => {});
 	}
 	if (signal.aborted) return;
-	console.log(ready ? `\nCrate is set up. Check on it any time with: ${crateCommand(installKind(), 'doctor')}`
-		: `\nCrate is still waiting for its public address. It keeps trying in the background; check with: ${crateCommand(installKind(), 'doctor')}`);
+	if (!ready) {
+		console.log(`\nCrate is still waiting for ${origin} to work. It keeps trying in the background; check with: ${doctor}\nLog: ${logPath}`);
+		return;
+	}
+	console.log(`${green('✓')} ${origin} is reachable`);
+	// The server shows its first code in the log once ready; with devices connected, ask for one.
+	const code = /crate-pair-[a-f0-9]{64}/.exec(shown)?.[0];
+	printPairing(code ? { code } : await requestLocalPairing(dataDir, computerName().slice(0, 128)), origin);
+	console.log(`Crate keeps running in the background. Check on it with: ${doctor}\n${dim(`Log: ${logPath}`)}`);
 }

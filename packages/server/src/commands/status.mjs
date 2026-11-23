@@ -9,7 +9,7 @@ import { requestLocalControl } from '../local-server-pairing.mjs';
 /** @typedef {import('../local-server-options.mjs').Command} Command */
 
 /** @param {{ createdAt: string, output: string } | null} backup */
-export function describeLastBackup(backup) {
+function describeLastBackup(backup) {
 	return backup ? `Last backup: ${backup.createdAt} at ${backup.output}`
 		: 'Last backup: none recorded. See "Automatic backups" in docs/self-hosting.md.';
 }

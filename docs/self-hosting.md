@@ -299,9 +299,10 @@ suggestion:
    server credentials, so choose it only if iCloud may store them. You can also pick
    another folder or skip backups. See [automatic backups](#automatic-backups).
 
-With a service, setup provisions the address, installs the service, and shows
-its log until the address is public and a pairing QR code is on screen.
-**Ctrl+C** then closes only that view. Without one, Crate runs in the terminal as
+With a service, setup provisions the address, installs the service, and prints a
+short summary. It waits until the address is public, showing Tailscale's Funnel
+approval link or startup errors if there are any, then shows a pairing QR code.
+The server's own output stays in its log. **Ctrl+C** stops only the waiting. Without one, Crate runs in the terminal as
 before. Options (`--tailscale`, `--hostname`, `--quick`) and a non-interactive
 terminal skip the questions; Docker never asks. Without a terminal or an option,
 setup starts a Quick Tunnel and says so. For daily use, choose
