@@ -8,7 +8,7 @@ import { getCurrentDeviceName, getCurrentPlatformCode } from './device-identity'
 import { generateSecureToken, hashToken } from './device-token';
 import { normalizeCloudflareDeployment } from '../cloudflare/deployment/state';
 import { workersDevOrigin } from '../cloudflare/deployment/worker-origin';
-import { HttpError, WorkerApiHttpClient } from '../sync/worker-api/http';
+import { HttpError, SyncTransportError, WorkerApiHttpClient } from '../sync/worker-api/http';
 import { readServerEncryption } from '../sync/encryption/server-encryption';
 import { DEVICE_PAIRING_PATH, parseDevicePairingLink, parseDevicePairingTarget, type DevicePairingTarget } from '../protocol/device-pairing';
 import { connectSelfHostedServer } from './self-hosted-connection';
@@ -83,7 +83,7 @@ async function startSelfHostedPairing(plugin: CratePlugin, target: DevicePairing
 }
 
 export async function startDevicePairing(plugin: CratePlugin, target: DevicePairingTarget | null): Promise<void> {
-	if (!target) { new Notice('This pairing link is invalid. Create a new one in Crate settings on your desktop.'); return; }
+	if (!target) { new Notice('This pairing link is invalid or incomplete. Create a new pairing link on a connected device, or run crate-server pair on your own server.'); return; }
 	if (target.kind === 'self-hosted') { await startSelfHostedPairing(plugin, target); return; }
 	const release = beginConnectionOperation(plugin, 'pairing');
 	if (!release) {
@@ -109,7 +109,9 @@ export async function startDevicePairing(plugin: CratePlugin, target: DevicePair
 		});
 	} catch (error) {
 		if (error instanceof ConnectionSetupError && error.code === 'replace-cancelled') new Notice(`${error.message} To connect, create a new code with Add a device on your other device.`);
-		else if (!getPluginLifecycleSignal(plugin).aborted) new Notice(`Could not connect: ${errorMessage(error)}`);
+		else if (!getPluginLifecycleSignal(plugin).aborted) new Notice(error instanceof SyncTransportError
+			? 'Could not reach your Crate server. Check your internet connection, then open the link again.'
+			: `Could not connect: ${errorMessage(error)}`);
 	} finally { release(); }
 }
 

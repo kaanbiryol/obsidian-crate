@@ -27,8 +27,10 @@ vi.mock('./lifecycle-state', () => ({ getPluginLifecycleSignal: () => new AbortC
 vi.mock('../ui/settings/device-key-pairing-modal', () => ({ DeviceKeyPairingModal: class { open = mocks.keysModal; } }));
 vi.mock('../sync/worker-api/http', () => {
 	class HttpError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+	class SyncTransportError extends Error {}
 	return {
 		HttpError,
+		SyncTransportError,
 		WorkerApiHttpClient: class {
 			setAbortSignal() {}
 			async requestJson(path: string, options: { body: string }) { mocks.requests.push({ path, body: options.body }); return mocks.exchange(); }
@@ -128,6 +130,18 @@ describe('redeemDevicePairing', () => {
 		mocks.encryption.mockResolvedValue({ mode: 'active' });
 		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#${target.code}`);
 		expect(mocks.replacement).not.toHaveBeenCalled();
+	});
+
+	it('explains an unreachable server and keeps server messages as they are', async () => {
+		const { HttpError, SyncTransportError } = await import('../sync/worker-api/http');
+		mocks.exchange.mockRejectedValue(new SyncTransportError('Load failed'));
+		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#${target.code}`);
+		mocks.exchange.mockRejectedValue(new HttpError('This pairing code expired or was already used. Create a new one on your desktop.', 410));
+		await handleDevicePairingLink(plugin as never, `${origin}/notifications/pair#${target.code}`);
+		expect(mocks.notices.filter(notice => notice.startsWith('Could not'))).toEqual([
+			'Could not reach your Crate server. Check your internet connection, then open the link again.',
+			'Could not connect: This pairing code expired or was already used. Create a new one on your desktop.',
+		]);
 	});
 
 	it('does nothing when the user cancels or the link is invalid', async () => {
