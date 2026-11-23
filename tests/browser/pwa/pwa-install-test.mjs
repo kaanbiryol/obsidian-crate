@@ -19,11 +19,17 @@ async function createContext(browser, standalone = false, cookies = []) {
   // This enrollment fixture changes scopes on renewal. Return valid paths for
   // the requested scope, including the renewed and freshly enrolled folders.
   await context.route('**/reminders/list?*', async route => {
-    const response = await route.fetch();
-    if (!response.ok()) return route.fulfill({ response });
-    const body = await response.json();
-    const folder = new URL(route.request().url()).searchParams.get('folderPath');
-    await route.fulfill({ response, json: { ...body, reminders: sortForList(body.reminders, folder) } });
+    try {
+      const response = await route.fetch();
+      if (!response.ok()) return await route.fulfill({ response });
+      const body = await response.json();
+      const folder = new URL(route.request().url()).searchParams.get('folderPath');
+      await route.fulfill({ response, json: { ...body, reminders: sortForList(body.reminders, folder) } });
+    } catch (error) {
+      // A list request still in flight when its page navigates or closes is disposed
+      // with it; nothing reads that response, so only other failures count.
+      if (!/disposed|has been closed/.test(String(error?.message))) throw error;
+    }
   });
   return context;
 }
