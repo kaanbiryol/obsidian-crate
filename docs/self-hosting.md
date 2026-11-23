@@ -649,8 +649,11 @@ it 30 seconds later.
 - **Locks:** a lock file stops two servers from using the same data. After a
   reboot, or once the process that held the lock is gone, Crate replaces the
   lock on its own. A force-quit server can leave workerd running on the same
-  files; Crate then refuses to start and prints the workerd process ID to stop
-  with `kill`. On other platforms, or when processes cannot be listed, check that
+  files. Crate records the workerd processes it starts in `workerd.json`, so the
+  next start stops the ones a force-quit left running and starts normally,
+  including under Docker, launchd or systemd. If another workerd without a parent is
+  running, or one does not stop, Crate refuses to start and prints the process ID to
+  stop with `kill`. On other platforms, or when processes cannot be listed, check that
   no Crate or workerd process is running, then remove `server.lock` from the
   data directory.
 - **Damaged database:** startup checks the database first and refuses to open a

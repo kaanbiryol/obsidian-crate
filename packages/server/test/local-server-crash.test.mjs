@@ -49,7 +49,7 @@ async function startServer(dataDir, port) {
 	return { child, exited, get output() { return output; }, started: true };
 }
 
-test('a server killed mid-write recovers its data and reclaims its lock once its runtime is gone', { timeout: 120_000, skip: !['darwin', 'linux'].includes(process.platform) }, async () => {
+test('a server killed mid-write recovers its data and the next start stops the workerd it left running', { timeout: 120_000, skip: !['darwin', 'linux'].includes(process.platform) }, async () => {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-crash-'));
 	/** @type {Awaited<ReturnType<typeof startServer>> | undefined} */
 	let server;
@@ -114,17 +114,13 @@ test('a server killed mid-write recovers its data and reclaims its lock once its
 		await delay(500);
 		assert.ok(running(orphans[0]), 'workerd outlives a killed server process');
 		assert.match(await status(), /Status: not responding/);
-		const refused = await startServer(dataDir, port);
-		assert.equal(refused.started, false);
-		await refused.exited;
-		assert.match(refused.output, new RegExp(`force-quit.*kill [\\d ]*\\b${orphans[0]}\\b`, 's'));
-		process.kill(orphans[0], 'SIGKILL');
-		while (running(orphans[0])) await delay(50);
-		orphans = [];
-
-		// No reboot and no manual lock removal: the abandoned lock is reclaimed.
+		// No reboot, no manual kill and no lock removal: the next start stops the workerd
+		// the dead server recorded (the one Miniflare restarted in case A) and reclaims the lock.
 		server = await startServer(dataDir, port);
 		assert.ok(server.started, server.output);
+		assert.match(server.output, new RegExp(`Stopped workerd left running by a force-quit Crate server \\(PID ${orphans[0]}\\)`));
+		assert.equal(running(orphans[0]), false);
+		orphans = [];
 		for (const [path, entry] of uploads) {
 			// Resending an interrupted or completed upload either commits it once or replays its receipt.
 			const result = await upload(path);

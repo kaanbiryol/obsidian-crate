@@ -23,7 +23,7 @@ import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocal
 
 // A backup describes its own source, so the record of the last backup stays out of it, and so
 // do automatic backup settings: a restored copy must not prune the original server's backups.
-const ephemeral = new Set(['server.lock', 'control.json', 'control.sock', 'status.json', 'last-backup.json', 'auto-backup.json', 'alerts.json', '.DS_Store']);
+const ephemeral = new Set(['server.lock', 'workerd.json', 'control.json', 'control.sock', 'status.json', 'last-backup.json', 'auto-backup.json', 'alerts.json', '.DS_Store']);
 const inside = (/** @type {string} */ parent, /** @type {string} */ child) => { const path = relative(parent, child); return path === '' || (!path.startsWith('..') && !isAbsolute(path)); };
 /** @param {string} path */
 async function digest(path) {

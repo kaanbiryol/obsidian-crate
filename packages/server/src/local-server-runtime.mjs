@@ -202,12 +202,9 @@ function pidIsRunning(pid) {
 	catch (error) { return error.code !== 'ESRCH'; }
 }
 
-/** Running workerd processes that lost their parent, or null where processes cannot be
- * listed. A force-quit server leaves its workerd running on the same files, adopted by
- * init or a subreaper. Workerd whose parent is a live Node process belongs to another
- * server or tool that still runs, never to the dead lock holder.
- * @returns {Promise<number[] | null>} */
-async function otherWorkerdProcesses() {
+/** Every running process, or null where processes cannot be listed.
+ * @returns {Promise<{ pid: number, ppid: number, name: string }[] | null>} */
+async function listProcesses() {
 	/** @type {{ pid: number, ppid: number, name: string }[]} */
 	let processes;
 	try {
@@ -228,21 +225,82 @@ async function otherWorkerdProcesses() {
 			});
 		} else return null;
 	} catch { return null; }
+	return processes;
+}
+
+/** Running workerd processes that lost their parent, or null where processes cannot be
+ * listed. A force-quit server leaves its workerd running on the same files, adopted by
+ * init or a subreaper. Workerd whose parent is a live Node process belongs to another
+ * server or tool that still runs, never to the dead lock holder.
+ * @returns {Promise<number[] | null>} */
+async function otherWorkerdProcesses() {
+	const processes = await listProcesses();
+	if (!processes) return null;
 	const names = new Map(processes.map(entry => [entry.pid, entry.name]));
 	return processes.filter(entry => entry.name === 'workerd' && names.get(entry.ppid) !== 'node').map(entry => entry.pid);
 }
 
+/** The workerd processes a server started on its data directory (`workerd.json`), so a
+ * start after a force-quit can stop the ones it left running there.
+ * @typedef {{ serverPid: number, workerd: number[] }} WorkerdRecord */
+const WORKERD_RECORD = 'workerd.json';
+
+/** Records this process's workerd children. Miniflare starts a new one on each restart.
+ * @param {string} dataDir */
+async function recordWorkerd(dataDir) {
+	const processes = await listProcesses();
+	if (!processes) return;
+	const workerd = processes.filter(entry => entry.name === 'workerd' && entry.ppid === process.pid).map(entry => entry.pid);
+	await writePrivateJson(join(dataDir, WORKERD_RECORD), { serverPid: process.pid, workerd });
+}
+
+/** @param {string} dataDir @returns {Promise<WorkerdRecord | null>} */
+async function readWorkerdRecord(dataDir) {
+	try {
+		const record = JSON.parse(await readFile(join(dataDir, WORKERD_RECORD), 'utf8'));
+		return Number.isSafeInteger(record?.serverPid) && Array.isArray(record.workerd) ? record : null;
+	} catch { return null; }
+}
+
+/** Asks processes to stop, then kills those that keep running.
+ * @param {number[]} pids @returns {Promise<boolean>} True once all have exited. */
+async function stopProcesses(pids) {
+	/** @param {NodeJS.Signals} signal */
+	const send = signal => { for (const pid of pids) { try { process.kill(pid, signal); } catch { /* already gone */ } } };
+	/** @param {number} ms */
+	const exited = async ms => {
+		for (const deadline = Date.now() + ms; pids.some(pidIsRunning);) {
+			if (Date.now() > deadline) return false;
+			await new Promise(resolve => setTimeout(resolve, 100));
+		}
+		return true;
+	};
+	send('SIGTERM');
+	if (await exited(10_000)) return true;
+	send('SIGKILL');
+	return exited(5_000);
+}
+
 /** Without a reboot, a lock is stale once its process is gone and no workerd it may
- * have started is still running. Throws while one may still use the data.
+ * have started is still running. Workerd the dead server recorded as its own is
+ * stopped first. Throws while any other may still use the data.
  * @param {string} text
- * @param {{ isRunning?: (pid: number) => boolean, listWorkerd?: () => Promise<number[] | null> }} [options] */
-export async function isAbandonedLock(text, { isRunning = pidIsRunning, listWorkerd = otherWorkerdProcesses } = {}) {
+ * @param {{ isRunning?: (pid: number) => boolean, listWorkerd?: () => Promise<number[] | null>,
+ * 	record?: WorkerdRecord | null, stop?: (pids: number[]) => Promise<boolean> }} [options] */
+export async function isAbandonedLock(text, { isRunning = pidIsRunning, listWorkerd = otherWorkerdProcesses, record = null, stop = stopProcesses } = {}) {
 	/** @type {ServerLock} */
 	let lock;
 	try { lock = JSON.parse(text); } catch { return false; }
 	if (!Number.isSafeInteger(lock?.pid) || isRunning(lock.pid)) return false;
-	const workerd = await listWorkerd();
+	let workerd = await listWorkerd();
 	if (workerd === null) return false;
+	// Only workerd that lost its parent and that the dead lock holder recorded is stopped.
+	const owned = record?.serverPid === lock.pid ? workerd.filter(pid => record.workerd.includes(pid)) : [];
+	if (owned.length) {
+		if (!await stop(owned)) throw new Error(`Data directory is locked by a Crate server that was force-quit, and its workerd did not stop (PID ${owned.join(', ')}). Stop it with: kill -9 ${owned.join(' ')}. Then start Crate again.`);
+		console.warn(`Stopped workerd left running by a force-quit Crate server (PID ${owned.join(', ')}).`);
+		workerd = workerd.filter(pid => !owned.includes(pid));
+	}
 	if (workerd.length) {
 		throw new Error(`Data directory is locked by a Crate server that was force-quit, and workerd it may have started is still running without it (PID ${workerd.join(', ')}). Stop it with: kill ${workerd.join(' ')}. Then start Crate again.`);
 	}
@@ -262,7 +320,7 @@ export async function lockLocalData(dataDir, options) {
 		catch (error) {
 			if (error.code !== 'EEXIST') throw error;
 			const previous = await readFile(path, 'utf8').catch(() => '');
-			if (attempt === 0 && (isLockFromEarlierBoot(previous) || await isAbandonedLock(previous, options))) {
+			if (attempt === 0 && (isLockFromEarlierBoot(previous) || await isAbandonedLock(previous, { record: await readWorkerdRecord(dataDir), ...options }))) {
 				if (!await removeStaleLock(path, previous)) throw locked();
 				continue;
 			}
@@ -317,6 +375,8 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 	/** @type {WorkerRuntimeConfig} */
 	const { compatibilityDate, compatibilityFlags, bindings, durableObjectClass, notificationRateLimit } = JSON.parse(runtimeText);
 	const unlock = await lockLocalData(dataDir);
+	// Best effort: without a record, a force-quit still leaves the manual kill.
+	const record = () => recordWorkerd(dataDir).catch(() => {});
 	/** @type {import('miniflare').Miniflare | undefined} */
 	let mf;
 	/** @param {import('miniflare').V4MiniflareOptions} options */
@@ -377,6 +437,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		// alarms must not execute against an unverified database or during admin.
 		mf = createRuntime(options);
 		await mf.ready;
+		await record();
 		const info = /** @type {{ serverRevision?: unknown, schemaVersion?: unknown }} */ (await (await mf.dispatchFetch(`${origin}/.well-known/crate`)).json());
 		if (info.serverRevision !== release.revision || info.schemaVersion !== release.schemaVersion) {
 			throw new Error('The Worker build is out of date. Run npm run build:worker before starting the server.');
@@ -405,12 +466,13 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			durableObjects: { [bindings.reminderAlarms]: { className: durableObjectClass, useSQLite: true } },
 			ratelimits: { [bindings.notificationRateLimiter]: { namespace_id: '1001', simple: notificationRateLimit } },
 			// Miniflare restarted a crashed workerd; reminders may have come due meanwhile.
-			unsafeHandleRuntimeRestart: async () => { crashes++; await wakeReminders(); },
+			unsafeHandleRuntimeRestart: async () => { crashes++; await record(); await wakeReminders(); },
 		};
 		if (!administrative) {
 			await mf.dispose();
 			mf = createRuntime(serving);
 			await mf.ready;
+			await record();
 			db = await mf.getD1Database(bindings.database);
 		}
 		let live = /** @type {import('miniflare').Miniflare} */ (mf);
@@ -466,6 +528,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 						if (closed) return;
 						const next = createRuntime(serving);
 						await next.ready;
+						await record();
 						if (closed) { await next.dispose(); return; }
 						live = next;
 						db = await next.getD1Database(bindings.database);
@@ -483,10 +546,12 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 				closed = true;
 				watchdog?.close();
 				if (!disposed) await live.dispose();
+				await unlink(join(dataDir, WORKERD_RECORD)).catch(() => {});
 				await unlock();
 			} };
 	} catch (error) {
 		await mf?.dispose();
+		await unlink(join(dataDir, WORKERD_RECORD)).catch(() => {});
 		await unlock();
 		throw error;
 	}

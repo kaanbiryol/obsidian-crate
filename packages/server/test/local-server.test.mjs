@@ -95,6 +95,28 @@ test('without a reboot, a lock is abandoned only when its process is gone and no
 	for (const text of ['', 'null', '{"pid":"1"}']) assert.equal(await isAbandonedLock(text, options(false, [])), false);
 });
 
+test('a start stops only the orphaned workerd that the dead lock holder recorded', async () => {
+	const lock = JSON.stringify({ pid: 4242, startedAt: new Date().toISOString() });
+	/** @type {number[][]} */
+	let stopped = [];
+	const options = (workerd, record, stops = true) => ({ isRunning: () => false, listWorkerd: async () => workerd, record,
+		stop: async (/** @type {number[]} */ pids) => { stopped.push(pids); return stops; } });
+	// Recorded and orphaned: stopped, then the lock is abandoned.
+	assert.equal(await isAbandonedLock(lock, options([7, 8], { serverPid: 4242, workerd: [7, 8, 99] })), true);
+	assert.deepEqual(stopped, [[7, 8]]);
+	// An orphan the dead server did not record may use other data: refuse and stop nothing.
+	stopped = [];
+	await assert.rejects(isAbandonedLock(lock, options([7, 9], { serverPid: 4242, workerd: [7] })), /PID 9.*kill 9/);
+	assert.deepEqual(stopped, [[7]]);
+	// A record from another server process (an earlier run, or another start) is ignored.
+	stopped = [];
+	await assert.rejects(isAbandonedLock(lock, options([7], { serverPid: 1, workerd: [7] })), /PID 7.*kill 7/);
+	await assert.rejects(isAbandonedLock(lock, options([7], null)), /PID 7.*kill 7/);
+	assert.deepEqual(stopped, []);
+	// A recorded workerd that will not exit keeps the lock and says how to force it.
+	await assert.rejects(isAbandonedLock(lock, options([7], { serverPid: 4242, workerd: [7] }, false)), /did not stop \(PID 7\).*kill -9 7/);
+});
+
 test('damaged metadata and missing storage cannot silently create a fresh server', { timeout: 20_000 }, async () => {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-damage-'));
 	try {
