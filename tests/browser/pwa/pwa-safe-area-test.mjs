@@ -158,8 +158,8 @@ try {
 				const backdropBounds = await backdrop.boundingBox();
 				assert.ok(backdropBounds.y <= 0 && backdropBounds.y + backdropBounds.height >= 852,
 					'one continuous backdrop covers the status-bar safe area and the rest of the screen');
-				// A phone card sheet uses one light scrim in both color schemes.
-				await expect(backdrop).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.2)');
+				// A phone card sheet dims lightly in light mode and more in dark mode, where it rises by surface lightness.
+				await expect(backdrop).toHaveCSS('background-color', colorScheme === 'dark' ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.2)');
 				await expect(backdrop).toHaveCSS('backdrop-filter', 'none');
 				await page.getByRole('button', { name: 'Close reminder editor', exact: true }).click();
 				await page.getByRole('dialog', { name: 'Edit reminder', exact: true }).waitFor({ state: 'detached' });
