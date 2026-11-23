@@ -37,13 +37,15 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 		return () => { if (controls.current === node) controls.current = null; };
 	}, []);
 
+	// The saved passages under the open editor, whose own fill gives way to its preview.
+	const editingMarks = useRef<HTMLElement[]>([]);
 	useLayoutEffect(() => {
 		const reader = article.current, text = body.current;
-		if (!reader || !text || !draft) { setGeometry(null); return; }
+		if (!reader || !text || !draft) { setGeometry(null); showEditing(editingMarks, []); return; }
 		const range = highlightRange(text, draft.highlight);
-		if (!range) { setGeometry(null); return; }
+		if (!range) { setGeometry(null); showEditing(editingMarks, []); return; }
 		const rects = highlightTextRects(text, draft.highlight);
-		if (!rects.length) { setGeometry(null); return; }
+		if (!rects.length) { setGeometry(null); showEditing(editingMarks, []); return; }
 		const bounds = reader.getBoundingClientRect();
 		setGeometry(readingHighlightGeometry({
 			rects, bounds, scrollTop: reader.scrollTop,
@@ -51,10 +53,9 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 			navigationBottom: reader.querySelector('nav')?.getBoundingClientRect().bottom,
 			headingBottom: reader.querySelector('.crate-reading-reader__header')?.getBoundingClientRect().bottom,
 		}));
-		const marks = Array.from(text.querySelectorAll<HTMLElement>('.crate-reading-reader__highlight')).filter(mark => draft.original && Number(mark.dataset.highlightStart) < draft.original.end && Number(mark.dataset.highlightEnd) > draft.original.start);
-		for (const mark of marks) mark.classList.add('is-editing');
-		return () => { for (const mark of marks) mark.classList.remove('is-editing'); };
+		showEditing(editingMarks, Array.from(text.querySelectorAll<HTMLElement>('.crate-reading-reader__highlight')).filter(mark => draft.original && Number(mark.dataset.highlightStart) < draft.original.end && Number(mark.dataset.highlightEnd) > draft.original.start));
 	}, [article, body, content, highlights, draft, layout]);
+	useLayoutEffect(() => () => showEditing(editingMarks, []), []);
 
 	useEffect(() => {
 		const reader = article.current, text = body.current;
@@ -185,4 +186,15 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 
 function savedHighlight(highlights: ReadingHighlight[], highlight: ReadingHighlight): ReadingHighlight | undefined {
 	return highlights.find(entry => sameHighlight(entry, highlight));
+}
+
+/** Marks `marks` as under the editor and returns the rest of `current` to their own fill. The
+ * editor's preview leaves at once, so that fill returns at once too: its colour transition (a
+ * synced draft settling) would show bare text meanwhile. Marks that stay are left alone. */
+function showEditing(current: React.RefObject<HTMLElement[]>, marks: HTMLElement[]): void {
+	const left = current.current.filter(mark => !marks.includes(mark));
+	for (const mark of left) { mark.classList.add('is-settling'); mark.classList.remove('is-editing'); }
+	for (const mark of left) { void mark.offsetWidth; mark.classList.remove('is-settling'); }
+	for (const mark of marks) mark.classList.add('is-editing');
+	current.current = marks;
 }

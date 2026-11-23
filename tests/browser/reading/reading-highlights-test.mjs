@@ -322,6 +322,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.reload();
     await expect(page.locator('.crate-reading-reader__highlight')).toHaveCount(3);
     await expect(page.locator('.crate-reading-reader__body mark[data-sync="pending"]')).toHaveCount(0);
+    // A synced passage gets its own fill back the moment its editor closes, not faded in from bare text.
+    await page.locator('.crate-reading-reader__highlight').first().tap();
+    await expect(page.getByRole('group', { name: 'Highlight actions' })).toBeVisible();
+    await expect(page.locator('.crate-reading-reader__highlight.is-editing')).not.toHaveCount(0);
+    await page.evaluate(() => {
+      window.markTransitions = 0;
+      document.addEventListener('transitionrun', event => { if (event.target.closest?.('.crate-reading-reader__highlight:not(.is-editing)')) window.markTransitions++; }, true);
+    });
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('group', { name: 'Highlight actions' })).toHaveCount(0);
+    assert.equal(await page.evaluate(() => window.markTransitions), 0, 'a deselected highlight keeps its fill');
     const longArticle = await page.addStyleTag({ content: '.crate-reading-reader__body { padding-top: 1400px; min-height: 12000px; }' });
     await page.evaluate(() => window.scrollTo({ top: 6300, behavior: 'instant' }));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(6300);

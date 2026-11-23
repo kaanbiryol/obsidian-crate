@@ -48,6 +48,7 @@
 	// Unsynced passages read as drafts and settle to the solid fill once sent.
 	&__body mark[data-sync="pending"] { background: color-mix(in srgb, var(--text-highlight-bg, rgba(255, 208, 64, .35)) 45%, transparent); text-decoration: underline dashed color-mix(in srgb, #b99a12 70%, transparent); text-underline-offset: .2em; text-decoration-thickness: 1px; }
 	&__body mark { transition: background-color 240ms ease; }
+	&__body mark.is-settling { transition: none; }
 	@media (prefers-reduced-motion: reduce) { &__body mark { transition: none; } }
 	&__quick-actions { display: flex; justify-content: flex-end; }
 	// Overflow actions open below the top bar like an iOS context menu.
