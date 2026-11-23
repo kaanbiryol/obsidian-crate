@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Button } from '../../ui/shared/Button';
 import { IconButton } from '../../ui/shared/IconButton';
-import { PWA_FADE, PWA_PICKER_EXIT, PWA_SURFACE_SPRING } from '../../ui/shared/navigation/motion';
+import { PWA_FADE, PWA_SURFACE_SPRING } from '../../ui/shared/navigation/motion';
 import { readingHighlights, sameHighlight, type ReadingHighlight } from '../core/highlights';
 import { highlightRange, highlightTextRects } from './reader-highlights';
 import { readingHighlightGeometry, type HighlightGeometry } from './reading-highlight-geometry';
@@ -148,21 +148,19 @@ export function ReadingHighlightActions({ body, article, content, highlights, on
 	// Obsidian desktop has no native share sheet, so offer Copy only.
 	const canShare = typeof article.current?.ownerDocument.defaultView?.navigator.share === 'function';
 	const reduceMotion = useReducedMotion();
-	// The toolbar grows from the edge facing the passage and shrinks back into it; the surface fade supports
-	// that, and the exit eases in so the menu stays readable as it leaves.
-	// Moving between highlights or dragging a handle keeps it mounted, so only show and hide animate.
+	// The toolbar grows from the edge facing the passage, with the surface fading in to support it.
+	// Dismissal is instant, like a native selection menu, so nothing lingers over the text.
+	// Moving between highlights or dragging a handle keeps it mounted, so only showing animates.
 	const surfaceMotion = {
 		hidden: { opacity: 0 },
 		shown: { opacity: 1, transition: PWA_FADE },
-		leaving: { opacity: 0, transition: PWA_PICKER_EXIT },
 	} as const;
 	const toolbarMotion = {
 		hidden: { scale: reduceMotion ? 1 : .9 },
 		shown: { scale: 1, transition: PWA_SURFACE_SPRING },
-		leaving: { scale: reduceMotion ? 1 : .94, transition: PWA_PICKER_EXIT },
 	};
 	return <AnimatePresence>{draft && geometry && <PresenceSurface key={opening} ref={attachControls} className="crate-reading-reader__highlight-editor"
-		variants={surfaceMotion} initial="hidden" animate="shown" exit="leaving">
+		variants={surfaceMotion} initial="hidden" animate="shown">
 		<div aria-hidden="true">{geometry.boxes.map((box, index) => <span key={index} className="crate-reading-reader__highlight-preview" style={box} />)}</div>
 		{!image && (['start', 'end'] as const).map(edge => {
 			const box = geometry[edge];
