@@ -25,6 +25,10 @@
 	&__source-icon img[data-loaded='true'] { opacity: 1; }
 	&__item-copy { min-width: 0; display: flex; flex-direction: column; gap: var(--crate-list-copy-gap); }
 	&__open strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; @include list-item.title; }
+	// Takes one title line so the row keeps its height when the article arrives.
+	&__item-copy:has(> .crate-reading__title-placeholder) { flex: 1; }
+	&__title-placeholder { --crate-placeholder: color-mix(in srgb, var(--text-normal) 8%, transparent); width: 70%; height: var(--crate-font-base); margin-block: calc(var(--crate-font-base) * .2); border-radius: 6px;
+		background: linear-gradient(90deg, var(--crate-placeholder) 30%, color-mix(in srgb, var(--text-normal) 16%, transparent) 50%, var(--crate-placeholder) 70%) 0 0 / 250% 100%; animation: crate-reading-placeholder 1.4s ease-in-out infinite; }
 	&__meta { color: var(--text-muted); font-size: var(--crate-font-xs); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	&__list-scroll:has(> .crate-reading__empty) {
 		@include empty-state.body;
@@ -33,6 +37,7 @@
 	&__empty { @include empty-state.primary; }
 	&__reader-pane { min-width: 0; min-height: 0; overflow: hidden; }
 }
+@keyframes crate-reading-placeholder { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @mixin compact-layout {
 	&__layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
 	&__sidebar { grid-column: 1; grid-row: 2; padding: 0; background: var(--crate-app-bg); }
