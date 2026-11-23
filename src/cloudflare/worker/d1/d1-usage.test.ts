@@ -32,3 +32,17 @@ it('keeps one identity for a namespace however many requests wrap it', async () 
 	expect(seen).toEqual([namespace, namespace, namespace, namespace]);
 	expect(bindingIdentity(undefined)).toBeUndefined();
 });
+
+it('keeps one identity for the database however many requests wrap it', async () => {
+	// A Durable Object request meters D1 and then routes through the Worker, which meters
+	// it again. Admission caches keyed on the database must see the original binding.
+	const DB = { prepare: () => ({}), batch: async () => [], exec: async () => ({}) };
+	const seen: unknown[] = [];
+	for (let request = 0; request < 2; request++) {
+		await withD1Usage({ DB } as unknown as Env, async env => {
+			seen.push(bindingIdentity(env.DB));
+			return withD1Usage(env, async inner => { seen.push(bindingIdentity(inner.DB)); return new Response(); });
+		});
+	}
+	expect(seen).toEqual([DB, DB, DB, DB]);
+});

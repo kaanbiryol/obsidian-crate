@@ -64,7 +64,8 @@ interface ResponseContext {
 
 export async function fetchWorkerRequest(request: Request, env: Env, execution: WorkerExecution = { kind: 'public' }): Promise<Response> {
 	// Usage metering wraps the namespace per request; remember setup on the binding it wraps.
-	const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, env.DB, execution, bindingIdentity(env.REMINDER_ALARMS)));
+	// A Durable Object request arrives with its own metered DB, so admission unwraps it too.
+	const response = await withD1Usage(env, measured => handleWorkerRequest(request, measured, bindingIdentity(env.DB), execution, bindingIdentity(env.REMINDER_ALARMS)));
 	return shortcutLaunchResponse(request, response, env.CRATE_DEPLOYMENT_FINGERPRINT);
 }
 

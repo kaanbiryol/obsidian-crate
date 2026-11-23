@@ -431,6 +431,35 @@ test('real HTTP sync, credentials, receipts and durable alarms survive a local s
 	}
 });
 
+test('a verified device uploads past the anonymous per-minute admission limit', { timeout: 40_000 }, async () => {
+	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-admission-'));
+	let runtime;
+	let server;
+	try {
+		runtime = await openLocalRuntime({ dataDir });
+		server = await listenLocalServer(runtime, { port: 0 });
+		const origin = `http://127.0.0.1:${server.address().port}`;
+		const device = await issueLocalDevice(runtime.db, 'Mac');
+		const info = await (await fetch(`${origin}/.well-known/crate`)).json();
+		await runtime.db.prepare("INSERT INTO server_state(id, import_token, import_state) VALUES (1, 'test', 'complete') ON CONFLICT(id) DO UPDATE SET import_token = excluded.import_token, import_state = excluded.import_state").run();
+		// Uploads run in the transfer object, which wraps the database per request. Its
+		// admission must still recognize the verified bearer rather than charge every
+		// upload to the anonymous 60-per-minute budget.
+		for (let index = 0; index < 70; index++) {
+			const response = await fetch(`${origin}/sync/upload?path=${index}.md`, { method: 'PUT', headers: {
+				Authorization: `Bearer ${device.token}`, 'X-Crate-Protocol': String(info.protocol.current), 'Content-Type': 'text/plain',
+				'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': `e1_${String(info.reminderOperationDay).padStart(8, '0')}_${randomUUID()}`,
+			}, body: `note ${index}` });
+			assert.equal(response.status, 200, `upload ${index}: ${await response.clone().text()}`);
+			await response.text();
+		}
+	} finally {
+		if (server) await new Promise(resolve => server.close(resolve));
+		await runtime?.close();
+		await rm(dataDir, { recursive: true, force: true });
+	}
+});
+
 test('starting arms reminder delivery for a reminder that came due with no alarm', { timeout: 40_000 }, async () => {
 	const dataDir = await mkdtemp(join(tmpdir(), 'crate-local-rearm-'));
 	let runtime;
