@@ -16,7 +16,7 @@ const readingSession = { token: previewAuthToken, id: 'document-scroll', folderP
 const articles = Array.from({ length: 30 }, (_, index) => ({
   crate_reading_version: 1, crate_reading_id: `67de6c50-c70c-4c85-93f2-${String(index + 1).padStart(12, '0')}`,
   title: `Document scroll article ${index}`, source_url: 'https://example.com/article', saved_at: '2026-09-21T10:00:00.000Z',
-  reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready', capture_method: 'web-clipper', path: `Reading/${index}.md`,
+  reading_status: 'inbox', favorite: false, tags: index % 3 ? [] : ['essays'], extraction_status: 'ready', capture_method: 'web-clipper', path: `Reading/${index}.md`,
 }));
 const reminders = Array.from({ length: 60 }, (_, index) => ({
   id: `document-scroll-${index}`, content: `Document scroll reminder ${index}`, project: index % 2 ? 'Inbox' : 'Work',
@@ -30,10 +30,10 @@ const errands = ['Pick up coffee beans', 'Print photos'].map((content, index) =>
 
 const browser = await webkit.launch();
 
-async function openApp(userAgent, path, { statusBarInset = 0 } = {}) {
+async function openApp(userAgent, path, { statusBarInset = 0, reducedMotion = 'reduce' } = {}) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent,
-    serviceWorkers: 'block', timezoneId: 'UTC', reducedMotion: 'reduce',
+    serviceWorkers: 'block', timezoneId: 'UTC', reducedMotion,
   });
   await context.addInitScript(session => localStorage.setItem('crate-reading-session-v1', JSON.stringify(session)), readingSession);
   // Installed iOS 27 apps raise headers with their own z-index; chrome must stay above the cover.
@@ -41,7 +41,11 @@ async function openApp(userAgent, path, { statusBarInset = 0 } = {}) {
     document.documentElement.setAttribute('data-pwa-ios27-standalone', 'true');
   }));
   await context.route('**/reading/session', route => route.fulfill({ json: readingSession }));
-  await context.route('**/reading/items*', route => route.fulfill({ json: { items: articles, issues: [], cursor: null } }));
+  await context.route('**/reading/tags*', route => route.fulfill({ json: { tags: ['essays'], counts: [articles.filter(item => item.tags.length).length] } }));
+  await context.route('**/reading/items*', route => {
+    const tag = new URL(route.request().url()).searchParams.get('tag');
+    return route.fulfill({ json: { items: articles.filter(item => !tag || item.tags.includes(tag)), issues: [], cursor: null } });
+  });
   await context.route('**/reading/item?*', route => route.fulfill({ json: {
     item: articles.find(item => item.crate_reading_id === new URL(route.request().url()).searchParams.get('id')),
     markdown: 'A long article for document scrolling. '.repeat(600),
@@ -219,6 +223,56 @@ try {
   await expect(long.page.locator('.reminder-render-item').last()).toBeInViewport();
   assert.deepEqual(long.errors, []);
   await long.context.close();
+  // While the list scrolls the document, a pull moves its rows below the header cover rather
+  // than carrying the cover down over the first rows, and a tag switch fades the old rows out
+  // where they were drawn instead of a header's height lower.
+  const tagged = await openApp(IPHONE, '/notifications?section=reading', { reducedMotion: 'no-preference' });
+  const readingList = tagged.page.locator('.crate-feature-panel[data-active="true"] .crate-reading__list-scroll:not([data-departing-list])');
+  await expect(readingList.locator('.crate-reading__open')).toHaveCount(articles.length);
+  await expectOwner(tagged.page, 'crate-reading__list-scroll');
+  const firstRow = () => tagged.page.evaluate(() => {
+    const row = document.querySelector('.crate-feature-panel[data-active="true"] .crate-reading__list-scroll .crate-reading__open');
+    const bounds = row.getBoundingClientRect();
+    return { top: Math.round(bounds.top), clip: { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height } };
+  });
+  // The cover takes no hits, so look for the row's text in the pixels.
+  const rowDrawn = async ({ clip }) => (await sharp(await tagged.page.screenshot({ clip })).stats()).channels.some(channel => channel.stdev > 8);
+  const restingRow = await firstRow();
+  assert.equal(await rowDrawn(restingRow), true, 'the first row shows at rest');
+  const touch = (type, y) => tagged.page.evaluate(([type, y]) => {
+    // Desktop WebKit does not expose a constructible Touch.
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    const point = { clientY: y, clientX: 40 };
+    Object.defineProperty(event, 'touches', { value: y === null ? { length: 0, item: () => null } : { length: 1, 0: point, item: () => point } });
+    document.querySelector('.crate-feature-panel[data-active="true"] .crate-reading__list-scroll .crate-reading__open').dispatchEvent(event);
+  }, [type, y]);
+  await touch('touchstart', 300);
+  await touch('touchmove', 500);
+  await expect(tagged.page.locator('.crate-feature-panel[data-active="true"] .pwa-pull-refresh')).toHaveClass(/is-ready/);
+  await expectOwner(tagged.page, 'crate-reading__list-scroll');
+  const pulled = await firstRow();
+  assert.ok(pulled.top - restingRow.top > 40, `the pull moves the rows down (${restingRow.top} -> ${pulled.top})`);
+  assert.equal(await rowDrawn(pulled), true, 'the header cover stays over the header while pulling');
+  await touch('touchcancel', null);
+  await expect.poll(async () => (await firstRow()).top).toBe(restingRow.top);
+  await tagged.page.evaluate(() => {
+    const samples = window.__departingSamples = [];
+    new MutationObserver(records => {
+      for (const node of records.flatMap(record => [...record.addedNodes])) {
+        if (!(node instanceof HTMLElement) || !node.dataset.departingList) continue;
+        samples.push({ top: Math.round(node.querySelector('.crate-reading__open').getBoundingClientRect().top), owner: node.dataset.documentScroll ?? null });
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  const firstTop = (await firstRow()).top;
+  await tagged.page.getByRole('group', { name: 'Filter by tag' }).getByRole('button', { name: 'essays', exact: true }).tap();
+  await expect(readingList.locator('.crate-reading__open')).toHaveCount(articles.filter(item => item.tags.length).length);
+  const departing = await tagged.page.evaluate(() => window.__departingSamples);
+  assert.equal(departing.length, 1, 'the tag switch fades the old rows out');
+  assert.equal(departing[0].owner, null, 'the copy is not a second document scroller');
+  assert.ok(Math.abs(departing[0].top - firstTop) <= 1, `the old rows fade where they were drawn (${departing[0].top}, not ${firstTop})`);
+  assert.deepEqual(tagged.errors, []);
+  await tagged.context.close();
   console.log('PWA document scroll checks passed.');
 } finally {
   await browser.close();

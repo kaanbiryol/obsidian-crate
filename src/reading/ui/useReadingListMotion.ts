@@ -108,6 +108,10 @@ function copyDepartingList(list: HTMLElement): HTMLElement {
 	const node = list.cloneNode(true) as HTMLElement;
 	node.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
 	node.removeAttribute('tabindex');
+	// An iOS list that scrolls the document carries inline layout for that handoff (a margin
+	// past its pinned header, a fixed header cover); the copy would show them twice, lower down.
+	node.removeAttribute('style');
+	delete node.dataset.documentScroll;
 	node.inert = true;
 	node.setAttribute('aria-hidden', 'true');
 	node.dataset.departingList = 'true';

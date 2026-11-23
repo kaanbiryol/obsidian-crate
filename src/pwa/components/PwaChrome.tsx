@@ -178,12 +178,16 @@ function usePullOffset(indicatorRef: RefObject<HTMLDivElement | null>, glyphRef:
 }
 
 /** The in-flow content after `indicator`, at each level up to the one that holds the pulled
- * scroller: what a pull moves down. Positioned layers, like a floating add button, stay. */
+ * scroller: what a pull moves down. Positioned layers, like a floating add button, stay.
+ * A list scrolling the document moves its children instead: a transform on the list itself
+ * would carry its fixed header cover down over the first rows. */
 function contentAfter(indicator: HTMLElement, scrollSelector: string, owner: Window): HTMLElement[] {
 	const after: HTMLElement[] = [];
 	for (let level: Element = indicator; level.parentElement; level = level.parentElement) {
 		for (let next = level.nextElementSibling; next; next = next.nextElementSibling) {
-			if (!/absolute|fixed/.test(owner.getComputedStyle(next).position)) after.push(next as HTMLElement);
+			if (/absolute|fixed/.test(owner.getComputedStyle(next).position)) continue;
+			if (next instanceof HTMLElement && next.dataset.documentScroll === 'true') after.push(...next.children as HTMLCollectionOf<HTMLElement>);
+			else after.push(next as HTMLElement);
 		}
 		if (level.parentElement.querySelector(scrollSelector)) return after;
 	}
