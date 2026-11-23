@@ -6,6 +6,7 @@ import { PWA_PREFERENCES_KEY } from '../settings/preferences';
 import { ReadingApiError, loadReading, readingRequest } from './api';
 import { connectReadingFromReminders } from './session/reminders-session';
 import { type ReadingCache } from './storage/storage';
+import type { ReadingItem } from '@/reading/core/model';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import type { PendingReading } from './outbox';
 import { useReadingSync } from './useReadingSync';
@@ -257,6 +258,38 @@ it('refreshes the library on open and when shown again, never on a timer', async
 	expect(loadReading).toHaveBeenCalledOnce();
 	await act(async () => document.dispatchEvent(new window.Event('visibilitychange')));
 	expect(loadReading).toHaveBeenCalledTimes(2);
+});
+
+it('checks back on a newly saved link until its article arrives, then stops', async () => {
+	stored.queue = [];
+	const link: ReadingItem = { crate_reading_version: 1, crate_reading_id: 'saved', title: 'example.com', source_url: 'https://example.com/a', saved_at: new Date().toISOString(),
+		reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'pending', path: '' };
+	const older = { ...link, crate_reading_id: 'older', saved_at: new Date(Date.now() - 60 * 60_000).toISOString() };
+	vi.mocked(loadReading).mockResolvedValue({ ...cache, items: [link, older] });
+	renderSync();
+	await act(async () => {});
+	expect(loadReading).toHaveBeenCalledOnce();
+	await act(async () => vi.advanceTimersByTimeAsync(2_000));
+	expect(loadReading).toHaveBeenCalledTimes(2);
+	await act(async () => vi.advanceTimersByTimeAsync(3_000));
+	expect(loadReading).toHaveBeenCalledTimes(3);
+	vi.mocked(loadReading).mockResolvedValue({ ...cache, items: [{ ...link, title: 'Saved', extraction_status: 'ready' }, older] });
+	await act(async () => vi.advanceTimersByTimeAsync(5_000));
+	expect(loadReading).toHaveBeenCalledTimes(4);
+	// The article arrived; a link saved an hour ago and still fetching costs no checks.
+	await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+	expect(loadReading).toHaveBeenCalledTimes(4);
+});
+
+it('stops checking on a link whose article does not arrive', async () => {
+	stored.queue = [];
+	vi.mocked(loadReading).mockResolvedValue({ ...cache, items: [{ crate_reading_version: 1, crate_reading_id: 'saved', title: 'example.com', source_url: 'https://example.com/a',
+		saved_at: new Date().toISOString(), reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'pending', path: '' }] });
+	renderSync();
+	await act(async () => {});
+	await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+	// The open load, then one check at each of 2, 5, 10, 20, 40 and 80 seconds.
+	expect(loadReading).toHaveBeenCalledTimes(7);
 });
 
 it('reuses a refresh completed within 30 seconds when shown again, but not when reconnecting', async () => {

@@ -11,7 +11,7 @@ export const ReadingItemContent = React.memo(function ReadingItemContent({ item 
 	return <>
 		<ReadingSourceIcon item={item} />
 		<span className="crate-reading__item-copy"><strong>{readingTitle(item)}</strong>
-			<span className="crate-reading__meta">{videoId ? `Video · ${item.author || 'YouTube'}` : <>{readingSource(item.source_url)}{item.extraction_status !== 'ready' && <><span aria-hidden="true"> · </span>{item.extraction_status === 'pending' ? 'Text pending' : item.source_url ? 'Link only' : 'Empty note'}</>}</>}</span>
+			<span className="crate-reading__meta">{videoId ? `Video · ${item.author || 'YouTube'}` : <>{readingSource(item.source_url)}{item.extraction_status !== 'ready' && <><span aria-hidden="true"> · </span>{item.extraction_status === 'pending' ? 'Fetching article' : item.source_url ? 'Link only' : 'Empty note'}</>}</>}</span>
 		</span>
 		{videoId && <ReadingVideoThumbnail key={videoId} id={videoId} />}
 	</>;

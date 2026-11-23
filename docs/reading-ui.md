@@ -407,7 +407,11 @@ shared minimum width, padding, and subtle borders. Phone layouts give both actio
 equal width and 48px minimum height.
 
 Link capture in both hosts asks only for the URL; article extraction supplies the
-title, with the hostname as the fallback while extraction is pending. Plugin
+title, with the hostname as the fallback while extraction is pending. The row says
+**Fetching article** meanwhile. The PWA checks back 2, 5, 10, 20, 40 and 80
+seconds after it first lists a link saved in the last 10 minutes as fetching,
+while visible and online, so the row and an open article fill in without a pull
+to refresh; after that it waits for the next foreground. Plugin
 **Save a link** uses the reminder header Save action, with no footer actions. PWA
 **Save a link** uses the shared reminder editor header instead: close on the left,
 title centered, and **Save** on the right, disabled until the web link is valid.

@@ -10,9 +10,22 @@ import { requestSharedFeaturesRefresh } from '../shared-features';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { FOREGROUND_REFRESH_GAP_MS, onAppResume, type AppResumeReason } from '../shell/app-resume';
 
+// A saved link's article usually arrives seconds after the save. The list checks back this
+// long after it first lists the link as fetching, then waits for the next foreground.
+const FETCH_CHECKS_MS = [2_000, 5_000, 10_000, 20_000, 40_000, 80_000];
+// Links saved longer ago than this are not watched, so an article that never arrives
+// costs no checks when the app opens.
+const FETCH_WATCH_AGE_MS = 10 * 60_000;
+
+/** When the list next checks on a link it first listed as fetching at `since`, or Infinity. */
+export function nextFetchCheck(since: number, now: number): number {
+	for (const delay of FETCH_CHECKS_MS) if (since + delay > now) return since + delay;
+	return Infinity;
+}
+
 /** Owns refresh serialization, bounded retries and foreground/cross-tab refresh. */
-export function useReadingSync({ session, ready, readOnly, pending, publishSyncResult, reportLibraryFailure, isCurrentSession, run, resetSession, retryVerification }: Pick<ReturnType<typeof useReadingSession>,
-	'session' | 'ready' | 'readOnly' | 'pending' | 'publishSyncResult' | 'reportLibraryFailure' | 'isCurrentSession' | 'run' | 'resetSession' | 'retryVerification'>, enabled = true) {
+export function useReadingSync({ session, ready, readOnly, cache, pending, publishSyncResult, reportLibraryFailure, isCurrentSession, run, resetSession, retryVerification }: Pick<ReturnType<typeof useReadingSession>,
+	'session' | 'ready' | 'readOnly' | 'cache' | 'pending' | 'publishSyncResult' | 'reportLibraryFailure' | 'isCurrentSession' | 'run' | 'resetSession' | 'retryVerification'>, enabled = true) {
 	const enabledRef = useRef(enabled);
 	enabledRef.current = enabled;
 	const [syncing, setSyncing] = useState(false), [syncedSession, setSyncedSession] = useState<ReadingSession | null>(null);
@@ -87,6 +100,30 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 		const timer = window.setTimeout(() => { void run(() => refresh(session)); }, Math.max(0, retryAt - Date.now()));
 		return () => window.clearTimeout(timer);
 	}, [enabled, session, ready, readOnly, isOffline, retryAt, refresh, run]);
+	// Links being fetched, by when the list first showed each as fetching.
+	const fetching = useRef(new Map<string, number>());
+	useEffect(() => {
+		if (!enabled || !session || !ready || readOnly || isOffline) return;
+		const listed = new Set<string>();
+		for (const item of cache?.items ?? []) {
+			if (item.extraction_status !== 'pending' || !(Date.now() - Date.parse(item.saved_at) <= FETCH_WATCH_AGE_MS)) continue;
+			listed.add(item.crate_reading_id);
+			if (!fetching.current.has(item.crate_reading_id)) fetching.current.set(item.crate_reading_id, Date.now());
+		}
+		for (const id of fetching.current.keys()) if (!listed.has(id)) fetching.current.delete(id);
+		let timer: number | undefined;
+		const schedule = () => {
+			const now = Date.now(), due = Math.min(...[...fetching.current.values()].map(since => nextFetchCheck(since, now)));
+			if (!Number.isFinite(due)) return;
+			timer = window.setTimeout(() => {
+				// A hidden app checks again when it returns to the foreground.
+				if (document.visibilityState === 'visible') void run(() => refresh(session));
+				schedule();
+			}, due - now);
+		};
+		schedule();
+		return () => window.clearTimeout(timer);
+	}, [enabled, session, ready, readOnly, isOffline, cache, refresh, run]);
 	useEffect(() => {
 		if (!session || !ready) return;
 		const reload = () => { if (enabledRef.current && document.visibilityState === 'visible') void run(() => refresh(session)); };
@@ -111,7 +148,8 @@ export function useReadingSync({ session, ready, readOnly, pending, publishSyncR
 		};
 		// A read-only copy appears after its encryption check just failed.
 		if (!readOnly) reload();
-		// Refresh on open, foreground, reconnect and explicit refresh; never on a timer.
+		// Refresh on open, foreground, reconnect and explicit refresh; on a timer only to retry
+		// queued changes or to check on a link being fetched.
 		const stopResume = onAppResume(resume);
 		window.addEventListener('storage', storageChanged); window.addEventListener(READING_CHANGED_EVENT, changed); window.addEventListener(PWA_AUTH_CHANGED_EVENT, changed);
 		return () => { stopResume(); window.removeEventListener('storage', storageChanged); window.removeEventListener(READING_CHANGED_EVENT, changed); window.removeEventListener(PWA_AUTH_CHANGED_EVENT, changed); };
