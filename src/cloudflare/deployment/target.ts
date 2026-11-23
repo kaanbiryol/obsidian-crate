@@ -41,7 +41,7 @@ function selectAccount(
 	const [onlyAccount] = accounts;
 	if (accounts.length === 1 && onlyAccount) return onlyAccount;
 	if (accounts.length === 0) {
-		throw new Error('Cloudflare did not grant access to an account');
+		throw new Error('Cloudflare did not grant access to an account. Select Connect with Cloudflare again and choose one account');
 	}
 	throw new Error('Select exactly one Cloudflare account when authorizing Crate, then try again');
 }
