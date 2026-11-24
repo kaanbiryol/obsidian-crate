@@ -52,7 +52,7 @@ it('shows reminders and Reading controls before a server is connected', async ()
 it('keeps notifications with the feature controls once connected', async () => {
 	const sections = await display(true);
 	const features = sections.indexOf('reminders');
-	expect(sections.slice(features, features + 3)).toEqual(['reminders', 'reading', 'notifications']);
+	expect(sections.slice(features, features + 3)).toEqual(['reminders', 'notifications', 'reading']);
 });
 
 it('hides notifications while Reminders is off, since the server refuses reminder settings then', async () => {

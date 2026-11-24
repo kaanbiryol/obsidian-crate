@@ -70,9 +70,9 @@ export class CrateSettingTab extends PluginSettingTab {
 		// Reminders and Reading work without a server, so they can be turned on before connecting.
 		createSettingsSectionHeading(containerEl, 'Features');
 		this.renderSection(renderRemindersSettings, containerEl.createDiv({ cls: 'crate-reminders-settings' }));
-		this.renderSection(renderReadingSettings, containerEl);
 		// Notifications are reminder settings, which the server refuses while Reminders is off.
 		if (isConfigured && this.plugin.remindersSettings.enabled) this.renderSection(renderNotificationsSection, containerEl);
+		this.renderSection(renderReadingSettings, containerEl);
 		this.renderSection(renderShowGetStartedSetting, containerEl);
 
 		if (showInfrastructure) {
