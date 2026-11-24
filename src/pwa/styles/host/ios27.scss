@@ -19,6 +19,12 @@ html[data-pwa-ios27-standalone="true"] #pwa-status-bar {
 	background:var(--pwa-status-bar-tint,var(--pwa-launch-bg));
 	pointer-events:none;
 }
+/* The strip sits above sheets, so an upward sheet shadow would darken only the
+   gap below it and leave a lighter band at the top. The backdrop alone
+   separates the sheet here, as in native iOS sheets. */
+html[data-pwa-ios27-standalone="true"] :is(.pwa-modal-sheet--settings .pwa-sheet-surface,.pwa-reminder-sheet-stage,.crate-reminders-ui .pwa-modal-sheet--page .pwa-sheet-surface) {
+	box-shadow:none;
+}
 html[data-pwa-ios27-standalone="true"] {
 	/* Keep content clear of the strip. Use only the remaining inset reported for
 	   content, not the maximum from translucent/full-screen mode. */
