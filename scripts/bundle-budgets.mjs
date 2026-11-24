@@ -10,17 +10,19 @@ export const bundleBudgets = {
 		// links, the recovery key option when requesting keys and revoking replaced Cloudflare
 		// logins, with checkpoints saved as change numbers, the PWA's flicker fixes, the reminder
 		// completion animation, Reading title placeholders, errors with next steps and the
-		// grouped connection options, measure 5.0264 MB raw / 2.3234 MB gzip.
-		maxBytes: 5026400,
-		maxGzipBytes: 2323400,
+		// grouped connection options and the simplified reader header, measure 5.0267 MB raw /
+		// 2.3235 MB gzip.
+		maxBytes: 5026700,
+		maxGzipBytes: 2323500,
 	},
 	{
 		path: 'dist/styles.css',
 		// Vault history's Deleted files view with Reading image highlights and their Highlights rows,
-		// the reminder completion animation, Reading title placeholders and the failed article card
-		// measure 402.7 KB raw / 50.1 KB gzip across the plugin and shared PWA surfaces.
-		maxBytes: 402700,
-		maxGzipBytes: 50100,
+		// the reminder completion animation, Reading title placeholders, the failed article card and
+		// the simplified reader header measure 403.7 KB raw / 50.3 KB gzip across the plugin and
+		// shared PWA surfaces.
+		maxBytes: 403700,
+		maxGzipBytes: 50300,
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
@@ -44,10 +46,10 @@ export const bundleBudgets = {
 		// server file and batch limits, with readable network errors, the Reading connection
 		// view, held changes that keep lists and the reader from flickering, the reminder
 		// completion animation, Reading title placeholders, recovery key errors with next
-		// steps, the failed and pending article states and notice action rows, measure
-		// 1.2184 MB raw / 399.5 KB gzip.
-		maxBytes: 1218400,
-		maxGzipBytes: 399500,
+		// steps, the failed and pending article states, notice action rows, the simplified
+		// reader header, measure 1.2206 MB raw / 400.0 KB gzip.
+		maxBytes: 1220600,
+		maxGzipBytes: 400000,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
@@ -55,9 +57,9 @@ export const bundleBudgets = {
 		// server file and batch limits, with readable network errors, the Reading connection
 		// view, held changes that keep lists and the reader from flickering, the reminder
 		// completion animation, Reading title placeholders, recovery key errors with next
-		// steps, the failed and pending article states and notice action rows, measure
-		// 1.9402 MB raw / 640.8 KB gzip.
-		maxBytes: 1940200,
-		maxGzipBytes: 640800,
+		// steps, the failed and pending article states, notice action rows, the simplified
+		// reader header, measure 1.9423 MB raw / 641.3 KB gzip.
+		maxBytes: 1942300,
+		maxGzipBytes: 641300,
 	}],
 };

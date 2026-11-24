@@ -102,7 +102,8 @@ for (const browserName of ['chromium', 'webkit'] as const) {
 					const article = page.locator('article.crate-reading-reader');
 					const more = article.getByRole('button', { name: 'More article actions', exact: true });
 					const menuItem = async (name: string) => { await more.click(); return page.getByRole('menu', { name: 'More article actions' }).getByRole('menuitem', { name, exact: true }); };
-					const controls = article.locator('.crate-reading-reader__nav button');
+					// More changes as it opens and closes, so the stable set is the other top-bar controls.
+					const controls = article.locator('.crate-reading-reader__nav button:not([aria-haspopup], [role="menuitem"])');
 					const appearance = () => controls.evaluateAll(buttons => buttons.map(button => {
 						const style = getComputedStyle(button), rect = button.getBoundingClientRect();
 						return { opacity: style.opacity, color: style.color, background: style.background, shadow: style.boxShadow,
@@ -172,7 +173,7 @@ for (const browserName of ['chromium', 'webkit'] as const) {
 					const more = article.getByRole('button', { name: 'More article actions', exact: true });
 					const menuItem = async (name: string) => { await more.click(); return page.getByRole('menu', { name: 'More article actions' }).getByRole('menuitem', { name, exact: true }); };
 					const nav = article.locator('.crate-reading-reader__nav');
-					const appearance = () => nav.locator('button').evaluateAll(buttons => buttons.map(button => {
+					const appearance = () => nav.locator('button:not([aria-haspopup], [role="menuitem"])').evaluateAll(buttons => buttons.map(button => {
 						const style = getComputedStyle(button);
 						return { opacity: style.opacity, background: style.background, shadow: style.boxShadow, disabled: (button as HTMLButtonElement).disabled };
 					}));
@@ -183,6 +184,7 @@ for (const browserName of ['chromium', 'webkit'] as const) {
 					const before = await appearance();
 					await run(action);
 					if (action === 'Favorite article') await expect(article.getByRole('button', { name: action, exact: true })).toHaveAttribute('aria-disabled', 'true');
+					await page.mouse.move(0, 0);
 					expect(await appearance()).toEqual(before);
 					await (await menuItem('Share')).click();
 					await expect(page.locator('html')).toHaveAttribute('data-shared', 'true');
@@ -200,6 +202,7 @@ for (const browserName of ['chromium', 'webkit'] as const) {
 					await page.evaluate(() => window.dispatchEvent(new CustomEvent('reading-settle-update', { detail: 'fail' })));
 					await expect(article.getByRole('alert')).toHaveText('Could not save article.');
 					if (action === 'Favorite article') await expect(article.getByRole('button', { name: undo, exact: true })).toHaveAttribute('aria-disabled', 'false');
+					await page.mouse.move(0, 0);
 					expect(await appearance()).toEqual(before);
 					} finally { await browser.close(); }
 				});

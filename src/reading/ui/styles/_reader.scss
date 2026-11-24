@@ -82,8 +82,8 @@
 	&__availability, &__availability > span { display: inline-flex; align-items: center; }
 	&__availability[data-offline] { color: var(--text-faint, var(--text-muted)); }
 	// The top bar's sync dot matches the library header: green once this article is synced.
-	&__sync { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; }
-	&__sync .crate-sync-indicator { width: 12px; height: 12px; }
+	&__sync { display: inline-flex; align-self: stretch; align-items: center; justify-content: center; width: 32px; }
+	&__sync .crate-sync-indicator { flex: 0 0 12px; width: 12px; height: 12px; }
 	// Tags read as compact chips; the add chip opens the tag editor.
 	&__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 14px; }
 	&__tag {

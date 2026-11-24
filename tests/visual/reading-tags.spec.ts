@@ -67,7 +67,9 @@ for (const host of ['plugin', 'pwa']) for (const width of [390, 1280]) {
 		await expect(chips).toHaveText(['#design', '#later', '#topics/books']);
 		while (await chips.count()) await chips.first().click();
 		await page.getByRole('button', { name: 'Save tags', exact: true }).click();
-		await expect(article.locator('.crate-reading-reader__tags')).toHaveCount(0);
+		// With no tags left, the row keeps only its add chip.
+		await expect(article.locator('.crate-reading-reader__tags span')).toHaveCount(0);
+		await expect(edit).toBeVisible();
 		await article.getByRole('button', { name: 'Back to reading' }).click();
 		await expect(page.locator('.crate-reading__reader-pane')).toBeHidden();
 		// Removing the final use of a selected tag must not leave an empty, stuck filter.

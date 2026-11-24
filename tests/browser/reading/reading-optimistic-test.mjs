@@ -201,7 +201,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const firstBody = (await pending(page))[0].body;
     await expect(page.locator('.crate-reading__reader-pane').getByRole('button', { name: 'Remove favorite', exact: true })).toBeEnabled();
     await setTags('essays');
-    await expect(page.locator('.crate-reading-reader__tags')).toHaveText('#essays');
+    await expect(page.locator('.crate-reading-reader__tags span')).toHaveText(['#essays']);
     await page.locator('.crate-reading__reader-pane').getByRole('button', { name: 'Remove favorite', exact: true }).click();
     await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Archive', exact: true }).click();
     await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Move to inbox', exact: true }).click();
@@ -302,7 +302,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(toast).toContainText('Tags didn’t sync');
     await expect(toast.getByRole('button', { name: 'Review', exact: true })).toBeVisible();
     await expect(toast).toHaveAttribute('role', 'alert');
-    await expect(page.locator('.crate-reading-reader__tags')).toHaveText('#remote');
+    await expect(page.locator('.crate-reading-reader__tags span')).toHaveText(['#remote']);
     await expect(page.locator('.crate-reading__reader-pane').getByRole('button', { name: 'Remove favorite', exact: true })).toHaveAttribute('aria-pressed', 'true');
     const rejected = await pending(page);
     assert.equal(rejected.length, 2); assert.ok(rejected.every(op => op.review));
