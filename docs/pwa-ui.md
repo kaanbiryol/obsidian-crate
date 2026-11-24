@@ -276,7 +276,10 @@ stay quiet. Persistent sync notices and settings retain the recovery details.
 styles in `src/pwa/styles/_notice.scss` loaded by the common foundation.
 Recovery features retain their announcements, retry/discard decisions, and
 review-before-removal safeguards. Standard actions use `Button`/`PwaButton`;
-PWA feature code cannot import Base UI Button directly.
+PWA feature code cannot import Base UI Button directly. Secondary (`outline`)
+actions are compact raised buttons: 28px minimum height with a hairline border and
+a slight shadow, growing taller only when a long label wraps. An invisible
+pseudo-element keeps a 44px touch target.
 
 `src/pwa/storage/download.ts` owns the JSON download and Blob URL lifecycle shared by
 Reading and reminder recovery. Each caller retains its filename, payload

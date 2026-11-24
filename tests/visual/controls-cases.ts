@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 
 type ClipboardWindow = Window & { copiedValue?: string; finishCopy?: () => void; copyCalls?: number };
 
+/** The tappable height: the control, or the larger hit area a compact PWA action adds with ::after. */
+const tapHeight = (el: Element) => Math.max(el.getBoundingClientRect().height, parseFloat(getComputedStyle(el, '::after').height) || 0);
+
 export function registerControlTests() {
   for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for (const width of [390, 1280]) {
     test(`controls ${host} ${theme} ${width}`, async ({ page }, testInfo) => {
@@ -32,7 +35,7 @@ export function registerControlTests() {
       await expect(sync).toHaveCSS('border-radius', host === 'pwa' ? '6px' : '4px');
       const longAction = page.getByRole('button', { name: 'Export unsynced reminders and saved changes from this device' });
       expect(await longAction.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
-      expect((await page.getByRole('button', { name: 'Always a touch target' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect(await page.getByRole('button', { name: 'Always a touch target' }).evaluate(tapHeight)).toBeGreaterThanOrEqual(44);
 
       await sync.focus();
       await page.keyboard.press('Tab');
@@ -96,7 +99,7 @@ export function registerControlTests() {
         await expect(page.getByRole('combobox')).toHaveValue('inbox');
         const recovery = page.getByRole('region', { name: 'Example recovery' });
         await expect(recovery.getByRole('status')).toHaveText('Your changes remain on this device.');
-        expect((await recovery.getByRole('button', { name: 'Review changes' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        expect(await recovery.getByRole('button', { name: 'Review changes' }).evaluate(tapHeight)).toBeGreaterThanOrEqual(44);
         expect(await recovery.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
         const indicatorMatchesPalette = async (token: string) => page.locator('.toast').evaluate((el, token) => {
           const probe = document.createElement('span');
@@ -200,7 +203,8 @@ export function registerControlTests() {
       await page.goto('/?host=pwa&theme=dark&scene=controls');
       const sync = page.getByRole('button', { name: 'Sync vault', exact: true });
       await expect(sync).toBeVisible();
-      expect((await sync.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      // Compact secondary actions extend their hit area beyond the visible 28px surface.
+      expect(await sync.evaluate(tapHeight)).toBeGreaterThanOrEqual(44);
       const restingBackground = await sync.evaluate(el => getComputedStyle(el).backgroundColor);
       await sync.tap();
       await expect(page.getByRole('status', { name: 'Activations' })).toHaveText('1');

@@ -38,7 +38,7 @@ export function VersionSettings() {
 			<CopyableText value={diagnostics} label="Version diagnostics" copyLabel="Copy diagnostics"
 				successMessage="Version details copied."
 				failureMessage="Select and copy the version details below."
-				fieldClassName="settings-diagnostics-text" buttonClassName="settings-action-row" />
+				fieldClassName="settings-diagnostics-text" />
 		</SettingsRow>
 	</>;
 }

@@ -39,7 +39,7 @@
 	.settings-panel[inert] { pointer-events: none; }
 	.reminder-modal-header { flex: 0 0 auto; min-height: 52px; border-bottom: 0; }
 	.settings-feedback { margin: 0; padding: var(--crate-space-12) var(--crate-space-20); }
-	.settings-navigation-row, .settings-action-row, .settings-row--diagnostics .settings-action-row {
+	.settings-navigation-row, .settings-action-row {
 		position: relative; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box;
 		// Extend the hit target and feedback through the card inset, keeping copy aligned.
 		width: calc(100% + 2 * var(--crate-space-16)); max-width: none; min-height: 52px;
@@ -50,14 +50,9 @@
 		line-height: 1.4; text-align: left; white-space: normal; cursor: pointer;
 	}
 	.crate-action-button.settings-action-row { border: 0 !important; }
-	.settings-action-row, .settings-row--diagnostics .settings-action-row { touch-action: manipulation; justify-content: space-between; color: var(--text-normal); }
+	.settings-action-row { touch-action: manipulation; justify-content: space-between; color: var(--text-normal); }
 	.settings-action-row > svg { flex-shrink: 0; color: var(--text-faint); }
 	.settings-action-row[data-tone="danger"], .settings-action-row[data-tone="danger"] > svg { color: var(--crate-danger); }
-	// CopyableText owns its label, so the trailing copy icon is drawn here.
-	.settings-row--diagnostics .settings-action-row::after {
-		content: ''; flex-shrink: 0; width: 17px; height: 17px; background: var(--text-faint);
-		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='14' height='14' x='8' y='8' rx='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/svg%3E") center / contain no-repeat;
-	}
 	.settings-action-row:disabled { opacity: .45; cursor: default; }
 	.settings-navigation-row:focus-visible, .settings-action-row:focus-visible {
 		outline: 2px solid var(--crate-focus-ring); outline-offset: -2px;
@@ -80,12 +75,7 @@
 			border-end-end-radius: calc(var(--crate-radius-card) - 1px);
 		}
 	}
-	.settings-row--diagnostics:last-child .crate-copyable-text:has(> .crate-field__description:empty) > .settings-action-row {
-		border-end-start-radius: calc(var(--crate-radius-card) - 1px);
-		border-end-end-radius: calc(var(--crate-radius-card) - 1px);
-	}
-	.settings-row.settings-row--diagnostics { padding: 0; min-height: 0; }
-	.settings-row--diagnostics .crate-copyable-text { width: 100%; gap: 0; }
+	.settings-row--diagnostics .crate-copyable-text { width: 100%; gap: var(--crate-space-8); }
 	.settings-row--diagnostics .crate-field__description:empty { display: none; }
 	.settings-account, .settings-recovery-actions { margin-top: var(--crate-space-12); padding-inline: var(--crate-space-16); }
 	// Flat page: a full-bleed divider separates the account action from the last section.
@@ -124,9 +114,16 @@
 		transition: none;
 	}
 	.settings-preference-control .settings-preference-input { font-weight: var(--crate-font-weight-normal); }
-	.settings-preference-control--select { justify-content: flex-end; background: transparent; }
-	.settings-preference-control--select .settings-preference-input { padding: 0 22px 0 0; text-align: right; text-align-last: right; color: var(--text-normal); font-size: var(--crate-font-base); }
-	.settings-preference-control--select svg { right: 0; color: var(--text-faint); }
+	// Select values use the raised secondary surface. They keep 16px text so iPhone does not
+	// zoom on focus, which makes them 32px tall; the whole row stays the tap target.
+	.settings-preference-control--select {
+		flex: 0 0 auto; width: auto; height: auto; min-height: 32px;
+		border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent); border-radius: 6px;
+		background: var(--pwa-raised-button-bg, color-mix(in srgb, var(--text-normal) 6%, transparent));
+		box-shadow: var(--pwa-raised-button-shadow, 0 1px 1px rgba(0, 0, 0, .12));
+	}
+	.settings-preference-control--select .settings-preference-input { min-height: 30px; padding: 0 30px 0 12px; color: var(--text-normal); font-size: var(--crate-font-base); }
+	.settings-preference-control--select svg { right: 8px; color: var(--text-faint); }
 	.settings-help { margin: 0 0 8px; }
 	.settings-panel__section .settings-help { margin-bottom: 0; padding-bottom: 12px; }
 	.settings-main { display: flex; flex-direction: column; }
@@ -149,7 +146,6 @@
 	.settings-row--version > strong { font-size: var(--crate-font-xs); white-space: normal; overflow-wrap: anywhere; }
 
 	.settings-row--theme { flex-direction: column; align-items: stretch; gap: 8px; }
-	.settings-preference-control--select { flex-basis: 152px; width: 152px; }
 	.settings-value { color: var(--text-muted); font-size: var(--crate-font-base); text-align: right; max-width: 60%; overflow-wrap: anywhere; }
 	.settings-status { font-size: var(--crate-font-base); font-weight: 400; }
 	.settings-navigation-row { font-size: var(--crate-font-base); font-weight: var(--crate-font-weight-medium); }
@@ -176,7 +172,6 @@
 
 	@media (max-width: 360px) {
 		.settings-theme-option { padding-inline: 6px; }
-		.settings-preference-control--select { flex-basis: 140px; width: 140px; }
 	}
 
 	.settings-section-description { margin: 0; padding: 0 var(--crate-space-16) var(--crate-space-12); color: var(--text-muted); font-size: var(--crate-font-xxs); line-height: 1.45; }

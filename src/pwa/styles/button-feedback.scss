@@ -15,34 +15,56 @@
 // A modal makes the source screen inert; it must not retain pressed feedback.
 .crate-reminders-ui [inert] .crate-icon-button:not(:disabled)[data-press-active] { opacity: 1; }
 
-// Secondary text actions use a borderless filled surface. Rows, toggles and
-// floating reader controls keep their own treatment.
+// Secondary text actions are compact raised surfaces: a hairline and a slight lift.
+// Long labels may wrap and grow taller; the pseudo-element keeps a 44px touch target.
+// Rows, toggles and floating reader controls keep their own treatment.
 .crate-reminders-ui .crate-action-button[data-variant="outline"]:not(.settings-action-row, .settings-navigation-row, .auth-card__group > *, .pwa-update-button, .crate-reading-reader__highlights-button, [aria-pressed]) {
-  border: 0 !important;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--text-normal) 7%, transparent);
-  color: var(--text-normal);
-  font-weight: 500;
-  &[data-tone="danger"] { background: color-mix(in srgb, var(--crate-danger) 14%, transparent); color: var(--crate-danger); }
-  &:not(:disabled) {
-    @media (hover: hover) and (pointer: fine) { &:hover { background: color-mix(in srgb, var(--text-normal) 11%, transparent); } }
-    &[data-press-active] { background: color-mix(in srgb, var(--text-normal) 14%, transparent); }
-  }
-}
-
-// Raised secondary: a compact surface with a hairline and a slight lift for
-// small inline opt-ins. The pseudo-element keeps a 44px touch target.
-.crate-reminders-ui .crate-action-button.pwa-raised-button[data-variant="outline"] {
   position: relative;
-  height: 28px;
+  height: auto;
   min-height: 28px;
-  padding: 0 12px;
+  min-width: 0;
+  padding: 4px 12px;
   border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent) !important;
+  border-radius: 6px;
   background: var(--pwa-raised-button-bg, color-mix(in srgb, var(--text-normal) 6%, transparent));
   box-shadow: var(--pwa-raised-button-shadow, 0 1px 1px rgba(0, 0, 0, .12));
-  &::after { content: ""; position: absolute; inset: -8px -6px; }
+  color: var(--text-normal);
+  font-weight: 500;
+  // Vertical only, so the label width still bounds the control. Measured inside the
+  // 1px border: 26px + 2 x 9px gives a 44px target.
+  &::after { content: ""; position: absolute; inset: -9px 0; }
+  &[data-tone="danger"] { background: color-mix(in srgb, var(--crate-danger) 14%, transparent); color: var(--crate-danger); }
   &:not(:disabled) {
     @media (hover: hover) and (pointer: fine) { &:hover { background: var(--pwa-raised-button-hover-bg, color-mix(in srgb, var(--text-normal) 9%, transparent)); } }
     &[data-press-active] { background: color-mix(in srgb, var(--text-normal) 12%, transparent); }
   }
+}
+
+// Primary actions share the compact geometry, filled with the accent and a faint top
+// highlight. Sign-in cards keep their full-width calls to action.
+.crate-reminders-ui .crate-action-button[data-variant="primary"]:not(.auth-card *) {
+  position: relative;
+  height: auto;
+  min-height: 28px;
+  min-width: 0;
+  padding: 4px 12px;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 1px 2px rgba(0, 0, 0, .2);
+  font-weight: 500;
+  &::after { content: ""; position: absolute; inset: -9px 0; }
+}
+
+// Ghost actions share the compact geometry: text only at rest, a faint fill on hover and
+// press. Controls with their own layout keep it, including the floating highlight toolbar,
+// whose actions fill fixed segments.
+.crate-reminders-ui .crate-action-button[data-variant="ghost"]:not(.settings-tabs-reset, .settings-tab-handle, .pwa-update-pill, .browser-setup__choice, .crate-reading-reader__selection > *, .auth-card *) {
+  position: relative;
+  height: auto;
+  min-height: 28px;
+  min-width: 0;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  // Measured inside the transparent 1px border: 26px + 2 x 9px gives a 44px target.
+  &::after { content: ""; position: absolute; inset: -9px 0; }
 }

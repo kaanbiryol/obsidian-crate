@@ -97,7 +97,7 @@ export function PwaTopNotices({
 									? <span className="pwa-notification-prompt__copy" role="status">Notifications are blocked. Allow them in settings, then reopen Crate.</span>
 									: <>
 										<span className="pwa-notification-prompt__copy">Get alerts when reminders are due</span>
-										<Button className="pwa-inline-button pwa-raised-button pwa-notification-prompt__enable" type="button"
+										<Button className="pwa-inline-button pwa-notification-prompt__enable" type="button"
 											disabled={notificationPrompt === 'pending'} onClick={onEnableNotifications}>
 											Enable
 										</Button>
