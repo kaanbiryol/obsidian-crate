@@ -81,8 +81,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await sheet.goto(saved.launchUrl);
     await expect(sheet.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
     assert.equal(new URL(sheet.url()).hash, '');
-    const openReading = sheet.getByRole('link', { name: 'Read it here instead', exact: true });
-    const itemId = new URL(await openReading.getAttribute('href'), origin).searchParams.get('item');
+    const openObsidian = sheet.getByRole('link', { name: 'Open in Obsidian', exact: true });
+    const itemId = new URL(await openObsidian.getAttribute('href')).searchParams.get('item');
     assert.ok(itemId);
     await sheet.reload();
     await expect(sheet.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
@@ -194,7 +194,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       return JSON.parse(await page.getByLabel('Diagnostics', { exact: true }).inputValue());
     };
     const noSuccess = async () => {
-      await expect(page.getByRole('link', { name: 'Read it here instead', exact: true })).toBeHidden();
+      await expect(page.getByRole('link', { name: 'Open in Obsidian', exact: true })).toBeHidden();
       assert.ok(!await page.getByRole('heading', { name: /^(?:Saved|Already saved)/ }).count());
       assert.equal(new URL(page.url()).hash, '');
     };
@@ -254,11 +254,10 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       assert.equal(handoffs, 0);
     }
     // Encrypted vaults save during the shortcut request; the page only confirms,
-    // without a handoff, a stale stored capability or a Read it here link.
+    // without a handoff, or a stale stored capability.
     await page.evaluate(() => sessionStorage.setItem('crate-reading-handoff-v1', JSON.stringify({ token: 'e'.repeat(64), until: Date.now() + 300000 })));
     await page.goto(`${origin}/notifications/save-reading?shortcut=${contract.revision}&contract=${contract.version}#saved=0cf86c65-51e2-4e2b-8987-0a4732473588`);
     await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Read it here instead', exact: true })).toBeHidden();
     assert.equal(await page.getByRole('link', { name: 'Open in Obsidian', exact: true }).getAttribute('href'), 'obsidian://crate-reading?item=0cf86c65-51e2-4e2b-8987-0a4732473588');
     assert.equal(await page.evaluate(() => sessionStorage.getItem('crate-reading-handoff-v1')), null);
     assert.equal(handoffs, 0);
@@ -291,12 +290,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.getByRole('button', { name: 'Retry save', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible();
     assert.equal(attempts.length, 2); assert.deepEqual(attempts[0], attempts[1]); assert.equal(attempts[0].body, '{}');
-    const savedId = new URL(await page.getByRole('link', { name: 'Read it here instead', exact: true }).getAttribute('href'), origin).searchParams.get('item');
-    assert.equal(await page.getByRole('link', { name: 'Open in Obsidian', exact: true }).getAttribute('href'), `obsidian://crate-reading?item=${savedId}`);
+    const savedId = new URL(await page.getByRole('link', { name: 'Open in Obsidian', exact: true }).getAttribute('href')).searchParams.get('item');
     assert.equal(savedId, firstReceipt.id); assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM files').first()).count, 1);
     await expect(page.getByRole('heading', { name: 'A newer shortcut is available', exact: true })).toBeHidden();
 
-    await expect(page.locator('#message')).toHaveText('Read it in Obsidian, or open Crate from your Home Screen.');
+    await expect(page.locator('#message')).toHaveText('Open it in Obsidian or in the Crate app.');
     await expect(page.locator('#status-label')).toHaveCount(0);
     await expect(page.locator('#support')).toBeHidden();
 

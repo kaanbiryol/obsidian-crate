@@ -9,14 +9,14 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
 	const key = 'crate-reading-handoff-v1', errorKey = 'crate-reading-handoff-error-v1';
 	const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 	const title = element('title'), message = element('message'), retry = element<HTMLButtonElement>('retry');
-	const progress = element('progress'), open = element<HTMLAnchorElement>('open'), support = element('support');
+	const progress = element('progress'), support = element('support');
 	const details = element<HTMLDetailsElement>('diagnostic-details'), field = element<HTMLTextAreaElement>('diagnostics');
 	const copy = element<HTMLButtonElement>('copy'), copyStatus = element('copy-status'), issue = element<HTMLAnchorElement>('issue');
 	const update = element('update'), download = element<HTMLAnchorElement>('download'), reconnect = element<HTMLAnchorElement>('reconnect');
 	const reload = element<HTMLButtonElement>('reload'), brand = element('brand'), done = element('done');
 	const obsidian = element<HTMLAnchorElement>('obsidian');
-	// iOS cannot hand a link to an installed Home Screen app, so success points there or to Obsidian.
-	const savedMessage = 'Read it in Obsidian, or open Crate from your Home Screen.';
+	// iOS cannot hand a link to an installed Home Screen app, so success links to Obsidian and mentions the Home Screen app.
+	const savedMessage = 'Open it in Obsidian or in the Crate app.';
 	const showDone = (isDone: boolean) => { done.hidden = !isDone; brand.hidden = isDone; obsidian.hidden = !isDone; };
 	const number = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : null;
 	const codes = new Set(['reading_error', 'reading_not_configured', 'feature_paused', 'protocol_incompatible',
@@ -102,7 +102,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
 	const failure = (input: Record<string, unknown>) => {
 		const clean = normalize({ shortcutRevision, shortcutContract, ...input });
 		const status = clean.status, code = clean.code;
-		progress.hidden = true; open.hidden = true; support.hidden = false; showDone(false);
+		progress.hidden = true; support.hidden = false; showDone(false);
 		retry.hidden = !token || clean.stage !== 'handoff' || [400, 401, 403, 409, 410, 413, 423, 426].includes(Number(status));
 		reload.hidden = status !== 428;
 		title.textContent = 'Save not confirmed';
@@ -151,7 +151,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
 		if (busy) return;
 		busy = true; retry.disabled = true; retry.hidden = true; progress.hidden = false;
 		message.textContent = 'Keep this window open.';
-		title.textContent = 'Saving…'; support.hidden = true; open.hidden = true; showDone(false);
+		title.textContent = 'Saving…'; support.hidden = true; showDone(false);
 		let status: number | null = null, requestId: string | null = null;
 		try {
 			const response = await fetch('/reading/handoff', { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(20000),
@@ -166,7 +166,6 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
 			}
 			title.textContent = data.alreadySaved ? 'Already saved' : 'Saved';
 			message.textContent = savedMessage; showDone(true);
-			open.href = '/notifications?section=reading&item=' + encodeURIComponent(data.id); open.hidden = false;
 			obsidian.href = 'obsidian://crate-reading?item=' + encodeURIComponent(data.id);
 			updateAvailable();
 		} catch { failure({ stage: 'handoff', status, requestId, code: 'network_error' }); }
