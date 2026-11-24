@@ -32,6 +32,30 @@ describe('extractDocument', () => {
 		expect(author).toBe('Ada Example');
 	});
 
+	describe('X posts', () => {
+		// X's server-rendered page puts the author's name in the first dir="auto" block,
+		// before the post body, inside a logged-out shell.
+		const shell = `<html><head><title>Ada Example on X</title></head><body><article>
+			<div dir="auto">Ada Example</div><div dir="auto" lang="en">Synthetic post body that is long enough to save as reading text.</div>
+		</article><p>Log in to see more posts.</p></body></html>`;
+		const url = 'https://x.com/ada/status/123?s=46';
+
+		it('saves the post body through Defuddle, not the author name', async () => {
+			const requests: string[] = [];
+			const { markdown } = await extractDocument(shell, url, async request => {
+				requests.push(request.url);
+				return Response.json({ code: 200, tweet: { id: '123', url: 'https://x.com/ada/status/123', author: { name: 'Ada Example', screen_name: 'ada' },
+					created_at: 'Tue Nov 24 09:00:00 +0000 2026', text: 'Synthetic post body that is long enough to save as reading text.' } });
+			});
+			expect(requests).toEqual(['https://api.fxtwitter.com/ada/status/123']);
+			expect(markdown).toContain('Synthetic post body that is long enough');
+		});
+
+		it('rejects the login shell when no X extractor recognizes the post', async () => {
+			await expect(extractDocument(shell, url, async () => new Response('', { status: 503 }))).rejects.toThrow('No usable post text');
+		});
+	});
+
 	it('lowercases HTML attribute names but keeps case-sensitive SVG names', () => {
 		const { document } = parseHTML('<html><body><img srcSet="a.png 1x" SRCSET="ignored"><svg viewBox="0 0 10 10"></svg></body></html>');
 		lowercaseHtmlAttributes(document);
