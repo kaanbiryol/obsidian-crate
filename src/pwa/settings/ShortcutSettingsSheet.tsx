@@ -20,9 +20,9 @@ export function ShortcutSettingsSheet({ open, onClose, onCloseEnd, children }: {
 	if (!mounted) return null;
 	const close = () => { onClose(); requestClose(); };
 	return <PwaModalSheet isOpen={open && !isClosing} onClose={close} onCloseEnd={finishClose}
-		variant="settings" presentation="page" sheetClassName="pwa-shortcut-sheet" label="Set up iPhone shortcut" recedeCanvas={false}>
+		variant="settings" presentation="page" sheetClassName="pwa-shortcut-sheet" label="Save to Crate shortcut" recedeCanvas={false}>
 		<aside className="settings-sheet settings-sheet--unified outline-none" tabIndex={-1}>
-			<ModalHeader title="Set up iPhone shortcut" closeLabel="Close shortcut setup" onClose={close} closeDisabled={isClosing} />
+			<ModalHeader title="Save to Crate shortcut" closeLabel="Close shortcut setup" onClose={close} closeDisabled={isClosing} />
 			<div className="settings-panel settings-shortcut-body">
 				<div className="crate-reading settings-subpage">{children}</div>
 			</div>

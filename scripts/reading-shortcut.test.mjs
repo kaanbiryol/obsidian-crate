@@ -138,3 +138,54 @@ test('the released shortcut sends the link to the server and shows its save page
   assert.deepEqual(releaseShortcutSource, shortcutSource);
   assert.ok(!JSON.stringify(readingShortcutTemplate(releaseShortcutSource)).includes('openurl'));
 });
+
+// Interprets setup routing up to the first network request or exit. It checks
+// variable wiring only; Shortcuts behavior on iOS needs a physical device.
+function setupRoute(actions, input, stored) {
+  const outputs = {}, variables = {}, frames = [], events = [];
+  const value = parameter => {
+    const attached = parameter?.Value?.attachmentsByRange?.['{0, 1}'] ?? parameter?.Value;
+    return attached?.Type === 'ExtensionInput' ? input : shortcutValue(parameter, outputs, variables);
+  };
+  for (const action of actions) {
+    const p = action.WFWorkflowActionParameters, kind = identifier(action);
+    if (kind === 'conditional') {
+      if (p.WFControlFlowMode === 0) {
+        const active = frames.every(frame => frame.taken);
+        const subject = active ? shortcutValue(p.WFInput, outputs, variables) : undefined;
+        frames.push({ active, taken: active && (subject == null || subject === '' || Array.isArray(subject) && subject.length === 0) });
+      } else if (p.WFControlFlowMode === 1) { const frame = frames.at(-1); frame.taken = frame.active && !frame.taken; }
+      else frames.pop();
+      continue;
+    }
+    if (!frames.every(frame => frame.taken)) continue;
+    if (kind === 'detect.link') outputs[p.UUID] = input.match(/https?:\/\/\S+/g) ?? [];
+    else if (kind === 'nothing') outputs[p.UUID] = undefined;
+    else if (kind === 'setvariable') variables[p.WFVariableName] = shortcutValue(p.WFInput, outputs, variables);
+    else if (kind === 'getstoredcontent') outputs[p.UUID] = stored;
+    else if (kind === 'text.match') { const subject = String(value(p.text) ?? ''); outputs[p.UUID] = new RegExp(p.WFMatchTextPattern).test(subject) ? [subject] : []; }
+    else if (kind === 'text.replace') outputs[p.UUID] = String(value(p.WFInput)).replace(new RegExp(p.WFReplaceTextFind), p.WFReplaceTextReplace);
+    else if (kind === 'ask') { events.push('ask'); outputs[p.UUID] = `https://typed.example/reading/shortcut-exchange#${'b'.repeat(64)}`; }
+    else if (kind === 'alert') events.push(p.WFAlertActionCancelButtonShown ? `confirm ${shortcutValue(p.WFAlertActionMessage.Value.attachmentsByRange[Object.keys(p.WFAlertActionMessage.Value.attachmentsByRange)[0]], outputs, variables)}` : p.WFAlertActionTitle);
+    else if (kind === 'downloadurl') { events.push(`request ${shortcutValue(p.WFURL, outputs, variables)}`); break; }
+    else if (kind === 'exit') { events.push('exit'); break; }
+    else if (kind === 'getitemfromlist') { events.push('share'); break; }
+    else if (kind === 'getvalueforkey') { events.push('configured'); break; }
+  }
+  return events;
+}
+test('a pairing link passed as input pairs after confirming its server and is never saved as an article', () => {
+  const actions = readingShortcutWithFirstRunSetup(shortcutSource, { pairing: true }).WFWorkflowActions;
+  const link = `https://crate.example/reading/shortcut-exchange#${'a'.repeat(64)}`;
+  const configured = { endpoint: 'https://old.example/reading/shortcut/v1/prepare', authorization: 'Bearer x' };
+  for (const stored of [undefined, configured]) {
+    assert.deepEqual(setupRoute(actions, link, stored), ['confirm crate.example', `request https://crate.example${contract.exchangePath}`]);
+  }
+  assert.deepEqual(setupRoute(actions, '', undefined), ['ask', `request https://typed.example${contract.exchangePath}`]);
+  assert.deepEqual(setupRoute(actions, '', configured), ['ask', `request https://typed.example${contract.exchangePath}`]);
+  assert.deepEqual(setupRoute(actions, 'https://news.example/article', undefined), ['ask', `request https://typed.example${contract.exchangePath}`]);
+  assert.deepEqual(setupRoute(actions, 'https://news.example/article', configured), ['configured']);
+  for (const lookalike of [link.replace('https:', 'http:'), `${link} extra`, link.replace('#', '?token=')]) {
+    assert.ok(!setupRoute(actions, lookalike, configured).some(event => event.startsWith('confirm')));
+  }
+});

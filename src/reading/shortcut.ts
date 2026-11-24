@@ -3,6 +3,12 @@ import contract from './shortcut-contract.json';
 export const READING_SHORTCUT_CONTRACT = Object.freeze(contract);
 /** Pages offers the verified shortcut download here once published. */
 export const READING_SHORTCUT_URL = contract.downloadUrl;
+/** Must match the signed template's WFWorkflowName; Shortcuts runs it by name. */
+const READING_SHORTCUT_NAME = 'Save to Crate';
+/** Runs the installed shortcut with a pairing code as its input. */
+export function readingShortcutPairingUrl(pairingCode: string): string {
+	return `shortcuts://run-shortcut?name=${encodeURIComponent(READING_SHORTCUT_NAME)}&input=text&text=${encodeURIComponent(pairingCode)}`;
+}
 /** Development Workers offer the shortcut signed from the working tree here.
  * Outside the PWA scope, so iOS opens it in a browser sheet that can be closed. */
 export const DEVELOPMENT_SHORTCUT_PATH = '/shortcuts/development/';

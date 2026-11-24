@@ -46,9 +46,9 @@ Share a link from any app straight into your Reading list.
 
 ### iPhone
 
-With iOS 27 or later, open **Settings → Install → Save from iPhone** in the web app and follow the steps to install and pair **Save to Crate**. After that, select **Share → Save to Crate** from any app. The shortcut needs a connection.
+With iOS 27 or later, open **Settings → Install → Save to Crate shortcut** in the web app and follow the steps to install and pair **Save to Crate**. After that, select **Share → Save to Crate** from any app. The shortcut needs a connection.
 
-You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to **Save from iPhone** in the web app to create a pairing code. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is. Logging out of the web app you paired from, or removing that session from connected devices in Obsidian, also disconnects the shortcut.
+You can also get the shortcut from [Crate’s iPhone shortcut page](/shortcuts/v1/): select **Download shortcut**, then **Add Shortcut**, and return to **Save to Crate shortcut** in the web app to connect it. If the page says the shortcut isn't available yet, use **Reading → Save a link** until it is. Logging out of the web app you paired from, or removing that session from connected devices in Obsidian, also disconnects the shortcut.
 
 The shortcut isn't offered in [encrypted vaults](/docs/getting-started/limits/#with-encryption). Save links in the web app or in Obsidian instead.
 

@@ -10,8 +10,8 @@ async function allowsNativeBack(target) {
 
 export async function checkSettingsNavigation(page) {
 	const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
-	const shortcut = page.getByRole('dialog', { name: 'Set up iPhone shortcut', exact: true });
-	const open = settings.getByRole('button', { name: 'Set up iPhone shortcut', exact: true });
+	const shortcut = page.getByRole('dialog', { name: 'Save to Crate shortcut', exact: true });
+	const open = settings.getByRole('button', { name: 'Save to Crate shortcut', exact: true });
 	const main = page.locator('.settings-main');
 	await expect(settings.getByRole('region', { name: 'Tabs', exact: true }).getByRole('combobox', { name: 'Open app to' })).toBeVisible();
 	for (const section of ['Sync', 'About']) {
@@ -32,7 +32,7 @@ export async function checkSettingsNavigation(page) {
 		await expect(shortcut.locator('.settings-shortcut-body')).toBeVisible();
 		await expect(page.locator('.settings-page-stack')).toHaveAttribute('inert', '');
 		// A modal sheet dismisses downward or with its close control, not by edge swipe.
-		expect(await allowsNativeBack(shortcut.getByRole('heading', { name: 'Set up iPhone shortcut', exact: true }))).toBe(false);
+		expect(await allowsNativeBack(shortcut.getByRole('heading', { name: 'Save to Crate shortcut', exact: true }))).toBe(false);
 		const currentLength = await page.evaluate(() => history.length);
 		if (length !== undefined) expect(currentLength).toBe(length);
 		length = currentLength;

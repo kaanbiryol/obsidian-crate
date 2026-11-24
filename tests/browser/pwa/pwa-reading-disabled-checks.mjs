@@ -18,7 +18,7 @@ export async function checkDisabledReading(browser, origin, name) {
 	const disabledSheet = disabledPage.getByRole('dialog', { name: 'Settings', exact: true });
 	await expect(disabledSheet.getByRole('button', { name: 'Update app', exact: true })).toHaveCount(0);
 	await expect(disabledSheet.locator('.settings-attention')).toHaveCount(0);
-	await expect(disabledSheet.getByRole('button', { name: 'Set up iPhone shortcut', exact: true })).toBeDisabled();
+	await expect(disabledSheet.getByRole('button', { name: 'Save to Crate shortcut', exact: true })).toBeDisabled();
 	await disabledSheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 	await switchFeature(disabledPage, 'Reading');
 	await expect(disabledPage.getByRole('heading', { name: 'Connect your Reading folder', exact: true })).toBeVisible();

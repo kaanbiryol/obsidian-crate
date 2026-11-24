@@ -38,7 +38,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
     await page.goto(setup.href);
-    const dialog = page.getByRole('dialog', { name: 'Set up iPhone shortcut' });
+    const dialog = page.getByRole('dialog', { name: 'Save to Crate shortcut' });
     await expect(dialog).toBeVisible().catch(async error => { console.error('Setup page:', await page.locator('body').innerText(), errors); throw error; });
     const download = dialog.getByRole('link', { name: 'Download Save to Crate' });
     await expect(download).toHaveAttribute('href', 'https://crate.kaanbiryol.com/shortcuts/v1/');
@@ -50,11 +50,21 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await expect(dialog.getByRole('button', { name: 'Create pairing code', exact: true })).toBeDisabled();
     await expect(dialog.getByText('Connect to the internet to pair your shortcut.')).toBeVisible();
     await context.setOffline(false);
-    await dialog.getByRole('button', { name: 'Create pairing code', exact: true }).click();
+    // Downloading prepares a code; the external download itself is not followed.
+    await page.evaluate(() => document.addEventListener('click', event => { if (event.target.closest('a[target="_blank"]')) event.preventDefault(); }, true));
+    await download.click();
     const input = dialog.getByLabel('Pairing code', { exact: true });
     await expect(input).toHaveValue(/\/reading\/shortcut-exchange#[a-f0-9]{64}$/).catch(async error => { console.error('Pairing UI error:', await dialog.getByRole('alert').allTextContents()); console.error('Fields:', await dialog.locator('textarea').count()); throw error; });
     assert.equal(creates, 1);
     const code = await input.inputValue(); assert.ok(!code.includes('Bearer'));
+    await download.click(); await expect(input).toHaveValue(code); assert.equal(creates, 1);
+    // The deep link runs the installed shortcut with the code as text input.
+    const connect = new URL(await dialog.getByRole('link', { name: 'Connect in Shortcuts', exact: true }).getAttribute('href'));
+    assert.equal(`${connect.protocol}//${connect.host}${connect.pathname}`, 'shortcuts://run-shortcut');
+    assert.deepEqual(Object.fromEntries(connect.searchParams), { name: 'Save to Crate', input: 'text', text: code });
+    // The pasted code is folded away behind the main Connect action.
+    await expect(dialog.getByRole('button', { name: 'Copy code', exact: true })).toBeHidden();
+    await dialog.getByText('Shortcuts didn’t open?', { exact: true }).click();
     // Clipboard denial leaves a selectable fallback; no second credential is minted.
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Denied'); } } }));
     await dialog.getByRole('button', { name: 'Copy code', exact: true }).click();
@@ -122,7 +132,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await page.clock.setFixedTime(new Date());
     await dialog.getByRole('button', { name: 'Close shortcut setup' }).click();
     await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Set up iPhone shortcut', exact: true }).click();
+    await page.getByRole('button', { name: 'Save to Crate shortcut', exact: true }).click();
     await expect(input).toHaveCount(0);
     unavailable = true;
     await dialog.getByRole('button', { name: 'Create pairing code', exact: true }).click();

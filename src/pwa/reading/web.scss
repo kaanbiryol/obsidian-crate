@@ -19,8 +19,16 @@
 .crate-reminders-ui .crate-reading-shortcut {
   min-width: 0;
   padding-bottom: 16px;
-  // Flatten the code block into the step's action row: field, then Copy beside New code.
-  &__code, &__code .crate-copyable-text { display: contents; }
+  .setup-step__extra > p { flex-basis: 100%; }
+  // The pasted code is a fallback, folded below the main action.
+  &__fallback {
+    flex-basis: 100%;
+    summary { min-height: 44px; display: flex; align-items: center; color: var(--text-muted); font-size: var(--crate-font-xs); cursor: pointer; }
+    &[open] { display: grid; gap: var(--crate-space-8); }
+  }
+  // Field, then Copy, then its message.
+  &__code { display: flex; flex-wrap: wrap; align-items: center; gap: var(--crate-space-8); }
+  &__code .crate-copyable-text { display: contents; }
   &__code label { order: 1; flex-basis: 100%; color: var(--text-muted); font-size: var(--crate-font-xs); }
   &__code textarea.crate-text-input {
     order: 2; flex-basis: 100%; box-sizing: border-box; width: 100%; height: 44px; min-height: 0; margin-bottom: var(--crate-space-4);
@@ -28,8 +36,7 @@
     white-space: pre; color: var(--text-muted); font: 16px/42px var(--font-monospace, ui-monospace, monospace);
   }
   &__code .crate-copyable-text > button { order: 3; }
-  .setup-step__extra > button { order: 4; }
-  &__code .crate-copyable-text > span, &__code > p, .setup-step__extra > p { order: 5; flex-basis: 100%; }
+  &__code .crate-copyable-text > span { order: 5; flex-basis: 100%; }
   &__code .crate-field__description:empty { display: none; }
   &__code .crate-field__description, &__code .crate-field__error { font-size: var(--crate-font-xs); }
 }

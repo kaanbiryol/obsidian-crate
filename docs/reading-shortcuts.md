@@ -25,6 +25,11 @@ with `409 shortcut_encrypted_vault`, since the server cannot encrypt the note.
   short-lived pairing grant once, and returns capture access. Pairing codes use
   the `/reading/shortcut-exchange#<grant>` format; the native
   template derives the versioned request URL locally and sends the grant in JSON.
+  The PWA creates a code when the user downloads the shortcut. Its **Connect in Shortcuts** opens
+  `shortcuts://run-shortcut?name=Save%20to%20Crate&input=text&text=<code>`. A
+  pairing code as input always runs setup, asks the user to confirm its host
+  (any page can open that link), and is never saved as an article. Without it,
+  setup asks for the code to be pasted.
 - `POST /reading/shortcut/v1/prepare` accepts capture access and only
   `{ url, title? }`. The server creates the immutable capture operation and a
   five-minute capability. Preparation is not a save receipt.

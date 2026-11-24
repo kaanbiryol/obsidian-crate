@@ -85,7 +85,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
 	const updateAvailable = (required = false) => {
 		update.hidden = !required && !config.supportOnly && shortcutRevision >= config.shortcutRevision;
 		element('update-title').textContent = required ? 'Update your shortcut' : config.supportOnly ? 'Check your setup' : 'A newer shortcut is available';
-		element('update-message').textContent = required || config.supportOnly ? 'Install Save to Crate, then create a new pairing code in Reading settings.' : 'Your existing shortcut can keep saving. The latest version adds clearer error reports and update guidance.';
+		element('update-message').textContent = required || config.supportOnly ? 'Install Save to Crate again, then connect it from Settings → Save to Crate shortcut.' : 'Your existing shortcut can keep saving. The latest version adds clearer error reports and update guidance.';
 	};
 	const record = (input: Record<string, unknown>) => {
 		const clean = normalize({ shortcutRevision, shortcutContract, ...input });
@@ -109,7 +109,7 @@ export function runReadingSavePage(config: ReadingSaveConfig): void {
 		message.textContent = token ? 'The connection was interrupted. Retry to finish.' : 'Share the link again. If it keeps failing, check the diagnostics.';
 		if (status === 401 || status === 403 && code === 'shortcut_access_required') {
 			title.textContent = 'Reconnect your shortcut';
-			message.textContent = 'In the Crate app, open Reading settings → Set up iPhone shortcut to create a new pairing code.';
+			message.textContent = 'In the Crate app, open Settings → Save to Crate shortcut to create a new pairing code.';
 		} else if (clean.stage !== 'pair' && (status === 410 || code === 'save_link_expired' || code === 'missing_save_link')) {
 			title.textContent = 'Share this link again'; message.textContent = 'This link has expired or is missing. Share the article to Crate again.';
 		} else if (code === 'shortcut_encrypted_vault') {

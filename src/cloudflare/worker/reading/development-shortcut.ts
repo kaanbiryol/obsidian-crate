@@ -14,7 +14,7 @@ export function developmentShortcutPage(encoded = DEVELOPMENT_SHORTCUT): Respons
 <body><main><div class="brand-lockup"><img src="/notifications/crate-mark-256.png" alt="Crate"></div><section><h1>Save to Crate</h1>
 <p class="status-copy">Development build signed from your working tree.</p>
 <a class="button" href="${DEVELOPMENT_SHORTCUT_FILE_PATH}">Download shortcut</a>
-<p class="helper">Safari may take a few seconds to ask, then saves the file to <strong>Downloads</strong>. Open it from the download icon in the address bar or from <strong>Files → Downloads</strong>, select <strong>Add Shortcut</strong>, then return to Crate to create a pairing code.</p></section></main></body></html>`, {
+<p class="helper">Select <strong>Add Shortcut</strong>, then return to Crate. If it saves to Files instead, open it from <strong>Downloads</strong>.</p></section></main></body></html>`, {
 		headers: { ...headers, 'Content-Type': 'text/html; charset=utf-8',
 			'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" },
 	});

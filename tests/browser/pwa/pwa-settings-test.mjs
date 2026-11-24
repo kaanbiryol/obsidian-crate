@@ -94,7 +94,7 @@ try {
 			await sheet.evaluate(element => element.classList.remove('settings-keyboard-test'));
 			await keyboardStyles.evaluate(element => element.remove());
 			for (const title of ['Appearance', 'Notifications', 'Install']) await expect(sheet.getByRole('heading', { name: title, exact: true })).toBeVisible();
-			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
+			await expect(sheet.getByRole('button', { name: 'Save to Crate shortcut' })).toBeEnabled();
 			await expect(page.getByRole('dialog')).toHaveCount(1);
 			await expect(page.locator('[data-crate-section="reminders"]')).toHaveAttribute('inert', '');
 			await expectTheme(page, 'dark', 'system');
@@ -145,8 +145,8 @@ try {
 			await expect(readingLibrary).toHaveAttribute('data-list-style', 'flat');
 
 			await expect(sheet.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute('aria-pressed', 'true');
-			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
-			const shortcut = page.getByRole('dialog', { name: 'Set up iPhone shortcut', exact: true });
+			await sheet.getByRole('button', { name: 'Save to Crate shortcut' }).click();
+			const shortcut = page.getByRole('dialog', { name: 'Save to Crate shortcut', exact: true });
 			await expect(shortcut.getByRole('link', { name: 'Download Save to Crate' })).toBeVisible();
 			await expect(shortcut.getByRole('button', { name: 'Close shortcut setup', exact: true })).toHaveCount(1);
 			await expect(shortcut.getByRole('button', { name: 'Back to settings' })).toHaveCount(0);
@@ -155,10 +155,10 @@ try {
 			await shortcut.getByRole('button', { name: 'Close shortcut setup', exact: true }).click();
 			await expect(shortcut).toHaveCount(0);
 			await expect(sheet).toBeVisible();
-			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeFocused();
+			await expect(sheet.getByRole('button', { name: 'Save to Crate shortcut' })).toBeFocused();
 			// Exercise sheet dismissal too, keeping the parent panel and scroll intact.
 			await page.emulateMedia({ reducedMotion: 'no-preference' });
-			await sheet.getByRole('button', { name: 'Set up iPhone shortcut' }).click();
+			await sheet.getByRole('button', { name: 'Save to Crate shortcut' }).click();
 			const retainedScroll = await page.locator('.settings-main').evaluate(element => element.scrollTop);
 			await expect(shortcut).toHaveCSS('transform', 'none');
 			await page.keyboard.press('Escape');
@@ -166,7 +166,7 @@ try {
 			await expect(sheet).toBeVisible();
 			await expect.poll(() => sheet.locator('.settings-main').evaluate(element => Math.abs(new DOMMatrixReadOnly(getComputedStyle(element).transform).m41))).toBeLessThan(1);
 			expect(await sheet.locator('.settings-main').evaluate(element => element.scrollTop)).toBe(retainedScroll);
-			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeFocused();
+			await expect(sheet.getByRole('button', { name: 'Save to Crate shortcut' })).toBeFocused();
 			await page.emulateMedia({ reducedMotion: 'reduce' });
 			await expect(sheet.getByRole('region', { name: 'About', exact: true })).toBeVisible();
 			// Hold refresh open so unrelated controls are checked during real pending work.
@@ -244,7 +244,7 @@ try {
 			await page.goto(origin + '/notifications?tab=inbox');
 			await expect(page.locator('.crate-feature-panel[data-active="true"] .view-header-title')).toHaveText('Inbox');
 			await gear.click();
-			await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
+			await expect(sheet.getByRole('button', { name: 'Save to Crate shortcut' })).toBeEnabled();
 			await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 
 			// An inactive feature's saved work must be visible before a shared logout.

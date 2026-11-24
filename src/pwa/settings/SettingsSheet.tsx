@@ -82,7 +82,7 @@ export function SettingsSheet({ onReviewReminders, onOpenEnd, navigation }: { na
 		transition.requestClose();
 		return true;
 	};
-	const pageTitle = (screen: typeof page) => ({ settings: 'Settings', shortcut: 'Set up iPhone shortcut', logout: 'Log out of Crate?', install: 'Add to home screen' })[screen];
+	const pageTitle = (screen: typeof page) => ({ settings: 'Settings', shortcut: 'Save to Crate shortcut', logout: 'Log out of Crate?', install: 'Add to home screen' })[screen];
 	const title = pageTitle(page === 'shortcut' ? 'settings' : page);
 	const header = (screen: typeof page) => <>
 		<ModalHeader title={pageTitle(screen)} navigation={screen === 'settings' ? 'dismiss' : 'back'} closeLabel={screen === 'settings' ? 'Close settings' : 'Back to settings'}

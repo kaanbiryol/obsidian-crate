@@ -9,6 +9,7 @@ export function readingShortcutWithFirstRunSetup(template, { pairing = false } =
   const original = workflow.WFWorkflowActions;
   const actions = [];
   const storedKey = 'crate.capture.configuration';
+  const pairingPattern = '^https://[^\\s/?#@]+/reading/shortcut-exchange#[a-f0-9]{64}$';
   const configuration = { Type: 'Variable', VariableName: 'Crate configuration' };
   const attachment = value => ({ WFSerializationType: 'WFTextTokenAttachment', Value: value });
   const text = value => typeof value === 'string' ? value : ({
@@ -45,7 +46,23 @@ export function readingShortcutWithFirstRunSetup(template, { pairing = false } =
   // A library tap opens setup again, so replacing expired access or changing
   // servers never requires editing actions. Sharing a link reuses saved access.
   actions.push(original[2]);
-  const incoming = { Type: 'ActionOutput', OutputUUID: original[2].WFWorkflowActionParameters.UUID, OutputName: 'URLs' };
+  const links = { Type: 'ActionOutput', OutputUUID: original[2].WFWorkflowActionParameters.UUID, OutputName: 'URLs' };
+  // The Crate app can run this shortcut with a pairing link as text input
+  // (shortcuts://run-shortcut), so setup needs no copy and paste. That input is
+  // never treated as a shared article.
+  const incoming = { Type: 'Variable', VariableName: 'Crate shared link' };
+  const supplied = { Type: 'Variable', VariableName: 'Crate pairing link' };
+  const setVariable = (variable, value) => add('setvariable', { WFVariableName: variable.VariableName, WFInput: attachment(value) });
+  setVariable(incoming, links);
+  setVariable(supplied, add('nothing'));
+  if (pairing) {
+    const pairingLink = add('text.match', { WFMatchTextPattern: pairingPattern, text: text({ Type: 'ExtensionInput' }) });
+    const linkInput = whenEmpty(pairingLink);
+    otherwise(linkInput);
+    setVariable(incoming, add('nothing'));
+    setVariable(supplied, pairingLink);
+    end(linkInput);
+  }
   const setupOnly = whenEmpty(incoming);
   setConfiguration(add('nothing'));
   otherwise(setupOnly);
@@ -55,7 +72,15 @@ export function readingShortcutWithFirstRunSetup(template, { pairing = false } =
   const needsSetup = whenEmpty(configuration);
   let endpoint, authorization;
   if (pairing) {
-    const code = ask('In the Crate web app, open Settings → Reading → Set up. Paste the pairing code here.', '^https://[^\\s/?#@]+/reading/shortcut-exchange#[a-f0-9]{64}$', 'Copy a new pairing code from the Crate web app, then run this shortcut again.');
+    const typed = whenEmpty(supplied);
+    setVariable(supplied, add('ask', { WFAskActionPrompt: 'In the Crate web app, open Settings → Reading → Set up. Paste the pairing code here.', WFInputType: 'Text' }));
+    otherwise(typed);
+    // A link from another app or page could name any server, so the user confirms it.
+    const host = add('text.replace', { WFReplaceTextFind: '^https://([^/]+)/.*$', WFReplaceTextReplace: '$1', WFReplaceTextRegularExpression: true, WFInput: text(supplied) });
+    const confirmPrefix = 'Save to Crate will send the links you share to ';
+    add('alert', { WFAlertActionTitle: 'Connect to Crate?', WFAlertActionMessage: { WFSerializationType: 'WFTextTokenString', Value: { string: `${confirmPrefix}\ufffc.`, attachmentsByRange: { [`{${confirmPrefix.length}, 1}`]: host } } }, WFAlertActionCancelButtonShown: true });
+    end(typed);
+    const code = validate(supplied, pairingPattern, 'Copy a new pairing code from the Crate web app, then run this shortcut again.');
     // Split locally: the temporary secret must never appear in a network URL.
     const serverUrl = add('text.replace', { WFReplaceTextFind: '/reading/shortcut-exchange#[a-f0-9]{64}$', WFReplaceTextReplace: '', WFReplaceTextRegularExpression: true, WFInput: text(code) });
     const exchangeUrl = add('text.replace', { WFReplaceTextFind: '$', WFReplaceTextReplace: contract.exchangePath, WFReplaceTextRegularExpression: true, WFInput: text(serverUrl) });

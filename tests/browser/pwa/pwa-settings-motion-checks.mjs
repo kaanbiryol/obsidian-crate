@@ -23,7 +23,7 @@ export async function checkSettingsMotion(browser, origin) {
 		const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
 		await expect.poll(() => sheet.evaluate(el => el.getAnimations().some(a => a.playState === 'running'))).toBe(true);
 		await expect(page.locator('[data-crate-section="reading"] .crate-reading-web')).toHaveCount(0);
-		await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
+		await expect(sheet.getByRole('button', { name: 'Save to Crate shortcut' })).toBeEnabled();
 		await expect.poll(() => sheet.evaluate(el => el.getAnimations().length)).toBe(0);
 		// Sync initializes independently; opening settings must not render the library.
 		await expect(page.locator('[data-crate-section="reading"] .crate-reading-web')).toHaveCount(0);
@@ -118,7 +118,7 @@ export async function checkSettingsMotion(browser, origin) {
 		await page.emulateMedia({ reducedMotion: 'no-preference' });
 		await page.setViewportSize({ width: 1024, height: 800 });
 		await expect(canvas).toHaveCSS('transform', 'none');
-		await expect(sheet.getByRole('button', { name: 'Set up iPhone shortcut' })).toBeEnabled();
+		await expect(sheet.getByRole('button', { name: 'Save to Crate shortcut' })).toBeEnabled();
 		await sheet.getByRole('button', { name: 'Close settings', exact: true }).click();
 		await expect(sheet).toHaveCount(0);
 		await page.setViewportSize({ width: 390, height: 844 });
@@ -142,8 +142,8 @@ export async function checkSettingsMotion(browser, origin) {
 
 // Shortcut setup is its own sheet; Settings retains its scroll and canvas depth.
 async function checkShortcutSheet(page) {
-	const trigger = page.getByRole('button', { name: 'Set up iPhone shortcut', exact: true });
-	const shortcut = page.getByRole('dialog', { name: 'Set up iPhone shortcut', exact: true });
+	const trigger = page.getByRole('button', { name: 'Save to Crate shortcut', exact: true });
+	const shortcut = page.getByRole('dialog', { name: 'Save to Crate shortcut', exact: true });
 	const canvas = page.locator('.crate-modal-canvas');
 	await trigger.scrollIntoViewIfNeeded();
 	await trigger.focus();

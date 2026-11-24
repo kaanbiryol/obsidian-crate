@@ -11,8 +11,8 @@ export function ReadingSettings({ ready, connected, encrypted, unavailable, onSh
 	onShortcut: () => void;
 }) {
 	return <>
-		<Button size="touch" className="settings-navigation-row" onClick={onShortcut} disabled={!ready || !connected || encrypted} aria-label="Set up iPhone shortcut">
-			<span>Save from iPhone</span><ChevronRight size={16} aria-hidden="true" />
+		<Button size="touch" className="settings-navigation-row" onClick={onShortcut} disabled={!ready || !connected || encrypted}>
+			<span>Save to Crate shortcut</span><ChevronRight size={16} aria-hidden="true" />
 		</Button>
 		{(!ready || !connected || unavailable || encrypted) && <SettingsRow description={unavailable ?? (!ready ? 'Loading Reading settings…' : !connected ? 'Choose a Reading folder in Obsidian’s Crate settings to connect your library.' : 'Not available in encrypted vaults. Save links here or in Obsidian.')} />}
 	</>;

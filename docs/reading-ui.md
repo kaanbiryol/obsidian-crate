@@ -136,7 +136,7 @@ settings loads the other feature as needed without navigating to it. Inactive
 features do not open restored editors or apply automatic updates.
 The shared logout confirmation explains cleanup for both features and exposes
 unsynced reminder exports and recovery before clearing private device data.
-**Set up iPhone shortcut** opens in its own full-height Settings-style sheet.
+**Save to Crate shortcut** opens in its own full-height Settings-style sheet.
 Its circular close control, downward swipe, Escape, and browser Back return to
 the retained Settings screen and scroll position. The nested sheet keeps the
 app canvas at the parent sheet's depth and shares the existing reduced-motion
