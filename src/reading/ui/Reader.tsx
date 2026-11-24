@@ -212,16 +212,24 @@ export function ReadingReader({
 			<div hidden={mode !== 'article'}>
 			{videoId && showHeader && <ReadingVideo key={articleKey} id={videoId} source={item.source_url} body={body} content={content}
 				hasTranscript={segments.length > 0} pinned={videoPinned} onPinnedChange={setVideoPinned} seekTarget={videoSeek} />}
-			{markdown !== null && item.extraction_status !== 'ready' && <p className="crate-reading__notice">
-				{extractionNotice(item, Boolean(videoId), pendingMessage)}
-				{onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable'
-					&& <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>{videoId ? 'Retry capture' : 'Try again'}</Button>}
-			</p>}
-			{videoId && markdown !== null && item.extraction_status === 'ready' && !segments.length && <p className="crate-reading__notice">
-				{hasVideoNotes ? 'Saved notes are available. No timed transcript was found.' : 'Transcript unavailable. You can add one with the Crate Web Clipper template.'}
-				{!hasVideoNotes && onRetry && item.capture_method === 'url'
-					&& <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Retry transcript</Button>}
-			</p>}
+			{markdown !== null && item.extraction_status !== 'ready' && (!videoId && item.source_url && item.extraction_status === 'unavailable'
+				? <EmptyState compact className="crate-reading-reader__failed" icon="file-text" iconColor="secondary" title="Couldn’t save the article text"
+					description="You can still read it on the original page.">
+					{onRetry && item.capture_method === 'url'
+						&& <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Try again</Button>}
+				</EmptyState>
+				: <div className="crate-reading__notice">
+					<p>{extractionNotice(item, Boolean(videoId), pendingMessage)}</p>
+					{videoId && onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable' && <div className="crate-reading__notice-actions">
+						<Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Retry capture</Button>
+					</div>}
+				</div>)}
+			{videoId && markdown !== null && item.extraction_status === 'ready' && !segments.length && <div className="crate-reading__notice">
+				<p>{hasVideoNotes ? 'Saved notes are available. No timed transcript was found.' : 'Transcript unavailable. You can add one with the Crate Web Clipper template.'}</p>
+				{!hasVideoNotes && onRetry && item.capture_method === 'url' && <div className="crate-reading__notice-actions">
+					<Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Retry transcript</Button>
+				</div>}
+			</div>}
 			{markdown === null ? <div className="pwa-reading-article-opening__body">
 				{loadingError ? <><p role="alert">{loadingError}</p><Button variant="outline" onClick={onRetryOpen}>Retry</Button></>
 					: <LoadingIndicator label={videoId ? "Loading video details" : "Loading article"} />}
@@ -265,8 +273,7 @@ function extractionNotice(item: ReadingMetadata, video: boolean, pendingMessage:
 		if (item.extraction_status !== 'pending') return 'Your video is saved. You can watch it on YouTube.';
 		return item.title === new URL(item.source_url).hostname ? 'Your video is saved. Fetching details and transcript…' : 'Video details are saved. Fetching the transcript…';
 	}
-	if (item.extraction_status === 'pending') return pendingMessage;
-	return item.source_url ? 'Article text couldn’t be saved. You can still read the original.' : 'This note is empty.';
+	return item.extraction_status === 'pending' ? pendingMessage : 'This note is empty.';
 }
 
 /** The original page, or the vault note when the item has no source. */
