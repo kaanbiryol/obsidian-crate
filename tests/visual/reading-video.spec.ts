@@ -38,7 +38,9 @@ for (const browserName of ['chromium', 'webkit'] as const) for (const host of ['
 			await page.getByRole('button', { name: 'Save tags', exact: true }).click();
 			await expect(article.getByText('#watch-later', { exact: true })).toBeVisible();
 			await article.getByRole('button', { name: 'Mark as watched', exact: true }).click();
-			await expect(article.getByRole('button', { name: 'Move to inbox', exact: true })).toBeVisible();
+			await article.getByRole('button', { name: 'More video actions', exact: true }).click();
+			await expect(article.getByRole('menuitem', { name: 'Move to inbox', exact: true })).toBeVisible();
+			await page.keyboard.press('Escape');
 			await article.getByRole('button', { name: 'Back to reading' }).click();
 			await expect(ready).toHaveCount(0);
 			await page.getByRole('button', { name: 'youtu.be YouTube video', exact: true }).click();
@@ -48,7 +50,11 @@ for (const browserName of ['chromium', 'webkit'] as const) for (const host of ['
 			await expect(article.getByText('Your video is saved. You can watch it on YouTube.')).toBeVisible();
 			await expect(article.getByText(/Article text couldn’t|You’ve reached the end/)).toHaveCount(0);
 			await expect(article.getByRole('button', { name: 'Mark as watched', exact: true })).toBeVisible();
-			await expect(article.getByRole('button', { name: 'Reading appearance' })).toHaveCount(0);
+			// A video without notes has no reading text, so More offers no appearance settings.
+			await article.getByRole('button', { name: 'More video actions', exact: true }).click();
+			await expect(article.getByRole('menuitem', { name: 'Archive', exact: true })).toBeVisible();
+			await expect(article.getByRole('menuitem', { name: 'Reading appearance', exact: true })).toHaveCount(0);
+			await page.keyboard.press('Escape');
 			await expect(article.getByRole('button', { name: 'Highlights (0)', exact: true })).toHaveCount(0);
 			await page.screenshot({ path: testInfo.outputPath('video-unavailable.png') });
 			await article.getByRole('button', { name: 'Back to reading' }).click();

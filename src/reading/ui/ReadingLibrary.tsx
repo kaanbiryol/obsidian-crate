@@ -201,8 +201,8 @@ export function ReadingLibraryPanel({
 					{notice}
 					<ReadingDuplicates items={snapshot.items} busy={busy.has('enrich') || busy.has('open')} onOpen={item => run('open', () => onOpen(item, undefined, shownSection))}
 						onEnrich={onEnrich ? (target, source) => run('enrich', () => onEnrich(target, source)) : undefined} />
-					{(error || snapshot.error || pageError) && <p className="crate-reading__notice" role="alert">{error || snapshot.error || pageError}{' '}
-						<Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></p>}
+					{(error || snapshot.error || pageError) && <div className="crate-reading__notice" role="alert"><p>{error || snapshot.error || pageError}</p>
+						<div className="crate-reading__notice-actions"><Button variant="outline" disabled={busy.has('refresh')} onClick={() => run('refresh', onRefresh)}>Refresh</Button></div></div>}
 					{snapshot.issues.length > 0 && <ReadingIssues issues={snapshot.issues} />}
 					{listContent ?? (loading ? <LoadingIndicator label="Loading Reading" immediate={immediateLoading} /> : <>
 						{shownSection === 'highlights' && (count > 0

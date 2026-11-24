@@ -1,5 +1,6 @@
 import {
 	Archive,
+	CircleArrowDown,
 	ArchiveRestore,
 	ArrowUp,
 	ArrowUpRight,
@@ -97,6 +98,7 @@ const ICONS: Record<string, LucideIcon> = {
 	'chevron-right': ChevronRight,
 	circle: Circle,
 	'circle-check': CircleCheck,
+	'circle-arrow-down': CircleArrowDown,
 	clock: Clock,
 	eye: Eye,
 	'eye-off': EyeOff,

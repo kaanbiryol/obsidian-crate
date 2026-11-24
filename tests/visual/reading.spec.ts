@@ -32,7 +32,7 @@ for (const host of ['plugin', 'pwa']) for (const theme of ['light', 'dark']) for
 		await highlightsDialog.getByRole('button', { name: 'Close highlights', exact: true }).click();
 		await expect(highlightsDialog).toHaveCount(0);
 		await article.getByRole('button', { name: 'Favorite article', exact: true }).click();
-		await article.getByRole('button', { name: 'Archive article', exact: true }).click();
+		await article.getByRole('button', { name: 'More article actions', exact: true }).click(); await article.getByRole('menuitem', { name: 'Archive', exact: true }).click();
 		await article.getByRole('button', { name: 'Edit article tags' }).click();
 		await page.getByRole('textbox', { name: 'Tags' }).fill('essays saved');
 		await page.getByRole('button', { name: 'Save tags', exact: true }).click();
@@ -86,7 +86,7 @@ test('reading keeps the selected tab indicator in place when a reader returns im
 	await article.click();
 	await returnFromReader('favorites');
 	await article.click();
-	await page.getByRole('button', { name: 'Archive article', exact: true }).click();
+	await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Archive', exact: true }).click();
 	await returnFromReader('favorites');
 	await selectTab('Archive');
 	await article.click();
@@ -106,7 +106,7 @@ for (const host of ['plugin', 'pwa']) test(`reader appearance, capture, keyboard
 	await expect(body.locator('a[href^="javascript:"],a[href*="password"]')).toHaveCount(0);
 	expect(await page.evaluate(() => (window as unknown as Record<string, unknown>).__readingAttack)).toBeUndefined();
 	expect(remote).toEqual([]);
-	await page.getByRole('button', { name: 'Reading appearance' }).click();
+	await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Reading appearance', exact: true }).click();
 	const sheet = page.getByRole('dialog', { name: 'Reading appearance' });
 	await expect.poll(async () => { const bounds = await sheet.boundingBox(); return bounds && Math.round(bounds.y + bounds.height); }).toBe(844);
 	await expect(page.getByTestId('visual-surface')).toHaveScreenshot(`reading-appearance-${host}.png`, { animations: 'disabled', maxDiffPixelRatio: 0.001 });

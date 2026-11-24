@@ -19,15 +19,15 @@ async function checkReaderNavigation(page) {
   const floating = reader.locator('.crate-reading-reader__floating');
   const highlights = reader.getByRole('button', { name: /^Highlights \(/ });
   const tags = reader.getByRole('button', { name: 'Edit article tags', exact: true });
-  await expect(tags).toHaveText('');
+  await expect(tags).toHaveText(/^\+/);
   const material = button => button.evaluate(element => {
     const style = getComputedStyle(element);
     return { background: style.background, border: style.borderColor, shadow: style.boxShadow,
       blur: style.backdropFilter || style.webkitBackdropFilter, color: style.color };
   });
-  const appearance = reader.getByRole('button', { name: 'Reading appearance', exact: true });
-  assert.deepEqual(await material(tags), await material(appearance), 'Tags matches the appearance icon');
-  assert.deepEqual(await material(highlights), await material(appearance), 'Highlights uses the same frosted material and icon color');
+  // The floating highlights button shares the top bar's frosted material.
+  const surface = async element => { const { color, ...rest } = await material(element); return rest; };
+  assert.deepEqual(await surface(highlights), await surface(nav.locator('.crate-reading-reader__quick-actions')), 'Highlights uses the same frosted material as the top bar');
   await expect(reader.getByRole('group', { name: 'Article view' })).toHaveCount(0);
   await expect(floating).toHaveCSS('height', '0px');
   // Give the short server fixture enough length to exercise real browser scrolling.
@@ -83,12 +83,12 @@ async function checkReaderNavigation(page) {
     // Opening a sheet from a scrolled article must restore the document offset.
     // Give this sheet an explicit focus-return target. A programmatic click
     // alone can leave the preceding Highlights trigger as the remembered target.
-    await appearance.evaluate(element => { element.focus({ preventScroll: true }); element.click(); });
-    await expect(page.getByRole('dialog', { name: 'Reading appearance' })).toBeVisible();
+    await tags.evaluate(element => { element.focus({ preventScroll: true }); element.click(); });
+    await expect(page.getByRole('dialog', { name: 'Article tags' })).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog', { name: 'Reading appearance' })).toHaveCount(0);
-    await expect(appearance).toBeFocused();
-    await appearance.evaluate(element => element.blur());
+    await expect(page.getByRole('dialog', { name: 'Article tags' })).toHaveCount(0);
+    await expect(tags).toBeFocused();
+    await tags.evaluate(element => element.blur());
     await expect(page.locator('body')).not.toHaveClass(/pwa-sheet-scroll-locked/);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(360);
     await scrollTo(700);
@@ -563,12 +563,12 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await expect(page.getByRole('button', { name: 'Back to reading' })).toBeEnabled();
   // Article actions and the highlights button wait for the article.
   await expect(page.locator('.crate-reading-reader__highlights-button')).toHaveCount(0);
-  for (const name of ['Archive article', 'Favorite article', 'More article actions']) await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
+  for (const name of ['Favorite article', 'More article actions']) await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
   const originalArticle = await page.locator('.crate-reading__reader-pane article').elementHandle();
   firstArticle.release();
   await articleShown(page);
   await expect(page.locator('.crate-reading-reader__highlights-button')).toBeVisible();
-  for (const name of ['Archive article', 'Favorite article', 'More article actions']) await expect(page.getByRole('button', { name, exact: true })).toBeEnabled();
+  for (const name of ['Favorite article', 'More article actions']) await expect(page.getByRole('button', { name, exact: true })).toBeEnabled();
   // Reopening below shows this saved copy while the download is held.
   await saveForOffline(page);
   await page.getByText('Available offline', { exact: true }).waitFor();
@@ -630,15 +630,15 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   assert.ok(await page.evaluate(() => document.getSelection().toString().length > 0), 'Article text remains selectable');
   await page.evaluate(() => document.getSelection().removeAllRanges());
   await expect(page.locator('.crate-reading-reader__nav')).toHaveCSS('-webkit-user-select', 'none');
-  await expect(page.getByRole('button', { name: 'Reading appearance', exact: true })).toHaveCSS('-webkit-user-select', 'none');
-  await page.getByRole('button',{name:'Reading appearance',exact:true}).click();
+  await expect(page.getByRole('button', { name: 'More article actions', exact: true })).toHaveCSS('-webkit-user-select', 'none');
+  await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Reading appearance', exact: true }).click();
   const appearance = page.getByRole('dialog',{name:'Reading appearance',exact:true});
   await expect(appearance).toHaveClass(/pwa-modal-sheet__container--settings/);
   await page.getByRole('button',{name:'Increase text size'}).click();
   await expect(page.locator('.crate-reading-reader__body')).toHaveCSS('font-size', '20px');
   await page.keyboard.press('Escape');
   await expect(appearance).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'Reading appearance',exact:true})).toBeFocused();
+  await expect(page.getByRole('button',{name:'More article actions',exact:true})).toBeFocused();
   await page.getByRole('button',{name:'Edit article tags'}).click();
   const tags = page.getByRole('dialog',{name:'Article tags'});
   await expect(tags).toHaveClass(/pwa-modal-sheet__container--settings/);
@@ -784,9 +784,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   const archiveUpdate = fixture.holdResponse('update');
   await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
   await page.getByText('Available offline',{exact:true}).waitFor();
-  await page.getByRole('button',{name:'Archive article',exact:true}).click();
+  await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Archive', exact: true }).click();
   await archiveUpdate.started;
-  await expect(page.getByRole('button',{name:'Move to inbox',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'More article actions',exact:true}).click();
+  await expect(page.getByRole('menuitem',{name:'Move to inbox',exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
   await assertNoPendingBanner(page);
   await page.getByRole('button',{name:'Back to reading',exact:true}).click();
   await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
@@ -798,7 +800,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   archiveUpdate.release();
   await expect(readingSync).toHaveAttribute('data-sync-state','synced');
   await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
-  await page.getByRole('button',{name:'Move to inbox',exact:true}).click();
+  await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Move to inbox', exact: true }).click();
   await page.getByRole('button',{name:'Back to reading',exact:true}).click();
   await expect(page.locator('.crate-reading__reader-pane article')).toHaveCount(0);
   await page.locator('.crate-feature-panel[data-active="true"] [data-dock-switcher]').press('ArrowDown');
@@ -817,7 +819,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
   await page.getByRole('button',{name:/browser.example.invalid browser.example.invalid/}).click();
   await expect(page.getByRole('heading',{name:'browser.example.invalid',exact:true})).toBeVisible();
   // The cached reader opens at once; its header reports this article's held change.
-  await expect(page.locator('.crate-reading-reader__availability').getByRole('status')).toHaveText('Syncing 1 change');
+  await expect(page.locator('.crate-reading-reader__sync')).toHaveText('Syncing 1 change');
   await assertNoPendingBanner(page);
   await page.getByRole('button',{name:'Back to reading',exact:true}).click();
   await page.getByRole('button',{name:'Save a link',exact:true}).click();

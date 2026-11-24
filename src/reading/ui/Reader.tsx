@@ -65,7 +65,7 @@ export function ReadingReader({
 	focusHighlight?: ReadingHighlight; autoHideNavigation?: boolean; floatingHighlights?: boolean;
 	pendingMessage?: string;
 	status?: string; onRetry?: () => Promise<void>; notice?: React.ReactNode; mutationPending?: boolean; highlightsPending?: boolean;
-	/** This article's own sync state; a synced article shows `status` instead. */
+	/** This article's own sync state, shown as the top bar's sync dot like the library header's. */
 	syncStatus?: { state: SyncIndicatorState; label: string };
 	/** Highlights still waiting to sync render in a lighter style. */
 	pendingHighlights?: ReadingHighlight[];
@@ -92,6 +92,8 @@ export function ReadingReader({
 	const [videoSeek, setVideoSeek] = useState<{ seconds: number; reveal?: boolean } | null>(null);
 	const [videoPinned, setVideoPinned] = useState(true);
 	const hasVideoNotes = useMemo(() => Boolean(videoId && markdown !== null && readingDocument(markdown).text.trim()), [videoId, markdown]);
+	// A capture with no article text yet shows a centered status instead of a notice above nothing.
+	const emptyArticle = useMemo(() => !videoId && markdown !== null && !readingDocument(markdown).text.trim(), [videoId, markdown]);
 	const showHeader = !revealContentTogether || markdown !== null || Boolean(loadingError);
 	// Article actions wait for the article; Back stays available.
 	const loading = markdown === null && !loadingError;
@@ -150,13 +152,19 @@ export function ReadingReader({
 		</form>}</ReadingDialog>}
 	</>;
 	const minutes = useMemo(() => Math.max(1, Math.ceil((markdown ?? '').trim().split(/\s+/).length / 220)), [markdown]);
+	const share = () => void shareLink(article.current?.ownerDocument.defaultView, readingTitle(item), item.source_url);
+	// The top bar keeps favorite; archive also ends the article as Mark as read.
 	const moreActions: ReaderMenuAction[] = [
+		...onUpdate ? [{ label: item.reading_status === 'archived' ? 'Move to inbox' : 'Archive', icon: item.reading_status === 'archived' ? 'archive-restore' : 'archive',
+			disabled: mutationPending, onSelect: () => toggleArchived() }] : [],
+		...item.source_url ? [{ label: 'Share', icon: 'share-2', disabled: sharing, onSelect: share }] : [],
+		...(!videoId || hasVideoNotes) ? [{ label: 'Reading appearance', icon: 'type', onSelect: () => setDialog('appearance') }] : [],
 		...onEdit ? [{ label: 'Open note', icon: 'file-text', onSelect: onEdit }] : [],
 		...onOfflineChange ? [{ label: savedOffline ? 'Remove offline copy' : 'Save for offline', icon: 'download',
 			disabled: busy || markdown === null, onSelect: () => void run(() => onOfflineChange(!savedOffline)) }] : [],
 		...onDelete ? [{ label: `Delete ${kind}`, icon: 'trash-2', tone: 'danger' as const, disabled: mutationPending, onSelect: () => setDialog('delete') }] : [],
 	];
-	const toggleArchived = () =>void run(() => onUpdate!({ reading_status: item.reading_status === 'archived' ? 'inbox' : 'archived' }));
+	function toggleArchived() { void run(() => onUpdate!({ reading_status: item.reading_status === 'archived' ? 'inbox' : 'archived' })); }
 	const seekToHighlight = (highlight: ReadingHighlight) => {
 		const seconds = transcriptMoment(segments, highlight.start, highlight.end);
 		if (seconds !== undefined) setVideoSeek({ seconds, reveal: false });
@@ -174,12 +182,12 @@ export function ReadingReader({
 		</div>}
 		<nav className="crate-reading-reader__nav crate-detail-navigation" aria-label={videoId ? 'Video actions' : 'Article actions'}>
 			<BackButton label="Back to reading" onClick={onBack} />
-			<div className="crate-reading-reader__quick-actions">{onUpdate && <>
-				<IconButton size="large" icon={item.reading_status === 'archived' ? 'archive-restore' : 'archive'} label={item.reading_status === 'archived' ? 'Move to inbox' : `Archive ${kind}`}
-					disabled={mutationPending || loading} aria-disabled={busy || mutationPending} onClick={toggleArchived} />
-				<IconButton size="large" icon="star" label={item.favorite ? 'Remove favorite' : `Favorite ${kind}`} aria-pressed={item.favorite} data-filled={item.favorite}
-					disabled={mutationPending || loading} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ favorite: !item.favorite }))} />
-			</>}<ReaderMoreMenu label={`More ${kind} actions`} actions={moreActions} disabled={loading} /></div>
+			<div className="crate-reading-reader__quick-actions">
+				{syncStatus && <span className="crate-reading-reader__sync" role="status" aria-label={syncStatus.label} title={syncStatus.label}
+					data-sync-state={syncStatus.state}><SyncIndicator state={syncStatus.state} /><span className="crate-reading__sr-only">{syncStatus.label}</span></span>}
+				{onUpdate && <IconButton size="large" icon="star" label={item.favorite ? 'Remove favorite' : `Favorite ${kind}`} aria-pressed={item.favorite} data-filled={item.favorite}
+					disabled={mutationPending || loading} aria-disabled={busy || mutationPending} onClick={() => void run(() => onUpdate({ favorite: !item.favorite }))} />}
+				<ReaderMoreMenu label={`More ${kind} actions`} actions={moreActions} disabled={loading} /></div>
 		</nav>
 		<div className="crate-reading-reader__page">
 			{notice}
@@ -192,15 +200,13 @@ export function ReadingReader({
 					{videoId && <span>Video</span>}
 					{videoId && segments.length > 0 && item.transcript_language && <span>Transcript: {item.transcript_language}</span>}
 					{!videoId && markdown !== null && item.extraction_status === 'ready' && <span>{minutes} min read</span>}
+					{status && <ReaderAvailability status={status} />}
 				</div>
-				<div className="crate-reading-reader__tools">
-					<ReaderAvailability syncStatus={syncStatus} status={status} />
-					{(!videoId || hasVideoNotes) && <IconButton size="large" icon="type" label="Reading appearance" onClick={() => setDialog('appearance')} />}
-					{onUpdate && <IconButton size="large" icon="hash" label={`Edit ${kind} tags`} disabled={mutationPending} onClick={() => setDialog('tags')} />}
-					{item.source_url && <IconButton size="large" icon={copied ? 'check' : 'share-2'} label={copied ? 'Link copied' : `Share ${kind}`} aria-disabled={sharing}
-						onClick={() => void shareLink(article.current?.ownerDocument.defaultView, readingTitle(item), item.source_url)} />}
-				</div>
-				{item.tags.length > 0 && <div className="crate-reading-reader__tags">{item.tags.map(tag => <span key={tag}>#{tag}</span>)}</div>}
+				{(item.tags.length > 0 || onUpdate) && <div className="crate-reading-reader__tags">
+					{item.tags.map(tag => <span key={tag} className="crate-reading-reader__tag">#{tag}</span>)}
+					{onUpdate && <Button className="crate-reading-reader__tag crate-reading-reader__tag--add" aria-label={`Edit ${kind} tags`} title={`Edit ${kind} tags`}
+						disabled={mutationPending} onClick={() => setDialog('tags')}>+</Button>}
+				</div>}
 			</header>}
 			{error && <p role="alert" className="crate-reading__notice">{error}</p>}
 			{copied && <span className="crate-reading__sr-only" role="status">Link copied</span>}
@@ -212,16 +218,21 @@ export function ReadingReader({
 			<div hidden={mode !== 'article'}>
 			{videoId && showHeader && <ReadingVideo key={articleKey} id={videoId} source={item.source_url} body={body} content={content}
 				hasTranscript={segments.length > 0} pinned={videoPinned} onPinnedChange={setVideoPinned} seekTarget={videoSeek} />}
-			{markdown !== null && item.extraction_status !== 'ready' && (!videoId && item.source_url && item.extraction_status === 'unavailable'
-				? <EmptyState compact className="crate-reading-reader__failed" icon="file-text" iconColor="secondary" title="Couldn’t save the article text"
+			{markdown !== null && item.extraction_status !== 'ready' && (emptyArticle && item.source_url && item.extraction_status === 'unavailable'
+				? <EmptyState compact className="crate-reading-reader__status" icon="file-text" iconColor="secondary" title="Couldn’t save the article text"
 					description="You can still read it on the original page.">
 					{onRetry && item.capture_method === 'url'
 						&& <Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Try again</Button>}
 				</EmptyState>
+				: emptyArticle && item.extraction_status === 'pending'
+				? <EmptyState compact className="crate-reading-reader__status" icon="file-text" iconColor="secondary" title="Saving the article text"
+					description={pendingMessage}>
+					<LoadingIndicator label="Saving article text" immediate />
+				</EmptyState>
 				: <div className="crate-reading__notice">
 					<p>{extractionNotice(item, Boolean(videoId), pendingMessage)}</p>
-					{videoId && onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable' && <div className="crate-reading__notice-actions">
-						<Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>Retry capture</Button>
+					{onRetry && item.capture_method === 'url' && item.extraction_status === 'unavailable' && <div className="crate-reading__notice-actions">
+						<Button variant="outline" disabled={busy || mutationPending} onClick={() => void run(onRetry)}>{videoId ? 'Retry capture' : 'Try again'}</Button>
 					</div>}
 				</div>)}
 			{videoId && markdown !== null && item.extraction_status === 'ready' && !segments.length && <div className="crate-reading__notice">
@@ -273,7 +284,8 @@ function extractionNotice(item: ReadingMetadata, video: boolean, pendingMessage:
 		if (item.extraction_status !== 'pending') return 'Your video is saved. You can watch it on YouTube.';
 		return item.title === new URL(item.source_url).hostname ? 'Your video is saved. Fetching details and transcript…' : 'Video details are saved. Fetching the transcript…';
 	}
-	return item.extraction_status === 'pending' ? pendingMessage : 'This note is empty.';
+	if (item.extraction_status === 'pending') return pendingMessage;
+	return item.source_url ? 'Article text couldn’t be saved. You can still read the original.' : 'This note is empty.';
 }
 
 /** The original page, or the vault note when the item has no source. */
@@ -285,10 +297,12 @@ function ReaderSource({ item }: { item: ReadingMetadata }) {
 }
 
 /** This article's unsynced changes, or else its download state. */
-function ReaderAvailability({ syncStatus, status }: { syncStatus?: { state: SyncIndicatorState; label: string }; status?: string }) {
-	return <div className="crate-reading-reader__availability">{syncStatus && syncStatus.state !== 'synced'
-		? <span role="status" data-sync-state={syncStatus.state}><SyncIndicator state={syncStatus.state} />{syncStatus.label}</span>
-		: status && <span role="status"><ThemeIcon id="check" size="xs" aria-hidden="true" />{status}</span>}</div>;
+/** Offline availability is a small icon with its words for screen readers; rarer states stay as text. */
+function ReaderAvailability({ status }: { status: string }) {
+	const offline = /available offline$/i.test(status);
+	return <span className="crate-reading-reader__availability" data-offline={offline || undefined} title={offline ? status : undefined}>
+		<span role="status">{offline ? <><ThemeIcon id="circle-arrow-down" size="xs" aria-hidden="true" /><span className="crate-reading__sr-only">{status}</span></> : status}</span>
+	</span>;
 }
 
 function ReadingAppearanceSettings({ fontSize, serif, onChange }: { fontSize: number; serif: boolean; onChange: (changes: Partial<ReadingAppearance>) => void }) {

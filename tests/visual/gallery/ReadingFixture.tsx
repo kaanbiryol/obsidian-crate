@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ReadingLibraryPanel, type ReadingLibraryProps } from '@/reading/ui/ReadingLibrary';
 import { ReadingReader } from '@/reading/ui/Reader';
 import type { ReadingItem } from '@/reading/core/model';
+import type { SyncIndicatorState } from '@/ui/shared/SyncIndicator';
 import type { ReadingLibrarySource } from '@/reading/ui/useLibraryPages';
 import { ReadingDialog, ReadingDialogHost } from '@/reading/ui/ReadingDialog';
 import { PluginReadingDialog } from '@/reading/ui/plugin/ObsidianReadingDialog';
@@ -32,8 +33,13 @@ const videos: ReadingItem[] = [
 	{ ...initial[1]!, title: 'youtu.be', source_url: 'https://youtu.be/aqz-KE-bpKQ?t=30', extraction_status: 'unavailable', favorite: false },
 	{ ...initial[2]!, title: 'youtube.com', source_url: 'https://youtube.com/shorts/ScMzIvxBSi4', extraction_status: 'pending', capture_method: 'url' },
 ];
+// The web app reports each article's sync state; `reader-sync=<state>` shows the others.
+const SYNC_LABELS: Record<string, string> = { synced: 'All changes synced', syncing: 'Syncing 1 change', pending: '1 change waiting to sync', error: 'Couldn’t sync 1 change', offline: 'Offline: 1 change waiting to sync' };
+const readerSync = () => { const state = new URLSearchParams(location.search).get('reader-sync') ?? 'synced'; return { state: state as SyncIndicatorState, label: SYNC_LABELS[state] ?? state }; };
 // A link capture whose article text could not be saved.
 const failedArticle: ReadingItem = { ...initial[1]!, title: 'x.com', source_url: 'https://x.com/ada/status/1', extraction_status: 'unavailable', favorite: false };
+// A link capture whose article text is still being saved.
+const pendingArticle: ReadingItem = { ...initial[1]!, title: 'journal.example.org', source_url: 'https://journal.example.org/new', favorite: false };
 const body = `A good article deserves more than a passing glance. Save something that catches your attention, and return when you have a little time.
 
 ## Make room for the interesting things
@@ -71,7 +77,7 @@ export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, 
 	const videoFixture = new URLSearchParams(location.search).has('reading-video');
 	const immediateReaderReturn = new URLSearchParams(location.search).has('reading-back');
 	const [items, setItems] = useState(() => videoFixture ? videos : new URLSearchParams(location.search).has('highlight-library') ? initial.slice(0, 3).map((item, index) => ({ ...item, highlights: [{ start: 0, end: 14, text: 'A good article', note: index === 0 ? 'Revisit this idea' : undefined, createdAt: `2026-09-${23 - index}T10:00:00Z` }] })) : new URLSearchParams(location.search).has('empty') ? [] : new URLSearchParams(location.search).has('many') ? Array.from({ length: 250 }, (_, i) => ({ ...initial[i % initial.length]!, title: `Saved essay ${i + 1}`, crate_reading_id: `67de6c50-c70c-4c85-93f2-${i.toString().padStart(12, '0')}` })) : new URLSearchParams(location.search).has('vault-note') ? [{ ...initial[0]!, title: 'A vault note', source_url: '' }] : new URLSearchParams(location.search).has('fetching') ? [{ ...initial[1]!, crate_reading_id: 'fetching', title: 'journal.example.org', source_url: 'https://journal.example.org/new' }, initial[1]!] : initial);
-	const [article, setArticle] = useState<ReadingItem | null>(() => new URLSearchParams(location.search).has('reader-failed') ? failedArticle : new URLSearchParams(location.search).has('reader') ? initial[0]! : null);
+	const [article, setArticle] = useState<ReadingItem | null>(() => new URLSearchParams(location.search).has('reader-failed') ? failedArticle : new URLSearchParams(location.search).has('reader-pending') ? pendingArticle : new URLSearchParams(location.search).has('reader') ? initial[0]! : null);
 	const [adding, setAdding] = useState(false), [url, setUrl] = useState('');
 	const [savedOffline, setSavedOffline] = useState(true);
 	const [mounted, setMounted] = useState(true);
@@ -111,7 +117,7 @@ export function ReadingFixture({ onAdd, renderNavigation, renderLibraryContent, 
 	if (!mounted) return null;
 	return <><ReadingLibraryPanel listStyle={listStyle} renderNavigation={renderNavigation} renderLibraryContent={renderLibraryContent} source={source} snapshot={{ items, issues: [], loading: false, error: null }} onAdd={() => { onAdd(); setAdding(true); }}
 		onOpen={async item => { setArticle(item); }} onRefresh={async () => {}}
-		activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} onRetry={article === failedArticle ? async () => {} : undefined} markdown={article === failedArticle ? '' : videoFixture ? (article.extraction_status === 'ready' ? 'My notes: revisit the sculpture gallery.' : '') : body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status={videoFixture ? "Details available offline" : "Available offline"} onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onSaveComplete={() => { document.documentElement.dataset.readingSaveCompletions = String(Number(document.documentElement.dataset.readingSaveCompletions ?? 0) + 1); }} onEdit={() => {}}
+		activeId={article?.crate_reading_id} readerMotion={immediateReaderReturn ? 'none' : renderNavigation ? 'slide' : undefined} reader={article && <ReadingReader floatingHighlights item={article} syncStatus={pwaActions ? readerSync() : undefined} onRetry={article === failedArticle ? async () => {} : undefined} markdown={article === failedArticle || article === pendingArticle ? '' : videoFixture ? (article.extraction_status === 'ready' ? 'My notes: revisit the sculpture gallery.' : '') : body + (article.source_url ? '' : '\n[absolute link](https://example.com/more)')} status={videoFixture ? "Details available offline" : "Available offline"} onBack={() => setArticle(null)} onUpdate={changes => update(article, changes)} onSaveComplete={() => { document.documentElement.dataset.readingSaveCompletions = String(Number(document.documentElement.dataset.readingSaveCompletions ?? 0) + 1); }} onEdit={() => {}}
 			{...pwaActions && { savedOffline, onOfflineChange: async (keep: boolean) => setSavedOffline(keep), onDelete: async () => { setItems(current => current.filter(item => item.crate_reading_id !== article.crate_reading_id)); setArticle(null); } }} />} />
 		{adding && (new URLSearchParams(location.search).get('host') === 'plugin' ? <ReadingDialogHost.Provider value={PluginReadingDialog}><SaveLinkDialog variant={innerWidth > 600 ? 'centered' : 'bottom-sheet'} url={url} onUrl={setUrl} saving={false} onClose={() => setAdding(false)} onSave={() => setAdding(false)} /></ReadingDialogHost.Provider> : <ReadingDialog title="Save a link" onClose={() => setAdding(false)}><SaveLinkForm url={url} onUrl={setUrl} onSave={() => setAdding(false)} onCancel={() => setAdding(false)} saving={false} /></ReadingDialog>)}
 	</>;

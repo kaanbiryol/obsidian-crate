@@ -40,7 +40,7 @@ try {
       await page.goto(`${origin}/notifications?section=reading`);
       await openArticle(page, 0);
       await checkAppearance(page, false, 19);
-      await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
+      await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Reading appearance', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Reading appearance' });
       await dialog.getByRole('button', { name: 'Literary Serif' }).click();
       await dialog.getByRole('button', { name: 'Increase text size' }).click();
@@ -61,7 +61,7 @@ try {
       await page.goto(`${origin}/notifications?section=reading`);
       await openArticle(page, 0);
       await checkAppearance(page, true, 21);
-      await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
+      await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Reading appearance', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Literary Serif' })).toHaveAttribute('aria-pressed', 'true');
       await expect(page.getByLabel('Text size', { exact: true })).toHaveText('21');
       console.log(`${engine.name()}: reading appearance persists across articles, reload and close/reopen`);

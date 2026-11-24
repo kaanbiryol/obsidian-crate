@@ -9,13 +9,19 @@ for (const host of ['plugin', 'pwa']) {
 			const article = page.locator('.crate-reading-reader');
 			await expect(article.getByRole('heading', { name: 'A vault note' })).toBeVisible();
 			await expect(article.getByRole('link', { name: 'Original' })).toHaveCount(0);
-			await expect(article.getByRole('button', { name: 'Share article' })).toHaveCount(0);
+			// A vault note has no link to share.
+			await article.getByRole('button', { name: 'More article actions', exact: true }).click();
+			await expect(article.getByRole('menuitem', { name: 'Archive', exact: true })).toBeVisible();
+			await expect(article.getByRole('menuitem', { name: 'Share', exact: true })).toHaveCount(0);
+			await page.keyboard.press('Escape');
 			await expect(article.getByRole('link', { name: 'relative link', exact: true })).toHaveCount(0);
 			await expect(article.getByRole('link', { name: 'absolute link', exact: true })).toHaveAttribute('href', 'https://example.com/more');
 			await article.getByRole('button', { name: 'Favorite article', exact: true }).click();
 			await expect(article.getByRole('button', { name: 'Remove favorite', exact: true })).toHaveAttribute('aria-pressed', 'true');
-			await article.getByRole('button', { name: 'Archive article', exact: true }).click();
-			await expect(article.getByRole('button', { name: 'Move to inbox', exact: true })).toBeVisible();
+			await article.getByRole('button', { name: 'More article actions', exact: true }).click(); await article.getByRole('menuitem', { name: 'Archive', exact: true }).click();
+			await article.getByRole('button', { name: 'More article actions', exact: true }).click();
+			await expect(article.getByRole('menuitem', { name: 'Move to inbox', exact: true })).toBeVisible();
+			await page.keyboard.press('Escape');
 			await article.getByRole('button', { name: 'Back to reading' }).click();
 			await page.getByRole('button', { name: 'Archive', exact: true }).click();
 			await expect(page.getByRole('button', { name: 'Vault note A vault note' })).toBeVisible();

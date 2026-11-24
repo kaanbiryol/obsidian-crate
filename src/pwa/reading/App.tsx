@@ -175,12 +175,12 @@ function ReadingNotices({ recovery, error, showError, connectionText, retrying, 
 	return <>
 		{connectionText && <PwaConnectionBanner text={connectionText} retrying={retrying}
 			onRetry={connectionText.startsWith('Offline') ? undefined : onRetry} />}
-		{recovery && <p className="crate-reading__notice">{'Changes from an earlier sign-in are still stored here. '}
-			<Button variant="outline" onClick={onExport}>Export earlier changes</Button></p>}
-		{error && showError && <p className="crate-reading__notice" role="alert">{error}{' '}
-			<Button variant="outline" onClick={onRetry}>Retry</Button></p>}
-		{!error && syncIssue && <p className="crate-reading__notice" role="alert">{syncIssue.error || 'A Reading change needs review.'}{' '}
-			<Button variant="outline" onClick={onReview}>Review changes</Button></p>}
+		{recovery && <div className="crate-reading__notice"><p>Changes from an earlier sign-in are still stored here.</p>
+			<div className="crate-reading__notice-actions"><Button variant="outline" onClick={onExport}>Export earlier changes</Button></div></div>}
+		{error && showError && <div className="crate-reading__notice" role="alert"><p>{error}</p>
+			<div className="crate-reading__notice-actions"><Button variant="outline" onClick={onRetry}>Retry</Button></div></div>}
+		{!error && syncIssue && <div className="crate-reading__notice" role="alert"><p>{syncIssue.error || 'A Reading change needs review.'}</p>
+			<div className="crate-reading__notice-actions"><Button variant="outline" onClick={onReview}>Review changes</Button></div></div>}
 	</>;
 }
 

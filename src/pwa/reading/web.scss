@@ -131,7 +131,7 @@ html.pwa-document-reader {
 .crate-reminders-ui.pwa-reading-root .crate-reading-reader {
   --reader-control-border: color-mix(in srgb, var(--text-normal) 10%, transparent);
 
-  &__quick-actions, & .crate-reading-reader__tools > button[data-variant], & .crate-reading-reader__highlights-button[data-variant] {
+  &__quick-actions, & .crate-reading-reader__highlights-button[data-variant] {
     @include glass.surface;
     border-radius: tokens.$radius-pill;
   }
@@ -141,6 +141,8 @@ html.pwa-document-reader {
     @media (prefers-contrast: more) { --crate-action-border: var(--text-muted); }
   }
   &__quick-actions { padding: 2px; gap: 2px; }
+  // Tag chips use the raised button surface in the web app.
+  & .crate-reading-reader__tag:not(.crate-reading-reader__tag--add) { background: var(--pwa-raised-button-bg, color-mix(in srgb, var(--text-normal) 6%, transparent)); box-shadow: var(--pwa-raised-button-shadow, 0 1px 1px rgba(0, 0, 0, .12)); }
   &__quick-actions:empty { display: none; }
   &__quick-actions > button { border-radius: 50%; }
   &__quick-actions .crate-reading-menu > button { border-radius: 50%; }
@@ -150,9 +152,6 @@ html.pwa-document-reader {
   &__header { margin-bottom: 20px; }
   &__source { margin-bottom: 18px; }
   &__header h1 { margin-bottom: 18px; }
-  &__tools { gap: 6px; margin-top: 20px; border: 0; min-height: 44px; flex-wrap: wrap; }
-  &__availability { min-width: 100px; }
-  &__tools > button { min-height: 44px; flex-shrink: 0; }
   &__tabs { padding: 3px; gap: 3px; border: 1px solid var(--reader-control-border); border-radius: tokens.$radius-pill; background: var(--background-primary-alt); }
   &__tabs button { min-width: 0; min-height: 44px; border: 1px solid transparent; border-radius: tokens.$radius-pill; font-size: 14px; }
   &__tabs button[aria-pressed="true"] {

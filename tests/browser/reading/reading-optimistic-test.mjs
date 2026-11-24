@@ -203,8 +203,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
     await setTags('essays');
     await expect(page.locator('.crate-reading-reader__tags')).toHaveText('#essays');
     await page.locator('.crate-reading__reader-pane').getByRole('button', { name: 'Remove favorite', exact: true }).click();
-    await page.getByRole('button', { name: 'Archive article', exact: true }).click();
-    await page.getByRole('button', { name: 'Move to inbox', exact: true }).click();
+    await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Archive', exact: true }).click();
+    await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Move to inbox', exact: true }).click();
     await openHighlightNote('Add note');
     await page.getByLabel('Your note').fill('First note');
     await page.getByRole('button', { name: 'Save note', exact: true }).click();

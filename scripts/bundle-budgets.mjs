@@ -44,9 +44,10 @@ export const bundleBudgets = {
 		// server file and batch limits, with readable network errors, the Reading connection
 		// view, held changes that keep lists and the reader from flickering, the reminder
 		// completion animation, Reading title placeholders, recovery key errors with next
-		// steps and the failed article card, measure 1.2180 MB raw / 399.4 KB gzip.
-		maxBytes: 1218000,
-		maxGzipBytes: 399400,
+		// steps, the failed and pending article states and notice action rows, measure
+		// 1.2184 MB raw / 399.5 KB gzip.
+		maxBytes: 1218400,
+		maxGzipBytes: 399500,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
@@ -54,8 +55,9 @@ export const bundleBudgets = {
 		// server file and batch limits, with readable network errors, the Reading connection
 		// view, held changes that keep lists and the reader from flickering, the reminder
 		// completion animation, Reading title placeholders, recovery key errors with next
-		// steps and the failed article card, measure 1.9397 MB raw / 640.7 KB gzip.
-		maxBytes: 1939700,
-		maxGzipBytes: 640700,
+		// steps, the failed and pending article states and notice action rows, measure
+		// 1.9402 MB raw / 640.8 KB gzip.
+		maxBytes: 1940200,
+		maxGzipBytes: 640800,
 	}],
 };

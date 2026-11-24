@@ -8,7 +8,7 @@ for (const browserName of ['chromium', 'webkit'] as const) {
 				const page = await browser.newPage({ baseURL, viewport: { width: 320, height: 844 }, reducedMotion: 'reduce' });
 				await page.route(/^https:\/\//, route => route.abort());
 				await page.goto(`/?host=${host}&scene=reading&theme=dark&reader`);
-				await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
+				await page.getByRole('button', { name: 'More article actions', exact: true }).click(); await page.getByRole('menuitem', { name: 'Reading appearance', exact: true }).click();
 				const dialog = page.getByRole('dialog', { name: 'Reading appearance' });
 				await expect(dialog).toBeVisible();
 				const preview = dialog.locator('.crate-reading-reader__sample-frame');

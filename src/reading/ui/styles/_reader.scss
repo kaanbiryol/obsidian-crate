@@ -78,11 +78,29 @@
 	&__header h1:focus { outline: none; }
 	&__byline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--text-muted); font-size: 12px; }
 	&__byline > * + *::before { content: '·'; margin-right: 12px; color: var(--text-faint, var(--text-muted)); }
-	&__tools { display: flex; align-items: center; gap: 0; border-top: 1px solid var(--crate-divider); border-bottom: 1px solid var(--crate-divider); margin-top: 26px; min-height: 52px; }
-	&__availability { display: flex; align-items: center; flex: 1; color: var(--text-muted); font-size: 10px; }
-	&__availability span { display: inline-flex; align-items: center; gap: 4px; }
-	&__availability .crate-sync-indicator { width: 12px; height: 12px; flex: 0 0 12px; }
-	&__tags { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11px; color: var(--text-muted); padding-top: 12px; }
+	// Availability is the last byline item: an offline icon, or short text for rarer states.
+	&__availability, &__availability > span { display: inline-flex; align-items: center; }
+	&__availability[data-offline] { color: var(--text-faint, var(--text-muted)); }
+	// The top bar's sync dot matches the library header: green once this article is synced.
+	&__sync { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; }
+	&__sync .crate-sync-indicator { width: 12px; height: 12px; }
+	// Tags read as compact chips; the add chip opens the tag editor.
+	&__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 14px; }
+	&__tag {
+		display: inline-flex; align-items: center; box-sizing: border-box; height: 24px; padding: 0 8px;
+		border: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent); border-radius: 6px;
+		background: color-mix(in srgb, var(--text-normal) 6%, transparent); color: var(--text-normal);
+		font-size: 12px; font-weight: var(--crate-font-weight-medium, 500); line-height: 1;
+	}
+	&__tag--add {
+		position: relative; min-width: 24px; justify-content: center; border-style: dashed;
+		border-color: color-mix(in srgb, var(--text-normal) 18%, transparent); background: transparent; box-shadow: none;
+		color: var(--text-muted); font: inherit; font-size: 12px; font-weight: var(--crate-font-weight-medium, 500); cursor: pointer;
+		&::after { content: ""; position: absolute; inset: -10px -4px; }
+		&:hover:not(:disabled) { background: var(--crate-control-hover-bg); color: var(--text-normal); }
+		&:disabled { cursor: default; opacity: .5; }
+		&:focus-visible { outline: 2px solid var(--crate-focus-ring); outline-offset: 1px; }
+	}
 	&__body { font-family: var(--font-text, var(--font-interface, system-ui, sans-serif)); font-size: var(--reading-font-size, 19px); line-height: 1.85; overflow-wrap: anywhere; color: var(--text-normal); }
 	&[data-serif="true"] .crate-reading-reader__body { font-family: Georgia, 'Times New Roman', serif; }
 	&__body p { margin: 0 0 1.35em; }
@@ -131,7 +149,6 @@
 		&__header h1 { font-size: 32px; line-height: 1.2; letter-spacing: -.035em; }
 		&__source { margin-bottom: 22px; }
 		&__body { line-height: 1.8; }
-		&__availability { font-size: 10px; }
 	}
 }
 

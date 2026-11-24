@@ -57,7 +57,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
       await expect(page.locator('.crate-reading-workspace')).toHaveAttribute('data-reader-open', 'true');
       await expect(page).toHaveURL(new RegExp(`item=${saved.id}`));
       await expect(page.locator('.crate-reading-reader__body')).toContainText('A useful article excerpt.');
-      if (status) await expect(page.locator('.crate-reading-reader__availability').getByRole('status')).toHaveText(status);
+      // Sync problems show in the top bar; offline availability is the byline icon.
+      if (status) await expect(status instanceof RegExp ? page.locator('.crate-reading-reader__sync') : page.locator('.crate-reading-reader__availability').getByRole('status')).toHaveText(status);
     };
     // Only an article saved for offline keeps its text on the device.
     await open(null);

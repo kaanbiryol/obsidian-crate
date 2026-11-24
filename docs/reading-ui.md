@@ -34,9 +34,12 @@ lifecycle adapter.
 Reading uses a single-screen library with bottom navigation at every width in
 both hosts. Opening an article replaces the library; filters remain in the picker.
 Reading dialogs use sheets rather than a separate desktop presentation.
-The reader's top bar holds archive, favorite and a **More** menu with the less
-frequent actions (**Open note**, **Save for offline**, and **Delete** last, in red).
-Appearance, tags and share stay in the row under the title so it fits on a phone.
+The reader's top bar holds favorite and a **More** menu (**Archive**, **Share**,
+**Reading appearance**, **Open note**, **Save for offline**, and **Delete** last, in red).
+Archive also ends every inbox article as **Mark as read**. A sync dot leads the top
+bar, as in the library header, and reports this article's own changes. The byline ends
+with a small icon when the article is available offline, and tags show as chips with
+a **+** chip that opens the tag editor.
 Obsidian keeps separate library and reader scroll containers. The PWA reader uses
 document scrolling while preserving the covered library’s filters and list position.
 Browser history remains in the PWA adapter.

@@ -12,9 +12,10 @@
 	.crate-reading__notice { padding: 12px 12px; margin: 12px 0; background: var(--crate-panel-bg); border: 1px solid var(--crate-divider); border-radius: 10px; overflow-wrap: anywhere; font-size: 13px; color: var(--text-muted); }
 	.crate-reading__notice button { margin: 4px; }
 	.crate-reading__notice > p { margin: 0; }
-	.crate-reading__notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+	.crate-reading__notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 	.crate-reading__notice-actions > button { margin: 0; }
-	.crate-reading-reader__failed { padding-block: 40px; }
+	.crate-reading-reader__status { padding-block: 40px; }
+	.crate-reading-reader__status .crate-content-loading { flex: 0 0 auto; padding: 4px; }
 	.crate-reading__notice ul { max-height: 150px; overflow-y: auto; padding-left: 20px; }
 	.crate-reading__notice summary { cursor: pointer; min-height: 32px; align-content: center; }
 	.crate-reading__capture { display: grid; gap: 20px; }
