@@ -42,6 +42,8 @@ export function getPwaStatusText({
 	return null;
 }
 
+export type NotificationPrompt = 'enable' | 'pending' | 'blocked' | null;
+
 export function usePwaStatus({
 	authToken,
 	bootstrapped,
@@ -64,7 +66,7 @@ export function usePwaStatus({
 }): {
 	readOnlyMessage: string | null;
 	readOnly: boolean;
-	canShowNotificationPrompt: boolean;
+	notificationPrompt: NotificationPrompt;
 	statusText: string | null;
 } {
 	const [statusNow, setStatusNow] = useState(() => Date.now());
@@ -101,12 +103,23 @@ export function usePwaStatus({
 		unavailableMessage,
 	}), [dataMode, error, isOffline, lastUpdatedAt, statusNow, unavailableMessage]);
 	// Enabling alerts needs the server, so the prompt waits while the banner shows.
-	const canShowNotificationPrompt = Boolean(authToken && bootstrapped && !statusText && (push.phase === 'off' || push.phase === 'error') && isStandaloneApp());
+	const offered = push.phase === 'off' || push.phase === 'error';
+	// Keep an offered prompt through the permission sheet: it leaves once alerts
+	// are on and stays, saying why, when the person declines.
+	const [heldFor, setHeldFor] = useState<string | null>(null);
+	const held = authToken !== null && heldFor === authToken;
+	if (offered && authToken && !held) setHeldFor(authToken);
+	else if (held && !offered && push.phase !== 'checking' && push.phase !== 'blocked') setHeldFor(null);
+	const prompt: NotificationPrompt = offered ? 'enable'
+		: held && push.phase === 'checking' ? 'pending'
+			: held && push.phase === 'blocked' ? 'blocked'
+				: null;
+	const notificationPrompt = prompt && authToken && bootstrapped && !statusText && isStandaloneApp() ? prompt : null;
 
 	return {
 		readOnlyMessage,
 		readOnly,
-		canShowNotificationPrompt,
+		notificationPrompt,
 		statusText,
 	};
 }

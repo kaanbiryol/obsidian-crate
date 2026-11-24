@@ -53,7 +53,7 @@ async function harness(browser, existing = false, standalone = false) {
     } });
     Object.defineProperty(window, 'pushManager', { configurable: true, value: {
       getSubscription: async () => { window.pushReads = (window.pushReads || 0) + 1; await window.heldPushRead; const value = read(); if (value.readFailure) throw new Error('Provider unavailable'); return value.endpoint ? subscription(value.endpoint) : null; },
-      subscribe: async () => { const value = read(); const endpoint = value.endpoint || firstEndpoint; write({ ...value, permission: 'granted', endpoint, subscribes: value.subscribes + 1 }); return subscription(endpoint); },
+      subscribe: async () => { const value = read(); await window.heldSubscribe; if (value.decline) { write({ ...value, permission: 'denied' }); throw new DOMException('Permission denied', 'NotAllowedError'); } const endpoint = value.endpoint || firstEndpoint; write({ ...value, permission: 'granted', endpoint, subscribes: value.subscribes + 1 }); return subscription(endpoint); },
       permissionState: async () => read().permission,
     } });
   }, { authKey, providerKey, token: previewAuthToken, existing, firstEndpoint, standalone });
@@ -299,11 +299,37 @@ async function stableListOnResume(browser) {
   } finally { await state.close(); }
 }
 
+async function listPromptFollowsPermission(browser) {
+  const state = await harness(browser, false, true);
+  const { page } = state;
+  try {
+    await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+    const prompt = page.locator('.pwa-notification-prompt');
+    const enable = prompt.getByRole('button', { name: 'Enable', exact: true });
+    await provider(page, { decline: true });
+    await enable.click();
+    // Declining keeps the row and says why instead of dismissing it.
+    await expect(prompt).toContainText('Notifications are blocked');
+    await expect(enable).toHaveCount(0);
+    await provider(page, { decline: false, permission: 'default' });
+    await page.reload();
+    await page.evaluate(() => { window.heldSubscribe = new Promise(resolve => { window.releaseSubscribe = resolve; }); });
+    await enable.click();
+    // The row stays while the permission sheet is open.
+    await expect(enable).toBeDisabled();
+    await expect(prompt).toBeVisible();
+    await page.evaluate(() => window.releaseSubscribe());
+    await expect(prompt).toHaveCount(0);
+    expect((await providerState(page)).permission).toBe('granted');
+  } finally { await state.close(); }
+}
+
 try {
   for (const browserType of [chromium, webkit]) {
     const browser = await browserType.launch();
     try {
       await stableListOnResume(browser);
+      await listPromptFollowsPermission(browser);
       for (const failure of ['before', 'after']) await registrationFailure(browser, failure);
       await renewalAndProviderChanges(browser);
       await serviceWorkerRenewal(browser);

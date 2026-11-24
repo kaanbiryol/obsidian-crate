@@ -2,7 +2,7 @@ import { PwaUpdateButton } from '../update/PwaUpdateNotice';
 import { LoadingSpinner } from '@/ui/shared/LoadingIndicator';
 import React, { type RefObject, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
-import { useIsPresent } from 'motion/react';
+import { AnimatePresence, motion, useIsPresent } from 'motion/react';
 import { PwaButton as Button } from './PwaButton';
 import {
 	Bell,
@@ -15,7 +15,8 @@ import { loadPwaPreferences } from '../settings/preferences';
 import { createPwaUpdateScreenHtml } from '../shell/update-screen';
 import { IconButton } from '@/ui/shared/IconButton';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import { PWA_FADE_TIMING } from '@/ui/shared/navigation/motion';
+import { PWA_FADE, PWA_FADE_TIMING } from '@/ui/shared/navigation/motion';
+import type { NotificationPrompt } from '../reminders/usePwaStatus';
 
 function PwaSettingsButton({
 	settingsOpen,
@@ -63,7 +64,7 @@ export function PwaTopNotices({
 	statusText,
 	onRetry,
 	retrying,
-	showNotificationPrompt,
+	notificationPrompt,
 	onEnableNotifications,
 	children,
 }: {
@@ -71,27 +72,42 @@ export function PwaTopNotices({
 	/** Omitted while offline. */
 	onRetry?: () => void;
 	retrying: boolean;
-	showNotificationPrompt: boolean;
+	notificationPrompt: NotificationPrompt;
 	onEnableNotifications: () => void;
 	children?: React.ReactNode;
 }) {
-	const showNotices = statusText || showNotificationPrompt || children;
-	if (!showNotices) return null;
+	const reducedMotion = useReducedMotion();
+	const showNotices = Boolean(statusText || notificationPrompt || children);
+	// Collapse the row, or the whole strip when it was the last notice, once
+	// notifications turn on instead of jumping the list up.
+	const collapse = { opacity: 0, height: 0, overflow: 'hidden' as const, transition: reducedMotion ? { duration: 0 } : PWA_FADE };
+	const collapseStrip = { ...collapse, paddingTop: 0, paddingBottom: 0 };
 
 	return (
-		<div className="pwa-top-notices">
-			{statusText && <PwaConnectionBanner text={statusText} onRetry={onRetry} retrying={retrying} />}
-			{children}
-			{showNotificationPrompt && (
-				<div className="pwa-notification-prompt">
-					<Bell className="pwa-notification-prompt__icon" size={14} aria-hidden="true" />
-					<span className="pwa-notification-prompt__copy">Get alerts when reminders are due</span>
-					<Button className="pwa-inline-button pwa-raised-button pwa-notification-prompt__enable" type="button" onClick={onEnableNotifications}>
-						Enable
-					</Button>
-				</div>
+		<AnimatePresence initial={false}>
+			{showNotices && (
+				<motion.div key="notices" className="pwa-top-notices" exit={collapseStrip}>
+					{statusText && <PwaConnectionBanner text={statusText} onRetry={onRetry} retrying={retrying} />}
+					{children}
+					<AnimatePresence initial={false}>
+						{notificationPrompt && (
+							<motion.div key="notification-prompt" className="pwa-notification-prompt" exit={collapse}>
+								<Bell className="pwa-notification-prompt__icon" size={14} aria-hidden="true" />
+								{notificationPrompt === 'blocked'
+									? <span className="pwa-notification-prompt__copy" role="status">Notifications are blocked. Allow them in settings, then reopen Crate.</span>
+									: <>
+										<span className="pwa-notification-prompt__copy">Get alerts when reminders are due</span>
+										<Button className="pwa-inline-button pwa-raised-button pwa-notification-prompt__enable" type="button"
+											disabled={notificationPrompt === 'pending'} onClick={onEnableNotifications}>
+											Enable
+										</Button>
+									</>}
+							</motion.div>
+						)}
+					</AnimatePresence>
+				</motion.div>
 			)}
-		</div>
+		</AnimatePresence>
 	);
 }
 

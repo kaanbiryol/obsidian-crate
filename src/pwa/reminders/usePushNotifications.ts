@@ -47,6 +47,7 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 		if (isCurrent()) setState(previous => !enable && previous.authToken === authToken && previous.initialCheckComplete
 			? previous
 			: { authToken, push: CHECKING, initialCheckComplete: previous.authToken === authToken && previous.initialCheckComplete });
+		let manager: PushManager | null = null;
 		const promise = (async () => {
 			try {
 				if (!isStandaloneApp() && isIosOrIpados()) {
@@ -57,7 +58,7 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 				// encryption mode before choosing the window or decrypting SW provider.
 				await prepareSession();
 				if (!isCurrent()) return;
-				const manager = await getPwaPushManager();
+				manager = await getPwaPushManager();
 				if (!isCurrent()) return;
 				if (!manager) {
 					update({ phase: 'unsupported', status: 'Push notifications are not supported in this browser.' });
@@ -110,7 +111,10 @@ export function usePushNotifications({ authToken, apiFetch, prepareSession, show
 				update(result.notificationsEnabled ? ENABLED : PAUSED);
 				if (enable) showToast(result.notificationsEnabled ? 'success' : 'info', result.notificationsEnabled ? 'Notifications enabled' : PAUSED.status);
 			} catch (error) {
+				// Declining the permission sheet rejects subscribe(); show why, not an error.
+				const denied = manager ? await notificationPermission(manager).then(permission => permission === 'denied', () => false) : false;
 				if (!isCurrent()) return;
+				if (denied) { update(BLOCKED); return; }
 				const message = error instanceof Error ? error.message : String(error);
 				update({ phase: 'error', status: `Notifications are not confirmed. ${message}` });
 				if (enable) showToast('error', message);

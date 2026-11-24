@@ -72,3 +72,25 @@ describe('usePwaStatus clock', () => {
 		} finally { vi.useRealTimers(); }
 	});
 });
+
+describe('usePwaStatus notification prompt', () => {
+	it('keeps the prompt through the permission request until notifications turn on', async () => {
+		const { renderHook } = await import('../../test/react-hooks');
+		const { usePwaStatus } = await import('./usePwaStatus');
+		let phase = 'off';
+		const status = renderHook(() => usePwaStatus({ authToken: 'token', bootstrapped: true, dataMode: 'live', error: null, isOffline: false,
+			lastUpdatedAt: now, push: { phase, status: null } as never }),
+		() => { Object.assign(window, { matchMedia: () => ({ matches: true }) }); });
+		const at = (next: string) => { phase = next; status.rerender(); return status.current.notificationPrompt; };
+		expect(status.current.notificationPrompt).toBe('enable');
+		expect(at('checking')).toBe('pending');
+		// Declining keeps the row and says why.
+		expect(at('blocked')).toBe('blocked');
+		expect(at('error')).toBe('enable');
+		expect(at('checking')).toBe('pending');
+		expect(at('enabled')).toBeNull();
+		// A later passive check does not bring it back.
+		expect(at('checking')).toBeNull();
+		expect(at('blocked')).toBeNull();
+	});
+});

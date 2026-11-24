@@ -32,7 +32,7 @@ export function RemindersApp() {
 		recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges,
 	} = mutations;
 	const { modal, saving, transition: modalTransition, closeModal, openReminder, openModal, editFailedChange, editReminder, saveReminder, deleteReminder } = editor;
-	const { readOnlyMessage, canShowNotificationPrompt, statusText } = status;
+	const { readOnlyMessage, notificationPrompt, statusText } = status;
 	const {
 		colorScheme, isDarkMode, settingsOpen, toggleSettings, reorderDragging, setReorderDragging,
 		showToast, handlePullRefresh, initialContentReady, sharedReminders, resolvePageTitle,
@@ -93,7 +93,7 @@ export function RemindersApp() {
 				statusText={statusText}
 				onRetry={isOffline ? undefined : () => { void handlePullRefresh(); }}
 				retrying={refreshing}
-				showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
+				notificationPrompt={isProjectDetail ? null : notificationPrompt}
 				onEnableNotifications={enablePushNotifications}
 			>
 				<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
@@ -113,7 +113,7 @@ export function RemindersApp() {
 		</>
 	), [
 		loading, modal, settingsOpen, reorderDragging, handlePullRefresh, statusText, isOffline, refreshing,
-		canShowNotificationPrompt, enablePushNotifications, issues, loadReminders, rebuildOfflineCache, changes,
+		notificationPrompt, enablePushNotifications, issues, loadReminders, rebuildOfflineCache, changes,
 		storageError, retryInitialization, retryChange, editFailedChange, discardChange, recoveryChanges,
 		quarantinedChanges, config.folderPath, recoverChanges, removeQuarantinedChanges,
 	]);
