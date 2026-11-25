@@ -34,6 +34,7 @@ export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
 export class LocalManifest {
 	readonly uploadJournal: UploadJournal;
 	private renames = new RenameDependencies();
+	private lastFolderMove?: { source: string; destination: string; revision: number };
 	private app: Pick<App, 'vault'>;
 	private manifestPath: string;
 	private tmpPath: string;
@@ -364,15 +365,21 @@ export class LocalManifest {
 	getRenameDependencies(): Record<string, string> { return this.renames.toRecord(); }
 
 	/**
-	 * Obsidian reports a folder move as one event for the folder plus one per
-	 * file. A file moves alone, so only folder events (or callers that cannot
-	 * tell, for an untracked source) scan every path below the source.
+	 * Obsidian reports a folder move as one event for the folder, then one for each file
+	 * and folder below it. A file moves alone, so only folder events (or callers that
+	 * cannot tell, for an untracked source) scan every path below the source. The folder's
+	 * own event already moved everything below it, so the events after it, with nothing
+	 * changed in between, are skipped instead of each scanning the manifest again.
 	 */
 	recordRename(source: string, destination: string, kind?: 'file' | 'folder'): void {
+		const last = this.lastFolderMove;
+		if (last?.revision === this.revision && source.startsWith(`${last.source}/`)
+			&& destination === last.destination + source.slice(last.source.length)) return;
 		const tracked = Boolean(getPathEntry(this.manifest.files, source));
 		const folder = kind ? kind === 'folder' : !tracked;
 		this.renames.recordRename(source, destination, folder, folder ? this.getAllPaths() : tracked ? [source] : []);
 		this.markChanged();
+		this.lastFolderMove = folder ? { source, destination, revision: this.revision } : undefined;
 	}
 
 	/**

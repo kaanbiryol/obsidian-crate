@@ -102,3 +102,26 @@ it('keeps following saved dependencies after a restart', async () => {
 	restarted.recordRename('C/note.md', 'A/note.md', 'file');
 	expect(restarted.getRenameDependencies()).toEqual({});
 });
+
+it('scans the manifest once for a folder move, however many folders it holds', () => {
+	const manifest = manifestFor();
+	const paths = Array.from({ length: 30 }, (_, index) => `A/${index % 3}/${index % 5}/n${index}.md`);
+	for (const path of paths) manifest.setEntry(path, entry);
+	manifest.setEntry('Other/kept.md', entry);
+	let scans = 0;
+	const getAllPaths = manifest.getAllPaths.bind(manifest);
+	manifest.getAllPaths = () => { scans++; return getAllPaths(); };
+	// Obsidian's order: the folder, then each file and folder below it.
+	const below = [...new Set(paths.flatMap(path => { const [, a, b] = path.split('/'); return [`A/${a}`, `A/${a}/${b}`, path]; }))];
+	manifest.recordRename('A', 'B', 'folder');
+	for (const path of below) manifest.recordRename(path, `B${path.slice(1)}`, path.endsWith('.md') ? 'file' : 'folder');
+	expect(scans).toBe(1);
+	expect(manifest.getRenameDependencies()).toEqual(Object.fromEntries(paths.map(path => [path, `B${path.slice(1)}`])));
+
+	// Any change in between ends the folder move, so a later event is recorded again.
+	manifest.setEntry('B/new.md', entry);
+	manifest.recordRename('A/0', 'B/0', 'folder');
+	expect(scans).toBe(2);
+	manifest.recordRename('B', 'C', 'folder');
+	expect(manifest.getRenameDependencies()['A/0/0/n0.md']).toBe('C/0/0/n0.md');
+});
