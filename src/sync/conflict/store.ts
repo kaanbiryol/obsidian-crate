@@ -116,6 +116,8 @@ export class ConflictStore {
 				this.app.vault,
 				(path) => this.isStorePath(path) || shouldIgnore(path),
 				() => { if (isCancelled()) throw createAbortError('Conflict discovery cancelled'); },
+				// A copy this misses is never resolved: resolving checks that it is gone.
+				true,
 			);
 			discoveredPaths = new Set(files.map((file) => file.path).filter(isConflictFile));
 		} catch (error) {

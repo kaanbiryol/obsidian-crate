@@ -92,7 +92,8 @@ it('walks the vault twice at startup and still syncs an edit made during the sta
 		// Before: a third walk probed for edits the startup sync missed, and found this one.
 		const walks = (folder: string) => list.mock.calls.filter(([path]) => path === folder).length;
 		expect(walks('')).toBe(2);
-		expect(walks('folder-7')).toBe(2);
+		// Only the first walk lists visible folders; the startup sync reuses the hidden folders it found.
+		expect(walks('folder-7')).toBe(1);
 		expect(disk.text(downloaded)).toBe('remote edit');
 		expect(uploaded).toEqual([edited]);
 	} finally {

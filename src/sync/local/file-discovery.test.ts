@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { TFile, Vault } from 'obsidian';
 import { shouldIgnoreSyncPath } from './ignore';
 import {
+	forgetNestedHiddenFolders,
 	getAllVaultFiles,
 	getExtensionFromPath,
+	NESTED_HIDDEN_FOLDERS_MAX_AGE_MS,
+	noteHiddenPathChange,
 	insertBeforeExtension,
 	isHiddenPath,
 } from './file-discovery';
@@ -31,6 +34,56 @@ describe('file-discovery helpers', () => {
 });
 
 describe('getAllVaultFiles', () => {
+	it('walks only the hidden folders a recent full walk found when asked to reuse them', async () => {
+		const tree: Record<string, { files: string[]; folders: string[] }> = {
+			'': { files: [], folders: ['A', 'B'] },
+			A: { files: [], folders: ['A/.cfg', 'A/Sub'] },
+			'A/.cfg': { files: ['A/.cfg/a.json'], folders: [] },
+			'A/Sub': { files: [], folders: [] },
+			B: { files: [], folders: [] },
+		};
+		const list = vi.fn(async (path: string) => tree[path] ?? Promise.reject(new Error(`missing ${path}`)));
+		const stat = vi.fn(async (path: string) => tree[path] ? { type: 'folder', size: 0, mtime: 1 } : { type: 'file', size: 1, mtime: 1 });
+		const vault = { getFiles: () => [], adapter: { list, stat } } as unknown as Vault;
+		const scan = async (reuse: boolean) => (await getAllVaultFiles(vault, () => false, undefined, reuse)).map(file => file.path);
+
+		expect(await scan(true)).toEqual(['A/.cfg/a.json']);
+		expect(list.mock.calls.map(call => call[0]).sort()).toEqual(['', 'A', 'A/.cfg', 'A/Sub', 'B']);
+		// A new hidden folder waits for the next full walk; the remembered one is still walked.
+		tree.B = { files: [], folders: ['B/.new'] };
+		tree['B/.new'] = { files: ['B/.new/b.json'], folders: [] };
+		list.mockClear();
+		expect(await scan(true)).toEqual(['A/.cfg/a.json']);
+		expect(list.mock.calls.map(call => call[0]).sort()).toEqual(['', 'A/.cfg']);
+		// A scan that does not reuse them always lists every folder.
+		expect(await scan(false)).toEqual(['A/.cfg/a.json', 'B/.new/b.json']);
+
+		// A removed folder is skipped rather than failing the scan.
+		delete tree['A/.cfg'];
+		tree.A = { files: [], folders: ['A/Sub'] };
+		expect(await scan(true)).toEqual(['B/.new/b.json']);
+	});
+
+	it('lists every folder again after a change outside the remembered folders or once they are old', async () => {
+		const tree: Record<string, { files: string[]; folders: string[] }> = {
+			'': { files: [], folders: ['A'] }, A: { files: [], folders: ['A/.cfg'] }, 'A/.cfg': { files: ['A/.cfg/a.json'], folders: [] },
+		};
+		const list = vi.fn(async (path: string) => tree[path]!);
+		const vault = { getFiles: () => [], adapter: { list, stat: vi.fn(async (path: string) => ({ type: tree[path] ? 'folder' : 'file', size: 1, mtime: 1 })) } } as unknown as Vault;
+		const listsA = async () => { list.mockClear(); await getAllVaultFiles(vault, () => false, undefined, true); return list.mock.calls.some(call => call[0] === 'A'); };
+
+		expect(await listsA()).toBe(true);
+		// Paths in remembered or hidden root folders, and hidden files in visible folders, change nothing.
+		for (const path of ['A/.cfg/b.json', '.obsidian/app.json', 'A/.env', 'A/note.md']) noteHiddenPathChange(vault, path);
+		expect(await listsA()).toBe(false);
+		noteHiddenPathChange(vault, 'A/Sub/.git2/config');
+		expect(await listsA()).toBe(true);
+		forgetNestedHiddenFolders(vault);
+		expect(await listsA()).toBe(true);
+		vi.useFakeTimers({ now: Date.now() + NESTED_HIDDEN_FOLDERS_MAX_AGE_MS });
+		try { expect(await listsA()).toBe(true); } finally { vi.useRealTimers(); }
+	});
+
 	it('overlaps visible folder listings and returns nested hidden files in path order', async () => {
 		const folders = Array.from({ length: 20 }, (_, index) => `F${String(index).padStart(2, '0')}`);
 		let active = 0, peak = 0;

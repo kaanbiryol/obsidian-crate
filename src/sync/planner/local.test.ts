@@ -7,6 +7,7 @@ import { sha256Hex } from '../../platform/sha256';
 const fileDiscoveryMocks = vi.hoisted(() => ({
 	getAllVaultFiles: vi.fn(),
 	isHiddenPath: vi.fn((path: string) => path.split('/').some(segment => segment.startsWith('.'))),
+	forgetNestedHiddenFolders: vi.fn(),
 }));
 
 const conflictMocks = vi.hoisted(() => ({
@@ -16,6 +17,7 @@ const conflictMocks = vi.hoisted(() => ({
 vi.mock('../local/file-discovery', () => ({
 	getAllVaultFiles: fileDiscoveryMocks.getAllVaultFiles,
 	isHiddenPath: fileDiscoveryMocks.isHiddenPath,
+	forgetNestedHiddenFolders: fileDiscoveryMocks.forgetNestedHiddenFolders,
 }));
 
 vi.mock('../conflict/conflict', () => ({
@@ -54,6 +56,22 @@ describe('planner local diff helpers', () => {
 
 		expect(result).toEqual(['notes/missing.md', 'notes/todo.md']);
 		expect(adapter.exists.mock.calls.map(([path]) => path)).toEqual(['notes/missing.md', 'notes/unindexed.md', 'notes/todo.md']);
+	});
+
+	it('makes the next scan walk every folder when a tracked hidden file exists undiscovered', async () => {
+		const adapter = { exists: vi.fn(async (path: string) => path !== 'notes/missing.md') };
+		const context = {
+			vault: { adapter, getAbstractFileByPath: () => null } as never,
+			localManifest: { getAllPaths: () => ['notes/missing.md', 'notes/unindexed.md', 'notes/.cfg/a.json'] } as never,
+			signal: new AbortController().signal, shouldIgnore: () => false, verifyContent: async () => false,
+			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+			encrypted: () => false, maxFileBytes: () => 25 * 1024 * 1024,
+		};
+		fileDiscoveryMocks.forgetNestedHiddenFolders.mockClear();
+
+		expect(await getLocalDeletes(context, new Set(), 5)).toEqual(['notes/missing.md']);
+		expect(fileDiscoveryMocks.forgetNestedHiddenFolders).toHaveBeenCalledOnce();
+		expect(fileDiscoveryMocks.forgetNestedHiddenFolders).toHaveBeenCalledWith(context.vault);
 	});
 
 	it('detects changed local files by hash and skips unchanged ones', async () => {
