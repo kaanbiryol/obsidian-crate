@@ -125,6 +125,8 @@ export interface IncrementalSyncPlannerContext {
 	getLocalDeletes(discoveredPaths: ReadonlySet<string>): Promise<string[]>;
 	/** Publishes the downloading phase itself. */
 	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void>;
+	/** Moves an unchanged local file to a remote rename's new path; false when it cannot. */
+	moveUnchangedLocalFile?(from: string, to: string, expectedHash: string, revision?: string): Promise<boolean>;
 	processDiff(
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,

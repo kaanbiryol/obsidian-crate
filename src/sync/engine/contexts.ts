@@ -18,6 +18,7 @@ import { getLocalChanges as planLocalChanges, getLocalDeletes as planLocalDelete
 import { prepareUploadFromPath as prepareTransferUploadFromPath, prepareUploadFromVaultFile } from '../transfer/prepare';
 import { parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles } from '../transfer/download';
 import { processDiff as transferProcessDiff } from '../transfer/process';
+import { moveUnchangedLocalFile } from '../local/local-move';
 import { uploadPreparedFiles as transferUploadPreparedFiles } from '../transfer/upload';
 import { PREPARE_CONCURRENCY, DOWNLOAD_CONCURRENCY } from '../transfer/constants';
 import type { SyncResult, SyncState, SyncWork } from '../types';
@@ -381,6 +382,7 @@ export class SyncEngineContexts {
 			}, PREPARE_CONCURRENCY, onUnchanged),
 			getLocalDeletes: discoveredPaths => planLocalDeletes(this.localDiffPlanner, discoveredPaths, PREPARE_CONCURRENCY),
 			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles,
+			moveUnchangedLocalFile: (from, to, hash, revision) => moveUnchangedLocalFile(this.transfer, from, to, hash, revision),
 			processDiff: this.processDiff,
 			prepareUploadFromPath: this.prepareUploadFromPath,
 			uploadPreparedFiles: this.uploadPreparedFiles,

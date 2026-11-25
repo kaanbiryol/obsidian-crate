@@ -532,3 +532,36 @@ describe('runIncrementalSync', () => {
 		});
 	});
 });
+
+describe('remote renames', () => {
+	const changes = [
+		{ seq: 11, path: 'Old/note.md', action: 'delete' as const, hash: '', size: 0, created_at: '2026-11-25T00:00:00Z' },
+		{ seq: 12, path: 'New/note.md', action: 'put' as const, hash: 'same', size: 4, revision: 'rev-2', created_at: '2026-11-25T00:00:00Z' },
+	];
+
+	it('moves the unchanged local file instead of trashing and downloading it', async () => {
+		const harness = createIncrementalHarness({ settings: { lastSeq: 10 }, lastSeq: 12, changes });
+		harness.localManifest.getEntry.mockImplementation((path: string) => path === 'Old/note.md' ? { hash: 'same', size: 4, modified: '2026-11-24T00:00:00Z' } : undefined);
+		const move = vi.fn(async () => true), download = vi.fn(async () => {});
+		harness.context.moveUnchangedLocalFile = move;
+		harness.context.parallelDownloadAndSaveFiles = download;
+		const result = await runIncrementalSync(harness.context, {});
+		expect(result?.success).toBe(true);
+		expect(move).toHaveBeenCalledWith('Old/note.md', 'New/note.md', 'same', 'rev-2');
+		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('Old/note.md');
+		expect(harness.vault.trash).not.toHaveBeenCalled();
+		expect(download).not.toHaveBeenCalled();
+		expect(result).toMatchObject({ deletedPaths: ['Old/note.md'], downloadedPaths: ['New/note.md'] });
+	});
+
+	it('applies the delete and the download when the move cannot run', async () => {
+		const harness = createIncrementalHarness({ settings: { lastSeq: 10 }, lastSeq: 12, changes });
+		harness.localManifest.getEntry.mockImplementation((path: string) => path === 'Old/note.md' ? { hash: 'same', size: 4, modified: '2026-11-24T00:00:00Z' } : undefined);
+		harness.context.moveUnchangedLocalFile = vi.fn(async () => { throw new Error('rename failed'); });
+		const download = vi.fn(async () => {});
+		harness.context.parallelDownloadAndSaveFiles = download;
+		await runIncrementalSync(harness.context, {});
+		expect(download).toHaveBeenCalledWith(
+			[expect.objectContaining({ path: 'New/note.md', expectedRemoteHash: 'same' })], expect.anything(), expect.any(Function), undefined);
+	});
+});

@@ -11,6 +11,7 @@ import type { SyncResult } from '../types';
 import type { FileDiff } from './types';
 import { isVaultTFileLike } from '../local/local-delete';
 import { assertLocalSyncPath, unsupportedLocalPathIssue } from '../local/local-path-safety';
+import { portablePathKey } from '../../protocol/portable-path';
 
 export interface IncrementalRemoteReconciliation {
 	discoveredLocalChanges: Array<{ path: string; hash: string }>;
@@ -42,9 +43,10 @@ export async function reconcileIncrementalRemoteChanges(
 	const reclassifiedPaths = new Set<string>();
 	const downloadRequests: DownloadRequest[] = [];
 	const conflicts: FileDiff[] = [];
+	const moved = await applyRemoteMoves(context, changesByPath, localChangedPaths, localDeletedPaths, result);
 
 	for (const [path, entry] of changesByPath) {
-		if (context.shouldIgnore(path)) continue;
+		if (context.shouldIgnore(path) || moved.has(path)) continue;
 		const unsupported = unsupportedLocalPathIssue(path);
 		if (unsupported) { (result.issues ??= []).push(unsupported); continue; }
 
@@ -173,6 +175,53 @@ export async function reconcileIncrementalRemoteChanges(
 		downloadRequests,
 		conflicts,
 	};
+}
+
+/** A remote rename arrives as a delete of the old path and a write of the same bytes at the
+ * new one. Moving the unchanged local file there saves downloading it again; a pair the move
+ * cannot apply, or any other change, is reconciled as usual. Returns both paths of each move. */
+async function applyRemoteMoves(
+	context: IncrementalSyncPlannerContext,
+	changesByPath: ReadonlyMap<string, ChangelogEntry>,
+	localChangedPaths: ReadonlySet<string>,
+	localDeletedPaths: ReadonlySet<string>,
+	result: SyncResult,
+): Promise<Set<string>> {
+	const moved = new Set<string>();
+	if (!context.moveUnchangedLocalFile) return moved;
+	const eligible = (path: string) => !context.shouldIgnore(path) && !unsupportedLocalPathIssue(path)
+		&& !localChangedPaths.has(path) && !localDeletedPaths.has(path);
+	// Old paths by the hash of their synced bytes.
+	const sources = new Map<string, string[]>();
+	for (const [path, entry] of changesByPath) {
+		const baseline = entry.action === 'delete' && eligible(path) ? context.localManifest.getEntry(path) : undefined;
+		if (!baseline) continue;
+		const paths = sources.get(baseline.hash);
+		if (paths) paths.push(path); else sources.set(baseline.hash, [path]);
+	}
+	if (!sources.size) return moved;
+	for (const [path, entry] of changesByPath) {
+		if (entry.action === 'delete' || !eligible(path) || context.localManifest.getEntry(path) || entry.size > context.maxFileBytes()) continue;
+		const candidates = sources.get(entry.hash);
+		// A case or Unicode-only rename keeps its own handling.
+		const from = candidates?.find(source => portablePathKey(source) !== portablePathKey(path));
+		if (!from) continue;
+		candidates!.splice(candidates!.indexOf(from), 1);
+		try {
+			if (!await context.moveUnchangedLocalFile(from, path, entry.hash, entry.revision)) continue;
+		} catch (error) {
+			if (isAbortError(error)) throw error;
+			// Reconciled as a delete and a download, which check the files as they are now.
+			continue;
+		}
+		context.localManifest.removeEntry(from);
+		moved.add(from).add(path);
+		result.deleted++;
+		result.deletedPaths.push(from);
+		result.downloaded++;
+		result.downloadedPaths.push(path);
+	}
+	return moved;
 }
 
 /** The local scan trusts matching metadata, so a file it found unchanged reuses

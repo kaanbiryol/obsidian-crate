@@ -140,6 +140,7 @@ export class PersistentTestVault {
 		},
 		process: async (file: TFile, update: (content: string) => string) => this.process(file.path, update),
 		trash: async (file: TFile) => { this.moveToTrash(file.path); },
+		rename: async (file: TFile, to: string) => { this.rename(file.path, to); },
 		adapter: {
 			exists: async (path: string) => this.resolve(path) !== undefined,
 			read: async (path: string) => this.text(path),

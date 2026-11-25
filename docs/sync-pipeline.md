@@ -123,6 +123,8 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 5. Execute operations, preparing and uploading local files in bounded chunks
 6. Update local manifest and `lastSeq`
 
+Another device's rename arrives as a delete of the old path and a write at the new one. When the written hash matches the old path's synced baseline, the old path has no local change or delete, and nothing is at the new path, the planner moves the local file there (`local/local-move.ts`) instead of trashing it and downloading the same bytes. The move checks the old file's current hash first and records the new path like a download, without updating links in other notes. A pair it cannot move, including a case-only rename, is applied as a delete and a download. The renaming device still uploads the new path: the server has no copy operation, and an encrypted file's ciphertext is bound to its path.
+
 Returns `null` to signal fallback to full sync only when the changelog cannot be used: on cursor expiry or a non-transient error while reading it. Transport failures and retryable server statuses (408, 425, 429, 5xx) return a failed result instead, so the next sync retries incrementally without re-reading the vault. Any other error after the changelog is read, such as a local scan, apply or save error, also returns a failed result: a full sync would read the whole server inventory and then fail on the same local error.
 
 A changelog that ends before this device's cursor means the server lost history,
