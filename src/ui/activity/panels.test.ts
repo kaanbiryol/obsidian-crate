@@ -74,6 +74,32 @@ it.each([
  expect(element.collectText()).not.toContain('All synced');
 });
 
+it('keeps pending files in view, locked with progress, during a sync the Sync activity view can stop', () => {
+		const element = new FakeElement('div');
+		const setSyncProgress = vi.fn();
+		vi.mocked(renderPendingBrowser).mockReturnValueOnce({ start: vi.fn(), pause: vi.fn(), dispose: vi.fn(), setSyncProgress, updateAction: vi.fn() });
+		const actions = { sync: { describe: vi.fn(), run: vi.fn() } } as never;
+		const state: SyncState = { ...syncing, work: { phase: 'downloading', current: 361, total: 2012 } };
+		renderPendingPanel(element as never, { paths: ['Notes/draft.md'], loadDiff: load, state, actions });
+		expect(renderPendingBrowser).toHaveBeenCalledExactlyOnceWith(element, ['Notes/draft.md'], load, undefined, actions);
+		expect(element.querySelector('.crate-activity-loading')).toBeNull();
+		expect(setSyncProgress).toHaveBeenCalledExactlyOnceWith({ label: expect.stringContaining('361') as string, fraction: 361 / 2012 });
+});
+
+it('shows pending files during the startup sync but a spinner while only checking local files', () => {
+		const element = new FakeElement('div');
+		const actions = { sync: { describe: () => ({ idle: false, label: 'Checking…', disabled: true }), run: vi.fn() } } as never;
+		vi.mocked(renderPendingBrowser).mockReturnValueOnce({ start: vi.fn(), pause: vi.fn(), dispose: vi.fn(), setSyncProgress: vi.fn(), updateAction: vi.fn() });
+		renderPendingPanel(element as never, { paths: ['Notes/draft.md'], loadDiff: load, state: { ...syncing, initializing: true }, actions });
+		expect(renderPendingBrowser).toHaveBeenCalledOnce();
+
+		element.empty();
+		vi.mocked(renderPendingBrowser).mockClear();
+		renderPendingPanel(element as never, { paths: ['Notes/draft.md'], loadDiff: load, state: { ...syncing, status: 'idle', initializing: true }, actions });
+		expect(renderPendingBrowser).not.toHaveBeenCalled();
+		expect(element.collectText()).toContain('Checking local files…');
+});
+
 it('shows change progress independently of the pending queue size', () => {
 		const element = new FakeElement('div');
 		renderPendingPanel(element as never, { paths: ['queued.md'], loadDiff: load, state: syncing, progress: { type: 'sync', current: 3, total: 12 } });

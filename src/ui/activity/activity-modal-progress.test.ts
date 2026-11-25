@@ -11,9 +11,13 @@ vi.mock('obsidian', () => createObsidianUiModule());
 vi.mock('./ActivitySheet', () => ({ ActivitySheet: vi.fn() }));
 vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }) }));
 vi.mock('./conflict-review-modal', () => ({ ConflictReviewModal: vi.fn() }));
+const browserProgress = vi.hoisted(() => vi.fn());
 vi.mock('./pending-browser', async importOriginal => ({
 	...await importOriginal<typeof import('./pending-browser')>(),
-	renderPendingBrowser: (container: FakeElement) => { container.createDiv({ cls: 'crate-pending-browser' }); },
+	renderPendingBrowser: (container: FakeElement) => {
+		container.createDiv({ cls: 'crate-pending-browser' });
+		return { start: vi.fn(), pause: vi.fn(), dispose: vi.fn(), setSyncProgress: browserProgress, updateAction: vi.fn() };
+	},
 }));
 
 /** A sync runtime with nothing pending; tests override what they exercise. */
@@ -108,7 +112,9 @@ it('updates progress without copying the pending list or rebuilding the empty co
 	for (let tick = 0; tick < 100; tick++) { internal.onProgress(); await Promise.resolve(); }
 
 	// Before: about 4 full copies per tick and a conflicts rebuild on every tick.
-	expect(getPendingKeys).not.toHaveBeenCalled();
+	// The first tick swaps the spinner for the locked file list; later ticks only update its footer.
+	expect(getPendingKeys).toHaveBeenCalledOnce();
+	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBeTruthy();
 	expect(rebuildConflicts).toHaveBeenCalledOnce();
 	expect(header.querySelector('.crate-activity-subtitle-label')?.textContent).toBe('Syncing…');
 });
@@ -179,6 +185,28 @@ it('keeps the file browser in view during a sync and shows progress in its foote
 	internal.renderPending();
 	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBe(browser);
 	expect(setSyncProgress).toHaveBeenLastCalledWith();
+});
+
+it('shows pending files instead of a spinner when opened during a sync started elsewhere', () => {
+	const pending = ['a.md', 'b.md'];
+	let state = { status: 'syncing', lastSync: '2026-01-01T00:00:00.000Z', lastError: null, pendingChanges: 2, conflictCount: 0,
+		work: { phase: 'downloading', current: 361, total: 2012 } } as SyncState;
+	const modal = createModal(DEFAULT_SETTINGS, runtime({
+		getState: () => state, getPendingKeys: () => [...pending], getPendingChangeCount: () => pending.length,
+	}));
+	const internal = internals(modal);
+	internal.pendingPanel = new FakeElement('div');
+	internal.header = internal.createHeader(new FakeElement('div'), new FakeElement('div'));
+	internal.renderPending();
+	const browser = internal.pendingPanel.querySelector('.crate-pending-browser');
+	expect(browser).toBeTruthy();
+	expect(internal.pendingPanel.querySelector('.crate-activity-loading-label')).toBeNull();
+	expect(browserProgress).toHaveBeenLastCalledWith({ label: 'Downloading 361 of 2,012', fraction: 361 / 2012 });
+
+	// Progress ticks update the footer without rebuilding the list.
+	state = { ...state, work: { phase: 'downloading', current: 362, total: 2012 } };
+	internal.renderPending();
+	expect(internal.pendingPanel.querySelector('.crate-pending-browser')).toBe(browser);
 });
 
 it('keeps the conflicts panel and its focusable buttons across unrelated state events', () => {

@@ -1,5 +1,5 @@
 import { renderPendingSyncButton, type PendingActions } from './pending-actions';
-import { formatSyncProgress } from './progress-label';
+import { formatShortSyncProgress, formatSyncProgress, syncProgressFraction } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, renderLoadingState } from './rendering';
 import { renderPendingBrowser, type PendingChecks, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
@@ -20,12 +20,20 @@ export function renderPendingPanel(container: HTMLElement, { paths, loadDiff, st
 	const hasError = state?.status === 'error';
 	const syncing = state?.status === 'syncing';
 	const checking = state?.initializing && !hasError && state.status !== 'offline';
-	container.toggleClass('has-file-browser', paths.length > 0 && !syncing && !progress && !checking);
+	// With actions, a running sync keeps pending files in view, locked, with progress in the list's footer.
+	const lockedBrowser = (syncing || !!progress) && paths.length > 0 && !!actions;
+	container.toggleClass('has-file-browser', lockedBrowser || paths.length > 0 && !syncing && !progress && !checking);
 	const withSyncButton = (parent: HTMLElement): PendingChecks | undefined => {
 		if (!actions) return;
 		const update = renderPendingSyncButton(parent, actions.sync);
 		return { start() {}, pause() {}, dispose() {}, setSyncProgress() {}, updateAction: update };
 	};
+	if (lockedBrowser) {
+		const checks = renderPendingBrowser(container, paths, loadDiff, browserState, actions);
+		const work = progress?.work ?? state?.work;
+		checks.setSyncProgress({ label: formatShortSyncProgress(progress, work), fraction: syncProgressFraction(work) });
+		return checks;
+	}
 	if (syncing || progress) return withSyncButton(renderLoadingState(container, formatSyncProgress(progress, state?.work)));
 	if (checking) return withSyncButton(renderLoadingState(container, 'Checking local files…'));
 	if (paths.length === 0) {

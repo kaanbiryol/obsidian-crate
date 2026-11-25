@@ -115,8 +115,11 @@ export class ActivityModal extends BaseUiModal {
 	private renderPending(): void {
 		const state = this.deps.getState();
 		const progress = this.deps.getActivityProgress();
+		const syncing = state.status === 'syncing' || !!progress;
+		// A running sync shows pending files locked with progress in their footer; a spinner only without them.
+		const lockedBrowser = syncing && this.deps.getPendingChangeCount() > 0;
 		const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
-		if (loadingLabel && isActivityBusy(state, progress)) {
+		if (loadingLabel && isActivityBusy(state, progress) && !lockedBrowser) {
 			// Keep the spinner mounted through frequent progress updates.
 			const text = state.status === 'syncing' || progress ? formatSyncProgress(progress, state.work) : 'Checking local files…';
 			if (loadingLabel.textContent !== text) loadingLabel.textContent = text;
@@ -124,8 +127,7 @@ export class ActivityModal extends BaseUiModal {
 			this.pendingChecks?.updateAction();
 			return;
 		}
-		const syncing = state.status === 'syncing' || !!progress;
-		// A sync started from the file browser keeps it in view, locked, with progress in its footer.
+		// A browser already in view stays mounted, locked, through the sync.
 		if (syncing && this.pendingChecks && this.pendingPanel.querySelector('.crate-pending-browser')) {
 			const work = progress?.work ?? state.work;
 			this.pendingChecks.setSyncProgress({ label: formatShortSyncProgress(progress, work), fraction: syncProgressFraction(work) });
@@ -133,7 +135,7 @@ export class ActivityModal extends BaseUiModal {
 		}
 		const paths = this.deps.getPendingKeys();
 		// Rebuilding the file browser discards its comparisons; keep it while the pending set is unchanged.
-		const showsBrowser = paths.length > 0 && !isActivityBusy(state, progress);
+		const showsBrowser = paths.length > 0 && (lockedBrowser || !isActivityBusy(state, progress));
 		const rendered = this.renderedBrowserPaths;
 		// Automatic sync decides whether rows carry checkboxes, so changing it rebuilds the list.
 		if (showsBrowser && rendered?.length === paths.length && rendered.every((key, index) => key === paths[index])
