@@ -27,10 +27,10 @@
     "access": "public"
   },
   "dependencies": {
-    "ws": "8.21.0",
+    "ws": "8.23.0",
     "sharp": "0.35.5",
-    "youch": "4.1.0-beta.10",
-    "undici": "7.30.1",
+    "youch": "4.1.1",
+    "undici": "8.13.1",
     "workerd": "1.20261123.1",
     "@cspotcode/source-map-support": "0.8.1"
   },
