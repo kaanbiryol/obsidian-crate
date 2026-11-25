@@ -110,7 +110,7 @@ export function createPendingActions(
 		const item = byKey.get(key)!;
 		const menu = new Menu();
 		// A plugin row stands for several files, so it has no single file to open.
-		const fileActions = item.plugin ? [] : actions.fileActions?.(item.path) ?? [];
+		const fileActions = item.plugin || item.crateUpdate ? [] : actions.fileActions?.(item.path) ?? [];
 		for (const action of fileActions) menu.addItem(item => item.setTitle(action.title).setIcon(action.icon).onClick(() => {
 			void action.run().catch((error: unknown) => new Notice(error instanceof Error ? error.message : 'Could not open this file.'));
 		}));

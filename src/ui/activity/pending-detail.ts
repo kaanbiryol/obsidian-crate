@@ -108,6 +108,7 @@ function renderPlugin(preview: HTMLElement, plugin: NonNullable<PendingDetailReq
 			return;
 		}
 		text("Your other devices install this Crate update on their next sync. Crate's settings and sync state stay on each device.");
+		if (plugin.keys.some(key => decodePendingChange(key).kind === 'delete')) text('It also removes the older update it replaces, so no device installs that one.');
 		const list = files();
 		for (const name of CRATE_UPDATE_FILES) file(list, name);
 		return;

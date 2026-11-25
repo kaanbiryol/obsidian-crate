@@ -27,10 +27,18 @@ it('calls a plugin removed only when every code file is deleted', () => {
 	expect(pendingPluginStatus(mixed!)).toBe('Plugin updated');
 });
 
-it('marks Crate update bundles, and groups nothing without a config folder', () => {
-	const [bundle, replaced] = groupPendingItems(['.obsidian/crate-update/0.14.1.json', remove('.obsidian/crate-update/0.14.0.json')], '.obsidian');
-	expect(bundle).toMatchObject({ crateUpdate: true, deleted: false });
-	expect(pendingPluginStatus(bundle!)).toBe('Plugin updated');
+it('groups Crate update bundles into one row, and groups nothing without a config folder', () => {
+	const keys = ['a.md', remove('.obsidian/crate-update/0.14.0.json'), 'b.md', '.obsidian/crate-update/0.14.1.json'];
+	const items = groupPendingItems(keys, '.obsidian');
+	// Before: the new bundle and the one it replaced showed as two Crate rows.
+	expect(items.map(item => item.path)).toEqual(['a.md', '.obsidian/crate-update', 'b.md']);
+	const bundle = items[1]!;
+	expect(bundle).toMatchObject({ crateUpdate: true, deleted: false, keys: [keys[1], keys[3]] });
+	expect(keys).not.toContain(bundle.key);
+	expect(pendingPluginStatus(bundle)).toBe('Plugin updated');
+	const [replaced] = groupPendingItems([remove('.obsidian/crate-update/0.14.0.json')], '.obsidian');
 	expect(pendingPluginStatus(replaced!)).toBe('Older update removed');
+	// A conflict copy is not a bundle, so it stays a file row.
+	expect(groupPendingItems(['.obsidian/crate-update/0.14.1 (conflict).json'], '.obsidian')[0]).not.toHaveProperty('crateUpdate');
 	expect(groupPendingItems(['.obsidian/plugins/x/main.js']).map(item => item.plugin)).toEqual([undefined]);
 });

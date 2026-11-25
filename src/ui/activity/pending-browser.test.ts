@@ -169,7 +169,7 @@ it('locks the selection and shows sync progress in the footer, then restores it'
 	checks.dispose();
 });
 
-it('shows a Crate update bundle as a Crate plugin row listing its files, without diffing it', async () => {
+it('shows a Crate update and the older bundle it replaces as one Crate row listing its files, without diffing it', async () => {
 	const { renderPendingBrowser } = await import('./pending-browser');
 	const { pendingChangeKey } = await import('../../sync/pending/pending-change');
 	const load = vi.fn(async () => modified);
@@ -179,11 +179,12 @@ it('shows a Crate update bundle as a Crate plugin row listing its files, without
 	const checks = renderPendingBrowser(panel, ['.obsidian/crate-update/0.11.0.json', pendingChangeKey('delete', '.obsidian/crate-update/0.10.0.json')], load, state);
 	await new Promise(resolve => setTimeout(resolve, 0));
 	const names = [...panel.querySelectorAll('.crate-browser-file-name')].map(name => name.textContent);
-	expect(names).toEqual(['Crate', 'Crate']);
-	expect([...panel.querySelectorAll('.crate-browser-file-path')].map(path => path.textContent)).toEqual(['Plugin updated', 'Older update removed']);
-	expect(statuses(panel)).toEqual(['', '']);
+	expect(names).toEqual(['Crate']);
+	expect([...panel.querySelectorAll('.crate-browser-file-path')].map(path => path.textContent)).toEqual(['Plugin updated']);
+	expect(statuses(panel)).toEqual(['']);
 	panel.querySelector<HTMLButtonElement>('.crate-browser-file')!.click();
 	expect([...panel.querySelectorAll('.crate-plugin-file-name')].map(item => item.textContent)).toEqual(['styles.css', 'main.js', 'manifest.json']);
+	expect(panel.textContent).toContain('It also removes the older update it replaces');
 	expect(load).not.toHaveBeenCalled();
 	checks.dispose();
 });
