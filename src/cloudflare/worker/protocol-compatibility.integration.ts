@@ -25,7 +25,7 @@ function request(path: string, protocol: string | undefined, method = 'GET', bod
 }
 
 describe('old and future clients against the current Worker', () => {
-	it.each([undefined, String(CRATE_PLUGIN_PROTOCOL.oldestCompatible - 1), String(CRATE_PLUGIN_PROTOCOL.current + 1), '7', '11', 'invalid'])('refuses incompatible writes before any publication (protocol=%s)', async protocol => {
+	it.each([undefined, String(CRATE_PLUGIN_PROTOCOL.oldestCompatible - 1), String(CRATE_PLUGIN_PROTOCOL.current + 1), 'invalid'])('refuses incompatible writes before any publication (protocol=%s)', async protocol => {
 		const original = await env.DB.prepare('SELECT * FROM files').all();
 		for (const [path, method, body] of [
 			['/sync/upload?path=Note.md', 'PUT', 'Must not replace bytes'],

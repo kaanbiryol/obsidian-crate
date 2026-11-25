@@ -1,4 +1,4 @@
-import { anchorRecurrence, recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
+import { recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrence/recurrenceCalendar';
 import type { RecurrenceRule } from '@/reminders/core/model';
 import { rebuildCheckboxLine } from '@/reminders/core/grammar/checkboxParser';
 import { calculateNextOccurrence } from '@/reminders/core/recurrence/recurrenceCalculator';
@@ -58,7 +58,6 @@ function completionTransition(
 			line = { kind: 'rebuild', completed: false, due: currentDue };
 		} else line = { kind: 'uncheck' };
 	} else if (recurrence && !reminder.completed) {
-		recurrence = anchorRecurrence(recurrence, currentDue, currentHasTime);
 		const completedCount = recurrence.completedCount ?? 0;
 		const nextInstant = calculateNextOccurrence(currentHasTime ? currentDue : recurrenceCalendarInstant(currentDue, recurrence), recurrence, completedCount);
 		const nextDue = nextInstant && !currentHasTime ? recurrenceCalendarDate(nextInstant, recurrence) : nextInstant;

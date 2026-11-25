@@ -67,15 +67,12 @@ it('removes only readable copies an earlier sign-in saved, never queues, drafts 
 it('lists saved copies from their items without reading their bodies', async () => {
 	await cacheReadingArticle(session, item(1, { saved_at: '2026-10-01T12:00:00Z' }), 'One');
 	await cacheReadingArticle(session, item(2, { saved_at: '2026-10-03T12:00:00Z' }), 'Two');
-	// Saved before items were stored apart, or with a damaged item: the copy is read whole.
-	values.set(articleKey(3), { item: item(3, { saved_at: '2026-10-02T12:00:00Z' }), markdown: 'Three', usedAt: 1 });
-	values.set(`article-item:${session.id}:${item(2).crate_reading_id}`, { item: { ...item(2), path: 'Other/article.md' } });
+	await cacheReadingArticle(session, item(3, { saved_at: '2026-10-02T12:00:00Z' }), 'Three');
 	vi.mocked(decodeReadingValue).mockClear();
 
 	expect((await readOfflineReadingItems(session)).map(entry => entry.title)).toEqual(['Article 2', 'Article 3', 'Article 1']);
 	const decoded = vi.mocked(decodeReadingValue).mock.calls.map(([key]) => key);
-	expect(decoded).not.toContain(articleKey(1));
-	expect(decoded).toEqual(expect.arrayContaining([articleKey(2), articleKey(3)]));
+	expect(decoded.some(key => key.startsWith('article:'))).toBe(false);
 });
 
 it('removes an earlier sign-in\'s items with its copies, and items whose copy is gone', async () => {

@@ -20,7 +20,7 @@ Wire protocol ranges, capabilities, parser versions and browser/local storage en
 1. Check resource identities, the schema, migration history and the deployed release.
 2. Acquire the durable deployment fence and repeat those checks. Never substitute an empty database or bucket for missing saved storage.
 3. Initialize an empty database from `schema.sql`. An existing current database receives no DDL. For a supported older database, require a verified recovery checkpoint before applying its declared migrations.
-4. Publish the Worker/PWA with the same database and bucket bindings, then configure its address and maintenance.
+4. Publish the Worker/PWA with the same database and bucket bindings, then configure its address.
 5. Read back the live artifact and bindings, query the database version, and probe the Worker metadata endpoint for the exact fingerprint, revision and schema version. The probe never sends the Cloudflare management token to the Worker.
 6. Record the deployed release, persist successful verification and release the fence. Preserve file contents, hashes, revisions and local sync authority.
 

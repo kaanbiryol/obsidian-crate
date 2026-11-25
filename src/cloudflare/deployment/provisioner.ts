@@ -191,13 +191,6 @@ export async function provisionCloudflareDeployment(input: {
 			d1DatabaseId: databaseId,
 			r2BucketName: input.metadata.r2BucketName,
 		}));
-		input.onProgress?.('Configuring server maintenance…');
-		await fence.mutate(() => input.api.updateWorkerSchedules(
-			input.accountId,
-			input.metadata.workerName,
-			[],
-		), 'configure-maintenance');
-
 		input.onProgress?.('Enabling the server address…');
 		if (input.metadata.workersSubdomain !== workersSubdomain) {
 			input.metadata.workersSubdomain = workersSubdomain;

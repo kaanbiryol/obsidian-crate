@@ -41,13 +41,6 @@ it('keeps a monthly reminder on its day after a shorter month', () => {
 	expect(dues).toEqual(['2027-02-28T09:00:00.000Z', '2027-03-31T08:00:00.000Z', '2027-04-30T08:00:00.000Z']);
 });
 
-it('anchors a monthly reminder saved before the rule carried its day', () => {
-	const reminder = { ...saved(false), recurrence: { frequency: 'monthly' as const, timezone: 'UTC' } };
-	expect(planReminderCompletion(reminder, true)).toMatchObject({
-		dueDatetime: '2026-10-21T09:00:00.000Z', recurrence: { frequency: 'monthly', dayOfMonth: 21, completedCount: 1 },
-	});
-});
-
 it('keeps a daily reminder at its typed time across a daylight-saving gap', () => {
 	// 02:30 does not exist in Berlin on 2027-03-28, so that occurrence moves to 03:30.
 	const block = buildCreatedReminderBlock({ content: 'Take medicine', priority: 4, dueDate: new Date('2027-03-27T01:30:00Z'),
@@ -61,13 +54,6 @@ it('keeps a daily reminder at its typed time across a daylight-saving gap', () =
 		dues.push(scanReminderMarkdownContent('Reminders/Inbox.md', file, 'Reminders').reminders[0]!.dueDatetime!);
 	}
 	expect(dues).toEqual(['2027-03-28T01:30:00.000Z', '2027-03-29T00:30:00.000Z', '2027-03-30T00:30:00.000Z']);
-});
-
-it('anchors the time of a timed repeat saved before the rule carried it', () => {
-	const reminder = { ...saved(false), dueDatetime: '2027-03-27T01:30:00.000Z', dueDate: '2027-03-27', recurrence: { frequency: 'daily' as const, timezone: 'Europe/Berlin' } };
-	const first = planReminderCompletion(reminder, true);
-	expect(first).toMatchObject({ dueDatetime: '2027-03-28T01:30:00.000Z', recurrence: { hour: 2, minute: 30 } });
-	expect(planReminderCompletion({ ...reminder, ...first, completed: false }, true).dueDatetime).toBe('2027-03-29T00:30:00.000Z');
 });
 
 it('drops the repeat time when a timed repeat becomes date-only', () => {

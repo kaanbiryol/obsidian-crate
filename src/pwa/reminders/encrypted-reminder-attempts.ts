@@ -77,8 +77,6 @@ export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; f
 export interface IndexedReminderNote { file: { path: string; hash: string; size: number; revision: string }; path: string; reminders: unknown[]; issue?: string }
 /** The most notes an encrypted reminder list may hold; its persisted index shares the bound. */
 export const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
-// Before notes were kept one per record, the whole index was one value at this key.
-const legacyIndexKey = (scope: string) => `index:${scope}`;
 // The header holds the identity; each parsed note is its own record after it, by revision.
 const indexKey = (scope: string) => `note-index:${scope}`;
 const noteRange = (scope: string) => IDBKeyRange.bound(`${indexKey(scope)}\u0000`, `${indexKey(scope)}\u0000￿`);
@@ -122,7 +120,7 @@ export async function saveEncryptedReminderIndex(scope: string, identity: string
 	try {
 		if (!isCurrent()) return;
 		const tx = db.transaction('attempts', 'readwrite');
-		const writes: Promise<unknown>[] = [tx.store.delete(legacyIndexKey(scope))];
+		const writes: Promise<unknown>[] = [];
 		const sameIdentity = headerIdentity(await tx.store.get(indexKey(scope)), scope) === identity;
 		const stored = new Set(sameIdentity ? await tx.store.getAllKeys(noteRange(scope)) : []);
 		if (!sameIdentity) {

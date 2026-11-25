@@ -12,7 +12,6 @@ import {
 	type ReminderFileCacheEntry,
 } from './types';
 import { parseReminderCacheEntries, selectReminderIndexWarmBatch } from './warm';
-import { storedReminderRevision } from './revisions';
 import { getProjectFromPath } from '@/reminders/core/markdownScan';
 import { reminderSourceScanKey } from '../source-migration';
 import { duplicateReminderSourcesSql } from '../source-identity';
@@ -67,7 +66,6 @@ export async function loadIncrementalReminderIndex(
 	}
 
 	const remainingFiles = staleMetadata.length - warmMetadata.length;
-	if (remainingFiles === 0) await backfillRevisions(env.DB, folderPath, [...resolvedFiles.values()].filter(entry => !freshEntries.includes(entry)));
 	if (remainingFiles > 0) {
 		if (persistedFileCount !== freshEntries.length) {
 			throw new Error('Reminder index cache could not be warmed');
@@ -80,14 +78,6 @@ export async function loadIncrementalReminderIndex(
 		return resolved ? [{ path: file.path, project: getProjectFromPath(file.path, folderPath), reminders: resolved.reminders, issue: resolved.issue }] : [];
 	});
 	return { ready: true, ...buildReminderList(sources) };
-}
-
-// Rows cached before revisions were stored gain them a bounded batch per full list, so
-// an upgraded folder stops hashing every reminder without rewriting every row at once.
-const REVISION_BACKFILL_FILES = 200;
-async function backfillRevisions(db: D1Database, folderPath: string, entries: ReminderFileCacheEntry[]): Promise<void> {
-	const missing = entries.filter(entry => !entry.issue && entry.reminders.some(reminder => !storedReminderRevision(reminder))).slice(0, REVISION_BACKFILL_FILES);
-	try { await writeReminderFileCacheEntries(db, folderPath, missing); } catch { /* The cache is an optimization. */ }
 }
 
 /**

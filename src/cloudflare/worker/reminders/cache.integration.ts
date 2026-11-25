@@ -158,7 +158,7 @@ describe('reminder list cache with D1 and R2', () => {
 		expect((await response.json() as { reminders: Array<{ content: string }> }).reminders.map(reminder => reminder.content)).toEqual(['Current task']);
 		expect(bucketGet).not.toHaveBeenCalled();
 	});
-	it('stores each revision with its cache row and backfills rows cached without one', async () => {
+	it('stores each revision with its cache row and lists the stored one', async () => {
 		await seed(twoProjects);
 		type Listed = { reminders: Array<{ id: string; revision: string }> };
 		const first = await (await list()).json() as Listed;
@@ -167,19 +167,11 @@ describe('reminder list cache with D1 and R2', () => {
 		const stored = async () => (await db.prepare("SELECT reminders_json FROM reminder_file_cache WHERE file_path = 'Reminders/Inbox.md'").first<{ reminders_json: string }>())!.reminders_json;
 		expect(JSON.parse(await stored())).toMatchObject([{ id: 'r1', revision: first.reminders[0]!.revision }]);
 
-		// A row cached before revisions were stored is listed the same and gains its revision.
-		const legacy = JSON.parse(await stored()) as Array<Record<string, unknown>>;
-		await db.prepare("UPDATE reminder_file_cache SET reminders_json = ? WHERE file_path = 'Reminders/Inbox.md'")
-			.bind(JSON.stringify(legacy.map(({ revision: _revision, ...reminder }) => reminder))).run();
-		const bucketGet = vi.spyOn(bucket, 'get');
-		expect(await (await list()).json()).toEqual(first);
-		expect(JSON.parse(await stored())).toMatchObject([{ revision: first.reminders[0]!.revision }]);
-		expect(bucketGet).not.toHaveBeenCalled();
-
 		// The listed revision is the stored one rather than a new hash.
+		const rows = JSON.parse(await stored()) as Array<Record<string, unknown>>;
 		const marked = 'f'.repeat(64);
 		await db.prepare("UPDATE reminder_file_cache SET reminders_json = ? WHERE file_path = 'Reminders/Inbox.md'")
-			.bind(JSON.stringify(legacy.map(reminder => ({ ...reminder, revision: marked })))).run();
+			.bind(JSON.stringify(rows.map(reminder => ({ ...reminder, revision: marked })))).run();
 		expect(((await (await list()).json()) as Listed).reminders[0]!.revision).toBe(marked);
 	});
 

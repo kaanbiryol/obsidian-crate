@@ -144,11 +144,6 @@ describe('provisionCloudflareDeployment', () => {
 			r2BucketName: metadata.r2BucketName,
 		}));
 		expect(api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
-		expect(api.updateWorkerSchedules).toHaveBeenCalledWith(
-			metadata.accountId,
-			metadata.workerName,
-			[],
-		);
 		expect(metadata.lastDeployedVersion).toBe('0.1.0');
 		expect(metadata.lastDeployedFingerprint).toBe('f'.repeat(64));
 		expect(workerUrl).toBe('https://crate-0123456789abcdef.personal-crate.workers.dev');
@@ -207,7 +202,7 @@ describe('provisionCloudflareDeployment', () => {
 		const metadata = createMetadata();
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
-		expect([...steps]).toEqual(expect.arrayContaining(['create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment']));
+		expect([...steps]).toEqual(expect.arrayContaining(['create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'enable-server-address', 'record-release', 'verify-deployment']));
 		expect([...steps].filter(step => !(UPDATE_STEPS as readonly string[]).includes(step))).toEqual([]);
 	});
 

@@ -23,7 +23,7 @@ export function isRefusedMutation(error: unknown): boolean {
 export const UPDATE_STEPS = [
 	'acquire-deployment', 'freeze-upgrade-data', 'verify-upgrade-checkpoint', 'resume-upgraded-server',
 	'prepare-database', 'create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker',
-	'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment',
+	'enable-server-address', 'record-release', 'verify-deployment',
 ] as const;
 /** Deletion steps that only remove resources, so deletion may repeat them while one is in flight. */
 export const REPEATABLE_DELETION_STEPS = ['delete-worker', 'deleteR2Objects', 'deleteR2Bucket', 'deleteD1Database', 'enable-deletion-address'] as const;

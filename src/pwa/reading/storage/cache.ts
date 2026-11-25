@@ -101,14 +101,11 @@ export async function readOfflineReadingItems(session: ReadingSession): Promise<
 	for (const key of keys) {
 		if (!key.startsWith(prefix)) continue;
 		const id = key.slice(prefix.length);
-		// Each copy's item is stored apart from its body. A copy saved before that, or with a
-		// damaged item, is read whole.
+		// Each copy's item is stored apart from its body, so listing never decrypts a body.
+		if (!listed.has(rows + id)) continue;
 		let item: unknown;
-		if (listed.has(rows + id)) try { item = (decodeReadingValue(rows + id, await tx.store.get(rows + id)) as { item?: unknown } | null)?.item; } catch { /* Read the copy. */ }
-		if (isReadingItem(item, folder) && item.crate_reading_id === id) { items.push(item); continue; }
-		let article: unknown;
-		try { article = decodeReadingValue(key, await tx.store.get(key)); } catch { continue; }
-		if (isReadingArticleCache(article, folder)) items.push(article.item);
+		try { item = (decodeReadingValue(rows + id, await tx.store.get(rows + id)) as { item?: unknown } | null)?.item; } catch { continue; }
+		if (isReadingItem(item, folder) && item.crate_reading_id === id) items.push(item);
 	}
 	await tx.done; assertReadingSession(session);
 	return items.sort((a, b) => b.saved_at.localeCompare(a.saved_at));

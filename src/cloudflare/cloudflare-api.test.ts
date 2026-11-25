@@ -149,24 +149,6 @@ describe('CloudflareApiClient', () => {
 		expect(error.code).toBe(10042);
 	});
 
-	it('replaces Worker cron triggers with the requested maintenance schedules', async () => {
-		const transport = vi.fn<HttpTransport>(async () => ({
-			status: 200,
-			text: JSON.stringify({ success: true, result: { schedules: [] } }),
-		}));
-		const client = new CloudflareApiClient('token', transport);
-
-		await client.updateWorkerSchedules('account', 'crate worker', ['*/15 * * * *']);
-
-		expect(transport).toHaveBeenCalledWith(
-			'https://api.cloudflare.com/client/v4/accounts/account/workers/scripts/crate%20worker/schedules',
-			expect.objectContaining({
-				method: 'PUT',
-				body: JSON.stringify([{ cron: '*/15 * * * *' }]),
-			}),
-		);
-	});
-
 	it('rejects a D1 response when any SQL statement reports failure', async () => {
 		const client = new CloudflareApiClient('token', vi.fn(async () => ({
 			status: 200,

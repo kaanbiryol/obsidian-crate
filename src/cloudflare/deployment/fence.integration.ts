@@ -58,7 +58,7 @@ async function harness(empty = false) {
 		}),
 		transport: vi.fn(), sleep: vi.fn(async () => {}),
 		uploadWorker: vi.fn(async (input: { artifacts: ReturnType<typeof artifact> }) => { state.worker = { annotations: { 'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}` }, bindings }; }),
-		updateWorkerSchedules: vi.fn(async () => {}), getWorkersSubdomain: vi.fn(async (): Promise<string | null> => 'test'),
+		getWorkersSubdomain: vi.fn(async (): Promise<string | null> => 'test'),
 		createWorkersSubdomain: vi.fn(async () => 'test'), enableWorkerSubdomain: vi.fn(async () => {}),
 		getWorkerSubdomain: vi.fn(async () => ({ enabled: true, previews_enabled: false })),
 		listWorkers: vi.fn(async () => [{ id: metadata.workerName }]),
