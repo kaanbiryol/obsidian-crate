@@ -11,32 +11,34 @@ export const bundleBudgets = {
 		// logins, with checkpoints saved as change numbers, the PWA's flicker fixes, the reminder
 		// completion animation, Reading title placeholders, errors with next steps and the
 		// grouped connection options, the simplified reader header and the Reading change feed with
-		// stored tag counts and its scale fixes, measure 5.0356 MB raw / 2.3297 MB gzip.
-		maxBytes: 5035600,
-		maxGzipBytes: 2329700,
+		// stored tag counts and its scale fixes, measure 5.0356 MB raw / 2.3297 MB gzip. Lexical 0.53,
+		// Motion 14.14, Marked 18.3 and Defuddle 0.19.13 bring it to 5.0960 MB raw / 2.3626 MB gzip.
+		maxBytes: 5096000,
+		maxGzipBytes: 2362600,
 	},
 	{
 		path: 'dist/styles.css',
 		// Vault history's Deleted files view with Reading image highlights and their Highlights rows,
 		// the reminder completion animation, Reading title placeholders, the failed article card and
 		// the simplified reader header and off-screen library Highlights rows measure 404.0 KB raw / 50.3 KB
-		// gzip across the plugin and shared PWA surfaces.
-		maxBytes: 404000,
+		// gzip across the plugin and shared PWA surfaces. Tailwind 4.3.5 brings it to 404.2 KB raw.
+		maxBytes: 404200,
 		maxGzipBytes: 50300,
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
 		// The deployable Worker embeds the complete reminders PWA assets.
 		// Server-side extraction for encrypted Reading drops Defuddle from the embedded PWA:
-		// 4.043 MB raw / 1.294 MB gzip.
-		maxBytes: 4085000,
-		maxGzipBytes: 1307000,
+		// 4.043 MB raw / 1.294 MB gzip. The Lexical, Motion, Marked and Defuddle updates bring it to
+		// 4.100 MB raw / 1.311 MB gzip.
+		maxBytes: 4107200,
+		maxGzipBytes: 1313500,
 	}, {
 		path: '.generated/cloudflare/worker-self-hosted.mjs',
 		// The server package's Worker: the deployable one plus chunked uploads and ranged
-		// downloads, 4.019 MB raw / 1.282 MB gzip.
-		maxBytes: 4085000,
-		maxGzipBytes: 1307000,
+		// downloads, 4.107 MB raw / 1.313 MB gzip after the Lexical, Motion, Marked and Defuddle updates.
+		maxBytes: 4107200,
+		maxGzipBytes: 1313500,
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
@@ -48,9 +50,10 @@ export const bundleBudgets = {
 		// completion animation, Reading title placeholders, recovery key errors with next
 		// steps, the failed and pending article states, notice action rows, the simplified
 		// reader header, Reading changes applied to loaded pages, released images and cancelled
-		// searches, measure 1.2256 MB raw / 401.7 KB gzip.
-		maxBytes: 1225600,
-		maxGzipBytes: 401700,
+		// searches, measure 1.2256 MB raw / 401.7 KB gzip. Lexical 0.53 and Motion 14.14 bring it to
+		// 1.2335 MB raw / 404.9 KB gzip.
+		maxBytes: 1233500,
+		maxGzipBytes: 404900,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
@@ -60,8 +63,9 @@ export const bundleBudgets = {
 		// completion animation, Reading title placeholders, recovery key errors with next
 		// steps, the failed and pending article states, notice action rows, the simplified
 		// reader header, Reading changes applied to loaded pages, released images and cancelled
-		// searches, measure 1.9474 MB raw / 643.0 KB gzip.
-		maxBytes: 1947400,
-		maxGzipBytes: 643000,
+		// searches, measure 1.9474 MB raw / 643.0 KB gzip. Lexical 0.53, Motion 14.14 and Marked 18.3
+		// bring it to 1.9769 MB raw / 654.6 KB gzip.
+		maxBytes: 1976900,
+		maxGzipBytes: 654600,
 	}],
 };

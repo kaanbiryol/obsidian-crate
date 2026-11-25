@@ -82,7 +82,7 @@ async function startSelfHostedPairing(plugin: CratePlugin, target: DevicePairing
 	}
 }
 
-export async function startDevicePairing(plugin: CratePlugin, target: DevicePairingTarget | null): Promise<void> {
+async function startDevicePairing(plugin: CratePlugin, target: DevicePairingTarget | null): Promise<void> {
 	if (!target) { new Notice('This pairing link is invalid or incomplete. Create a new pairing link on a connected device, or run crate-server pair on your own server.'); return; }
 	if (target.kind === 'self-hosted') { await startSelfHostedPairing(plugin, target); return; }
 	const release = beginConnectionOperation(plugin, 'pairing');

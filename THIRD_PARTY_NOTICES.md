@@ -4,7 +4,7 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 
 | Package | Version | Declared license |
 | --- | --- | --- |
-| @babel/runtime | 8.0.7 | MIT |
+| @babel/runtime | 8.1.3 | MIT |
 | @base-ui/react | 1.9.0 | MIT |
 | @base-ui/utils | 0.5.0 | MIT |
 | @floating-ui/core | 1.8.0 | MIT |
@@ -12,23 +12,23 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | @floating-ui/react-dom | 2.1.9 | MIT |
 | @floating-ui/utils | 0.2.12 | MIT |
 | @internationalized/date | 3.12.4 | Apache-2.0 |
-| @lexical/a11y | 0.52.0 | MIT |
-| @lexical/clipboard | 0.52.0 | MIT |
-| @lexical/dragon | 0.52.0 | MIT |
-| @lexical/extension | 0.52.0 | MIT |
-| @lexical/history | 0.52.0 | MIT |
-| @lexical/html | 0.52.0 | MIT |
-| @lexical/internal | 0.52.0 | MIT |
-| @lexical/link | 0.52.0 | MIT |
-| @lexical/list | 0.52.0 | MIT |
-| @lexical/plain-text | 0.52.0 | MIT |
-| @lexical/selection | 0.52.0 | MIT |
-| @lexical/utils | 0.52.0 | MIT |
+| @lexical/a11y | 0.53.0 | MIT |
+| @lexical/clipboard | 0.53.0 | MIT |
+| @lexical/dragon | 0.53.0 | MIT |
+| @lexical/extension | 0.53.0 | MIT |
+| @lexical/history | 0.53.0 | MIT |
+| @lexical/html | 0.53.0 | MIT |
+| @lexical/internal | 0.53.0 | MIT |
+| @lexical/link | 0.53.0 | MIT |
+| @lexical/list | 0.53.0 | MIT |
+| @lexical/plain-text | 0.53.0 | MIT |
+| @lexical/selection | 0.53.0 | MIT |
+| @lexical/utils | 0.53.0 | MIT |
 | @mixmark-io/domino | 2.2.0 | BSD-2-Clause |
 | @noble/ciphers | 2.4.0 | MIT |
-| @preact/signals-core | 1.14.4 | MIT |
-| @swc/helpers | 0.5.19 | Apache-2.0 |
-| @types/react | 19.3.0 | MIT |
+| @preact/signals-core | 1.14.5 | MIT |
+| @swc/helpers | 0.5.24 | Apache-2.0 |
+| @types/react | 19.3.3 | MIT |
 | @types/trusted-types | 2.0.7 | MIT |
 | @xmldom/xmldom | 0.9.12 | MIT |
 | agent-base | 7.1.4 | MIT |
@@ -42,19 +42,19 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | css-select | 7.0.0 | BSD-2-Clause |
 | css-what | 8.0.0 | BSD-2-Clause |
 | cssom | 0.5.0 | MIT |
-| csstype | 3.2.3 | MIT |
+| csstype | 3.2.4 | MIT |
 | date-fns | 4.4.0 | MIT |
 | debug | 4.4.3 | MIT |
-| defuddle | 0.19.6 | MIT |
+| defuddle | 0.19.13 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
 | dom-serializer | 3.1.1 | MIT |
 | domelementtype | 3.0.0 | BSD-2-Clause |
 | domhandler | 6.0.1 | BSD-2-Clause |
-| dompurify | 3.4.17 | (MPL-2.0 OR Apache-2.0) |
+| dompurify | 3.5.0 | (MPL-2.0 OR Apache-2.0) |
 | domutils | 4.0.2 | BSD-2-Clause |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
 | entities | 8.1.0 | BSD-2-Clause |
-| framer-motion | 14.6.0 | MIT |
+| framer-motion | 14.14.0 | MIT |
 | highlight.js | 11.12.0 | BSD-3-Clause |
 | html-escaper | 3.0.3 | MIT |
 | htmlparser2 | 12.0.0 | MIT |
@@ -62,19 +62,19 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | https-proxy-agent | 7.0.6 | MIT |
 | idb | 8.0.4 | ISC |
 | inherits | 2.0.4 | ISC |
-| jose | 6.2.13 | MIT |
+| jose | 6.2.18 | MIT |
 | jwa | 2.0.1 | MIT |
 | jws | 4.0.1 | MIT |
-| lexical | 0.52.0 | MIT |
+| lexical | 0.53.0 | MIT |
 | linkedom | 0.18.13 | ISC |
-| lucide-react | 1.61.0 | ISC |
-| marked | 18.1.1 | MIT |
+| lucide-react | 1.80.0 | ISC |
+| marked | 18.3.0 | MIT |
 | mathml-to-latex | 1.8.0 | MIT |
 | minimalistic-assert | 1.0.1 | ISC |
 | minimist | 1.2.8 | MIT |
-| motion | 14.6.0 | MIT |
-| motion-dom | 14.6.0 | MIT |
-| motion-utils | 14.6.0 | MIT |
+| motion | 14.14.0 | MIT |
+| motion-dom | 14.14.0 | MIT |
+| motion-utils | 14.7.0 | MIT |
 | ms | 2.1.3 | MIT |
 | nth-check | 3.0.1 | BSD-2-Clause |
 | qrcode-generator | 2.0.4 | MIT |
@@ -85,8 +85,8 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | safer-buffer | 2.1.2 | MIT |
 | scheduler | 0.28.0 | MIT |
 | temml | 0.13.5 | MIT |
-| tslib | 2.8.1 | 0BSD |
-| turndown | 7.2.4 | MIT |
+| tslib | 2.9.1 | 0BSD |
+| turndown | 7.2.5 | MIT |
 | typescript | 6.0.3 | Apache-2.0 |
 | uhyphen | 0.2.0 | ISC |
 | use-sync-external-store | 1.7.0 | MIT |
@@ -94,9 +94,9 @@ This file lists the production dependencies recorded in `package-lock.json` and 
 | web-push | 3.6.7 | MPL-2.0 |
 | web-push-browser | 1.4.2 | ISC |
 | yaml | 2.9.1 | ISC |
-| zustand | 5.0.16 | MIT |
+| zustand | 5.1.0 | MIT |
 
-## @babel/runtime@8.0.7
+## @babel/runtime@8.1.3
 
 Declared license: MIT
 
@@ -513,7 +513,7 @@ Apache License
    limitations under the License.
 ```
 
-## @lexical/a11y@0.52.0
+## @lexical/a11y@0.53.0
 
 Declared license: MIT
 
@@ -543,7 +543,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/clipboard@0.52.0
+## @lexical/clipboard@0.53.0
 
 Declared license: MIT
 
@@ -573,7 +573,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/dragon@0.52.0
+## @lexical/dragon@0.53.0
 
 Declared license: MIT
 
@@ -603,7 +603,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/extension@0.52.0
+## @lexical/extension@0.53.0
 
 Declared license: MIT
 
@@ -633,7 +633,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/history@0.52.0
+## @lexical/history@0.53.0
 
 Declared license: MIT
 
@@ -663,7 +663,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/html@0.52.0
+## @lexical/html@0.53.0
 
 Declared license: MIT
 
@@ -693,7 +693,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/internal@0.52.0
+## @lexical/internal@0.53.0
 
 Declared license: MIT
 
@@ -723,7 +723,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/link@0.52.0
+## @lexical/link@0.53.0
 
 Declared license: MIT
 
@@ -753,7 +753,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/list@0.52.0
+## @lexical/list@0.53.0
 
 Declared license: MIT
 
@@ -783,7 +783,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/plain-text@0.52.0
+## @lexical/plain-text@0.53.0
 
 Declared license: MIT
 
@@ -813,7 +813,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/selection@0.52.0
+## @lexical/selection@0.53.0
 
 Declared license: MIT
 
@@ -843,7 +843,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @lexical/utils@0.52.0
+## @lexical/utils@0.53.0
 
 Declared license: MIT
 
@@ -938,7 +938,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## @preact/signals-core@1.14.4
+## @preact/signals-core@1.14.5
 
 Declared license: MIT
 
@@ -968,7 +968,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @swc/helpers@0.5.19
+## @swc/helpers@0.5.24
 
 Declared license: Apache-2.0
 
@@ -1178,7 +1178,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-## @types/react@19.3.0
+## @types/react@19.3.3
 
 Declared license: MIT
 
@@ -1547,7 +1547,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## csstype@3.2.3
+## csstype@3.2.4
 
 Declared license: MIT
 
@@ -1633,7 +1633,7 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## defuddle@0.19.6
+## defuddle@0.19.13
 
 Declared license: MIT
 
@@ -1757,7 +1757,7 @@ THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRE
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## dompurify@3.4.17
+## dompurify@3.5.0
 
 Declared license: (MPL-2.0 OR Apache-2.0)
 
@@ -2217,7 +2217,7 @@ THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRE
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## framer-motion@14.6.0
+## framer-motion@14.14.0
 
 Declared license: MIT
 
@@ -2440,7 +2440,7 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## jose@6.2.13
+## jose@6.2.18
 
 Declared license: MIT
 
@@ -2522,7 +2522,7 @@ FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TOR
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## lexical@0.52.0
+## lexical@0.53.0
 
 Declared license: MIT
 
@@ -2576,7 +2576,7 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## lucide-react@1.61.0
+## lucide-react@1.80.0
 
 Declared license: ISC
 
@@ -2628,7 +2628,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## marked@18.1.1
+## marked@18.3.0
 
 Declared license: MIT
 
@@ -2760,7 +2760,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## motion@14.6.0
+## motion@14.14.0
 
 Declared license: MIT
 
@@ -2790,7 +2790,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## motion-dom@14.6.0
+## motion-dom@14.14.0
 
 Declared license: MIT
 
@@ -2820,7 +2820,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## motion-utils@14.6.0
+## motion-utils@14.7.0
 
 Declared license: MIT
 
@@ -3140,7 +3140,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## tslib@2.8.1
+## tslib@2.9.1
 
 Declared license: 0BSD
 
@@ -3161,7 +3161,7 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## turndown@7.2.4
+## turndown@7.2.5
 
 Declared license: MIT
 
@@ -3387,7 +3387,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-## zustand@5.0.16
+## zustand@5.1.0
 
 Declared license: MIT
 
