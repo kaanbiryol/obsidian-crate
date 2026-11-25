@@ -12,6 +12,8 @@ export default defineConfig({
 	plugins: [cloudflareTest({ wrangler: { configPath: './wrangler.cloudflare.jsonc' } })],
 	resolve: { alias: { '@': srcPath } },
 	test: {
+		// This suite runs the built Worker; a stale build is rebuilt first.
+		globalSetup: ['./scripts/worker-test-setup.mjs'],
 		include: [CLOUDFLARE_BUNDLE_TEST],
 		testTimeout: 20_000,
 	},

@@ -22,6 +22,8 @@ export default defineConfig({
 		},
 	},
 	test: {
+		// Durable Objects run the built Worker; a stale build is rebuilt first.
+		globalSetup: ['./scripts/worker-test-setup.mjs'],
 		setupFiles: ['./src/test/setup-byte-equality.ts'],
 		include: ['src/cloudflare/**/*.integration.ts'],
 		// Runs against the Cloudflare bundle in vitest.cloudflare-bundle.config.ts.

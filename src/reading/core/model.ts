@@ -65,6 +65,15 @@ export function readingUrlIdentity(value: string): string {
 	return url.href;
 }
 
+// Items keep their identity while their note is unchanged, so each URL is normalized once.
+const itemUrlIdentities = new WeakMap<Pick<ReadingItem, 'source_url'>, string>();
+/** `readingUrlIdentity` of an item's source, cached per item object. */
+export function readingItemUrlIdentity(item: Pick<ReadingItem, 'source_url'>): string {
+	let identity = itemUrlIdentities.get(item);
+	if (identity === undefined) { identity = readingUrlIdentity(item.source_url); itemUrlIdentities.set(item, identity); }
+	return identity;
+}
+
 export function readingTimestamp(value: unknown): string {
 	if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
 		|| !Number.isFinite(Date.parse(value))) throw new Error('Saved date must include a time and timezone.');

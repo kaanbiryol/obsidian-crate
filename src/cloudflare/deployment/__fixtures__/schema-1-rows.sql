@@ -21,6 +21,6 @@ INSERT INTO reminder_sources(file_path, reminder_id, due_key, occurrences) VALUE
 INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified) VALUES ('Reminders/Today.md', 'rev-r', 3, 1);
 INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, 1, 'Reading', 'generation-1', 'reading-1');
 INSERT INTO reading_items(id, portable_path, path, storage_key, hash, size, item_id, saved_at, status, favorite, highlighted_at) VALUES (1, 'reading/article.md', 'Reading/Article.md', 'objects/r', 'hash-r', 2048, 'item-1', '2026-01-01T10:00:00Z', 'unread', 1, '2026-01-02T10:00:00Z');
-INSERT INTO note_terms(term, saved_at, portable_path) VALUES ('plumbing', '2026-01-01T10:00:00Z', 'reading/article.md');
-INSERT INTO highlight_index(highlighted_at, portable_path, terms, words) VALUES ('2026-01-02T10:00:00Z', 'reading/article.md', '["pipes"]', 'pipes');
+INSERT INTO note_terms(term, saved_at, item) VALUES ('plumbing', '2026-01-01T10:00:00Z', 1);
+INSERT INTO highlight_index(highlighted_at, item, terms, words) VALUES ('2026-01-02T10:00:00Z', 1, '["pipes"]', 'pipes');
 INSERT INTO reading_captures(id, generation, url_identity, note, available_at) VALUES ('capture-1', 'generation-1', 'https://example.com/a', 'Read later', 0);

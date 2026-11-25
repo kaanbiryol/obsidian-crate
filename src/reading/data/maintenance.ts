@@ -19,6 +19,9 @@ export class ReadingMaintenance {
 	// Why a note is not done yet, or why its strict check failed, by path.
 	private notes = new Map<string, string>();
 	private editorWait = new Set<string>();
+	// Notes already found waiting for sync. Until sync lets imports run or the note changes,
+	// checking them again finds the same, so a refresh during a long sync skips them.
+	private syncWait = new Set<string>();
 	private listeners = new Set<() => void>();
 	private queue: Promise<void>;
 	private closed = false;
@@ -45,7 +48,7 @@ export class ReadingMaintenance {
 	}
 	/** Checks notes that changed: added, edited here, synced, or re-indexed after a restart. */
 	changed(paths: Iterable<string>): Promise<void> {
-		return this.run(() => { for (const path of paths) if (this.isNotePath(path)) this.todo.add(path); });
+		return this.run(() => { for (const path of paths) if (this.isNotePath(path)) { this.todo.add(path); this.syncWait.delete(path); } });
 	}
 	/** Retries notes that waited for sync or an editor. */
 	retry(): Promise<void> { return this.run(() => {}); }
@@ -68,26 +71,30 @@ export class ReadingMaintenance {
 	}
 	private async process(): Promise<void> {
 		let changed = false;
+		const adopting = this.canAdopt();
+		if (adopting) this.syncWait.clear();
 		for (const path of [...this.todo]) {
 			if (!this.active()) return;
+			if (!adopting && this.syncWait.has(path)) continue;
 			const file = this.vault.file ? this.vault.file(path) ?? undefined : this.vault.files().find(entry => entry.path === path);
 			if (!file) { this.todo.delete(path); this.editorWait.delete(path); changed = this.set(path, undefined) || changed; continue; }
 			const result = await this.check(file);
 			if (!this.active()) return;
 			if (result.done) this.todo.delete(path);
+			if (result.sync) this.syncWait.add(path);
 			if (result.message === EDITOR_WAIT || result.editor) this.editorWait.add(path); else this.editorWait.delete(path);
 			changed = this.set(path, result.message) || changed;
 		}
 		if (changed) for (const listener of this.listeners) listener();
 	}
 	/** One note's work. `done` is false while it waits for sync or an editor. */
-	private async check(file: ReadingFile): Promise<{ done: boolean; message?: string; editor?: boolean }> {
+	private async check(file: ReadingFile): Promise<{ done: boolean; message?: string; editor?: boolean; sync?: boolean }> {
 		if (file.size > MAX_READING_BYTES) return { done: true };
 		if (!this.canAdopt()) {
 			// Without reading, only a note the cache shows as a clip is known to need import.
 			const properties = this.vault.cachedProperties?.(file);
 			const clip = !properties || !Object.prototype.hasOwnProperty.call(properties, 'crate_reading_version');
-			return { done: false, ...(clip ? { message: SYNC_WAIT } : {}) };
+			return { done: false, sync: true, ...(clip ? { message: SYNC_WAIT } : {}) };
 		}
 		let original: string;
 		try { original = await this.vault.read(file); } catch (error) { return { done: true, message: error instanceof Error ? error.message : 'Could not read this note.' }; }

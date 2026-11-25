@@ -7,7 +7,7 @@ import { readingCapturePath, retitledCapturePath } from '../core/filename';
 import { portablePathKey } from '@/protocol/portable-path';
 import { isMarkdownNoteInFolder } from '@/protocol/note-paths';
 import { createReadingNote, parseReadingNote, updateReadingNote } from '../core/notes';
-import { MAX_READING_BYTES, readingUrlIdentity, validateReadingMetadata, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
+import { MAX_READING_BYTES, readingItemUrlIdentity, validateReadingMetadata, type ReadingChanges, type ReadingItem, type ReadingMetadata } from '../core/model';
 import { patchReadingFrontmatter, readReadingFrontmatter } from '../core/frontmatter';
 
 export interface ReadingFile { path: string; size: number; modifiedAt: number; revision?: string }
@@ -73,8 +73,6 @@ export class ReadingLibrary {
 	private holders = 0;
 	private releaseTimer: ReturnType<typeof setTimeout> | undefined;
 	private stopIssues: (() => void) | undefined;
-	// URL identities by item; an unchanged note keeps its item, so each is normalized once.
-	private urlIdentities = new WeakMap<ReadingItem, string>();
 	// The last parsed note: an update's rescan and reread see the same bytes.
 	private parsed: { content: string; metadata: ReadingMetadata | null } | undefined;
 	constructor(private vault: ReadingVault, readonly folder: string, private signal: AbortSignal,
@@ -314,11 +312,7 @@ export class ReadingLibrary {
 	add(url: string, title?: string, fetchArticle = true): Promise<{ item: ReadingItem; duplicate: boolean }> {
 		return this.enqueue(async () => {
 			await this.ensureListed();
-			const saved = findSavedReadingLink(this.snapshot.items, url, item => {
-				let identity = this.urlIdentities.get(item);
-				if (identity === undefined) { identity = readingUrlIdentity(item.source_url); this.urlIdentities.set(item, identity); }
-				return identity;
-			});
+			const saved = findSavedReadingLink(this.snapshot.items, url, readingItemUrlIdentity);
 			if (saved.kind === 'many') throw new Error('Multiple notes already save this link. Open reading to choose one.');
 			if (saved.kind === 'one') return { item: saved.item, duplicate: true };
 			const id = crypto.randomUUID();

@@ -67,8 +67,9 @@ it('verifies and projects eight files per pass, reading each once, within the qu
 	const state = { storage: { setAlarm: vi.fn(async () => {}) } } as unknown as DurableObjectState;
 	const get = vi.spyOn(env.BUCKET, 'get');
 	const { total } = await countQueries(() => runNotificationCoordinator(state, env));
-	// Was 39: projection now reads its jobs' sources, rows and identities in one round.
-	expect(total).toBe(38);
+	// Was 39: projection now reads its jobs' sources, rows and identities in one round. A
+	// Reading rebuild step then records the rows it wrote, for its daily budget: 39.
+	expect(total).toBe(39);
 	// Projection reuses the bytes verification read: one read per reminder and Reading note.
 	expect(get).toHaveBeenCalledTimes(8 + 3);
 	expect(total).toBeLessThanOrEqual(D1_QUERIES_PER_INVOCATION);

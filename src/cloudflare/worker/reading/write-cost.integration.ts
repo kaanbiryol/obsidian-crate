@@ -10,6 +10,8 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { readingIndexScope } from './library-index';
 import { mutateReading } from './mutations';
 import { meterD1Usage } from '../d1/d1-usage';
+import { writeCommittedMarkdownMove } from '../sync/atomic-markdown-move';
+import { readingItems } from './queries';
 
 const policy = { enabled: 1, folder_path: 'Reading', generation: 'g', revision: 'r' };
 // Every web app edit is a synced file edit: a version, changelog, receipt and staging rows
@@ -47,10 +49,11 @@ it('keeps the rows a web app favorite or archive writes to the file edit and its
 	const firstHighlight = await measure({ highlights: [passage('2026-02-01T00:00:00.000Z')] }, {});
 	const newerHighlight = await measure({ highlights: [passage('2026-02-02T00:00:00.000Z')] }, { highlights: saved });
 	const highlightNote = await measure({ highlights: [passage('2026-02-02T00:00:00.000Z', 'Revisit')] }, { highlights: saved });
-	// Measured 8, 9 and 8; the same edits wrote 7 rows before highlight_index.
-	expect(firstHighlight.written).toBeLessThanOrEqual(9);
-	expect(newerHighlight.written).toBeLessThanOrEqual(10);
-	expect(highlightNote.written).toBeLessThanOrEqual(9);
+	// Measured 8, 9 and 8; the same edits wrote 7 rows before highlight_index. The library
+	// revision adds one to every Reading commit.
+	expect(firstHighlight.written).toBeLessThanOrEqual(10);
+	expect(newerHighlight.written).toBeLessThanOrEqual(11);
+	expect(highlightNote.written).toBeLessThanOrEqual(10);
 	await context.annotate(JSON.stringify({ favorite, archive, firstHighlight, newerHighlight, highlightNote }), 'writes');
 });
 
@@ -60,11 +63,28 @@ it('reads about the same rows for a web app edit however many notes are highligh
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Second.md', createReadingNote({ id, url: 'https://example.invalid/second', title: 'Second', savedAt: new Date().toISOString() }), null);
 	// Other highlighted notes' rows, which an edit to this note must not read.
 	await env.DB.prepare(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2000)
-    INSERT INTO highlight_index(highlighted_at, portable_path, terms, words) SELECT printf('2026-01-01T00:00:%04dZ', i), printf('reading/other-%d.md', i), '[]', NULL FROM n`).run();
+    INSERT INTO highlight_index(highlighted_at, item, terms, words) SELECT printf('2026-01-01T00:00:%04dZ', i), 100000 + i, '[]', NULL FROM n`).run();
 	const meter = meterD1Usage(env.DB);
 	const response = await mutateReading({ ...env, DB: meter.db }, { tokenId: 'vault', scope: 'vault' }, policy,
 		{ id, before: { favorite: false }, changes: { favorite: true }, operationId: createReminderOperationId(Math.floor(Date.now() / 86400_000)) }, 'update');
 	expect(response.status, await response.clone().text()).toBe(200);
 	// Before: the highlight_index delete scanned the whole table, about 2,100 rows here.
 	expect(meter.usage.rowsRead).toBeLessThan(400);
+});
+
+it('moves a note inside the folder without rewriting its terms or highlight row', { timeout: 120_000 }, async () => {
+	// Runs after the tests above, in the same database, with its token and policy.
+	const content = patchReadingFrontmatter(createReadingNote({ id: crypto.randomUUID(), url: 'https://example.invalid/moved', title: 'Moved article about gardens', savedAt: new Date().toISOString() }), { tags: ['garden'] });
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Before.md', content, null);
+	const file = (await env.DB.prepare("SELECT hash, storage_key FROM files WHERE path = 'Reading/Before.md'").first<{ hash: string; storage_key: string }>())!;
+	const terms = async () => (await env.DB.prepare('SELECT count(*) AS n FROM note_terms').first<{ n: number }>())!.n;
+	const before = await terms();
+	const meter = meterD1Usage(env.DB);
+	await writeCommittedMarkdownMove(env.BUCKET, meter.db, { source: { path: 'Reading/Before.md', expectedHash: file.hash, expectedRevision: file.storage_key }, destination: { path: 'Reading/Later/After.md', content } });
+	// Measured 17 with the library revision; 39 when the index deleted and added the note's
+	// rows. The file move itself writes about 10.
+	expect(meter.usage.rowsWritten).toBeLessThanOrEqual(17);
+	expect(await terms()).toBe(before);
+	const page = await readingItems(env, policy, false, { section: 'inbox', cursor: '', q: 'gardens' }) as { items: Array<{ path: string }> };
+	expect(page.items.map(item => item.path)).toEqual(['Reading/Later/After.md']);
 });

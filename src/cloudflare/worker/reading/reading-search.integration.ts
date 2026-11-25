@@ -84,7 +84,8 @@ it('pages by cursor and removes a deleted note from search', async () => {
 	const file = (await getStoredFileRow(env.DB, 'Reading/Note 0.md'))!;
 	await commitFileDelete(env.DB, { path: 'Reading/Note 0.md', expectedHash: file.hash, expectedRevision: file.storageKey, previousFile: file });
 	expect((await items('q=note&cursor=' + encodeURIComponent(first.cursor!))).items).toHaveLength(4);
-	expect(await env.DB.prepare("SELECT count(*) AS n FROM note_terms WHERE portable_path = 'reading/note 0.md'").first()).toMatchObject({ n: 0 });
+	// No term outlives its note.
+	expect(await env.DB.prepare('SELECT count(*) AS n FROM note_terms WHERE item NOT IN (SELECT id FROM reading_items)').first()).toMatchObject({ n: 0 });
 });
 
 it('lists an encrypted note from the card its upload carries, and keeps that card for an upload without one', async () => {
@@ -136,7 +137,8 @@ it('rebuilds an encrypted index past a note larger than the plaintext limit', as
 
 it('splits an encrypted rebuild into steps that each read at most 16 MB', async () => {
 	for (let n = 0; n < 12; n++) await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Reading/${String(n).padStart(2, '0')}.md`, `CRATE-E2EE/1\n${'x'.repeat(1_500_000)}`, null);
-	await env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
+	// As a restore leaves it: no rows, so every note is read again.
+	await env.DB.batch([env.DB.prepare('DELETE FROM reading_items'), env.DB.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL')]);
 	const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' };
 	const read = (file: Parameters<typeof readStoredNote>[1]) => readStoredNote(env, file, MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES);
 	expect((await ensureReadingIndex(env, policy, read, undefined, true)).state).toBe('pending');
@@ -165,7 +167,7 @@ it('checks a search\'s other words in the term index, so notes without them cost
 		const path = `reading/${n}.md`, savedAt = new Date(Date.UTC(2025, 0, 1) + n * 60_000).toISOString(), term = n % 2 ? 'p:rus' : 'p:des';
 		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, terms, words)
       VALUES (?, ?, 'r', 'h', 1, ?, '{}', ?, 'inbox', ?, ?)`).bind(path, `Reading/${n}.md`, crypto.randomUUID(), savedAt, JSON.stringify([term]), JSON.stringify([n % 2 ? 'rust' : 'design'])));
-		statements.push(env.DB.prepare("INSERT INTO note_terms(term, saved_at, portable_path) VALUES (?, ?, ?)").bind(term, savedAt, path));
+		statements.push(env.DB.prepare("INSERT INTO note_terms(term, saved_at, item) VALUES (?, ?, (SELECT id FROM reading_items WHERE portable_path = ?))").bind(term, savedAt, path));
 	}
 	for (let index = 0; index < statements.length; index += 500) await env.DB.batch(statements.slice(index, index + 500));
 	const meter = meterD1Usage(env.DB);
@@ -185,7 +187,7 @@ it('walks a small favorites section instead of a word every note has', async () 
 		const path = `reading/${n}.md`, savedAt = new Date(Date.UTC(2025, 0, 1) + n * 60_000).toISOString();
 		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, favorite, terms, words)
       VALUES (?, ?, 'r', 'h', 1, ?, '{}', ?, 'inbox', ?, '["p:art"]', '["artisan"]')`).bind(path, `Reading/${n}.md`, crypto.randomUUID(), savedAt, n < 20 ? 1 : 0));
-		statements.push(env.DB.prepare("INSERT INTO note_terms(term, saved_at, portable_path) VALUES ('p:art', ?, ?)").bind(savedAt, path));
+		statements.push(env.DB.prepare("INSERT INTO note_terms(term, saved_at, item) VALUES ('p:art', ?, (SELECT id FROM reading_items WHERE portable_path = ?))").bind(savedAt, path));
 	}
 	for (let index = 0; index < statements.length; index += 500) await env.DB.batch(statements.slice(index, index + 500));
 	const meter = meterD1Usage(env.DB);
@@ -202,7 +204,7 @@ it('stops a search walk after its scan budget and continues from the last entry 
 		const path = `reading/walk-${n}.md`, savedAt = new Date(Date.UTC(2024, 0, 1) + n * 60_000).toISOString();
 		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, terms, words)
       VALUES (?, ?, 'r', 'h', 1, ?, '{}', ?, 'inbox', '["p:art"]', '["article"]')`).bind(path, `Reading/walk-${n}.md`, crypto.randomUUID(), savedAt));
-		statements.push(env.DB.prepare("INSERT INTO note_terms(term, saved_at, portable_path) VALUES ('p:art', ?, ?)").bind(savedAt, path));
+		statements.push(env.DB.prepare("INSERT INTO note_terms(term, saved_at, item) VALUES ('p:art', ?, (SELECT id FROM reading_items WHERE portable_path = ?))").bind(savedAt, path));
 	}
 	for (let index = 0; index < statements.length; index += 500) await env.DB.batch(statements.slice(index, index + 500));
 	const policy = { enabled: 0, folder_path: 'Reading', generation: 'g', revision: 'r' };

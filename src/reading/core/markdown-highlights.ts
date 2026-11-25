@@ -102,8 +102,10 @@ function insertMarkers(markdown: string, plans: HighlightPlan[]): string {
 		insertions.set(span.start, `${insertions.get(span.start) ?? ''}==`);
 		insertions.set(span.end, `==${insertions.get(span.end) ?? ''}`);
 	}
-	for (const [offset, text] of [...insertions].sort(([a], [b]) => b - a)) markdown = markdown.slice(0, offset) + text + markdown.slice(offset);
-	return markdown;
+	// One pass: rebuilding the article per marker copies it once per highlight.
+	let written = '', last = 0;
+	for (const [offset, text] of [...insertions].sort(([a], [b]) => a - b)) { written += markdown.slice(last, offset) + text; last = offset; }
+	return written + markdown.slice(last);
 }
 
 /** Prefer native markers, but never change link targets or the rendered structure. */
@@ -131,9 +133,11 @@ function resolvePlans(plain: string, document: MarkdownDocument, plans: Highligh
 /** Change delimiter bytes only; otherwise store a contextual text annotation. */
 export function writeMarkdownHighlights(markdown: string, value: ReadingHighlight[]): { markdown: string; highlights: ReadingHighlight[] } {
 	const desired = readingHighlights(value), original = readingDocument(markdown);
-	const delimiters = [...new Set(original.marks.flatMap(mark => [mark.open, mark.close]))].sort((a, b) => b - a);
-	let plain = markdown;
-	for (const offset of delimiters) plain = plain.slice(0, offset) + plain.slice(offset + 2);
+	// Delimiters never overlap, so one pass drops each one's two bytes.
+	const delimiters = [...new Set(original.marks.flatMap(mark => [mark.open, mark.close]))].sort((a, b) => a - b);
+	let plain = '', kept = 0;
+	for (const offset of delimiters) { plain += markdown.slice(kept, offset); kept = offset + 2; }
+	plain += markdown.slice(kept);
 	const document = readingDocument(plain);
 	if (document.text !== original.text || document.html !== original.html) throw new Error('This Markdown cannot be highlighted safely. Edit its highlights in Obsidian.');
 	const plans: HighlightPlan[] = [], images: ReadingHighlight[] = [];

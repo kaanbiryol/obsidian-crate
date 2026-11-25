@@ -1,6 +1,6 @@
 /** Reading state an encryption reset removes when it begins, so late extraction cannot
  * publish into the replacement policy. */
-export const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 'highlight_index', 'reading_tags', 'reading_jobs', 'reading_captures'] as const;
+export const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 'highlight_index', 'reading_tags', 'reading_tag_counts', 'reading_jobs', 'reading_captures'] as const;
 
 /**
  * What an encryption reset does with every table in schema.sql. Completion empties

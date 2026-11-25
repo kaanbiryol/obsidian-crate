@@ -11,7 +11,8 @@ import { ENCRYPTED_READING_ACTIONS, EncryptedReadingApi } from '@/pwa/reading/en
 import { captureServerArticle } from './capture-article';
 import { readingImageType } from '@/reading/core/article-images';
 export { ReadingApiError } from './session/api-error';
-import { isReadingArticle, isReadingItem, parseReadingListPage, type ReadingArticle } from './storage/record-validation';
+import { isReadingArticle, isReadingItem, parseReadingChanges, parseReadingListPage, type ReadingArticle, type ReadingChangesAnswer } from './storage/record-validation';
+import { applyReadingChanges } from '@/reading/ui/library-changes';
 import { mapBounded } from '@/platform/map-bounded';
 import { sha256Hex } from '@/platform/sha256';
 import { isSha256Hex } from '@/platform/validation';
@@ -23,7 +24,9 @@ import { rethrowUnreachable } from '../connection/issues';
 
 const ENCRYPTED_READING_PATH = new RegExp(`^/reading/(?:${ENCRYPTED_READING_ACTIONS.join('|')})(?:\\?|$)`);
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
-onReadingEncryptionReset(() => { encryptedClient = undefined; });
+// The last library read per sign-in, so a refresh asks the server only what changed since.
+let lastLibrary: { identity: string; cache: ReadingCache } | undefined;
+onReadingEncryptionReset(() => { encryptedClient = undefined; lastLibrary = undefined; });
 
 /** The server answers within 20 seconds; larger bodies also need time to travel. An encrypted
  * capture uploads its images, and an encrypted extract downloads them. */
@@ -32,12 +35,13 @@ export function readingRequestTimeout(path: string, body?: string): number {
 	return 20_000 + upload + (path === '/reading/encrypted-extract' ? 40_000 : 0);
 }
 
-async function rawReadingRequest(path: string, session: ReadingSession | null, body?: string, extraHeaders: Record<string, string> = {}): Promise<Response> {
+async function rawReadingRequest(path: string, session: ReadingSession | null, body?: string, extraHeaders: Record<string, string> = {}, signal?: AbortSignal): Promise<Response> {
 	if (session) assertReadingSession(session);
 	const method = body === undefined ? 'GET' : 'POST';
 	const protocolHeaders = crateRequestHeaders(session?.token, await crateProtocol(path, method));
 	if (session) assertReadingSession(session);
-	const response = await fetch(path, { method, cache: 'no-store', signal: AbortSignal.timeout(readingRequestTimeout(path, body)),
+	const timeout = AbortSignal.timeout(readingRequestTimeout(path, body));
+	const response = await fetch(path, { method, cache: 'no-store', signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
 		headers: { ...protocolHeaders, ...session ? readingEncryptionHeaders() : {}, 'Content-Type': 'application/json', ...extraHeaders }, body }).catch(rethrowUnreachable);
 	if (session) assertReadingSession(session);
 	await forgetRefusedProtocol(response);
@@ -48,8 +52,8 @@ async function rawReadingRequest(path: string, session: ReadingSession | null, b
 	checkEncryptionSignals(response, path, { probePath: '/reading/encryption', message: 'The encrypted Reading folder changed.' });
 	return response;
 }
-export function readingRequest<T>(path: string, session: ReadingSession | null, body?: string): Promise<T> {
-	return retryAfterEncryptionChange(refresh => preparedReadingRequest<T>(path, session, body, refresh));
+export function readingRequest<T>(path: string, session: ReadingSession | null, body?: string, signal?: AbortSignal): Promise<T> {
+	return retryAfterEncryptionChange(refresh => preparedReadingRequest<T>(path, session, body, refresh, signal));
 }
 /** The encrypted client for this session and key generation. */
 function encryptedReadingApi(session: ReadingSession, keys: FeatureKeys): EncryptedReadingApi {
@@ -58,23 +62,23 @@ function encryptedReadingApi(session: ReadingSession, keys: FeatureKeys): Encryp
 		captureArticle: (url, options) => captureServerArticle(url, body => rawReadingRequest('/reading/encrypted-extract', session, body), options),
 		folderPath: keys.folderPath, wireFolder: keys.wireFolder, paths: keys.paths, generation: keys.generation, authority: { vaultId: keys.vaultId, scopeId: 'vault', key: keys.vault },
 		searchKey: keys.readingSearch,
-		request: (route, wire, headers) => rawReadingRequest(route, session, wire, headers),
+		request: (route, wire, headers, signal) => rawReadingRequest(route, session, wire, headers, signal),
 		readAttempt: id => readReadingAttempt(session, id),
 		writeAttempt: (id, attempt) => writeReadingAttempt(session, id, attempt),
 		error: (message, status, code) => new ReadingApiError(message, status, code),
 	}) };
 	return encryptedClient.api;
 }
-async function preparedReadingRequest<T>(path: string, session: ReadingSession | null, body?: string, refresh = false): Promise<T> {
+async function preparedReadingRequest<T>(path: string, session: ReadingSession | null, body?: string, refresh = false, signal?: AbortSignal): Promise<T> {
 	if (session) {
 		const keys = await prepareReadingEncryption(session, refresh, body !== undefined);
 		if (keys && ENCRYPTED_READING_PATH.test(path)) {
-			const value = await encryptedReadingApi(session, keys).request(path, body); assertReadingSession(session);
+			const value = await encryptedReadingApi(session, keys).request(path, body, signal); assertReadingSession(session);
 			return value as T;
 		}
 		if (!keys) encryptedClient = undefined;
 	}
-	return await readingResponseJson(await rawReadingRequest(path, session, body), session) as T;
+	return await readingResponseJson(await rawReadingRequest(path, session, body, {}, signal), session) as T;
 }
 
 /** A response's JSON body, once the session it answered is still current. A failed
@@ -95,14 +99,21 @@ const MAX_READING_LIST_ISSUES = 10_000;
 
 /** What a library query asks the server for; an encrypted vault's client hashes it. */
 export interface ReadingItemsQuery { section: string; q?: string; tag?: string; url?: string; id?: string; cursor?: string }
-export interface ReadingItemsPage { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: string | null }
+export interface ReadingItemsPage { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: string | null; revision?: string }
 
-/** One server page of the library, newest first. */
-export async function queryReadingItems(session: ReadingSession, query: ReadingItemsQuery): Promise<ReadingItemsPage> {
+/** One server page of the library, newest first. `signal` cancels it, such as a search typed past. */
+export async function queryReadingItems(session: ReadingSession, query: ReadingItemsQuery, signal?: AbortSignal): Promise<ReadingItemsPage> {
 	const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== ''));
-	const page = parseReadingListPage(await readingRequest<unknown>(`/reading/items?${params}`, session), readingNoteFolder(session));
+	const page = parseReadingListPage(await readingRequest<unknown>(`/reading/items?${params}`, session, undefined, signal), readingNoteFolder(session));
 	if (!page || page.issues.length > MAX_READING_LIST_ISSUES) throw new Error('Reading library response is unreadable.');
-	return { items: page.items, issues: page.issues, cursor: page.cursor };
+	return { items: page.items, issues: page.issues, cursor: page.cursor, ...page.revision ? { revision: page.revision } : {} };
+}
+
+/** What changed in the library since `since`, or `reset`. */
+async function queryReadingChanges(session: ReadingSession, since: string): Promise<ReadingChangesAnswer> {
+	const changes = parseReadingChanges(await readingRequest<unknown>(`/reading/changes?since=${encodeURIComponent(since)}`, session), readingNoteFolder(session));
+	if (!changes || !changes.reset && changes.issues.length > MAX_READING_LIST_ISSUES) throw new Error('Reading library response is unreadable.');
+	return changes;
 }
 
 /** The tags of one section's notes, most used first with their counts. The server breaks ties
@@ -116,14 +127,33 @@ export async function queryReadingTags(session: ReadingSession, section: Reading
 }
 
 /** The library's first inbox page and its issues, kept in memory. The library stays on the
- * server; sections and searches read their own pages. A confirmed page also lets earlier
- * sign-ins' offline copies go. */
+ * server; sections and searches read their own pages. After the first read, a refresh asks what
+ * changed since and applies it: an unchanged library returns the same object, and the changes
+ * travel with a new one so the loaded sections apply them too. A confirmed first page also lets
+ * earlier sign-ins' offline copies go. */
 export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
+	const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath]);
+	const previous = lastLibrary?.identity === identity ? lastLibrary.cache : undefined;
+	if (previous?.revision) {
+		const changes = await queryReadingChanges(session, previous.revision);
+		if (!changes.reset) {
+			if (changes.revision === previous.revision) return previous;
+			const delta = { from: previous.revision, to: changes.revision, items: changes.items, removed: changes.removed };
+			const changed = new Set([...changes.removed, ...changes.items.map(item => item.path), ...changes.issues.map(issue => issue.path)]);
+			const cache: ReadingCache = { items: applyReadingChanges('inbox', previous.items, (previous.cursor ?? null) === null, delta),
+				issues: [...previous.issues.filter(issue => !changed.has(issue.path)), ...changes.issues], savedAt: Date.now(), cursor: previous.cursor ?? null,
+				revision: changes.revision, changes: delta };
+			lastLibrary = { identity, cache };
+			return cache;
+		}
+	}
 	const page = await queryReadingItems(session, { section: 'inbox' });
 	if (new Set(page.items.map(item => item.crate_reading_id)).size !== page.items.length) throw new Error('Reading library response is unreadable.');
 	// Best effort: a failed cleanup must not hide a library the server just returned.
 	await removeEarlierSessionCopies(session).catch(() => {});
-	return { items: page.items, issues: page.issues, savedAt: Date.now(), cursor: page.cursor };
+	const cache: ReadingCache = { items: page.items, issues: page.issues, savedAt: Date.now(), cursor: page.cursor, ...page.revision ? { revision: page.revision } : {} };
+	lastLibrary = { identity, cache };
+	return cache;
 }
 
 /** A confirmed edit. `article`
@@ -163,13 +193,13 @@ export async function reloadReadingAfterWrites(session: ReadingSession, writes: 
 
 /** An image in the Reading folder, as a blob typed by its file name. An encrypted vault's
  * copy is decrypted and checked against its own metadata. */
-export async function loadReadingImage(session: ReadingSession, path: string): Promise<Blob> {
+export async function loadReadingImage(session: ReadingSession, path: string, signal?: AbortSignal): Promise<Blob> {
 	const type = readingImageType(path);
 	if (!type) throw new Error('This is not an image.');
 	const bytes = await retryAfterEncryptionChange(async refresh => {
 		const keys = await prepareReadingEncryption(session, refresh);
-		if (keys) return encryptedReadingApi(session, keys).image(path);
-		const response = await rawReadingRequest(`/reading/file?${new URLSearchParams({ path })}`, session);
+		if (keys) return encryptedReadingApi(session, keys).image(path, signal);
+		const response = await rawReadingRequest(`/reading/file?${new URLSearchParams({ path })}`, session, undefined, {}, signal);
 		if (!response.ok) { const failure = await responseError(response, 'Image is unavailable.'); throw new ReadingApiError(failure.message, response.status, failure.code); }
 		return new Uint8Array(await response.arrayBuffer());
 	});

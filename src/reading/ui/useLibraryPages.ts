@@ -2,14 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { sameJson } from '@/platform/validation';
 import type { ReadingItem } from '../core/model';
 import type { ReadingSection, ReadingTag } from '../core/reading-presentation';
+import { applyReadingChanges, type ReadingLibraryChanges } from './library-changes';
 
 /** A host whose library stays on a server: each section, search and tag reads its own pages. */
 export interface ReadingLibrarySource {
-	load: (query: { section: ReadingSection; q: string; tag: string | null; cursor: string | null }) => Promise<{ items: ReadingItem[]; cursor: string | null }>;
+	/** `signal` aborts once the answer can no longer show, such as a search typed past. */
+	load: (query: { section: ReadingSection; q: string; tag: string | null; cursor: string | null }, signal?: AbortSignal) => Promise<{ items: ReadingItem[]; cursor: string | null }>;
 	/** The tags of one section's notes, for the tag filter. */
 	loadTags: (section: ReadingSection) => Promise<ReadingTag[]>;
 	/** Changes whenever the library may have changed, so the loaded pages reload. */
 	revision: unknown;
+	/** The server's library revision `revision` answers for. */
+	at?: string;
+	/** What changed since the previous revision: loaded sections apply it instead of reloading. */
+	changes?: ReadingLibraryChanges;
 	/** Local changes shown over the server's pages. */
 	present: (items: ReadingItem[]) => ReadingItem[];
 	/** Pages kept outside the list, so `prefetchLibrarySection` can read them before it mounts. */
@@ -25,7 +31,7 @@ interface Pages extends ShownLibraryQuery { key: string; items: ReadingItem[]; p
 /** What a query or section answered, and the library revision it answered for. */
 interface Cached { items: ReadingItem[]; present: Present; cursor: string | null; revision: unknown; browse: boolean }
 interface CachedTags { tags: ReadingTag[]; revision: unknown }
-export interface LibraryPageCache { revision: unknown; pages: Map<string, Cached>; tags: Map<ReadingSection, CachedTags> }
+export interface LibraryPageCache { revision: unknown; at?: string; pages: Map<string, Cached>; tags: Map<ReadingSection, CachedTags> }
 export const createLibraryPageCache = (): LibraryPageCache => ({ revision: undefined, pages: new Map(), tags: new Map() });
 // Typing waits this long before a search reaches the server.
 const SEARCH_DELAY_MS = 250;
@@ -54,18 +60,28 @@ function reuseUnchanged(shown: ReadingItem[], next: ReadingItem[]): ReadingItem[
 	return changed ? items : shown;
 }
 
-/** Moves a cache to a new revision: searches and tags are read again; sections keep their pages to show while they reload. */
-function moveToRevision(cache: LibraryPageCache, revision: unknown): void {
+/** Moves a cache to a new revision: searches and tags are read again. Sections current at the
+ * previous revision apply the source's changes in place when they start from it; otherwise they
+ * keep their pages to show while they reload. */
+function moveToRevision(cache: LibraryPageCache, source: Pick<ReadingLibrarySource, 'revision' | 'at' | 'changes' | 'present'> | undefined): void {
+	const revision = source?.revision;
 	if (cache.revision === revision) return;
-	for (const [key, cached] of cache.pages) if (!cached.browse) cache.pages.delete(key);
+	const changes = source?.changes, applies = !!changes && cache.at !== undefined && changes.from === cache.at;
+	for (const [key, cached] of cache.pages) {
+		if (!cached.browse) { cache.pages.delete(key); continue; }
+		if (!applies || cached.revision !== cache.revision) continue;
+		const [section] = JSON.parse(key) as [ReadingSection];
+		cache.pages.set(key, { ...cached, items: applyReadingChanges(section, cached.items, cached.cursor === null, changes), present: source.present, revision });
+	}
 	cache.revision = revision;
+	cache.at = source?.at;
 }
 
 /** Follows a few empty pages, which a bounded Highlights scan can return, before giving up. */
-async function loadFirstPages(source: ReadingLibrarySource, query: { section: ReadingSection; q: string; tag: string | null }, cursor: string | null, stale: () => boolean) {
-	let page = await source.load({ ...query, cursor });
+async function loadFirstPages(source: ReadingLibrarySource, query: { section: ReadingSection; q: string; tag: string | null }, cursor: string | null, stale: () => boolean, signal?: AbortSignal) {
+	let page = await source.load({ ...query, cursor }, signal);
 	for (let follows = 0; !page.items.length && page.cursor && follows < MAX_EMPTY_FOLLOWS && !stale(); follows++) {
-		page = await source.load({ ...query, cursor: page.cursor });
+		page = await source.load({ ...query, cursor: page.cursor }, signal);
 	}
 	return page;
 }
@@ -75,7 +91,7 @@ async function loadFirstPages(source: ReadingLibrarySource, query: { section: Re
 export async function prefetchLibrarySection(source: ReadingLibrarySource, section: ReadingSection): Promise<void> {
 	const cache = source.cache, key = JSON.stringify([section, '', null]);
 	if (!cache) return;
-	moveToRevision(cache, source.revision);
+	moveToRevision(cache, source);
 	if (cache.pages.has(key) && cache.tags.has(section)) return;
 	const answering = cache.revision;
 	const [page, tags] = await Promise.all([loadFirstPages(source, { section, q: '', tag: null }, null, () => false), source.loadTags(section)]);
@@ -105,19 +121,24 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 	const [ownCache] = useState(createLibraryPageCache);
 	const cache = useRef(ownCache);
 	cache.current = source?.cache ?? ownCache;
-	moveToRevision(cache.current, revision);
+	moveToRevision(cache.current, source);
 	// A query read before shows in the same render, so returning to it never paints a loading state.
 	const known = cache.current.pages.get(key), knownTags = cache.current.tags.get(section);
 	const pages: Pages = enabled && loaded.key !== key && known && knownTags
 		? { key, section, q: query, tag, items: known.items, present: known.present, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null }
 		: loaded;
 	const current = useRef(key), latest = useRef(source), shown = useRef(pages), stored = useRef(loaded), requests = useRef(0);
+	// The request in flight, cancelled once a newer one replaces it or the query changes.
+	const inflight = useRef<{ key: string; controller: AbortController }>(undefined);
 	current.current = key; latest.current = source; shown.current = pages; stored.current = loaded;
 	const fetchPage = useCallback(async (cursor: string | null, replace: boolean) => {
 		const source = latest.current, saved = cache.current, answering = saved.revision;
 		if (!source) return;
 		// Only the latest request applies, so a page answered after a refresh cannot leave a gap.
 		const requested = key, request = ++requests.current, stale = () => current.current !== requested || requests.current !== request;
+		inflight.current?.controller.abort();
+		const controller = new AbortController(), signal = controller.signal;
+		inflight.current = { key: requested, controller };
 		// A refresh of the shown query reads as many items as it shows, so the list keeps its place.
 		const keep = replace && shown.current.key === requested ? shown.current.items.length : 0;
 		// A reload of the shown query runs in the background; only a next page shows its spinner.
@@ -131,9 +152,9 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 			return knownTags?.tags ?? (shown.current.section === section ? shown.current.tags : []);
 		}) : Promise.resolve(freshTags ?? shown.current.tags);
 		try {
-			let page = await loadFirstPages(source, { section, q: query, tag }, cursor, stale), items = page.items;
+			let page = await loadFirstPages(source, { section, q: query, tag }, cursor, stale, signal), items = page.items;
 			for (let read = 1; replace && page.cursor && items.length < keep && read < MAX_RELOAD_PAGES && !stale(); read++) {
-				page = await source.load({ section, q: query, tag, cursor: page.cursor });
+				page = await source.load({ section, q: query, tag, cursor: page.cursor }, signal);
 				items = appendNew(items, page.items);
 			}
 			const sectionTags = await tags;
@@ -155,18 +176,35 @@ export function useLibraryPages(source: ReadingLibrarySource | undefined, sectio
 				: { key: requested, section, q: query, tag, items: [], cursor: null, tags: state.section === section ? state.tags : [], loading: false, error });
 		}
 	}, [key, section, query, tag]);
+	/** Reads the section's tags again, for pages brought to a new revision in place. */
+	const fetchTags = useCallback(async () => {
+		const source = latest.current, saved = cache.current, answering = saved.revision;
+		if (!source) return;
+		try {
+			const tags = await source.loadTags(section);
+			if (saved.revision !== answering) return;
+			saved.tags.set(section, { tags, revision: answering });
+			setPages(state => state.section === section && !sameJson(state.tags, tags) ? { ...state, tags } : state);
+		} catch { /* The tags shown stay; the next load asks again. */ }
+	}, [section]);
 	useEffect(() => {
+		// Another query's answer could no longer show.
+		if (inflight.current && inflight.current.key !== key) { inflight.current.controller.abort(); inflight.current = undefined; }
 		if (!enabled) return;
 		// A query read before shows at once. Since the last revision it needs no request;
 		// an older answer stays on screen while it reloads in the background.
 		const known = cache.current.pages.get(key), knownTags = cache.current.tags.get(section);
 		if (known && knownTags) {
-			if (stored.current.key !== key) setPages({ key, section, q: query, tag, items: known.items, present: known.present, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null });
+			if (stored.current.key !== key || stored.current.items !== known.items) {
+				setPages({ key, section, q: query, tag, items: known.items, present: known.present, cursor: known.cursor, tags: knownTags.tags, loading: false, error: null });
+			}
 			if (known.revision === revision && knownTags.revision === revision) return;
+			// Pages the revision's changes were applied to read only their tags again.
+			if (known.revision === revision) { void fetchTags(); return; }
 		}
 		const timer = window.setTimeout(() => { void fetchPage(null, true); }, query ? SEARCH_DELAY_MS : 0);
 		return () => window.clearTimeout(timer);
-	}, [fetchPage, key, section, query, tag, enabled, revision]);
+	}, [fetchPage, fetchTags, key, section, query, tag, enabled, revision]);
 	const settled = pages.key === key;
 	// A request unanswered past SLOW_LIBRARY_QUERY_MS shows a loading state rather than the
 	// previous query. A search counts from when its typing delay sends the request.

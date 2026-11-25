@@ -52,8 +52,8 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 		const id = typeof body.captureId === 'string' ? body.captureId : crypto.randomUUID();
 		// One round trip answers every check below. A note's link is its `u:` term.
 		const [saved, waiting, full, taken] = await env.DB.batch<{ results: Array<{ item_id?: string; id?: string }> }>([
-			env.DB.prepare(`SELECT item_id FROM reading_items WHERE portable_path IN (
-        SELECT portable_path FROM note_terms WHERE term = ? LIMIT 2)`).bind(`u:${identity}`),
+			env.DB.prepare(`SELECT item_id FROM reading_items WHERE id IN (
+        SELECT item FROM note_terms WHERE term = ? LIMIT 2)`).bind(`u:${identity}`),
 			env.DB.prepare('SELECT id FROM reading_captures WHERE generation=? AND url_identity=?').bind(current.generation, identity),
 			env.DB.prepare('SELECT 1 WHERE (SELECT count(*) FROM reading_jobs)+(SELECT count(*) FROM reading_captures)>=1000'),
 			env.DB.prepare('SELECT 1 FROM reading_captures WHERE id=? UNION ALL SELECT 1 FROM reading_items WHERE item_id=? LIMIT 1').bind(id, id),
@@ -83,6 +83,8 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 			await env.DB.batch([
 				env.DB.prepare('INSERT INTO reading_captures(id,generation,url_identity,note,available_at) VALUES (?,?,?,?,?)')
 					.bind(id, current.generation, identity, note, Date.now()),
+				// The first page lists queued captures; the changelog does not.
+				env.DB.prepare('UPDATE reading_policy SET epoch = epoch + 1 WHERE id = 1'),
 				operationStatement(env.DB, op, response),
 			]);
 			return readingResponse(response);

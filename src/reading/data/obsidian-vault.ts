@@ -41,10 +41,10 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 			signal.throwIfAborted();
 			validate();
 			const result: ReadingFile[] = [];
+			// The extension is checked first: saved images outnumber notes and are never listed.
 			const walk = (entry: TAbstractFile) => {
-				if (!allowed(entry.path)) return;
-				if (entry instanceof TFolder) for (const child of entry.children) walk(child);
-				else if (entry instanceof TFile && entry.extension.toLowerCase() === 'md') result.push(readingFile(entry));
+				if (entry instanceof TFile) { if (entry.extension.toLowerCase() === 'md' && allowed(entry.path)) result.push(readingFile(entry)); }
+				else if (entry instanceof TFolder && allowed(entry.path)) for (const child of entry.children) walk(child);
 			};
 			const root = vault.getAbstractFileByPath(folder);
 			if (root) walk(root);
@@ -70,7 +70,17 @@ export function createObsidianReadingVault(vault: Vault, folder: string, options
 			const file = vault.getAbstractFileByPath(path);
 			if (file instanceof TFile) fileEvents.set(file, (fileEvents.get(file) ?? 0) + 1);
 		},
-		occupied: path => vault.getAllLoadedFiles().some(file => portablePathKey(file.path) === portablePathKey(path)),
+		// Only the folders on the path are walked, each matching any case: a vault-wide scan
+		// costs every file per candidate name.
+		occupied: path => {
+			let level: TAbstractFile[] = [vault.getRoot()];
+			const segments = path.split('/');
+			for (let i = 1; i <= segments.length && level.length; i++) {
+				const key = portablePathKey(segments.slice(0, i).join('/'));
+				level = level.flatMap(entry => entry instanceof TFolder ? entry.children.filter(child => portablePathKey(child.path) === key) : []);
+			}
+			return level.length > 0;
+		},
 		read: async file => { const content = await readVaultMarkdown(vault, resolve(file)).catch(strictUtf8); resolve(file); return content; },
 		process: (file, update) => processVaultMarkdown(vault, resolve(file), current => { resolve(file); return update(current); }).catch(strictUtf8),
 		create: async (path, content) => {

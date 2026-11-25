@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
-import { reset } from 'cloudflare:test';
+import { resetAfterAlarms } from '../test-support/reset-test-harness';
 import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '@/protocol/server-info';
@@ -18,7 +18,7 @@ beforeEach(async () => {
 			.bind(id, await sha256Hex(id), expires))),
 	]);
 });
-afterEach(async () => { await reset(); });
+afterEach(resetAfterAlarms);
 
 const call = (path: string, init: { method?: string; bearer?: string; body?: unknown; headers?: Record<string, string> }) => worker.fetch(new Request(`https://test${path}`, {
 	method: init.method ?? 'POST', body: init.body === undefined ? undefined : JSON.stringify(init.body),

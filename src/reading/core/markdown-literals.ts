@@ -6,8 +6,11 @@ const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '
 // targets, math commands, footnote identifiers, callout types, or block IDs.
 const literal = /^(?:!?\[\[[^\r\n]*?\]\]|\[\^[^\]\r\n]+\]|\^\[[^\]\r\n]+\]|\[![\w-]+\][+-]?|\$\$(?:\\[\s\S]|(?!\$\$)[^\\])+?\$\$|\$(?!\$)(?:\\[^\r\n]|[^$\\\r\n])+?\$(?!\$)|%%[\s\S]*?%%|\^[\w-]+(?=[ \t]*(?:\n|$)))/;
 /** `source.search(/^ {0,3}\$\$/m)`: marked calls it with the rest of the note at every
- * paragraph, and `indexOf` skips text far faster than that regex can. */
-function mathBlockStart(source: string): number {
+ * paragraph, and `indexOf` skips text far faster than that regex can. Marked only cuts the
+ * paragraph at the answer, and a paragraph ends at a blank line, so the search stops there:
+ * searching the whole rest of the note at every paragraph grew with the square of its length. */
+function mathBlockStart(note: string): number {
+	const blank = note.indexOf('\n\n'), source = blank < 0 ? note : note.slice(0, blank);
 	for (let at = source.indexOf('$$'); at >= 0; at = source.indexOf('$$', at + 1)) {
 		let line = at;
 		while (line > 0 && at - line < 3 && source[line - 1] === ' ') line--;

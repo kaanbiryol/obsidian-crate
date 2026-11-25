@@ -8,7 +8,7 @@ import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
 import { portablePathKey } from '@/protocol/portable-path';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { sha256Hex } from '@/platform/sha256';
-import { FILE_FOLDER_MATCH, fileFolderArgs } from '../sync/file-identity';
+import { fileFolderArgs } from '../sync/file-identity';
 import type { Env } from '../types';
 import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-paths';
 
@@ -18,7 +18,21 @@ import { isMarkdownNoteInFolder, isMarkdownPath } from '../../../protocol/note-p
 const INDEX_FORMAT = 1;
 /** The upsert's unindexed columns for a note with a current card or metadata, from `committed c`. */
 const UNINDEXED = `storage_key = c.storage_key, hash = c.hash, size = c.size, metadata_json = c.metadata_json,
-        error = c.error, words = c.words, terms = c.terms, card = c.card, highlighted_at = c.highlighted_at`;
+        error = c.error, words = c.words, terms = c.terms, tag_terms = c.tag_terms, card = c.card, highlighted_at = c.highlighted_at`;
+/** The sections a row's tags are counted in, as their lists select them. */
+const SECTION_ROWS = "sections(section) AS (VALUES ('inbox'), ('archived'), ('favorites'), ('highlights'))";
+const LISTED_IN = (row: string) => `CASE s.section WHEN 'inbox' THEN ${row}.status = 'inbox' WHEN 'archived' THEN ${row}.status = 'archived'
+        WHEN 'favorites' THEN ${row}.favorite = 1 ELSE ${row}.highlighted_at IS NOT NULL AND ${row}.status IS NOT NULL END`;
+/** Listed in the web app: an unencrypted note without a duplicate ID, or an encrypted note with a card. */
+const VISIBLE = (row: string, duplicate = `${row}.duplicate`) => `((${row}.metadata_json IS NOT NULL AND ${duplicate} = 0) OR ${row}.card IS NOT NULL)`;
+/** Adds each row's `n` to the count of every section and tag it is listed under. `rows` selects
+ * `tag_terms`, `status`, `favorite`, `highlighted_at`, `visible` and `n`. Only counts that change
+ * are written; CROSS JOIN keeps `rows` outermost, so it is read once, not once per section.
+ * Follows a WITH list, or starts one with `WITH`. */
+const countChange = (rows: string) => `${SECTION_ROWS}, changed AS (${rows})
+      INSERT INTO reading_tag_counts(section, term, count) SELECT s.section, t.value, sum(x.n) FROM changed x CROSS JOIN json_each(x.tag_terms) t CROSS JOIN sections s
+      WHERE x.visible AND ${LISTED_IN('x')} GROUP BY s.section, t.value HAVING sum(x.n) != 0
+      ON CONFLICT(section, term) DO UPDATE SET count = reading_tag_counts.count + excluded.count`;
 const REBUILD_PAGE = 25;
 /** Bytes one rebuild step reads, so up to 25 notes of up to 4 MB stay within Worker memory. */
 const REBUILD_BYTES = 16 * 1024 * 1024;
@@ -57,6 +71,8 @@ interface IndexRow {
 	highlighted_at?: string | null; highlight_terms?: string | null; highlight_words?: string | null;
 	/** An encrypted note's sealed tag names, as JSON. */
 	tag_names?: string | null;
+	/** The note's tag terms, as JSON: counted per section in `reading_tag_counts`. */
+	tag_terms?: string | null;
 }
 
 /** The Reading card an encrypted upload carries as its public data, or null. */
@@ -89,7 +105,7 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 		const { fields } = data;
 		const highlights = { highlighted_at: data.highlighted_at, highlight_terms: JSON.stringify(data.highlight_terms), tag_names: JSON.stringify(data.tag_names) };
 		return { ...row, item_id: fields.item_id, saved_at: fields.saved_at, status: fields.status, favorite: fields.favorite ? 1 : 0,
-			terms: JSON.stringify(data.terms), card: JSON.stringify({ card: data.card }), ...highlights };
+			terms: JSON.stringify(data.terms), tag_terms: JSON.stringify(data.tag_names.map(tag => tag.term)), card: JSON.stringify({ card: data.card }), ...highlights };
 	}
 	if (size > MAX_READING_BYTES) return { ...row, error: READING_SIZE_ERROR };
 	if (content == null || typeof content !== 'string' && content.byteLength !== size) return 'unknown';
@@ -104,10 +120,11 @@ async function indexRow(change: ReadingFileChange, encrypted: boolean): Promise<
 		if (!block || block.text.trim()) article_edited = 1;
 		else article_hash = await sha256Hex(block.text);
 	}
+	const terms = readingTerms(metadata);
 	return { ...row, item_id: metadata.crate_reading_id, url: metadata.source_url || null,
 		metadata_json: JSON.stringify(metadata), article_hash, article_edited, saved_at: metadata.saved_at,
 		status: metadata.reading_status, favorite: metadata.favorite ? 1 : 0,
-		terms: JSON.stringify(readingTerms(metadata)), words: JSON.stringify(searchWords(metadata.title)),
+		terms: JSON.stringify(terms), tag_terms: JSON.stringify(terms.filter(term => term.startsWith('t:'))), words: JSON.stringify(searchWords(metadata.title)),
 		highlighted_at: highlightedAt(metadata), highlight_terms: JSON.stringify(highlightTerms(metadata)), highlight_words: JSON.stringify(highlightSearchWords(metadata)) };
 }
 
@@ -139,31 +156,84 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
       json_extract(value, '$.terms') AS terms, json_extract(value, '$.words') AS words, json_extract(value, '$.card') AS card,
       COALESCE(json_extract(value, '$.stale'), 0) AS stale, json_extract(value, '$.highlighted_at') AS highlighted_at,
       json_extract(value, '$.highlight_terms') AS highlight_terms, json_extract(value, '$.highlight_words') AS highlight_words,
-      json_extract(value, '$.tag_names') AS tag_names FROM json_each(?1)),
+      json_extract(value, '$.tag_names') AS tag_names, json_extract(value, '$.tag_terms') AS tag_terms FROM json_each(?1)),
     committed AS (SELECT i.* FROM input i WHERE EXISTS (SELECT 1 FROM reading_policy WHERE id = 1 AND folder_path = ?2)
       AND CASE WHEN i.storage_key IS NULL THEN NOT EXISTS (SELECT 1 FROM files f WHERE f.portable_path = i.portable AND f.path = i.path)
         ELSE EXISTS (SELECT 1 FROM files f WHERE f.portable_path = i.portable AND f.path = i.path AND f.storage_key = i.storage_key) END) `;
 	const statement = (sql: string, ...args: unknown[]) => db.prepare(committed + sql).bind(json, policy.folder_path, ...args);
 	const removes = rows.some(row => !row.keep), keeps = rows.filter(row => row.keep), plain = keeps.filter(row => !row.stale);
-	const removed = `portable_path IN (SELECT portable FROM committed WHERE keep = 0 AND storage_key IS NOT NULL)
-        OR (portable_path, path) IN (SELECT portable, path FROM committed WHERE storage_key IS NULL)`;
-	// A note's terms are keyed by its saved date, so they change only when a note leaves or its
-	// terms or saved date differ; a status edit keeps them. The row's own term list names every
-	// key to delete, so no second index on the terms is needed.
-	const termKeys = (rows: string) => `(term, saved_at, portable_path) IN (SELECT t.value, r.saved_at, r.portable_path FROM (${rows}) r, json_each(r.terms) t)`;
+	// A path this batch also keeps is an update of that row, not a removal.
+	const removed = `(portable_path IN (SELECT portable FROM committed WHERE keep = 0 AND storage_key IS NOT NULL)
+        OR (portable_path, path) IN (SELECT portable, path FROM committed WHERE storage_key IS NULL))
+        AND portable_path NOT IN (SELECT portable FROM committed WHERE keep = 1)`;
+	// Derived rows name a note by its row id, so a note keeps them while it moves.
+	const termKeys = (rows: string) => `(term, saved_at, item) IN (SELECT t.value, r.saved_at, r.id FROM (${rows}) r, json_each(r.terms) t)`;
 	// The rows whose terms this batch may remove, read before `reading_items` changes.
 	const lostTerms = (rows: string) => `SELECT t.value FROM (${rows}) r, json_each(r.terms) t`;
+	// A row this batch writes or removes, by its current state; `removed` names the row the
+	// innermost query reads.
+	const touched = `(portable_path IN (SELECT portable FROM committed WHERE keep = 1 AND stale = 0) OR (${removed}))`;
+	// Reading IDs rows leave in this batch, read before the rows change: only their groups can
+	// shrink, so only their duplicates can end. Each group is counted as it will be after the
+	// batch: its rows the batch leaves alone, and the batch's notes that will carry the ID.
+	const left = [
+		...removes ? [`SELECT item_id FROM reading_items WHERE item_id IS NOT NULL AND (${removed})`] : [],
+		`SELECT i.item_id FROM committed c JOIN reading_items i ON i.portable_path = c.portable
+          WHERE c.keep = 1 AND c.stale = 0 AND i.item_id IS NOT NULL AND i.item_id IS NOT c.item_id`,
+	].join(' UNION ALL ');
+	const ended = `duplicate = 1 AND item_id IN (${left}) AND NOT ${touched}
+        AND (SELECT count(*) FROM reading_items d WHERE d.item_id = reading_items.item_id AND NOT ${touched})
+          + (SELECT count(*) FROM committed c WHERE c.keep = 1 AND c.stale = 0 AND c.item_id = reading_items.item_id) = 1`;
 	return [
-		...(removes ? [statement(`DELETE FROM note_terms WHERE ${termKeys(`SELECT terms, saved_at, portable_path FROM reading_items WHERE ${removed}`)}`)] : []),
-		// A changed saved date moves every key; otherwise only the terms the note lost leave,
-		// and the insert below adds only the new ones.
-		...(plain.length ? [statement(`DELETE FROM note_terms WHERE (term, saved_at, portable_path) IN (
-        SELECT t.value, i.saved_at, i.portable_path FROM committed c JOIN reading_items i ON i.portable_path = c.portable, json_each(i.terms) t
+		// Duplicates whose other copies this batch moves to another ID or removes end here, with
+		// their notes listed again; the recount at the end handles the IDs the batch writes.
+		...(removes || plain.length ? [
+			statement(`, ${countChange(`SELECT tag_terms, status, favorite, highlighted_at, 1 AS visible, 1 AS n
+        FROM reading_items WHERE ${ended} AND metadata_json IS NOT NULL AND card IS NULL`)}`),
+			statement(`UPDATE reading_items SET duplicate = 0 WHERE ${ended}`),
+		] : []),
+		// A move removes its source and keeps its destination in one batch. The note's row moves
+		// to the new path with its terms, highlight row and counts; the statements below then
+		// change only what else differs.
+		...(removes && keeps.some(row => row.item_id) ? [statement(`UPDATE reading_items SET path = c.path, portable_path = c.portable
+        FROM committed c, committed r WHERE c.keep = 1 AND c.item_id IS NOT NULL AND r.storage_key IS NULL
+          AND reading_items.portable_path = r.portable AND reading_items.path = r.path AND reading_items.item_id = c.item_id
+          AND NOT EXISTS (SELECT 1 FROM reading_items x WHERE x.portable_path = c.portable)`)] : []),
+		...(removes ? [
+			statement(`DELETE FROM note_terms WHERE ${termKeys(`SELECT id, terms, saved_at FROM reading_items WHERE ${removed}`)}`),
+			// One subquery per statement: a row-value IN over a compound select scans the whole table.
+			statement(`DELETE FROM highlight_index WHERE (highlighted_at, item) IN (
+        SELECT highlighted_at, id FROM reading_items WHERE highlighted_at IS NOT NULL AND (${removed}))`),
+		] : []),
+		// A new note's row is added with its list fields and without terms, so the statements
+		// below add its terms and highlight row the way they change an existing note's, and the
+		// upsert then fills its revision and the rest.
+		...(keeps.length ? [statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, saved_at,
+          status, favorite, article_hash, article_edited, stale)
+        SELECT portable, path, '', hash, size, item_id, saved_at, status, favorite, article_hash, article_edited, stale FROM committed c
+        WHERE keep = 1 AND NOT EXISTS (SELECT 1 FROM reading_items x WHERE x.portable_path = c.portable)`)] : []),
+		// Tag counts change by each note's old listing taken away and its new one added; a note
+		// that keeps its tags and sections writes none. A new note's row above lists nothing yet,
+		// and a duplicate ID found below adjusts its counts there.
+		// Each written note is read once and listed twice: its row as it was (-1) and as it will be (1).
+		...(plain.length || removes ? [statement(`, ${countChange(`
+        SELECT CASE k.n WHEN 1 THEN c.tag_terms ELSE i.tag_terms END AS tag_terms, CASE k.n WHEN 1 THEN c.status ELSE i.status END AS status,
+          CASE k.n WHEN 1 THEN c.favorite ELSE i.favorite END AS favorite, CASE k.n WHEN 1 THEN c.highlighted_at ELSE i.highlighted_at END AS highlighted_at,
+          CASE k.n WHEN 1 THEN ${VISIBLE('c', 'i.duplicate')} ELSE ${VISIBLE('i')} END AS visible, k.n AS n
+        FROM committed c CROSS JOIN reading_items i ON i.portable_path = c.portable CROSS JOIN (SELECT -1 AS n UNION ALL SELECT 1) k
+        WHERE c.keep = 1 AND c.stale = 0${removes ? `
+        UNION ALL SELECT tag_terms, status, favorite, highlighted_at, ${VISIBLE('reading_items')}, -1 FROM reading_items WHERE ${removed}` : ''}`)}`)] : []),
+		// A note's terms are keyed by its saved date, so they change only when its terms or saved
+		// date differ; a status edit keeps them. The row's own term list names every key to
+		// delete, so no second index on the terms is needed. A changed saved date moves every key;
+		// otherwise only the terms the note lost leave, and only new ones are added.
+		...(plain.length ? [statement(`DELETE FROM note_terms WHERE (term, saved_at, item) IN (
+        SELECT t.value, i.saved_at, i.id FROM committed c JOIN reading_items i ON i.portable_path = c.portable, json_each(i.terms) t
         WHERE c.keep = 1 AND c.stale = 0 AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)
           AND (i.saved_at IS NOT c.saved_at OR c.terms IS NULL OR t.value NOT IN (SELECT value FROM json_each(c.terms))))`)] : []),
-		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(term, saved_at, portable_path)
-        SELECT t.value, r.saved_at, r.portable FROM (SELECT c.terms, c.saved_at, c.portable FROM committed c LEFT JOIN reading_items i ON i.portable_path = c.portable
-          WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)) r, json_each(r.terms) t`)] : []),
+		...(plain.some(row => row.terms) ? [statement(`INSERT OR IGNORE INTO note_terms(term, saved_at, item)
+        SELECT t.value, c.saved_at, i.id FROM committed c JOIN reading_items i ON i.portable_path = c.portable, json_each(c.terms) t
+        WHERE c.keep = 1 AND c.stale = 0 AND c.terms IS NOT NULL AND (i.terms, i.saved_at) IS NOT (c.terms, c.saved_at)`)] : []),
 		// An encrypted vault lists a tag's name while any note has its term. A name leaves only
 		// once its term left note_terms above; a note that keeps or gains the tag adds it back.
 		// Only encrypted notes carry tag names, so an unencrypted edit skips this read.
@@ -176,15 +246,13 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
         WHERE c.keep = 1 AND c.stale = 0 AND c.tag_names IS NOT NULL`)] : []),
 		// A note's highlight row is keyed by when it was last highlighted, so a new highlight
 		// moves it; other highlight edits update its terms in place.
-		// One subquery per statement: a row-value IN over a compound select scans the whole table.
-		...(removes ? [statement(`DELETE FROM highlight_index WHERE (highlighted_at, portable_path) IN (
-        SELECT highlighted_at, portable_path FROM reading_items WHERE highlighted_at IS NOT NULL AND (${removed}))`)] : []),
-		...(plain.length ? [statement(`DELETE FROM highlight_index WHERE (highlighted_at, portable_path) IN (
-        SELECT i.highlighted_at, i.portable_path FROM committed c JOIN reading_items i ON i.portable_path = c.portable
+		...(plain.length ? [statement(`DELETE FROM highlight_index WHERE (highlighted_at, item) IN (
+        SELECT i.highlighted_at, i.id FROM committed c JOIN reading_items i ON i.portable_path = c.portable
           WHERE c.keep = 1 AND c.stale = 0 AND i.highlighted_at IS NOT NULL AND i.highlighted_at IS NOT c.highlighted_at)`)] : []),
-		...(plain.some(row => row.highlighted_at) ? [statement(`INSERT INTO highlight_index(highlighted_at, portable_path, terms, words)
-        SELECT highlighted_at, portable, highlight_terms, highlight_words FROM committed WHERE keep = 1 AND stale = 0 AND highlighted_at IS NOT NULL
-        ON CONFLICT(highlighted_at, portable_path) DO UPDATE SET terms = excluded.terms, words = excluded.words
+		...(plain.some(row => row.highlighted_at) ? [statement(`INSERT INTO highlight_index(highlighted_at, item, terms, words)
+        SELECT c.highlighted_at, i.id, c.highlight_terms, c.highlight_words FROM committed c JOIN reading_items i ON i.portable_path = c.portable
+        WHERE c.keep = 1 AND c.stale = 0 AND c.highlighted_at IS NOT NULL
+        ON CONFLICT(highlighted_at, item) DO UPDATE SET terms = excluded.terms, words = excluded.words
         WHERE (highlight_index.terms, highlight_index.words) IS NOT (excluded.terms, excluded.words)`)] : []),
 		...(removes ? [
 			statement(`DELETE FROM reading_items WHERE ${removed}`),
@@ -199,9 +267,9 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
       WHERE reading_jobs.source_revision != excluded.source_revision`, Date.now())] : []),
 		// Setting an indexed column rewrites its index entry even when the value is the same. So
 		// indexed columns change first, and only on rows where they differ; the upsert then sets
-		// only unindexed columns and the change number. A favorite rewrites the row and its change
-		// number, not every index. Each update also sets the unindexed columns, so the upsert
-		// skips a row an update already brought to its new revision.
+		// only unindexed columns. A favorite rewrites the row and one section index, not every
+		// index. Each update also sets the unindexed columns, so the upsert skips a row an update
+		// already brought to its new revision.
 		...(plain.length ? [statement(`UPDATE reading_items SET path = c.path, item_id = c.item_id, saved_at = c.saved_at,
         article_hash = c.article_hash, article_edited = c.article_edited, stale = 0, ${UNINDEXED}
         FROM committed c WHERE c.keep = 1 AND c.stale = 0 AND reading_items.portable_path = c.portable
@@ -215,26 +283,56 @@ export async function readingIndexStatements(db: D1Database, changes: ReadingFil
 		...(keeps.length > plain.length ? [statement(`UPDATE reading_items SET path = c.path, stale = 1
         FROM committed c WHERE c.keep = 1 AND c.stale = 1 AND reading_items.portable_path = c.portable AND (reading_items.path, reading_items.stale) IS NOT (c.path, 1)`)] : []),
 		...(keeps.length ? [
-			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, error, article_hash, article_edited, saved_at,
-          status, favorite, stale, terms, words, card, highlighted_at)
-        SELECT portable, path, storage_key, hash, size, item_id, metadata_json, error, article_hash, article_edited, saved_at,
-          status, favorite, stale, terms, words, card, highlighted_at FROM committed WHERE keep = 1
+			// Every kept note has a row by now, so this only updates: an upsert reads fewer rows than an
+			// update from a join.
+			statement(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, metadata_json, error, words, terms, tag_terms, card, highlighted_at, stale)
+        SELECT portable, path, storage_key, hash, size, metadata_json, error, words, terms, tag_terms, card, highlighted_at, stale FROM committed WHERE keep = 1
         ON CONFLICT(portable_path) DO UPDATE SET storage_key = excluded.storage_key, hash = excluded.hash, size = excluded.size,
           metadata_json = excluded.metadata_json, error = excluded.error, words = excluded.words,
           terms = CASE WHEN excluded.stale = 1 THEN reading_items.terms ELSE excluded.terms END,
+          tag_terms = CASE WHEN excluded.stale = 1 THEN reading_items.tag_terms ELSE excluded.tag_terms END,
           card = CASE WHEN excluded.stale = 1 THEN reading_items.card ELSE excluded.card END,
           highlighted_at = CASE WHEN excluded.stale = 1 THEN reading_items.highlighted_at ELSE excluded.highlighted_at END
         WHERE reading_items.storage_key IS NOT excluded.storage_key OR excluded.stale = 1`),
 		] : []),
 
-		// Recount the IDs this batch wrote and every flagged row: a row that changed or left
-		// can only end a duplicate, and flagged rows are rare. Each branch uses an index;
-		// an OR would scan the table.
-		// Only rows whose flag flips change; a flip also changes the listing of an unchanged note.
-		db.prepare(`UPDATE reading_items SET duplicate = 1 - duplicate
-      WHERE portable_path IN (SELECT portable_path FROM reading_items WHERE item_id IN (SELECT value FROM json_each(?))
-        UNION ALL SELECT portable_path FROM reading_items WHERE duplicate = 1)
-        AND duplicate != ((SELECT count(*) FROM reading_items d WHERE d.item_id = reading_items.item_id) > 1)`).bind(JSON.stringify(keeps.flatMap(row => row.item_id ? [row.item_id] : []))),
+		...duplicateRecount(db, keeps.flatMap(row => row.item_id ? [row.item_id] : [])),
+		// The library revision names this commit's changelog entry, so clients ask what changed
+		// since. A commit without one, such as an initial import or a rebuild step, starts a new
+		// epoch, so clients read their first page again.
+		db.prepare(`UPDATE reading_policy SET epoch = epoch + ((SELECT max(seq) FROM changelog) IS changed),
+        changed = COALESCE((SELECT max(seq) FROM changelog), changed) WHERE id = 1`),
+	];
+}
+
+/** Recounts the notes with the IDs `itemIds`: ones a batch wrote, or ones rows it removed
+ * carried. An ID a written row left is recounted before the batch changes it. Only rows whose
+ * flag flips change; a flip also changes the listing of an unchanged note. */
+function duplicateRecount(db: D1Database, itemIds: string[]): D1PreparedStatement[] {
+	const flips = `item_id IN (SELECT value FROM json_each(?1))
+        AND duplicate != ((SELECT count(*) FROM reading_items d WHERE d.item_id = reading_items.item_id) > 1)`, ids = JSON.stringify(itemIds);
+	return [
+		// Only an unencrypted note's listing depends on the flag: it leaves its counts as it becomes a duplicate.
+		db.prepare(`WITH ${countChange(`SELECT tag_terms, status, favorite, highlighted_at, 1 AS visible, CASE WHEN duplicate = 0 THEN -1 ELSE 1 END AS n
+        FROM reading_items WHERE ${flips} AND metadata_json IS NOT NULL AND card IS NULL`)}`).bind(ids),
+		db.prepare(`UPDATE reading_items SET duplicate = 1 - duplicate WHERE ${flips}`).bind(ids),
+	];
+}
+
+/** Removes the rows `ids` and everything derived from them, for a rebuild that found their
+ * file gone, outside the folder, or in an older index format. */
+function removedRowStatements(db: D1Database, rows: Array<{ id: number; item_id: string | null }>): D1PreparedStatement[] {
+	if (!rows.length) return [];
+	const ids = JSON.stringify(rows.map(row => row.id)), removed = 'SELECT * FROM reading_items WHERE id IN (SELECT value FROM json_each(?1))';
+	return [
+		db.prepare(`WITH ${countChange(`SELECT tag_terms, status, favorite, highlighted_at, ${VISIBLE('r')} AS visible, -1 AS n FROM (${removed}) r`)}`).bind(ids),
+		db.prepare(`DELETE FROM note_terms WHERE (term, saved_at, item) IN (SELECT t.value, r.saved_at, r.id FROM (${removed}) r, json_each(r.terms) t)`).bind(ids),
+		db.prepare(`DELETE FROM highlight_index WHERE (highlighted_at, item) IN (SELECT highlighted_at, id FROM (${removed}) WHERE highlighted_at IS NOT NULL)`).bind(ids),
+		db.prepare(`DELETE FROM reading_tags WHERE term IN (SELECT t.value FROM (${removed}) r, json_each(r.terms) t)
+      AND NOT EXISTS (SELECT 1 FROM note_terms n WHERE n.term = reading_tags.term)`).bind(ids),
+		db.prepare(`DELETE FROM reading_jobs WHERE path IN (SELECT path FROM (${removed}))`).bind(ids),
+		db.prepare('DELETE FROM reading_items WHERE id IN (SELECT value FROM json_each(?1))').bind(ids),
+		...duplicateRecount(db, rows.flatMap(row => row.item_id ? [row.item_id] : [])),
 	];
 }
 
@@ -249,11 +347,17 @@ export function queueReadingArticles(db: D1Database): D1PreparedStatement {
 }
 
 export interface StoredReadingFile { path: string; storageKey: string; hash: string; size: number }
-/** `rebuilt` marks a call that indexed files, which can queue article extraction. */
-export type ReadingIndexState = { state: 'complete' | 'pending' | 'unavailable'; rebuilt?: boolean };
+/** `rebuilt` marks a call that indexed files, which can queue article extraction. `waiting`
+ * means the day's rebuild writes are spent; the next step runs at `retryAt`. */
+export type ReadingIndexState = { state: 'complete' | 'pending' | 'unavailable'; rebuilt?: boolean } | { state: 'waiting'; retryAt: number; rebuilt?: undefined };
 
-export interface ReadingIndexRow { scope: string; cursor: string | null }
-export const readingIndexStatement = (db: D1Database) => db.prepare('SELECT index_scope AS scope, index_cursor AS cursor FROM reading_policy WHERE id = 1 AND index_scope IS NOT NULL');
+/** `day` and `rows` count the rows rebuild steps wrote on one UTC day; `changed` and `epoch`
+ * make the library revision (`readingRevision`). */
+export interface ReadingIndexRow { scope: string | null; cursor: string | null; day?: number | null; rows?: number | null; changed?: number; epoch?: number }
+export const readingIndexStatement = (db: D1Database) => db.prepare(`SELECT index_scope AS scope, index_cursor AS cursor, index_day AS day, index_rows AS rows,
+    changed, epoch FROM reading_policy WHERE id = 1`);
+/** The library revision clients compare and ask changes since: `<epoch>.<changed>`. */
+export const readingRevision = (index: Pick<ReadingIndexRow, 'changed' | 'epoch'> | null) => `${index?.epoch ?? 0}.${index?.changed ?? 0}`;
 
 /** The state of an index row that is complete for `current`, or null when it must be (re)built. */
 export function completeReadingIndex(current: ReadingPolicy, index: ReadingIndexRow | null): ReadingIndexState | null {
@@ -261,52 +365,90 @@ export function completeReadingIndex(current: ReadingPolicy, index: ReadingIndex
 		? { state: 'complete' } : null;
 }
 
-/** The index state for `current`. While the index is being rebuilt, each call indexes
- * the next files from R2; a failed read keeps the position and reports `unavailable`.
- * `loaded` is the index row when the caller already read it in a batch.
- * In an encrypted vault each note's card is read from the public data stored with it. */
-export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readBytes: (file: StoredReadingFile) => Promise<ArrayBuffer>, loaded?: ReadingIndexRow | null, encrypted = false): Promise<ReadingIndexState> {
+/** Rows each rebuild step checks; unchanged rows cost a read and no write. */
+const RECONCILE_PAGE = 500;
+/** Rows rebuild steps may write in one UTC day, so a large first import or a new folder leaves
+ * the free plan's 100,000 daily writes room for sync. */
+export const READING_REBUILD_DAILY_ROWS = 50_000;
+const DAY_MS = 86_400_000;
+const formatOf = (scope: string | null | undefined) => scope?.split('\n')[2];
+
+/** The index state for `current`. While the index is incomplete, each call takes one step,
+ * starting from `cursor`:
+ * - `wipe:<id>` (a new index format) removes every row, then the files are indexed again;
+ * - `rows:<id>` removes rows whose file is gone or outside the folder;
+ * - `files:<path>` indexes each file in the folder whose row does not name its current
+ *   revision, reading only those notes from R2.
+ * A restore, a new folder or a commit whose bytes the writer could not see keeps every row
+ * that still names its file, so an unchanged library is checked without writes. A failed read
+ * keeps the position and reports `unavailable`. `loaded` is the index row when the caller
+ * already read it in a batch. In an encrypted vault each note's card is read from the public
+ * data stored with it. */
+export async function ensureReadingIndex(env: Env, current: ReadingPolicy, readBytes: (file: StoredReadingFile) => Promise<ArrayBuffer>, loaded?: ReadingIndexRow | null, encrypted = false, now = Date.now()): Promise<ReadingIndexState> {
 	const db = env.DB, scope = readingIndexScope(current);
-	let index = loaded !== undefined ? loaded : await readingIndexStatement(db).first<ReadingIndexRow>();
+	const index = loaded !== undefined ? loaded : await readingIndexStatement(db).first<ReadingIndexRow>();
 	const complete = completeReadingIndex(current, index);
 	if (complete) return complete;
-	if (index?.scope !== scope) {
-		index = { scope, cursor: '' };
-		await db.batch([
-			db.prepare('DELETE FROM reading_items'),
-			db.prepare('DELETE FROM note_terms'),
-			db.prepare('DELETE FROM highlight_index'),
-			db.prepare('DELETE FROM reading_tags'),
-			db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
-			db.prepare("UPDATE reading_policy SET index_scope = ?, index_cursor = '' WHERE id = 1").bind(scope),
-		]);
-	}
-	// Only notes are indexed, so saved images and other files never take a step. LIKE matches
-	// `.md` in any letter case, as `isReadingNotePath` does.
-	const { results } = await db.prepare(`SELECT path, portable_path, hash, size, storage_key FROM files WHERE ${FILE_FOLDER_MATCH} AND portable_path > ?
-    AND path LIKE '%.md' ORDER BY portable_path LIMIT ${REBUILD_PAGE}`).bind(...fileFolderArgs(current.folder_path), index.cursor ?? '')
-		.all<{ path: string; portable_path: string; hash: string; size: number; storage_key: string }>();
-	const changes: ReadingFileChange[] = [];
-	let cursor = index.cursor ?? '', unavailable = false, stopped = false, read = 0;
-	for (const file of results) {
-		if (isReadingNotePath(file.path, current.folder_path)) {
-			const change: ReadingFileChange = { path: file.path, storageKey: file.storage_key, hash: file.hash, size: file.size };
-			// An encrypted note is read for the card its upload carried.
-			if (file.size <= (encrypted ? MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES : MAX_READING_BYTES)) {
+	const today = Math.floor(now / DAY_MS);
+	if (index?.day === today && (index.rows ?? 0) >= READING_REBUILD_DAILY_ROWS) return { state: 'waiting', retryAt: (today + 1) * DAY_MS };
+	const position = index?.scope === scope && index.cursor ? index.cursor
+		: formatOf(index?.scope) === formatOf(scope) || !index?.scope ? 'rows:0' : 'wipe:0';
+	const split = position.indexOf(':'), phase = position.slice(0, split);
+	let after = position.slice(split + 1), next: string | null, state: 'complete' | 'pending' | 'unavailable' = 'pending';
+	const statements: D1PreparedStatement[] = [];
+	if (phase === 'wipe' || phase === 'rows') {
+		const { results } = await db.prepare(`SELECT i.id, i.item_id, i.path, f.storage_key AS file FROM reading_items i
+      LEFT JOIN files f ON f.portable_path = i.portable_path AND f.path = i.path WHERE i.id > ? ORDER BY i.id LIMIT ${RECONCILE_PAGE}`)
+			.bind(Number(after)).all<{ id: number; item_id: string | null; path: string; file: string | null }>();
+		const gone = phase === 'wipe' ? results : results.filter(row => row.file === null || !isReadingNotePath(row.path, current.folder_path));
+		statements.push(...removedRowStatements(db, gone));
+		next = results.length < RECONCILE_PAGE ? 'files:' : `${phase}:${results.at(-1)!.id}`;
+		after = '';
+	} else next = position;
+	// Once the rows are checked, the same step starts on the files, so a small library is rebuilt
+	// in one call. After a wipe in the same step, every file is indexed again.
+	const wiped = phase === 'wipe';
+	if (next === 'files:' || phase === 'files') {
+		// Only notes are indexed, so saved images and other files never take a step. LIKE matches
+		// `.md` in any letter case, as `isReadingNotePath` does. The cursor is the walk's only lower
+		// bound: beside the folder's own, SQLite seeks to the folder's start and reads every file
+		// the earlier steps walked.
+		const [folderStart, folderEnd, pathStart, pathEnd] = fileFolderArgs(current.folder_path);
+		const { results } = await db.prepare(`SELECT f.path, f.portable_path, f.hash, f.size, f.storage_key, i.storage_key AS indexed, i.path AS indexed_path
+      FROM (SELECT path, portable_path, hash, size, storage_key FROM files WHERE portable_path > ? AND portable_path < ? AND path >= ? AND path < ? AND path LIKE '%.md'
+        ORDER BY portable_path LIMIT ${RECONCILE_PAGE}) f
+      LEFT JOIN reading_items i ON i.portable_path = f.portable_path ORDER BY f.portable_path`).bind(after || folderStart, folderEnd, pathStart, pathEnd)
+			.all<{ path: string; portable_path: string; hash: string; size: number; storage_key: string; indexed: string | null; indexed_path: string | null }>();
+		const changes: ReadingFileChange[] = [];
+		let cursor = after, unavailable = false, stopped = false, read = 0;
+		for (const file of results) {
+			if (isReadingNotePath(file.path, current.folder_path) && (wiped || file.indexed !== file.storage_key || file.indexed_path !== file.path)) {
 				// The next step continues from here once this one's bytes are released.
-				if (changes.length && read + file.size > REBUILD_BYTES) { stopped = true; break; }
-				read += file.size;
-				try { change.content = await readBytes({ path: file.path, storageKey: file.storage_key, hash: file.hash, size: file.size }); }
-				catch { unavailable = true; break; }
+				if (changes.length >= REBUILD_PAGE) { stopped = true; break; }
+				const change: ReadingFileChange = { path: file.path, storageKey: file.storage_key, hash: file.hash, size: file.size };
+				// An encrypted note is read for the card its upload carried.
+				if (file.size <= (encrypted ? MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES : MAX_READING_BYTES)) {
+					if (changes.length && read + file.size > REBUILD_BYTES) { stopped = true; break; }
+					read += file.size;
+					try { change.content = await readBytes({ path: file.path, storageKey: file.storage_key, hash: file.hash, size: file.size }); }
+					catch { unavailable = true; break; }
+				}
+				changes.push(change);
 			}
-			changes.push(change);
+			cursor = file.portable_path;
 		}
-		cursor = file.portable_path;
+		statements.push(...await readingIndexStatements(db, changes, { policy: current, encrypted }));
+		next = !unavailable && !stopped && results.length < RECONCILE_PAGE ? null : `files:${cursor}`;
+		if (unavailable) state = 'unavailable';
 	}
-	const next = !unavailable && !stopped && results.length < REBUILD_PAGE ? null : cursor;
-	await db.batch([
-		...await readingIndexStatements(db, changes, { policy: current, encrypted }),
-		db.prepare('UPDATE reading_policy SET index_cursor = ? WHERE id = 1 AND index_scope = ?').bind(next, scope),
+	if (next === null) state = 'complete';
+	// A step that changed rows starts a new epoch: the changelog does not list its changes.
+	const results = await db.batch([
+		...statements,
+		db.prepare('UPDATE reading_policy SET index_scope = ?, index_cursor = ?, epoch = epoch + ? WHERE id = 1').bind(scope, next, statements.length ? 1 : 0),
 	]);
-	return { state: unavailable ? 'unavailable' : next === null ? 'complete' : 'pending', rebuilt: true };
+	const written = results.reduce((sum: number, result) => sum + ((result as { meta?: { rows_written?: number } }).meta?.rows_written ?? 0), 0);
+	await db.prepare('UPDATE reading_policy SET index_rows = CASE WHEN index_day IS ? THEN index_rows + ? ELSE ? END, index_day = ? WHERE id = 1')
+		.bind(today, written, written, today).run();
+	return { state, rebuilt: true };
 }

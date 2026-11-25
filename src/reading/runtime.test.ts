@@ -27,6 +27,7 @@ function harness() {
 	let writesVault = true;
 	const vault = {
 		configDir: '.obsidian', getAbstractFileByPath: (path: string) => path === root.path ? root : path === file.path ? file : null,
+		getRoot: () => Object.assign(new TFolder(), { path: '/', children: [root] }),
 		read: vi.fn(async (_file?: TFile) => content), process: vi.fn(async (_file: TFile, update: (content: string) => string) => { content = update(content); return content; }),
 		on: (name: string, callback: (file: TFile, oldPath?: string) => void) => {
 			if (!events.has(name)) events.set(name, new Set()); events.get(name)!.add(callback); return { name, callback };
@@ -85,6 +86,39 @@ describe('Reading runtime with Obsidian\'s frontmatter cache', () => {
 		stopReading(h.plugin);
 		expect(h.metadataCache.offref).toHaveBeenCalled();
 	});
+	it('lists the folder again only for events that can change notes', async () => {
+		const h = harness();
+		const properties = readReadingFrontmatter(await h.vault.read())!.value;
+		h.metadataCache.getFileCache.mockImplementation(() => ({ frontmatter: properties }));
+		h.workspace.layoutReady = true; startReading(h.plugin);
+		getReadingLibrary(h.plugin)!.retain();
+		await vi.advanceTimersByTimeAsync(500);
+		const lookup = vi.spyOn(h.vault, 'getAbstractFileByPath');
+		const listings = () => lookup.mock.calls.filter(([path]) => path === 'Reading').length;
+		// Obsidian sends folders through the same events as files.
+		const emit = (name: string, entry: TFile | TFolder) => { for (const listener of h.events.get(name) ?? []) (listener as (file: TFile | TFolder) => void)(entry); };
+		const folder = Object.assign(new TFolder(), { path: 'Reading/attachments/0cf86c65-51e2-4e2b-8987-0a4732473588', children: [] });
+		const image = Object.assign(new TFile(), { path: `${folder.path}/photo.png`, extension: 'png', stat: { size: 10, mtime: 1, ctime: 1 } });
+		// Saving or syncing an article's images creates their folder and files.
+		emit('create', folder); emit('create', image); emit('modify', image); emit('delete', image);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listings()).toBe(0);
+		// A deleted folder may have held notes.
+		emit('delete', folder);
+		await vi.advanceTimersByTimeAsync(500);
+		expect(listings()).toBeGreaterThan(0);
+		stopReading(h.plugin);
+	});
+	it('hears created notes only after the layout is ready, past the startup burst', () => {
+		const h = harness();
+		startReading(h.plugin);
+		expect(h.events.get('create')?.size ?? 0).toBe(0);
+		h.workspace.layoutReady = true;
+		for (const callback of h.callbacks) callback();
+		expect(h.events.get('create')?.size).toBe(1);
+		stopReading(h.plugin);
+		expect(h.events.get('create')?.size).toBe(0);
+	});
 });
 
 describe('Reading runtime lifecycle', () => {
@@ -96,7 +130,6 @@ describe('Reading runtime lifecycle', () => {
 		let completed = false;
 		if (operation === 'create') {
 			Object.assign(h.vault, {
-				getAllLoadedFiles: () => [h.file],
 				create: async () => { enter(); await pending; completed = true; },
 			});
 		} else {
@@ -248,7 +281,6 @@ describe('Reading runtime lifecycle', () => {
 		const lookup = h.vault.getAbstractFileByPath;
 		Object.assign(h.vault, {
 			adapter: { ...h.vault.adapter, exists: async () => false },
-			getAllLoadedFiles: () => root.children,
 			getAbstractFileByPath: (path: string) => root.children.find(file => file.path === path) ?? lookup(path),
 			create: async (path: string, content: string) => {
 				saved.set(path, content);

@@ -43,7 +43,8 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) test(
         if (req.url === '/reading/update' && loseUpdateReplies) {
           return Response.json({ error: 'Update acknowledgement interrupted' }, { status: 503 });
         }
-        if (req.url.startsWith('/reading/items')) listResponses++;
+        // A refresh reads the change feed, or the list when the pages cannot apply it.
+        if (req.url.startsWith('/reading/items') || req.url.startsWith('/reading/changes')) listResponses++;
         return response;
       },
     });

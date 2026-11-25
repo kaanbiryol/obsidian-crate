@@ -1,4 +1,4 @@
-import { ARTICLE_START, ARTICLE_END, readingUrlIdentity, type ReadingItem } from './model';
+import { ARTICLE_START, ARTICLE_END, readingItemUrlIdentity, readingUrlIdentity, type ReadingItem } from './model';
 import { managedArticle } from './article';
 import { parseReadingNote } from './notes';
 import { patchReadingFrontmatter, readReadingFrontmatter } from './frontmatter';
@@ -10,7 +10,7 @@ export function duplicateReadingGroups(items: ReadingItem[]): ReadingItem[][] {
 	const groups = new Map<string, ReadingItem[]>();
 	for (const item of items) {
 		if (!item.source_url) continue;
-		const identity = readingUrlIdentity(item.source_url), group = groups.get(identity) ?? [];
+		const identity = readingItemUrlIdentity(item), group = groups.get(identity) ?? [];
 		group.push(item); groups.set(identity, group);
 	}
 	return [...groups.values()].filter(group => group.length > 1);

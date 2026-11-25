@@ -13,19 +13,25 @@ stay.
 - Reading notes stay ordinary synced notes and the only source of truth.
 - `reading_items` holds one row per note: what the web app lists. Rows are derived and can be
   rebuilt. Every commit keeps them current, so a policy created for an empty folder starts with a
-  complete index. Otherwise notification passes rebuild it in steps of 25 notes and at most 16 MB,
-  in encrypted vaults too (from each note's card); a web app read that finds it incomplete takes
-  one step and answers 503 until it is done.
+  complete index. Otherwise notification passes rebuild it, in encrypted vaults too (from each
+  note's card): a rebuild keeps rows that still name their file's revision and reads only the
+  other notes, 25 and at most 16 MB per step, at most 50,000 written rows a day. A web app read
+  that finds it incomplete takes one step and answers 503 until it is done. The derived rows below
+  name a note by its row id, so a move changes only the note's path. See
+  [Reading index design](reading-index-design.md).
 - `note_terms` holds each listed note's search terms, keyed by saved
-  date: one per title word (`p:` and its first three letters, or `w:` and the whole word when
+  date and row id: one per title word (`p:` and its first three letters, or `w:` and the whole word when
   shorter), `t:` for a tag and `u:` for the link identity (`src/reading/core/search-terms.ts`).
   The scope lets other note indexes, such as a future vault-wide one, share the table.
 - `highlight_index` holds one row per highlighted note, keyed by when it was last highlighted
   (its newest highlight's date): the Highlights tab's pages. Its `terms` are the note's title,
   highlight and highlight-note words and its tags, in the same format.
+- `reading_tag_counts` holds how many listed notes of each section have each tag. Each commit
+  adds the difference it makes, so the tag filter reads one count per tag.
 - The web app never holds the library. It asks the server for one page at a time:
   `GET /reading/items?section=&q=&tag=&cursor=`, newest first, and lists every tag with
-  `GET /reading/tags`.
+  `GET /reading/tags`. Each page carries the library revision; a refresh asks
+  `GET /reading/changes?since=` and applies the answer to the pages it loaded.
 
 ## What each search matches
 
@@ -33,8 +39,9 @@ stay.
 - **Highlights:** highlight text, highlight notes and the title, through `highlight_index`. Each
   row's terms are checked in the row (`instr`), so a filtered page scans at most 2,000 rows, newest
   highlight first, and a short or empty page carries a cursor that continues the scan. The web app
-  asks for up to four such pages per load, and loads again while the list end stays in view. A page also ends before its notes
-  pass 512 KB. Article text is not searched; Obsidian searches it.
+  asks for up to four such pages per load, and loads again while the list end stays in view.
+  Article text is not searched; Obsidian searches it.
+- Every page, in any section, ends before its notes or cards pass 512 KB.
 - **Tags:** the tags view lists every tag and searches the list on the device. Selecting a tag
   filters the current section by its `t:` term.
 
@@ -47,7 +54,9 @@ entry, where a miss reads no row, so only notes with every term are read. Their 
 words (`words`) then confirm the match by searching the row's JSON text (`instr`), which reads no
 extra rows: a query word of 3 or more letters matches the start of a title word and a shorter one
 a whole word. To find the rarest term it counts each term's notes, up to 50 and, when every term
-has that many, up to 500. A walk reads at most 1,000 entries: when those hold fewer than a page of
+has that many, the first three terms up to 500, so the counts read at most about 2,000 rows. The
+first page chooses the term and its cursor keeps the choice, so later pages count nothing, and the
+web app cancels a search the user typed past. A walk reads at most 1,000 entries: when those hold fewer than a page of
 matches (a word whose first three letters many titles share, or a common word in a small section),
 the page is short and its cursor continues after the last entry read. The web app follows a few
 such pages before it waits for the next scroll, so one search request stays within about 3,000
@@ -104,6 +113,11 @@ independent security review listed in [Reading and encryption](reading-e2ee-asse
 - **Stored on the device**: only articles saved for offline, the queue of changes not yet sent,
   and an unsent link in the save form. Library pages stay in memory and are read again on each
   visit.
+- **Refresh**: the app asks what changed since the revision it last read. An unchanged library
+  costs one request; a changed note leaves the loaded section it no longer belongs to and goes
+  where it now sorts in the ones it does, inside the loaded range. Searches and tag filters are
+  read again. When the server answers `reset` (another epoch, or more than 500 changes), the app
+  reads its first page again and reloads the shown section.
 - Edits keep the pending-change queue, operation IDs and receipts. A pending edit is shown over
   the page that lists its note.
 - Saving a link checks for a duplicate with a link-term query in encrypted vaults, and with the
@@ -116,9 +130,11 @@ integration tests keep the bounds):
 
 | | Rows |
 | --- | --- |
-| New Reading note, written | about 22 (7 for any other note) |
-| Favorite or archive, written | about 15 |
+| New Reading note, written | about 24 (7 for any other note) |
+| Favorite or archive, written | about 16 to 19: one or two tag counts per tag that changes section |
+| Move inside the folder, written | 16, 10 of them the file move (39 before rows were keyed by note) |
 | Delete, written | about 25 |
+| Favorite, read | about 146 (127 before tag counts and rows keyed by note) |
 | First page, read | about 56, at any library size |
 | One-word search, read | about 104 for a full page; a rare word about 2 per match |
 | Two-word search, read | at most about 2,100 when both words are common and never share a note (a short page seeks once more to where the walk ended); about 80 when one is rare |
@@ -126,7 +142,9 @@ integration tests keep the bounds):
 | Add a highlight, written | about as many as a favorite: the note's `highlight_index` row adds 1 or 2 (a newer highlight moves the row) |
 | Highlights page, read | about one page |
 | Highlight search, read | about one page when matches are common; at most about 4,000 for a page with none (2,000 scanned, then a seek to where the scan ended) |
-| Tag list, read | about one row per tag |
+| Tag list, read | about one row per tag; for a section about two per tag (40,000 at 10,000 notes before stored counts) |
+| Refresh with nothing changed, read | under 10 |
+| Rebuild of unchanged notes | about one row read per note, no write and no R2 read |
 
 - Each title word is one term, and terms are keyed by saved date with no second index, so a
   search walks one term's entries, at most 1,000 per page, and a term costs one written row.

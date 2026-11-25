@@ -64,6 +64,19 @@ const PAGE_SIZE = 50;
 // Scrolling within this distance of the list's end loads the next page.
 const NEAR_END_PX = 800;
 
+/** One saved link. Memoized: a library update re-renders only the rows whose props changed. */
+const ReadingRow = React.memo(function ReadingRow({ item, selected, departs, groupDeparts, opening, onOpen }: {
+	item: ReadingItem; selected: boolean; departs: boolean; groupDeparts: boolean; opening: boolean; onOpen: (item: ReadingItem) => void;
+}) {
+	return <li className="crate-reading__item" data-selected={selected}
+		inert={departs} data-departed={departs ? item.crate_reading_id : undefined} data-departing={departs && !groupDeparts || undefined}>
+		<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`}
+			aria-current={selected ? 'true' : undefined} aria-disabled={opening} onClick={() => onOpen(item)}>
+			<ReadingItemContent item={item} />
+		</Button>
+	</li>;
+});
+
 /** Shared workspace. Uses the same stacked app layout at every width. */
 export function ReadingLibraryPanel({
 	listStyle = DEFAULT_LIST_STYLE, renderNavigation, renderLibraryContent, snapshot, source, initialSection = 'inbox', onAdd, onOpen, onRefresh, onEnrich,
@@ -156,6 +169,10 @@ export function ReadingLibraryPanel({
 		void action().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not update reading.'))
 			.finally(() => { pending.current.delete(key); setBusy(new Set(pending.current)); });
 	};
+	// Rows take one handler that keeps its identity, so an update re-renders only changed rows.
+	const latestOpen = useRef((_item: ReadingItem) => {});
+	useLayoutEffect(() => { latestOpen.current = item => run('open', () => onOpen(item, undefined, shownSection)); });
+	const openRow = useCallback((item: ReadingItem) => latestOpen.current(item), []);
 	const resetList = () => { setVisible(PAGE_SIZE); lists.current.get(shownSection)?.scrollTo({ top: 0 }); };
 	const selectTag = (value: string | null) => {
 		if (value === tag) return;
@@ -218,16 +235,8 @@ export function ReadingLibraryPanel({
 							const groupDeparts = group.items.every(item => departed.has(item.crate_reading_id));
 							return <section className="crate-reading__group" key={group.label} aria-label={group.label} inert={groupDeparts} data-departing={groupDeparts || undefined}>
 							<h3>{group.label}</h3>
-							<ul className="crate-reading__list">{group.items.map(item => {
-								const departs = departed.has(item.crate_reading_id);
-								return <li className="crate-reading__item" key={rowKey(item.crate_reading_id)} data-selected={activeId === item.crate_reading_id}
-									inert={departs} data-departed={departs ? item.crate_reading_id : undefined} data-departing={departs && !groupDeparts || undefined}>
-								<Button className="crate-reading__open" data-reading-id={item.crate_reading_id} aria-label={`${readingSource(item.source_url)} ${readingTitle(item)}`}
-									aria-current={activeId === item.crate_reading_id ? 'true' : undefined} aria-disabled={busy.has('open')} onClick={() => run('open', () => onOpen(item, undefined, shownSection))}>
-									<ReadingItemContent item={item} />
-								</Button>
-							</li>;
-							})}</ul>
+							<ul className="crate-reading__list">{group.items.map(item => <ReadingRow key={rowKey(item.crate_reading_id)} item={item}
+								selected={activeId === item.crate_reading_id} departs={departed.has(item.crate_reading_id)} groupDeparts={groupDeparts} opening={busy.has('open')} onOpen={openRow} />)}</ul>
 						</section>;
 						})}
 						{more && loadingMore && <LoadingIndicator label="Loading more" />}

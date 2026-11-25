@@ -30,13 +30,16 @@ export async function updatePolicy(db: D1Database, body: Record<string, unknown>
 	const current: ReadingPolicy = { enabled: Number(body.enabled), folder_path: folder,
 		generation: existing && existing.folder_path === folder ? existing.generation : crypto.randomUUID(), revision: crypto.randomUUID() };
 	await db.batch([db.prepare(`INSERT INTO reading_policy(id, enabled, folder_path, generation, revision) VALUES (1, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled, folder_path=excluded.folder_path, generation=excluded.generation, revision=excluded.revision`)
+    ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled, folder_path=excluded.folder_path, generation=excluded.generation, revision=excluded.revision,
+      epoch=reading_policy.epoch + 1`)
 		.bind(current.enabled, folder, current.generation, current.revision),
 		// Jobs extract into the folder of their generation, so a new one drops the old one's.
 		db.prepare('DELETE FROM reading_jobs WHERE generation != ?').bind(current.generation),
-		// A new folder with no files has a complete index from the start: every commit maintains
-		// it, so the first read neither wipes the rows those commits wrote nor rebuilds them.
-		...(existing?.generation === current.generation ? [] : [db.prepare(`UPDATE reading_policy SET index_scope = ?, index_cursor = NULL
+		// A new folder with no files needs no build: every commit maintains its index, so the
+		// first read never rebuilds the rows those commits wrote. Rows of the previous folder are
+		// removed first.
+		...(existing?.generation === current.generation ? [] : [db.prepare(`UPDATE reading_policy SET index_scope = ?,
+        index_cursor = CASE WHEN EXISTS (SELECT 1 FROM reading_items) THEN 'rows:0' END
       WHERE id = 1 AND NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_FOLDER_MATCH})`).bind(readingIndexScope(current), ...fileFolderArgs(folder))]),
 		...(encryption ? [saveFolderLabel(db, folder, body.folderLabel as string)] : [])]);
 	return readingResponse({ policy: await labelledPolicy(db, current, encryption) });

@@ -24,6 +24,8 @@ import { commitEncryptedAttempt, encryptedFilePath, encryptedOperationContext, o
 interface Source { file: WireFile; content: string; item: ReadingItem; hash: string }
 /** A listed note: its current server file and the item its card lists. */
 interface Listed { file: WireFile; item: ReadingItem; stale: boolean }
+type ListedCard = WireFile & { card: string; stale: boolean; fields: Partial<ReadingCardFields> };
+const UNREADABLE_CARD = 'This Reading card is unreadable. Open the note in Obsidian.';
 /** `rejected` marks an attempt the Worker refused with `version_conflict`; it is rebuilt, never resent. */
 interface Attempt { requestHash: string; body: string; generation: number; rejected?: true }
 /** What `prepare` commits: the answer when nothing needs writing, a note removal, or a
@@ -39,7 +41,7 @@ interface EncryptedReadingOptions {
 	searchKey: CryptoKey;
 	/** `images: false` asks the server for none: only a new note saves them. */
 	captureArticle?(url: string, options?: { images?: boolean }): Promise<ServerCapturedArticle>;
-	request(path: string, body?: string, headers?: Record<string, string>): Promise<Response>;
+	request(path: string, body?: string, headers?: Record<string, string>, signal?: AbortSignal): Promise<Response>;
 	readAttempt(id: string): Promise<unknown>;
 	writeAttempt(id: string, attempt: Attempt): Promise<void>;
 	error(message: string, status: number, code?: string): Error;
@@ -48,9 +50,9 @@ interface EncryptedReadingOptions {
 class NoteUnavailableError extends Error {}
 
 /** Reading routes this client answers; an encrypted session never sends them in plaintext. */
-export const ENCRYPTED_READING_ACTIONS: readonly string[] = ['items', 'item', 'tags', 'capture', 'update', 'retry', 'delete'];
+export const ENCRYPTED_READING_ACTIONS: readonly string[] = ['items', 'changes', 'item', 'tags', 'capture', 'update', 'retry', 'delete'];
 
-interface ItemsPage { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: string | null }
+interface ItemsPage { items: ReadingItem[]; issues: Array<{ path: string; message: string }>; cursor: string | null; revision?: string }
 
 /**
  * Plaintext only exists in the trusted client. The server lists encrypted cards a page at a
@@ -59,12 +61,10 @@ interface ItemsPage { items: ReadingItem[]; issues: Array<{ path: string; messag
  */
 export class EncryptedReadingApi {
 	private sources = new Map<string, Source>();
-	// Notes this client listed, by Reading ID, so an open or an edit finds its file.
-	private listed = new Map<string, Listed>();
 	constructor(private options: EncryptedReadingOptions) {}
 	private get cardKeys() { return { vaultId: this.options.authority.vaultId, key: this.options.authority.key, keyGeneration: this.options.generation, searchKey: this.options.searchKey }; }
-	private async json<T>(path: string, body?: string): Promise<T> {
-		const response = await this.options.request(path, body);
+	private async json<T>(path: string, body?: string, signal?: AbortSignal): Promise<T> {
+		const response = await this.options.request(path, body, undefined, signal);
 		if (!response.ok) {
 			const { message, code } = await responseError(response, 'Reading request failed.');
 			throw this.options.error(message, response.status, code);
@@ -92,9 +92,9 @@ export class EncryptedReadingApi {
 	}
 
 	/** An image file in the Reading folder, decrypted. Its metadata must name `path`. */
-	async image(path: string): Promise<Uint8Array<ArrayBuffer>> {
+	async image(path: string, signal?: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
 		const wire = await this.options.paths.wire(path);
-		const response = await this.options.request(`/reading/encrypted-file?${new URLSearchParams({ folderPath: this.options.wireFolder, path: wire })}`);
+		const response = await this.options.request(`/reading/encrypted-file?${new URLSearchParams({ folderPath: this.options.wireFolder, path: wire })}`, undefined, undefined, signal);
 		if (!response.ok) {
 			const { message, code } = await responseError(response, 'Image is unavailable.');
 			throw this.options.error(message, response.status, code);
@@ -108,30 +108,27 @@ export class EncryptedReadingApi {
 	}
 
 	/** One page of the library: the server matches hashed terms, and each card is opened and
-	 * rechecked here, so a page can hold fewer items than the server listed. */
-	private async items(params: URLSearchParams): Promise<ItemsPage> {
+	 * rechecked here, so a page can hold fewer items than the server listed. `found` collects
+	 * each listed note's file, for an open or an edit. */
+	private async items(params: URLSearchParams, found?: Map<string, Listed>, signal?: AbortSignal): Promise<ItemsPage> {
 		const q = params.get('q') ?? '', tag = params.get('tag') ?? '', url = params.get('url') ?? '', cursor = params.get('cursor') ?? '', id = params.get('id');
 		const highlights = params.get('section') === 'highlights';
 		const query = new URLSearchParams({ section: params.get('section') ?? 'inbox', ...cursor ? { cursor } : {}, ...id ? { id } : {} });
 		for (const term of await hashedQueryTerms(this.options.searchKey, { q, tag, url })) query.append('term', term);
-		type ListedCard = WireFile & { card: string; stale: boolean; fields: Partial<ReadingCardFields> };
-		const page: { cards: ListedCard[]; cursor: string | null } = await this.json(`/reading/items?${query}`);
+		const page: { cards: ListedCard[]; cursor: string | null; revision?: string } = await this.json(`/reading/items?${query}`, undefined, signal);
 		const items: ReadingItem[] = [], issues: ItemsPage['issues'] = [];
 		const ids = new Map<string, number>();
-		for (const listed of page.cards) {
-			const { card, stale, fields, ...file } = listed;
-			let item: ReadingItem;
-			try {
-				item = (await openReadingCard(card, file.path, this.cardKeys)).item;
-				// The server sorts by the listed fields; one that disagrees with its card is not trusted.
-				if (!sameReadingCardFields(item, fields ?? {})) throw new Error();
-			} catch { issues.push({ path: file.path, message: 'This Reading card is unreadable. Open the note in Obsidian.' }); continue; }
+		// Cards open in parallel; the page keeps the server's order.
+		const cards = await Promise.all(page.cards.map(listed => this.open(listed)));
+		for (const [index, opened] of cards.entries()) {
+			if (!opened) { issues.push({ path: page.cards[index]!.path, message: UNREADABLE_CARD }); continue; }
+			const { item, file, stale } = opened;
 			// The Highlights tab matches highlight text and notes as well as the title.
 			if (!matchesReadingQuery(item, { query: q, tag, highlights })) continue;
 			if (url) { try { if (!item.source_url || readingUrlIdentity(item.source_url) !== readingUrlIdentity(url)) continue; } catch { continue; } }
 			if (id && item.crate_reading_id !== id) continue;
 			ids.set(item.crate_reading_id, (ids.get(item.crate_reading_id) ?? 0) + 1);
-			this.listed.set(item.crate_reading_id, { file, item, stale });
+			found?.set(item.crate_reading_id, { file, item, stale });
 			items.push(item);
 		}
 		const unique = items.filter(item => {
@@ -139,7 +136,28 @@ export class EncryptedReadingApi {
 			issues.push({ path: item.path, message: READING_DUPLICATE_ID_ISSUE });
 			return false;
 		});
-		return { items: unique, issues, cursor: page.cursor };
+		return { items: unique, issues, cursor: page.cursor, ...page.revision ? { revision: page.revision } : {} };
+	}
+	/** A listed card opened, or null when it does not open or disagrees with the fields the
+	 * server sorted it by. */
+	private async open(listed: ListedCard): Promise<Listed | null> {
+		const { card, stale, fields, ...file } = listed;
+		try {
+			const { item } = await openReadingCard(card, file.path, this.cardKeys);
+			return sameReadingCardFields(item, fields ?? {}) ? { file, item, stale } : null;
+		} catch { return null; }
+	}
+	/** What changed since a library revision, each listed card opened here. */
+	private async changes(since: string): Promise<unknown> {
+		const answer = await this.json<{ revision: string; reset?: true; cards?: ListedCard[]; removed?: string[] }>(`/reading/changes?since=${encodeURIComponent(since)}`);
+		if (answer.reset) return { revision: answer.revision, reset: true };
+		const items: ReadingItem[] = [], issues: ItemsPage['issues'] = [], removed = [...answer.removed ?? []];
+		const listed = answer.cards ?? [], cards = await Promise.all(listed.map(card => this.open(card)));
+		for (const [index, opened] of cards.entries()) {
+			if (!opened) { const { path } = listed[index]!; issues.push({ path, message: UNREADABLE_CARD }); removed.push(path); continue; }
+			items.push(opened.item);
+		}
+		return { revision: answer.revision, items, issues, removed };
 	}
 	/** A section's tag names, opened here, each with its note count in the server's most used
 	 * order. A name sealed for another term is dropped. */
@@ -150,15 +168,17 @@ export class EncryptedReadingApi {
 		names.forEach((name, index) => { if (name && !counts.has(name)) counts.set(name, sealed[index]!.count); });
 		return { tags: [...counts.keys()], counts: [...counts.values()] };
 	}
-	/** The listed note with this Reading ID, read from the server when this client has not listed it. */
+	/** The listed note with this Reading ID, read from the server. */
 	private async find(id: string): Promise<Listed | undefined> {
-		await this.items(new URLSearchParams({ section: 'all', id }));
-		return this.listed.get(id);
+		const found = new Map<string, Listed>();
+		await this.items(new URLSearchParams({ section: 'all', id }), found);
+		return found.get(id);
 	}
 
-	async request(path: string, rawBody?: string): Promise<unknown> {
+	async request(path: string, rawBody?: string, signal?: AbortSignal): Promise<unknown> {
 		const url = new URL(path, 'https://crate.invalid'), action = url.pathname.slice('/reading/'.length);
-		if (action === 'items') return this.items(url.searchParams);
+		if (action === 'items') return this.items(url.searchParams, undefined, signal);
+		if (action === 'changes') return this.changes(url.searchParams.get('since') ?? '');
 		if (action === 'item') return (await this.item(url.searchParams.get('id') ?? ''))!.article;
 		if (action === 'tags') return await this.tags(url.searchParams.get('section') ?? '');
 		if (!rawBody || !ENCRYPTED_READING_ACTIONS.includes(action)) throw new Error('Unsupported encrypted Reading request.');
@@ -192,7 +212,6 @@ export class EncryptedReadingApi {
 				// Other decrypted notes stay valid; `sameInventoryFile` rejects any that changed elsewhere.
 				const committed = JSON.parse(sent.body) as { files: Array<{ path: string }>; remove?: Array<{ path: string }> };
 				for (const file of [...committed.files, ...committed.remove ?? []]) this.sources.delete(file.path);
-				for (const [itemId, listed] of this.listed) if (committed.files.concat(committed.remove ?? []).some(file => file.path === listed.file.path)) this.listed.delete(itemId);
 				return receipt.response;
 			},
 		});

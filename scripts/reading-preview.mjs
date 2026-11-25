@@ -25,7 +25,7 @@ if (!(await api('/reminders/list?folderPath=Reminders')).reminders?.length) {
     const operationId = `e1_${day}_${randomUUID()}`;
     const created = await api('/reminders/create', { ...reminder, operationId, id: operationId, folderPath: 'Reminders' });
     if (completed) await api('/reminders/set-completed', { operationId: `e1_${day}_${randomUUID()}`, expectedRevision: created.reminder.revision,
-      folderPath: 'Reminders', filePath: created.reminder.filePath, id: operationId, completed: true });
+      folderPath: 'Reminders', filePath: created.reminder.filePath, id: operationId, completed: true, completedAt: new Date().toISOString() });
   }
 }
 const server = createServer(async (request, response) => {

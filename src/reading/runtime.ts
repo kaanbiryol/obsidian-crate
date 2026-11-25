@@ -1,6 +1,6 @@
 import { readReadingPolicy, writeReadingPolicy } from './server';
 import { captureServerConnection, isUnreachableServer } from '../plugin/server-request';
-import { Notice, TFolder } from 'obsidian';
+import { Notice, TFile, TFolder, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { shouldIgnoreSyncPath, createIgnoreMatcherContext } from '../sync/local/ignore';
@@ -11,6 +11,7 @@ import { createReadingRefresh } from './data/refresh-batch';
 import { createObsidianReadingVault } from './data/obsidian-vault';
 import { validateReadingFolder, type ReadingSettings } from './settings';
 import { readingImageMode } from './core/article-images';
+import { isMarkdownPath } from '@/protocol/note-paths';
 
 export const READING_VIEW_TYPE = 'crate-reading';
 /** Vault changes check the server's Reading folder at most this often; Complete server setup checks at once. */
@@ -83,9 +84,15 @@ export async function waitForStoppedReading(plugin: ReadingRuntimeHost): Promise
 
 // Compiled patterns are keyed by their text, so one cache serves every check.
 const readingPatternCache = new Map<string, RegExp>();
+// A folder listing checks every entry, so the matcher is built once per setting: saved
+// settings replace the patterns array.
+let readingMatcher: { configDir: string; patterns: string[]; context: ReturnType<typeof createIgnoreMatcherContext> } | undefined;
 function allowedReadingPath(plugin: ReadingRuntimeHost, path: string): boolean {
-	return !shouldIgnoreSyncPath(path, createIgnoreMatcherContext(
-		[`${plugin.app.vault.configDir}/`], plugin.settings.ignorePatterns, readingPatternCache));
+	const configDir = plugin.app.vault.configDir, patterns = plugin.settings.ignorePatterns;
+	if (readingMatcher?.configDir !== configDir || readingMatcher.patterns !== patterns) {
+		readingMatcher = { configDir, patterns, context: createIgnoreMatcherContext([`${configDir}/`], patterns, readingPatternCache) };
+	}
+	return !shouldIgnoreSyncPath(path, readingMatcher.context);
 }
 
 function validateReadingConfiguration(plugin: ReadingRuntimeHost, settings: ReadingSettings): string {
@@ -203,12 +210,20 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 		readingVault.changed(path); library.invalidate(path);
 		refresh.changed(path);
 	};
+	// Cards list only notes, so saved images and other files change none. A new folder is
+	// empty; a moved or deleted one may hold notes and lists the folder again.
+	const listable = (file: TAbstractFile) => !(file instanceof TFile) || isMarkdownPath(file.path);
+	// Obsidian announces every existing file as created while it loads the vault; the first
+	// listing after the layout is ready sees them anyway, so creates are heard from then on.
+	const onCreate = (file: TAbstractFile) => { if (file instanceof TFile && listable(file)) changed(file.path); };
 	const refs = [
-		vault.on('create', file => { changed(file.path); }),
-		vault.on('modify', file => { changed(file.path); }),
-		vault.on('delete', file => { changed(file.path); }),
+		vault.on('modify', file => { if (listable(file)) changed(file.path); }),
+		vault.on('delete', file => { if (listable(file)) changed(file.path); }),
 		// A note moved into the folder is not re-indexed, so the background work checks it here.
-		vault.on('rename', (file, oldPath) => { changed(oldPath); changed(file.path); if (inFolder(file.path)) refresh.check(file.path); }),
+		vault.on('rename', (file, oldPath) => {
+			if (!listable(file) && !isMarkdownPath(oldPath)) return;
+			changed(oldPath); changed(file.path); if (inFolder(file.path)) refresh.check(file.path);
+		}),
 	];
 	// Obsidian re-indexes a note after every change, including notes changed while it was
 	// closed; cards then take the fresh properties without reading the notes.
@@ -247,7 +262,11 @@ export function startReading(plugin: ReadingRuntimeHost): void {
 	lifetime.addEventListener('abort', onAbort, { once: true });
 	readingState(plugin).runtime = { library, stop, checkSetup, setupError: () => setupError };
 	notifyRuntime(plugin);
-	plugin.app.workspace.onLayoutReady(() => { if (!controller.signal.aborted) { refresh.schedule(); } });
+	plugin.app.workspace.onLayoutReady(() => {
+		if (controller.signal.aborted) return;
+		refs.push(vault.on('create', onCreate));
+		refresh.schedule();
+	});
 }
 
 /** Applies changed Reading settings; open views close because they hold the previous library. */

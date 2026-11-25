@@ -24,8 +24,11 @@ const UNRELATED_FILES = 10_000;
 // Reads cost authentication, the Reading policy and index rows, and the item itself.
 const MAX_READ_ROWS = 20;
 // Saves add the file commit, its version, changelog and receipt rows, the index update and the
-// checks that skip unchanged section columns and search terms.
-const MAX_WRITE_ROWS = 135;
+// checks that skip unchanged section columns and search terms. Was 135; stored tag counts and
+// rows keyed by note add about 20 (measured 146 for a favorite), for no write beyond what changed.
+// The duplicate check for IDs a commit's rows leave adds about 9 (measured 155): it replaced a
+// recount of every flagged row, which read thousands with many copies (tag-counts.integration.ts).
+const MAX_WRITE_ROWS = 160;
 const policy = { enabled: 1, folder_path: 'Reading', generation: 'g', revision: 'r' };
 const operationId = () => createReminderOperationId(Math.floor(Date.now() / 86400_000));
 
@@ -66,7 +69,7 @@ beforeEach(async () => {
       ?, 'inbox', '["p:exa"]', '["example"]'
     FROM (SELECT *, CAST(substr(path, 9, length(path) - 11) AS INTEGER) AS n FROM files WHERE path >= 'Reading/' AND path < 'Reading0')`)
 		.bind(JSON.stringify(template), template.saved_at).run();
-	await env.DB.prepare(`INSERT INTO note_terms(term, saved_at, portable_path) SELECT 'p:exa', saved_at, portable_path FROM reading_items`).run();
+	await env.DB.prepare(`INSERT INTO note_terms(term, saved_at, item) SELECT 'p:exa', saved_at, id FROM reading_items`).run();
 });
 afterEach(reset);
 

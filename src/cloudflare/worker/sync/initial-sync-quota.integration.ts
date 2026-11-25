@@ -14,11 +14,12 @@ import { coordinatedNewFiles } from './staging/bulk-upload-dispatch';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 
 afterEach(async () => { await reset(); });
-/** `compact` also builds `file_versions` and `reading_items` the WITHOUT ROWID way, as
- * `files` always is. New uploads write neither, so the writes are the same. */
+/** `compact` also builds `file_versions` the WITHOUT ROWID way, as `files` always is. New
+ * uploads do not write it, so the writes are the same. `reading_items` keeps its rowid: derived
+ * Reading rows name a note by it. */
 async function initialize(compact = false) {
 	for (let sql of schema.split(';').map(value => value.trim()).filter(Boolean)) {
-		if (compact && /CREATE TABLE IF NOT EXISTS (file_versions|reading_items) \(/.test(sql)) {
+		if (compact && /CREATE TABLE IF NOT EXISTS file_versions \(/.test(sql)) {
 			sql = sql.replace(/id INTEGER PRIMARY KEY,\s*/, '').replace(/(portable_path|storage_key) TEXT NOT NULL UNIQUE/, '$1 TEXT PRIMARY KEY') + ' WITHOUT ROWID';
 		}
 		await env.DB.prepare(sql).run();
@@ -39,7 +40,7 @@ it.each([false, true])('bounds initial-upload writes and preserves retries (WITH
 	expect(await env.DB.prepare("SELECT storage_key FROM files WHERE path = 'existing'").first()).toEqual({ storage_key: 'existing-key' });
 	for (const name of ['files', 'file_versions', 'reading_items']) {
 		const table = await env.DB.prepare('SELECT sql FROM sqlite_master WHERE name = ?').bind(name).first<{ sql: string }>();
-		expect(table!.sql.includes('WITHOUT ROWID'), name).toBe(compact || name === 'files');
+		expect(table!.sql.includes('WITHOUT ROWID'), name).toBe(name === 'files' || compact && name === 'file_versions');
 	}
 
 	const meter = meterD1Writes(env.DB);

@@ -60,6 +60,16 @@
 	&-workspace[data-reader-open="true"] { .crate-reading__sidebar, .crate-reading__library { display: none; } .crate-reading__reader-pane { display: block; } }
 }
 
+// Highlight rows off screen skip layout and paint but stay in the page, so scrolling, find,
+// focus and motion still see them. `auto` remembers each row's height once it has been shown.
+// Skipping also clips painting to the row, so a focused row paints normally to keep its focus
+// ring. Saved-link rows do not skip: their own layout moved their text by a fraction of a pixel
+// and a restored scroll position by one.
+// Only the library's list, which can hold thousands of rows, skips: in WebKit a skipped row inside
+// a closed reader notice kept a box.
+.crate-reminders-ui .crate-reading__list-scroll > .crate-reading-highlights > .crate-reading-highlights__item { content-visibility: auto; contain-intrinsic-size: auto 100px; }
+.crate-reminders-ui .crate-reading__list-scroll > .crate-reading-highlights > .crate-reading-highlights__item:focus-within { content-visibility: visible; }
+
 // Reading uses one stacked app layout in both hosts at every width.
 .crate-reminders-ui .crate-reading {
 	@include compact-layout;

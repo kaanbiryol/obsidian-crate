@@ -283,16 +283,21 @@ CREATE TABLE IF NOT EXISTS crate_migrations (
 );
 
 -- `index_scope` is the scope reading_items was built for, NULL until a build starts, and
--- `index_cursor` the rebuild position, NULL once the build is complete.
+-- `index_cursor` the rebuild position, NULL once the build is complete. `index_rows` counts the
+-- rows rebuild steps wrote on the UTC day `index_day`. `changed` is the changelog sequence of
+-- the last commit that changed the index, and `epoch` counts changes the changelog does not
+-- show (rebuild steps, queued captures, policy edits): together the library revision.
 CREATE TABLE IF NOT EXISTS reading_policy (
  id INTEGER PRIMARY KEY CHECK (id = 1), enabled INTEGER NOT NULL,
  folder_path TEXT NOT NULL, generation TEXT NOT NULL, revision TEXT NOT NULL,
- index_scope TEXT, index_cursor TEXT
+ index_scope TEXT, index_cursor TEXT, index_day INTEGER, index_rows INTEGER NOT NULL DEFAULT 0,
+ changed INTEGER NOT NULL DEFAULT 0, epoch INTEGER NOT NULL DEFAULT 0
 );
 -- Reading notes in the Reading folder, written in the same batch as each file commit.
 -- Lists page by `saved_at` (empty for notes with an issue). `status` and `favorite` select a
--- section, and `highlighted_at` is the note's key in `highlight_index`. In an encrypted vault `card` comes from the note's upload,
--- sealed by the device that encrypted it, and `stale` marks an upload that carried none. `terms` is the JSON array stored in `note_terms`, and
+-- section, and `highlighted_at` is the note's key in `highlight_index`. Derived rows name the note by `id`, so a
+-- move changes only `path` and `portable_path`. In an encrypted vault `card` comes from the note's upload,
+-- sealed by the device that encrypted it, and `stale` marks an upload that carried none. `terms` is the JSON array stored in `note_terms`, `tag_terms` the tag terms among them, and
 -- `words` an unencrypted note's title words, which confirm a search's candidates. The link of a note
 -- is its `u:` term in `note_terms`.
 -- A rowid table: card, metadata and terms put rows over the 1 KB a WITHOUT ROWID page keeps.
@@ -302,26 +307,33 @@ CREATE TABLE IF NOT EXISTS reading_items (
  metadata_json TEXT, error TEXT, article_hash TEXT, article_edited INTEGER NOT NULL DEFAULT 0,
  duplicate INTEGER NOT NULL DEFAULT 0, saved_at TEXT NOT NULL DEFAULT '',
  status TEXT, favorite INTEGER NOT NULL DEFAULT 0,
- card TEXT, stale INTEGER NOT NULL DEFAULT 0, terms TEXT, words TEXT, highlighted_at TEXT
+ card TEXT, stale INTEGER NOT NULL DEFAULT 0, terms TEXT, words TEXT, highlighted_at TEXT, tag_terms TEXT
 );
-CREATE INDEX IF NOT EXISTS reading_items_status_idx ON reading_items(status, saved_at, portable_path);
-CREATE INDEX IF NOT EXISTS reading_items_favorite_idx ON reading_items(saved_at, portable_path) WHERE favorite = 1;
+CREATE INDEX IF NOT EXISTS reading_items_status_idx ON reading_items(status, saved_at, id);
+CREATE INDEX IF NOT EXISTS reading_items_favorite_idx ON reading_items(saved_at, id) WHERE favorite = 1;
 CREATE INDEX IF NOT EXISTS reading_items_issue_idx ON reading_items(portable_path) WHERE error IS NOT NULL OR duplicate = 1 OR article_edited = 1;
 CREATE INDEX IF NOT EXISTS reading_items_id_idx ON reading_items(item_id);
 CREATE INDEX IF NOT EXISTS reading_items_article_idx ON reading_items(article_hash) WHERE article_hash IS NOT NULL;
 -- Search terms of indexed Reading notes, plain or, in an encrypted vault, hashed.
 -- Each term lists its notes newest first, so a search walks one term and stops after a page.
 CREATE TABLE IF NOT EXISTS note_terms (
- term TEXT NOT NULL, saved_at TEXT NOT NULL, portable_path TEXT NOT NULL,
- PRIMARY KEY (term, saved_at, portable_path)
+ term TEXT NOT NULL, saved_at TEXT NOT NULL, item INTEGER NOT NULL,
+ PRIMARY KEY (term, saved_at, item)
 ) WITHOUT ROWID;
 -- One row per highlighted Reading note, newest highlight first: the Highlights tab's pages.
 -- `terms` is the JSON array a highlight search matches (title, highlight and note words, and
 -- tags, hashed in an encrypted vault) and `words` an unencrypted note's whole words, which
 -- confirm a match. A search scans a bounded run of rows, so the table needs no term index.
 CREATE TABLE IF NOT EXISTS highlight_index (
- highlighted_at TEXT NOT NULL, portable_path TEXT NOT NULL, terms TEXT NOT NULL, words TEXT,
- PRIMARY KEY (highlighted_at, portable_path)
+ highlighted_at TEXT NOT NULL, item INTEGER NOT NULL, terms TEXT NOT NULL, words TEXT,
+ PRIMARY KEY (highlighted_at, item)
+) WITHOUT ROWID;
+-- How many listed notes of each section have each tag: inbox, archived, favorites and
+-- highlights, as those lists select them. Each commit adds the difference it makes, from the
+-- `tag_terms` of each row. A count that reaches 0 stays until the tag is used again.
+CREATE TABLE IF NOT EXISTS reading_tag_counts (
+ section TEXT NOT NULL, term TEXT NOT NULL, count INTEGER NOT NULL,
+ PRIMARY KEY (section, term)
 ) WITHOUT ROWID;
 -- An encrypted vault's tag names, sealed by the device that saved a note with the tag, keyed by
 -- the tag's hashed term. A row stays while any note in `note_terms` has the term.

@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
-import { reset } from 'cloudflare:test';
+import { resetAfterAlarms } from './test-support/reset-test-harness';
 import { applySchema } from './test-support/schema-test-harness';
 import worker from './index';
 import { writeCommittedMarkdownFile } from './sync/markdown-files';
@@ -16,7 +16,7 @@ beforeEach(async () => {
 		.bind('protocol-test', await sha256Hex(new TextEncoder().encode(token)), 'vault').run();
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Note.md', 'Keep the original bytes', null);
 });
-afterEach(async () => { await reset(); });
+afterEach(resetAfterAlarms);
 
 function request(path: string, protocol: string | undefined, method = 'GET', body?: string) {
 	return new Request(`https://compatibility.test${path}`, { method, body, headers: {

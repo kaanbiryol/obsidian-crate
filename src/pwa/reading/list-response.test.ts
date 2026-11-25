@@ -72,3 +72,21 @@ it('ranks tied server tags by name, as a local library does', async () => {
 		{ name: 'mango', count: 5 }, { name: 'apple', count: 2 }, { name: 'kiwi', count: 2 }, { name: 'zebra', count: 2 },
 	]);
 });
+
+it('asks only what changed after the first read, and reads the first page again on reset', async () => {
+	const own = { ...session, id: 'changes' };
+	respond({ items: [item(1), item(2)], issues: [], cursor: null, revision: '0.5' });
+	const first = await loadReading(own);
+	expect(first.revision).toBe('0.5');
+	// Unchanged: the same library, from one small request.
+	respond({ revision: '0.5', items: [], issues: [], removed: [] });
+	expect(await loadReading(own)).toBe(first);
+	expect(network.mock.calls.at(-1)![0]).toBe('/reading/changes?since=0.5');
+	respond({ revision: '0.7', items: [{ ...item(2), title: 'Renamed' }], issues: [issue], removed: ['Reading/1.md'] });
+	const changed = await loadReading(own);
+	expect(changed).toMatchObject({ revision: '0.7', items: [{ title: 'Renamed' }], issues: [issue], changes: { from: '0.5', to: '0.7' } });
+	expect(removeEarlierSessionCopies).toHaveBeenCalledTimes(1);
+	respond({ revision: '1.7', reset: true }, { items: [item(3)], issues: [], cursor: null, revision: '1.7' });
+	expect(await loadReading(own)).toMatchObject({ revision: '1.7', items: [{ title: 'Article 3' }] });
+	expect(network.mock.calls.at(-1)![0]).toBe('/reading/items?section=inbox');
+});

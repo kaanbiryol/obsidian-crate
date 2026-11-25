@@ -3,7 +3,7 @@ import { createDevelopmentBuild } from './development-build.mjs';
 import { developmentShortcut } from './development-shortcut.mjs';
 import { builtinModules } from 'node:module';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
@@ -11,6 +11,7 @@ import { createPwaAssetVersion } from './pwa-asset-version.mjs';
 import { bundlePwaClient } from './pwa-client-build.mjs';
 import { bundleServiceWorkerRuntime } from './service-worker-build.mjs';
 import { collectServerInputs } from './server-build-inputs.mjs';
+import { staleWorkerBuild } from './worker-build-freshness.mjs';
 import { readingExtractionPlugin } from './reading-extraction-build.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -106,18 +107,8 @@ async function buildPwaClientBundle(serviceWorkerRuntime, shortcut) {
 // Release gates build once, then set CRATE_WORKER_PREBUILT=1 so nested build:worker
 // calls reuse that output. Missing output or an input edited after the build fails.
 function assertPrebuiltWorker(rootDir) {
-	const generated = resolve(rootDir, '.generated/cloudflare');
-	let identity, inputs, builtAt;
-	try {
-		identity = JSON.parse(readFileSync(resolve(generated, 'build-identity.json'), 'utf8'));
-		inputs = JSON.parse(readFileSync(resolve(generated, 'server-inputs.json'), 'utf8'));
-		builtAt = Math.min(...['worker.mjs', 'worker-self-hosted.mjs', 'pwa-client.json', 'build-identity.json'].map(name => statSync(resolve(generated, name)).mtimeMs));
-	} catch (error) {
-		throw new Error(`CRATE_WORKER_PREBUILT=1 requires a completed npm run build:worker: ${error.message}`, { cause: error });
-	}
-	if (identity.development !== null) throw new Error('CRATE_WORKER_PREBUILT=1 found a development Worker build; run npm run build:worker.');
-	const stale = inputs.filter(path => !existsSync(resolve(rootDir, path)) || statSync(resolve(rootDir, path)).mtimeMs > builtAt);
-	if (stale.length) throw new Error(`CRATE_WORKER_PREBUILT=1 found Worker inputs changed after the build; run npm run build:worker:\n${stale.map(path => `  ${path}`).join('\n')}`);
+	const stale = staleWorkerBuild(rootDir);
+	if (stale) throw new Error(`CRATE_WORKER_PREBUILT=1 found ${stale}; run npm run build:worker.`);
 }
 
 if (process.env.CRATE_WORKER_PREBUILT === '1' && !development) {

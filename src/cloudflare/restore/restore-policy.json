@@ -4,7 +4,7 @@
     "reminder_projections", "reminder_file_cache",
     "object_cleanup_queue", "upload_leases",
     "request_rate_limits", "notification_projection_jobs", "reminder_source_state",
-    "reading_items", "reading_jobs"
+    "reading_items", "note_terms", "highlight_index", "reading_tags", "reading_tag_counts", "reading_jobs"
   ],
   "resetColumns": { "reading_policy": ["index_scope", "index_cursor"] },
   "resetMaintenanceKeys": ["crate_deployment_fence", "crate_upgrade_checkpoint", "crate_upgrade_backup", "storage_id"],

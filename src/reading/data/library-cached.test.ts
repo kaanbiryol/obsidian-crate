@@ -177,6 +177,26 @@ describe('Reading background work', () => {
 		expect(work.issues.size).toBe(0);
 	});
 
+	it('skips notes already waiting for sync on each retry until sync finishes or they change', async () => {
+		const clips = Object.fromEntries(Array.from({ length: 50 }, (_, index) => [`Reading/Clip ${index}.md`, clip]));
+		const h = vault(clips);
+		let syncing = true, lookups = 0;
+		const file = h.fake.file!.bind(h.fake);
+		h.fake.file = path => { lookups++; return file(path); };
+		const work = maintenance(h.fake, () => !syncing);
+		await work.start();
+		expect(work.issues.size).toBe(50);
+		lookups = 0;
+		for (let index = 0; index < 10; index++) await work.retry();
+		expect(lookups).toBe(0);
+		await work.changed(['Reading/Clip 0.md']);
+		expect(lookups).toBe(1);
+		syncing = false;
+		await work.retry();
+		expect(h.writes).toHaveLength(50);
+		expect(work.issues.size).toBe(0);
+	});
+
 	it('reports a changed note the strict parser rejects instead of listing its card', async () => {
 		const duplicateKey = note(2).replace('favorite: false', 'favorite: false\nfavorite: true');
 		const h = vault({ 'Reading/A.md': note(1), 'Reading/B.md': note(2) });

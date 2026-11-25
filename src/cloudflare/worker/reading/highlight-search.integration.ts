@@ -31,7 +31,7 @@ const get = async <T>(path: string) => {
 };
 const highlights = async (query = '') => get<{ items: ReadingItem[]; cursor: string | null }>(`items?section=highlights&${query}`);
 const titles = async (query = '') => (await highlights(query)).items.map(item => item.title);
-const highlightRows = async () => (await env.DB.prepare('SELECT highlighted_at, portable_path FROM highlight_index ORDER BY highlighted_at DESC').all()).results;
+const highlightRows = async () => (await env.DB.prepare('SELECT h.highlighted_at, i.portable_path FROM highlight_index h JOIN reading_items i ON i.id = h.item ORDER BY h.highlighted_at DESC').all()).results;
 
 let day = 1;
 const notes = new Map<string, { path: string; note: string; id: string }>();
@@ -109,7 +109,7 @@ it('stops a highlight search after a bounded scan and continues it from the curs
       VALUES (?, ?, 'r', 'h', 1, ?, ?, ?, 'inbox', ?, '[]', '[]')`).bind(path, `Reading/${n}.md`, crypto.randomUUID(),
 			JSON.stringify({ crate_reading_version: 1, crate_reading_id: '00000000-0000-4000-8000-000000000001', title: `Note ${n}`, source_url: 'https://example.invalid/', saved_at: at,
 				reading_status: 'inbox', favorite: false, tags: [], extraction_status: 'ready' }), at, at));
-		statements.push(env.DB.prepare('INSERT INTO highlight_index(highlighted_at, portable_path, terms, words) VALUES (?, ?, ?, ?)')
+		statements.push(env.DB.prepare('INSERT INTO highlight_index(highlighted_at, item, terms, words) VALUES (?, (SELECT id FROM reading_items WHERE portable_path = ?), ?, ?)')
 			.bind(at, path, JSON.stringify([term]), JSON.stringify([n === 0 ? 'rare' : 'common'])));
 	}
 	for (let index = 0; index < statements.length; index += 500) await env.DB.batch(statements.slice(index, index + 500));
@@ -134,7 +134,7 @@ it('ends a Highlights page before its cards pass the size budget', async () => {
 		const path = `reading/${n}.md`, at = new Date(Date.UTC(2025, 0, 1) + n * 60_000).toISOString();
 		statements.push(env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, saved_at, status, highlighted_at, card)
       VALUES (?, ?, 'r', 'h', 1, ?, ?, 'inbox', ?, ?)`).bind(path, `Reading/${n}.md`, crypto.randomUUID(), at, at, JSON.stringify({ card: 'a'.repeat(200_000) })));
-		statements.push(env.DB.prepare("INSERT INTO highlight_index(highlighted_at, portable_path, terms) VALUES (?, ?, '[]')").bind(at, path));
+		statements.push(env.DB.prepare("INSERT INTO highlight_index(highlighted_at, item, terms) VALUES (?, (SELECT id FROM reading_items WHERE portable_path = ?), '[]')").bind(at, path));
 	}
 	await env.DB.batch(statements);
 	const first = await readingItems(env, policy, true, { section: 'highlights', cursor: '' }) as { cards: Array<{ path: string }>; cursor: string | null };

@@ -1,4 +1,4 @@
-import { TFile, TFolder, type Vault } from 'obsidian';
+import { TFile, TFolder, type TAbstractFile, type Vault } from 'obsidian';
 import { expect, it, vi } from 'vitest';
 import { createObsidianReadingVault } from './obsidian-vault';
 import { ReadingLibrary } from './library';
@@ -11,7 +11,7 @@ function harness() {
 	let allowed = true, content = 'text';
 	const vault = {
 		getAbstractFileByPath: (path: string) => entries.get(path) ?? null,
-		getAllLoadedFiles: () => [...entries.values()],
+		getRoot: () => Object.assign(new TFolder(), { path: '/', children: [folder] }),
 		adapter: { readBinary: vi.fn(async (_path: string): Promise<ArrayBuffer> => new TextEncoder().encode(content).buffer) },
 		read: vi.fn(async () => content),
 		process: vi.fn(async (_file: TFile, update: (source: string) => string) => { content = update(content); return content; }),
@@ -129,4 +129,16 @@ it('reports cached frontmatter, an indexed note without it, and an unindexed not
 	expect(adapter.cachedProperties(listed)).toBeUndefined();
 	// A file the adapter did not list has no identity to check, so it is read instead.
 	expect(adapter.cachedProperties({ path: 'Reading/note.md', size: 4, modifiedAt: 1 })).toBeUndefined();
+});
+
+it('finds a name taken in any case by walking only the folders on its path', () => {
+	const h = harness();
+	const nested = Object.assign(new TFolder(), { path: 'Reading/Later', children: [] as TAbstractFile[] });
+	nested.children.push(Object.assign(new TFile(), { path: 'Reading/Later/Saved.md', extension: 'md', stat: { size: 1, mtime: 1 } }));
+	(h.folder.children as TAbstractFile[]) = [h.file, nested];
+	expect(h.adapter.occupied!('reading/NOTE.md')).toBe(true);
+	expect(h.adapter.occupied!('Reading/later/saved.md')).toBe(true);
+	expect(h.adapter.occupied!('Reading/Later')).toBe(true);
+	expect(h.adapter.occupied!('Reading/other.md')).toBe(false);
+	expect(h.adapter.occupied!('Other/note.md')).toBe(false);
 });

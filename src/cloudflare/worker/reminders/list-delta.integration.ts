@@ -5,6 +5,7 @@ import { reset } from 'cloudflare:test';
 import { applySchema } from '../test-support/schema-test-harness';
 import { handleListReminders } from './handlers/list';
 import { revalidateReminderSources } from './source-migration';
+import { meterD1Usage } from '../d1/d1-usage';
 import { commitFileDelete } from '../sync/mutations';
 import { getStoredFileRow } from '../sync/storage';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
@@ -105,4 +106,20 @@ it('lists a note the notification projection parsed without reading it from stor
 	const listed = await list();
 	expect(listed.body).toMatchObject({ reminders: [{ id: 'a1' }] });
 	expect(get).not.toHaveBeenCalled();
+});
+
+it('reads each note once while scanning the folder for its sources', { timeout: 60_000 }, async () => {
+	const notes = 1000;
+	await env.DB.prepare(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < ?)
+		INSERT INTO files(path, portable_path, storage_key, hash, size) SELECT 'Reminders/' || x || '.md', 'reminders/' || x || '.md', 'key-' || x, '', 1 FROM n`).bind(notes).run();
+	// Only the folder walk is metered; parsing the (absent) note bytes is not what this measures.
+	const meter = meterD1Usage(env.DB), prepare = env.DB.prepare.bind(env.DB);
+	const db = { prepare: (sql: string) => sql.startsWith('SELECT path FROM files') ? meter.db.prepare(sql) : prepare(sql),
+		batch: (statements: D1PreparedStatement[]) => env.DB.batch(statements), exec: (sql: string) => env.DB.exec(sql) } as unknown as D1Database;
+	const scanned = () => env.DB.prepare("SELECT value FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'").first<{ value: string }>();
+	for (let pass = 0; pass < 100 && (await scanned())?.value !== ''; pass++) await revalidateReminderSources({ ...env, DB: db }, 4);
+	expect((await scanned())?.value).toBe('');
+	expect(await env.DB.prepare('SELECT count(*) AS n FROM reminder_source_state').first()).toEqual({ n: notes });
+	// Before: each batch of 100 read every note before its cursor again, 6,500 rows here.
+	expect(meter.usage.rowsRead).toBeLessThan(notes * 1.5);
 });

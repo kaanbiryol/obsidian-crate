@@ -48,6 +48,22 @@ describe('highlight feed', () => {
 		expect(filterReadingHighlights([first, second], 'keep').map(entry => entry.highlight.text)).toEqual(['New', 'Old']);
 		expect(filterReadingHighlights([], '')).toEqual([]);
 	});
+
+	it('sorts a list once and filters it in order as the search changes', () => {
+		const first = item('first', '2026-09-01', { highlights: [{ start: 0, end: 3, text: 'Old', createdAt: '2026-09-20' }, { start: 4, end: 7, text: 'New', createdAt: '2026-09-23' }] });
+		const second = item('second', '2026-09-21', { highlights: [{ start: 0, end: 6, text: 'Middle', createdAt: '2026-09-22' }] });
+		const all = [first, second];
+		const sort = vi.spyOn(Array.prototype, 'sort');
+		try {
+			const unfiltered = filterReadingHighlights(all, '');
+			expect(filterReadingHighlights(all, '')).toBe(unfiltered);
+			sort.mockClear();
+			// A search narrows the notes listed; their rows keep the order of the whole list.
+			expect(filterReadingHighlights([first], 'new', false, all).map(entry => entry.highlight.text)).toEqual(['New']);
+			expect(filterReadingHighlights([second, first], '', false, all).map(entry => entry.highlight.text)).toEqual(['New', 'Middle', 'Old']);
+			expect(sort).not.toHaveBeenCalled();
+		} finally { sort.mockRestore(); }
+	});
 });
 
 describe('highlights of a server library', () => {

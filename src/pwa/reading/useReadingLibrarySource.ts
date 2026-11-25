@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef } from 'react';
 import { createLibraryPageCache, prefetchLibrarySection, type LibraryPageCache, type ReadingLibrarySource } from '@/reading/ui/useLibraryPages';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
 import type { ReadingItem } from '@/reading/core/model';
+import type { ReadingLibraryChanges } from '@/reading/ui/library-changes';
 import type { DockTab } from '../settings/dock-preferences';
 import { queryReadingItems, queryReadingTags } from './api';
 import { presentReadingItems } from './pending-view';
 import type { PendingReading } from './outbox';
 import type { ReadingSession } from './session/session';
 
-interface Library { items: ReadingItem[]; cursor?: string | null; offline?: boolean }
+interface Library { items: ReadingItem[]; cursor?: string | null; offline?: boolean; revision?: string; changes?: ReadingLibraryChanges }
 
 const DOCK_SECTIONS: Partial<Record<DockTab, ReadingSection>> = { reading: 'inbox', favorites: 'favorites', archive: 'archived', highlights: 'highlights' };
 
@@ -26,14 +27,14 @@ export function useReadingLibrarySource({ session, savedOnly, library, pending, 
 	if (owned.current.identity !== identity) owned.current = { identity, cache: createLibraryPageCache() };
 	const cache = owned.current.cache;
 	const source = useMemo<ReadingLibrarySource | undefined>(() => session && !savedOnly && library ? {
-		load: async ({ section, q, tag, cursor }) => {
+		load: async ({ section, q, tag, cursor }, signal) => {
 			// The sync just read the first inbox page; the library shows it without asking again.
 			if (section === 'inbox' && !q.trim() && !tag && !cursor) return { items: library.items, cursor: library.cursor ?? null };
-			const page = await queryReadingItems(session, { section, q, tag: tag ?? undefined, cursor: cursor ?? undefined });
+			const page = await queryReadingItems(session, { section, q, tag: tag ?? undefined, cursor: cursor ?? undefined }, signal);
 			return { items: page.items, cursor: page.cursor };
 		},
 		loadTags: section => queryReadingTags(session, section),
-		revision: library, present: items => presentReadingItems(items, pending), cache,
+		revision: library, at: library.revision, changes: library.changes, present: items => presentReadingItems(items, pending), cache,
 	} : undefined, [session, savedOnly, library, pending, cache]);
 	const sections = dockReadingSections(dockTabs).join();
 	// Only a source for a new library starts a prefetch; `pending` changes rebuild it in between.

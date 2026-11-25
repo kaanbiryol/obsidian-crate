@@ -153,5 +153,7 @@ export async function scheduleReading(env: Env, loaded?: { encryption: Encryptio
 			if (!await wakeReading(env)) throw new Error('Could not schedule Reading');
 		}
 	}
-	return index.state === 'complete' ? null : Date.now() + (index.state === 'unavailable' ? 30_000 : 1);
+	if (index.state === 'complete') return null;
+	// A rebuild that spent the day's writes continues the next day.
+	return index.state === 'waiting' ? index.retryAt : Date.now() + (index.state === 'unavailable' ? 30_000 : 1);
 }

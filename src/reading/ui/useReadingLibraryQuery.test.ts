@@ -18,12 +18,12 @@ it('asks a server library from three characters and rechecks its candidates loca
 		let query = 'sy';
 		const hook = renderHook(() => useReadingLibraryQuery({ snapshot: { items: [], loading: false }, source, section: 'inbox', query, tag: null }));
 		await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-		expect(load).toHaveBeenLastCalledWith(expect.objectContaining({ q: '' }));
+		expect(load).toHaveBeenLastCalledWith(expect.objectContaining({ q: '' }), expect.any(AbortSignal));
 		expect(hook.current).toMatchObject({ listQuery: '', count: 2, loading: false, more: false });
 		query = 'sys';
 		hook.rerender();
 		await act(async () => { await vi.runAllTimersAsync(); });
-		expect(load).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'sys' }));
+		expect(load).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'sys' }), expect.any(AbortSignal));
 		expect(hook.current.items).toEqual([systems]);
 		expect(hook.current.tags).toEqual([{ name: 'Server', count: 2 }]);
 	} finally { vi.useRealTimers(); }

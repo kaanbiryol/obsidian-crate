@@ -22,6 +22,6 @@ it.each(['capture', 'update', 'retry', 'delete'])('sends an encrypted %s only as
 	// Tags, highlights and their notes are private in an encrypted vault.
 	const body = JSON.stringify({ id: 'item', before: { tags: ['private'], highlights: [{ start: 0, end: 6, text: 'secret', note: 'mine' }] }, operationId: 'operation' });
 	await readingRequest(`/reading/${action}`, session, body);
-	expect(encrypted).toHaveBeenCalledWith(`/reading/${action}`, body);
+	expect(encrypted).toHaveBeenCalledWith(`/reading/${action}`, body, undefined);
 	expect(network).not.toHaveBeenCalled();
 });

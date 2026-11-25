@@ -4,9 +4,18 @@ import { readingLiterals } from './markdown-literals';
 
 it.each([
 	'', '$$', 'a $$ b', 'a\n$$', 'a\n   $$', 'a\n    $$', 'a\n\t$$', 'a\r$$', 'a\u2028 $$', 'x$$$\n $$$', 'a $$x$$\n\nb\n  $$\nc',
-])('finds math blocks where a line-start search does: %j', source => {
+])('finds math blocks where a line-start search does, up to the paragraph\'s end: %j', source => {
 	const mathBlock = readingLiterals.find(extension => extension.name === 'readingMathBlock') as { start(source: string): number };
-	expect(mathBlock.start(source)).toBe(source.search(/^ {0,3}\$\$/m));
+	// Marked only cuts the current paragraph there, which never spans a blank line.
+	expect(mathBlock.start(source)).toBe(source.split('\n\n')[0]!.search(/^ {0,3}\$\$/m));
+});
+
+it('keeps a math block after a blank line whole, like one inside the paragraph', () => {
+	for (const source of ['a\n\n$$x\n\ny$$', 'a\n$$x$$\n\nb', 'a\n\n  $$x$$\nb']) {
+		expect(readingDocument(source).html).toContain('$$');
+		expect(readingDocument(source).html).not.toContain('<em>');
+	}
+	expect(readingDocument('a\n\n$$x\n\ny$$').text).toContain('$$x\n\ny$$');
 });
 
 it('maps long notes in roughly linear time', () => {

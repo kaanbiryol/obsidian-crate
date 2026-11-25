@@ -141,6 +141,7 @@ All sync routes require `vault`.
 | `POST` | `/reading/policy` | `vault` | Set the Reading folder and extraction state `{ folderPath, enabled, revision }` |
 | `GET` | `/reading/session` | `vault`, `reminders` | Return the credential's `{ id, folderPath, generation, expiresAt, day }` for the Reading app |
 | `GET` | `/reading/items?section=&cursor=` | `vault`, `reminders` | One page of the library, or encrypted cards |
+| `GET` | `/reading/changes?since=` | `vault`, `reminders` | What changed in the library since a revision |
 | `GET` | `/reading/tags` | `vault`, `reminders` | List library tags, optionally for one section with counts |
 | `GET` | `/reading/taken?path=…` | `vault`, `reminders` | Which of up to 20 server paths are taken, for naming encrypted notes (encrypted vaults only) |
 | `GET` | `/reading/item` | `vault`, `reminders` | Read one indexed note or queued capture (plaintext only) |
@@ -618,12 +619,15 @@ rebuild, which writes.
 ### Reading index rebuilds
 
 A new Reading folder or generation, an index format change, a restore or an index
-whose bytes were unavailable at commit time rebuilds the index from R2, 25 files
-per step. Reading list and mutation requests return 503 until that rebuild finishes
-or while source bytes cannot be verified. A temporary R2 failure keeps the rebuild
-position and does not permit capture deduplication against an incomplete index.
-Background storage-failure retries use a 30-second delay; ordinary rebuild steps
-continue immediately. Verified malformed or oversized notes instead produce stable
+whose bytes were unavailable at commit time rebuilds the index. The rebuild keeps every
+row that still names its file's current revision: each step checks 500 rows, removes those
+whose file is gone or outside the folder, then reads from R2 only the notes (up to 25 and
+16 MB) whose row is missing or older. A new index format removes every row first. Steps stop
+for the UTC day once they have written 50,000 rows and continue the next day. Reading list
+and mutation requests return 503 until that rebuild finishes or while source bytes cannot
+be verified. A temporary R2 failure keeps the rebuild position and does not permit capture
+deduplication against an incomplete index. Background storage-failure retries use a
+30-second delay; ordinary rebuild steps continue immediately. Verified malformed or oversized notes instead produce stable
 source issues until the source changes.
 
 ### Reading library pages and cards
@@ -632,19 +636,23 @@ source issues until the source changes.
 newest `saved_at` first. `section` is `inbox`, `archived`, `favorites`, `highlights` or `all`;
 `id` finds one Reading ID. An unencrypted vault also takes `q` (each word of 3 or more letters
 matches the start of a title word, a shorter one a whole word), `tag` and `url`, and answers
-`{ items, issues, cursor }`; the first unfiltered inbox page carries the capture queue and
+`{ items, issues, cursor, revision }`; the first unfiltered inbox page carries the capture queue and
 issues. An encrypted vault takes up to 10 hashed `term` values, every one of which must match,
-and answers `{ cards, cursor }`: each card's server path, revision, hash, size, sealed `card`,
-`stale` and the plaintext list `fields`. Terms live in `note_terms`, one per
+and answers `{ cards, cursor, revision }`: each card's server path, revision, hash, size, sealed `card`,
+`stale` and the plaintext list `fields`. The cursor is opaque. `revision` is the library
+revision, `<epoch>.<changed>`: `changed` is the changelog sequence of the last commit that
+changed the Reading index, and `epoch` counts changes the changelog does not list (rebuild
+steps, queued captures and policy edits). Terms live in `note_terms`, one per
 title word, tag and link, keyed by saved date: a search walks its rarest term (by counts capped
-at 50, then 500) newest first and stops after a page. It checks the other terms by key lookups in
+at 50, then 500 for its first three terms, on the first page only: the cursor keeps the choice)
+newest first and stops after a page. It checks the other terms by key lookups in
 `note_terms` and, unencrypted, the title words on the notes that have every term. See [Reading search](reading-search.md).
 
 `section=highlights` pages `highlight_index` instead: highlighted notes, newest highlight first.
 There `q` (or the hashed `term` values) and `tag` match each note's highlight terms: the words of
 its title, highlight text and highlight notes, and its tags. A filtered page scans at most 2,000
-rows, so a page can come back short or empty with a `cursor` that continues the scan. A Highlights
-page also ends before its notes or cards pass 512 KB.
+rows, so a page can come back short or empty with a `cursor` that continues the scan. Every page,
+in any section, ends before its notes or cards pass 512 KB.
 
 `GET /reading/tags` (library credential) lists every tag for the tags view, up to 5,000. An
 unencrypted vault answers `{ tags }`, lowercased, stepping through the distinct `t:` terms with
@@ -653,9 +661,17 @@ each name sealed by a device for its hashed term; the device opens them.
 
 `GET /reading/tags?section=inbox|favorites|archived|highlights` lists only the tags of notes in
 that section, most used first, with each tag's note count: `{ tags, counts }` unencrypted (the two
-arrays align), or `{ sealed: [{ term, name, count }] }` encrypted. It reads every tagged note entry
-once plus its note, so the web app asks once per section and keeps the answer until the library's
-next sync. Another section value receives HTTP 400.
+arrays align), or `{ sealed: [{ term, name, count }] }` encrypted. Each commit keeps the counts in
+`reading_tag_counts` by the difference it makes, so the list reads about two rows per tag at any
+library size. Another section value receives HTTP 400.
+
+`GET /reading/changes?since=<revision>` (library credential) answers what changed since a
+revision `/reading/items` returned: `{ revision, items, issues, removed }` unencrypted, or
+`{ revision, cards, removed }` encrypted. It reads the changelog entries after `since`, keeps those
+in the Reading folder, and lists their notes and every note sharing their Reading IDs: listed ones
+as items or cards, the other changed paths in `removed`. An unchanged library answers from the
+index row the request reads anyway. Another epoch, a pruned changelog or more than 500 entries
+answer `{ revision, reset: true }`, and the client reads its first page again.
 
 In an encrypted vault, each Reading note's upload carries its card as the file's public data
 (`{ kind: 'reading-card', version: 1, card, terms, fields, highlighted_at, highlight_terms, tag_names }`), from Obsidian's sync and the web

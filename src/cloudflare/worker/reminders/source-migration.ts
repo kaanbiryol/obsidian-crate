@@ -1,6 +1,6 @@
 import { portablePathKey } from '../../../protocol/portable-path';
 import { isReminderNotePath } from '../../../protocol/reminder-archive-path';
-import { FILE_FOLDER_MATCH, FILE_PATH_MATCH, fileFolderArgs, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
+import { FILE_PATH_MATCH, fileFolderArgs, filePathArgs, fileRevisionGuard } from '../sync/file-identity';
 import { loadStoredFileRows } from '../sync/storage';
 import { recordFileFailure } from '../notifications/file-retries';
 import { queryRows, readMaintenanceValue } from '../d1/db';
@@ -33,9 +33,12 @@ async function seedSourceStates(db: D1Database, folder: string): Promise<boolean
 	// An empty saved cursor marks completion; a missing row starts the migration.
 	if (saved === '') return false;
 	const cursor = saved ?? '';
+	// The cursor is the walk's only lower bound: beside the folder's own, SQLite seeks to the
+	// folder's start and reads every file the earlier batches walked.
+	const [folderStart, folderEnd, pathStart, pathEnd] = fileFolderArgs(folder);
 	const files = await queryRows<{ path: string }>(db.prepare(`SELECT path FROM files
-    WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md' AND portable_path > ? ORDER BY portable_path LIMIT ?`)
-		.bind(...fileFolderArgs(folder), portablePathKey(cursor), SCAN_BATCH_SIZE));
+    WHERE portable_path > ? AND portable_path < ? AND path >= ? AND path < ? AND lower(path) LIKE '%.md' ORDER BY portable_path LIMIT ?`)
+		.bind(cursor ? portablePathKey(cursor) : folderStart, folderEnd, pathStart, pathEnd, SCAN_BATCH_SIZE));
 	const next = files.length === SCAN_BATCH_SIZE ? files[files.length - 1]!.path : '';
 	await db.batch([
 		db.prepare(`INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified)

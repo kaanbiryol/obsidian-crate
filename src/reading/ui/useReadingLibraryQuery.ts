@@ -8,6 +8,7 @@ type Present = ReadingLibrarySource['present'];
 import { useMinimumLoading } from './useMinimumLoading';
 import { LOADING_INDICATOR_DELAY_MS } from '@/ui/shared/LoadingIndicator';
 
+const NO_EXCERPTS: ReturnType<typeof filterReadingHighlights> = [];
 // A loading spinner, once visible, stays at least this long so a quick answer never flickers it.
 const MIN_LOADING_MS = 300;
 
@@ -62,10 +63,13 @@ export function useReadingLibraryQuery({ snapshot, source, section, query, tag, 
 		? filterReadingItems(loaded, listedSection, '', null).filter(item => matchesReadingQuery(item, { query: shown.q, tag: shown.tag, highlights: listedSection === 'highlights' }))
 		: filterReadingItems(snapshot.items, section, listQuery, tag), [present, loaded, snapshot.items, section, listedSection, listQuery, tag, shown.q, shown.tag]);
 	const morePages = !!pages.cursor;
+	// Only the Highlights section lists highlights. Its rows are sorted once per loaded list,
+	// not per keystroke: the search filters them in order.
 	const excerpts = useMemo(() => {
-		const rows = filterReadingHighlights(items, shown.q, !!present);
-		return present && listedSection === 'highlights' && morePages ? settledHighlights(rows, pages.items) : rows;
-	}, [items, shown.q, present, listedSection, morePages, pages.items]);
+		if (listedSection !== 'highlights') return NO_EXCERPTS;
+		const rows = filterReadingHighlights(items, shown.q, !!present, present ? loaded : snapshot.items);
+		return present && morePages ? settledHighlights(rows, pages.items) : rows;
+	}, [items, shown.q, present, loaded, snapshot.items, listedSection, morePages, pages.items]);
 	const count = listedSection === 'highlights' ? excerpts.length : items.length;
 	// A local library counts its own tags; a server library's arrive with its first page.
 	const snapshotItems = snapshot.items;

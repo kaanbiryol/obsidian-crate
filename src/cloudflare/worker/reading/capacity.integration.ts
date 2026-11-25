@@ -34,14 +34,16 @@ async function seedLibrary(notes: number) {
 	const template = parseReadingNote(createReadingNote({ id: crypto.randomUUID(), url: 'https://example.invalid/template', title: 'Template', savedAt: new Date().toISOString() }))!;
 	await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
     INSERT INTO files(path, portable_path, storage_key, hash, size) SELECT 'Reading/' || x || '.md', 'reading/' || x || '.md', 'reading-key-' || x, '', 0 FROM n`).bind(notes).run();
-	await env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, terms, words)
+	// Each note has one of 100 tags.
+	await env.DB.prepare(`INSERT INTO reading_items(portable_path, path, storage_key, hash, size, item_id, metadata_json, saved_at, status, terms, words, tag_terms)
     SELECT portable_path, path, storage_key, hash, size, reading_id,
       json_set(?, '$.crate_reading_id', reading_id, '$.source_url', 'https://example.invalid/' || n, '$.title', 'Article ' || n, '$.saved_at', saved), saved, 'inbox',
-      json_array('p:art', CASE WHEN length(n) >= 3 THEN 'p:' || substr(n, 1, 3) ELSE 'w:' || n END), json_array('article', CAST(n AS TEXT))
+      json_array('p:art', CASE WHEN length(n) >= 3 THEN 'p:' || substr(n, 1, 3) ELSE 'w:' || n END, 't:tag' || (n % 100)), json_array('article', CAST(n AS TEXT)), json_array('t:tag' || (n % 100))
     FROM (SELECT *, printf('00000000-0000-4000-8000-%012d', n) AS reading_id, strftime('%Y-%m-%dT%H:%M:%fZ', '2020-01-01', '+' || n || ' minutes') AS saved
       FROM (SELECT *, CAST(substr(path, 9, length(path) - 11) AS INTEGER) AS n FROM files WHERE path >= 'Reading/' AND path < 'Reading0'))`)
 		.bind(JSON.stringify(template)).run();
-	await env.DB.prepare(`INSERT INTO note_terms(term, saved_at, portable_path) SELECT t.value, i.saved_at, i.portable_path FROM reading_items i, json_each(i.terms) t`).run();
+	await env.DB.prepare(`INSERT INTO note_terms(term, saved_at, item) SELECT t.value, i.saved_at, i.id FROM reading_items i, json_each(i.terms) t`).run();
+	await env.DB.prepare(`INSERT INTO reading_tag_counts(section, term, count) SELECT 'inbox', t.value, count(*) FROM reading_items i, json_each(i.tag_terms) t GROUP BY t.value`).run();
 }
 
 beforeEach(async () => { await applySchema(env.DB); });
@@ -58,6 +60,9 @@ it.for([10_000, 50_000])('pages and searches a %i-note Reading library for the w
 	// One note matches.
 	const rare = await request(`items?section=inbox&q=${notes - 1}`);
 	expect((JSON.parse(rare.body) as { items: Array<{ title: string }> }).items.map(item => item.title)).toEqual([`Article ${notes - 1}`]);
+	// The section's tag list reads its stored counts: about one row per tag.
+	const tags = await request('tags?section=inbox');
+	expect((JSON.parse(tags.body) as { tags: unknown[] }).tags).toHaveLength(100);
 	// A rare word beside a word every note has: the search starts from the rare one.
 	const mixed = await request(`items?section=inbox&q=article%20${notes - 1}`);
 	expect((JSON.parse(mixed.body) as { items: unknown[] }).items).toHaveLength(1);
@@ -66,8 +71,11 @@ it.for([10_000, 50_000])('pages and searches a %i-note Reading library for the w
 	for (const page of [first, common]) expect(page.rowsRead).toBeLessThan(200);
 	expect(rare.rowsRead).toBeLessThan(400);
 	expect(mixed.rowsRead).toBeLessThan(3000);
+	// About two rows per tag: its count, and again in the sort by count. Before: every tagged
+	// note entry and its note, 20,000 rows at 10,000 notes.
+	expect(tags.rowsRead).toBeLessThan(250);
 	await context.annotate(JSON.stringify({
 		scenario: 'web-app-reading-pages', localOnly: true, notes,
-		...Object.fromEntries(Object.entries({ first, common, rare, mixed }).map(([name, page]) => [name, { ms: Math.round(page.ms), bytes: page.bytes, rowsRead: page.rowsRead }])),
+		...Object.fromEntries(Object.entries({ first, common, rare, mixed, tags }).map(([name, page]) => [name, { ms: Math.round(page.ms), bytes: page.bytes, rowsRead: page.rowsRead }])),
 	}), 'capacity');
 });

@@ -1,15 +1,16 @@
 import { armNotificationCoordinator } from '../notifications/lifecycle';
 import type { Env } from '../types';
 import { readingResponse, ReadingError, readStoredNote, policyStatement, readingItemId } from './common';
-import { parseReadingItemsQuery, readingItem, readingItemStatements, readingItems, readingTags, parseReadingTagsSection, type ReadingItemRows } from './queries';
-import { completeReadingIndex, ensureReadingIndex, readingIndexStatement, type ReadingIndexRow } from './library-index';
+import { parseReadingItemsQuery, readingChanges, readingItem, readingItemStatements, readingItems, readingTags, parseReadingTagsSection, type ReadingItemRows } from './queries';
+import { completeReadingIndex, ensureReadingIndex, readingIndexStatement, readingRevision, type ReadingIndexRow } from './library-index';
 import type { ReadingPolicy } from '@/protocol/reading-policy';
 import { MAX_ENCRYPTED_NOTE_DOWNLOAD_BYTES } from '@/encryption/file-inventory';
 
 export interface LoadedLibraryRead { policy: ReadingPolicy | null; index: ReadingIndexRow | null; item?: ReadingItemRows }
 
-/** Whether `request` reads the library: a page, one item or the tag list. */
-export const isLibraryRead = (request: Request, path: string) => request.method === 'GET' && (path === '/reading/item' || path === '/reading/items' || path === '/reading/tags');
+/** Whether `request` reads the library: a page, its changes, one item or the tag list. */
+export const isLibraryRead = (request: Request, path: string) => request.method === 'GET'
+	&& (path === '/reading/item' || path === '/reading/items' || path === '/reading/changes' || path === '/reading/tags');
 
 /** Library reads load the policy, index row and item rows in one round trip and one snapshot. */
 export async function loadLibraryRead(db: D1Database, url: URL): Promise<LoadedLibraryRead> {
@@ -35,7 +36,10 @@ export async function readLibrary(request: Request, env: Env, current: ReadingPo
 	if (index.state !== 'complete') throw new ReadingError('Your Reading library is not fully available yet. Try refreshing shortly.', 503);
 	// A rebuild step changed the rows read before it.
 	// One small page, so it is answered outside the lock.
-	if (path === '/reading/items') return readingResponse(await readingItems(env, current, encrypted, parseReadingItemsQuery(url.searchParams, encrypted)));
+	// A rebuild step in this request moved the revision the request read before it.
+	const revision = index.rebuilt ? await readingIndexStatement(env.DB).first<ReadingIndexRow>() : loaded.index;
+	if (path === '/reading/items') return readingResponse(await readingItems(env, current, encrypted, parseReadingItemsQuery(url.searchParams, encrypted), readingRevision(revision)));
+	if (path === '/reading/changes') return readingResponse(await readingChanges(env, current, encrypted, url.searchParams.get('since'), revision));
 	if (path === '/reading/tags') return readingResponse(await readingTags(env, encrypted, parseReadingTagsSection(url.searchParams)));
 	if (path === '/reading/item') return await readingItem(env, current, url.searchParams.get('id'), request.headers.get('If-None-Match'), index.rebuilt ? undefined : loaded.item);
 	return readingResponse({ error: 'Not found' }, 404);

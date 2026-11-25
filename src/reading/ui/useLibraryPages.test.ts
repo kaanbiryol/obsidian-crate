@@ -325,3 +325,48 @@ it('keeps pages the list read while a prefetch was answering', async () => {
 	expect(cache.pages.get(JSON.stringify(['archived', '', null]))?.items).toEqual([read]);
 	expect(hook.current.items).toEqual([read]);
 });
+
+it('applies a refresh\'s changes to the loaded pages without reading them again', async () => {
+	const library = [1, 2, 3, 4, 5].map(article);
+	const api = server(() => library);
+	const loadTags = vi.fn(async () => []);
+	let source: ReadingLibrarySource = { load: api.load, loadTags, revision: {}, at: '0.1', present: items => items };
+	const hook = renderHook(() => useLibraryPages(source, 'inbox', '', null));
+	await flush(); await api.settle();
+	act(() => hook.current.loadMore()); await api.settle();
+	expect(titles(hook.current.items)).toEqual(['Article 1', 'Article 2', 'Article 3', 'Article 4']);
+	const reads = api.load.mock.calls.length, tagReads = loadTags.mock.calls.length;
+	// Article 2 was archived and article 3 renamed elsewhere; the refresh brings only those.
+	source = { ...source, revision: {}, at: '0.2', changes: { from: '0.1', to: '0.2', items: [{ ...library[1]!, reading_status: 'archived' }, { ...library[2]!, title: 'Renamed' }], removed: [] } };
+	hook.rerender(); await flush();
+	expect(titles(hook.current.items)).toEqual(['Article 1', 'Renamed', 'Article 4']);
+	// Before: the refresh read every loaded page again, up to 20 of them.
+	expect(api.load.mock.calls.length).toBe(reads);
+	expect(loadTags.mock.calls.length).toBe(tagReads + 1);
+	// Changes from another revision than the pages answer for reload them, as before.
+	source = { ...source, revision: {}, at: '0.4', changes: { from: '0.3', to: '0.4', items: [], removed: [] } };
+	hook.rerender(); await flush(); await api.settle();
+	expect(api.load.mock.calls.length).toBeGreaterThan(reads);
+});
+
+it('cancels a search typed past instead of letting it finish', async () => {
+	vi.useFakeTimers();
+	try {
+		const signals = new Map<string, AbortSignal>();
+		const load = vi.fn(({ q }: { q: string }, signal?: AbortSignal) => {
+			signals.set(q, signal!);
+			return new Promise<{ items: ReadingItem[]; cursor: string | null }>(resolve => { setTimeout(() => resolve({ items: [item], cursor: null }), 5_000); });
+		});
+		const source: ReadingLibrarySource = { load, loadTags: async () => [], revision: 1, present: items => items };
+		let q = 'rea';
+		const hook = renderHook(() => useLibraryPages(source, 'inbox', q, null));
+		await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+		expect(signals.get('rea')?.aborted).toBe(false);
+		q = 'read';
+		hook.rerender();
+		expect(signals.get('rea')!.aborted).toBe(true);
+		await act(async () => { await vi.runAllTimersAsync(); });
+		expect(signals.get('read')!.aborted).toBe(false);
+		expect(hook.current).toMatchObject({ items: [item], loading: false });
+	} finally { vi.useRealTimers(); }
+});

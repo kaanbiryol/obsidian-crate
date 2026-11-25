@@ -10,18 +10,18 @@ export const bundleBudgets = {
 		// links, the recovery key option when requesting keys and revoking replaced Cloudflare
 		// logins, with checkpoints saved as change numbers, the PWA's flicker fixes, the reminder
 		// completion animation, Reading title placeholders, errors with next steps and the
-		// grouped connection options and the simplified reader header, measure 5.0267 MB raw /
-		// 2.3235 MB gzip.
-		maxBytes: 5026700,
-		maxGzipBytes: 2323500,
+		// grouped connection options, the simplified reader header and the Reading change feed with
+		// stored tag counts and its scale fixes, measure 5.0356 MB raw / 2.3297 MB gzip.
+		maxBytes: 5035600,
+		maxGzipBytes: 2329700,
 	},
 	{
 		path: 'dist/styles.css',
 		// Vault history's Deleted files view with Reading image highlights and their Highlights rows,
 		// the reminder completion animation, Reading title placeholders, the failed article card and
-		// the simplified reader header measure 403.7 KB raw / 50.3 KB gzip across the plugin and
-		// shared PWA surfaces.
-		maxBytes: 403700,
+		// the simplified reader header and off-screen library Highlights rows measure 404.0 KB raw / 50.3 KB
+		// gzip across the plugin and shared PWA surfaces.
+		maxBytes: 404000,
 		maxGzipBytes: 50300,
 	}],
 	worker: [{
@@ -47,9 +47,10 @@ export const bundleBudgets = {
 		// view, held changes that keep lists and the reader from flickering, the reminder
 		// completion animation, Reading title placeholders, recovery key errors with next
 		// steps, the failed and pending article states, notice action rows, the simplified
-		// reader header, measure 1.2206 MB raw / 400.0 KB gzip.
-		maxBytes: 1220600,
-		maxGzipBytes: 400000,
+		// reader header, Reading changes applied to loaded pages, released images and cancelled
+		// searches, measure 1.2256 MB raw / 401.7 KB gzip.
+		maxBytes: 1225600,
+		maxGzipBytes: 401700,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
@@ -58,8 +59,9 @@ export const bundleBudgets = {
 		// view, held changes that keep lists and the reader from flickering, the reminder
 		// completion animation, Reading title placeholders, recovery key errors with next
 		// steps, the failed and pending article states, notice action rows, the simplified
-		// reader header, measure 1.9423 MB raw / 641.3 KB gzip.
-		maxBytes: 1942300,
-		maxGzipBytes: 641300,
+		// reader header, Reading changes applied to loaded pages, released images and cancelled
+		// searches, measure 1.9474 MB raw / 643.0 KB gzip.
+		maxBytes: 1947400,
+		maxGzipBytes: 643000,
 	}],
 };

@@ -1,3 +1,4 @@
+import type { ReadingLibraryChanges } from '@/reading/ui/library-changes';
 import type { ReadingItem } from '@/reading/core/model';
 import { isRecord } from '@/platform/validation';
 import { base64ToArrayBuffer } from '@/platform/base64';
@@ -14,6 +15,10 @@ import { readingNoteFolder } from '../session/encryption-session';
  * the server; this device stores only articles saved for offline. */
 export interface ReadingCache {
 	items: ReadingItem[]; issues: Array<{ path: string; message: string }>; savedAt: number; cursor?: string | null;
+	/** The server's library revision these items answer for. */
+	revision?: string;
+	/** What changed since the previous library, when this one was built from it rather than read again. */
+	changes?: ReadingLibraryChanges;
 	/** Offline, no library was read; the app lists the articles saved on this device instead. */
 	offline?: true;
 }
