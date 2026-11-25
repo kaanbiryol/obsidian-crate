@@ -61,7 +61,32 @@ it('removes only readable copies an earlier sign-in saved, never queues, drafts 
 	values.set(`article:earlier:${item(3).crate_reading_id}`, 'unreadable bytes');
 	await removeEarlierSessionCopies(session);
 	expect(articleKeys()).toEqual([articleKey(1), `article:earlier:${item(3).crate_reading_id}`]);
-	expect([...values.keys()].filter(key => !key.startsWith('article:')).sort()).toEqual([`attempt:${session.id}:a`, `draft:${session.id}`, `pending:${session.id}`].sort());
+	expect([...values.keys()].filter(key => !key.startsWith('article:')).sort()).toEqual([`article-item:${session.id}:${item(1).crate_reading_id}`, `attempt:${session.id}:a`, `draft:${session.id}`, `pending:${session.id}`].sort());
+});
+
+it('lists saved copies from their items without reading their bodies', async () => {
+	await cacheReadingArticle(session, item(1, { saved_at: '2026-10-01T12:00:00Z' }), 'One');
+	await cacheReadingArticle(session, item(2, { saved_at: '2026-10-03T12:00:00Z' }), 'Two');
+	// Saved before items were stored apart, or with a damaged item: the copy is read whole.
+	values.set(articleKey(3), { item: item(3, { saved_at: '2026-10-02T12:00:00Z' }), markdown: 'Three', usedAt: 1 });
+	values.set(`article-item:${session.id}:${item(2).crate_reading_id}`, { item: { ...item(2), path: 'Other/article.md' } });
+	vi.mocked(decodeReadingValue).mockClear();
+
+	expect((await readOfflineReadingItems(session)).map(entry => entry.title)).toEqual(['Article 2', 'Article 3', 'Article 1']);
+	const decoded = vi.mocked(decodeReadingValue).mock.calls.map(([key]) => key);
+	expect(decoded).not.toContain(articleKey(1));
+	expect(decoded).toEqual(expect.arrayContaining([articleKey(2), articleKey(3)]));
+});
+
+it('removes an earlier sign-in\'s items with its copies, and items whose copy is gone', async () => {
+	await cacheReadingArticle(session, item(1), 'Mine');
+	values.set(`article:earlier:${item(2).crate_reading_id}`, { item: item(2), markdown: 'Earlier', usedAt: 1 });
+	values.set(`article-item:earlier:${item(2).crate_reading_id}`, { item: item(2) });
+	values.set(`article-item:${session.id}:${item(3).crate_reading_id}`, { item: item(3) });
+	await removeEarlierSessionCopies(session);
+	expect([...values.keys()].filter(key => key.startsWith('article-item:'))).toEqual([`article-item:${session.id}:${item(1).crate_reading_id}`]);
+	await removeReadingArticle(session, item(1).crate_reading_id);
+	expect([...values.keys()].filter(key => key.startsWith('article-item:'))).toEqual([]);
 });
 
 it('never reads this session\'s copies while removing earlier ones', async () => {

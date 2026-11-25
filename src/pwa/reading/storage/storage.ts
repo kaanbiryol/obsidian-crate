@@ -6,7 +6,7 @@ import { abortTransaction } from '../../storage/abort-transaction';
 import { clearSessionStore } from '../../storage/clear-session-store';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
 import { assertReadingSession, READING_CHANGED_EVENT, READING_SESSION_KEY, type ReadingSession } from '../session/session';
-import { readingKeys, isPendingReadingKey, isArticleImageReadingKey } from './storage-keys';
+import { readingKeys, isPendingReadingKey, isArticleImageReadingKey, isArticleItemReadingKey } from './storage-keys';
 import { exportWrappedLocalKeys } from '../../encryption/encryption-keys';
 
 export { readReadingArticle, removeEarlierSessionCopies, cacheReadingArticle, removeReadingArticle, readOfflineReadingItems, offlineReadingImagePaths, readOfflineReadingImage, type ReadingCache, type OfflineReadingImages } from './cache';
@@ -166,8 +166,8 @@ export async function exportReadingData(): Promise<void> {
 	const db = await readingDatabase();
 	const data: Record<string, unknown> = {}, unreadable: string[] = [];
 	for (const key of await db.getAllKeys('values')) {
-		// Offline images are copies of vault files the server keeps.
-		if (key === 'share-key' || key === 'share-key-id' || isArticleImageReadingKey(key)) continue;
+		// Offline images are copies of vault files the server keeps, and items repeat their copy's.
+		if (key === 'share-key' || key === 'share-key-id' || isArticleImageReadingKey(key) || isArticleItemReadingKey(key)) continue;
 		const raw = await db.get('values', key);
 		try { data[key] = await readReadingValue(key); }
 		catch { data[key] = raw; unreadable.push(key); }
