@@ -25,13 +25,16 @@ export async function vaultChangeToken(db: D1Database, scope: string, state?: Va
 	return (await sha256Hex(`${scope}\nreset:${current.resetGeneration}\nimport:${current.importGeneration}\nseq:${current.seq}`)).slice(0, 32);
 }
 
-/** Two-part ETags: a vault change token, then a revision of the view's content. */
-export function parseChangeEtags(header: string | null): Array<{ changeToken: string; revision: string }> {
+/** Two-part ETags: a vault change token, then a revision of the view's content. A
+ * trailing `.i` marks a view that cannot be the base of a delta. */
+export function parseChangeEtags(header: string | null): Array<{ changeToken: string; revision: string; incomplete: boolean }> {
 	return (header?.split(',') ?? []).flatMap(value => {
-		const match = /^"([a-f0-9]{32})\.([a-f0-9]{32})"$/.exec(value.trim());
-		return match ? [{ changeToken: match[1]!, revision: match[2]! }] : [];
+		const match = /^"([a-f0-9]{32})\.([a-f0-9]{32})(\.i)?"$/.exec(value.trim());
+		return match ? [{ changeToken: match[1]!, revision: match[2]!, incomplete: match[3] !== undefined }] : [];
 	});
 }
+
+export const changeEtag = (changeToken: string, revision: string, complete: boolean) => `"${changeToken}.${revision}${complete ? '' : '.i'}"`;
 
 /** A changelog position plus everything that would invalidate replaying from it:
  * the view, an initial import and a destructive reset. */

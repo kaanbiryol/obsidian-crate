@@ -12,10 +12,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const PACKED_PREFIX = '1.';
 
 const packId = (id: string) => encodeBase64Url(Uint8Array.from(id.replace(/-/g, '').match(/../g)!, byte => parseInt(byte, 16)));
+const HEX = Array.from({ length: 256 }, (_, byte) => byte.toString(16).padStart(2, '0'));
+// Manifest and changelog pages unpack thousands of IDs per request, so this avoids
+// a string per byte.
 const unpackId = (value: string) => {
-	const hex = Array.from(decodeBase64Url(value, 16), byte => byte.toString(16).padStart(2, '0')).join('');
-	if (hex.length !== 32) throw new Error('Invalid stored encryption descriptor');
-	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+	const bytes = decodeBase64Url(value, 16);
+	if (bytes.length !== 16) throw new Error('Invalid stored encryption descriptor');
+	let id = '';
+	for (let index = 0; index < 16; index++) id += (index === 4 || index === 6 || index === 8 || index === 10 ? '-' : '') + HEX[bytes[index]!]!;
+	return id;
 };
 
 export function packDescriptor(descriptor: EncryptedFileDescriptor): string {

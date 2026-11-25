@@ -35,12 +35,26 @@ describe('sync metadata snapshots', () => {
 
 		expect(db.batch).toHaveBeenCalledOnce();
 		expect(statements).toHaveLength(2);
-		expect(statements[0]?.args).toEqual([7]);
+		expect(statements[0]?.args).toEqual([7, 5000]);
 		expect(await response.json()).toEqual({
 			changes: [{ seq: 8, path: 'notes/a.md', action: 'put', hash: 'hash', size: 4, created_at: 'now' }],
 			lastSeq: 8,
 			hasMore: false,
 		});
+	});
+
+	it('pages an encrypted changelog in smaller pages', async () => {
+		const statements: ReturnType<typeof createStatement>[] = [];
+		const rows = Array.from({ length: 2000 }, (_, index) => ({ seq: index + 1, path: `n${index}.md`, action: 'put', hash: 'h', size: 1, created_at: 'now', descriptor: null }));
+		const db = {
+			prepare: vi.fn((sql: string) => { const statement = createStatement(sql); statements.push(statement); return statement; }),
+			batch: vi.fn(async () => [{ results: rows }, { results: [{ lastSeq: 9000, minSeq: 1 }] }]),
+		};
+
+		const response = await handleGetChanges(new Request('https://worker.test/sync/changes?since=0'), db as never, true);
+
+		expect(statements[0]?.args).toEqual([0, 2000]);
+		expect(await response.json()).toMatchObject({ lastSeq: 9000, hasMore: true });
 	});
 
 	it('reads the manifest and its cursor in one D1 batch', async () => {

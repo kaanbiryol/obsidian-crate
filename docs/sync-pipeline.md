@@ -116,7 +116,7 @@ Entry point: `runtime.ts:triggerForegroundSync()`
 
 Primary sync mode. Fetches only changelog entries since `lastSeq`:
 
-1. Paginate `GET /sync/changes?since=<seq>` (5000 entries per page)
+1. Paginate `GET /sync/changes?since=<seq>` (5000 entries per page, 2000 in an encrypted vault)
 2. Deduplicate each page into a path map as it arrives - only the latest entry per file is retained
 3. Detect local changes (hash comparison) and local deletes (missing manifest paths)
 4. Classify each affected path with the shared three-way reconciliation policy

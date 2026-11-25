@@ -19,9 +19,9 @@ export class ReminderCommandError extends Error {
 
 /** The wire record answered by the Worker routes and encrypted web apps. Fields
  * are listed explicitly so new scanner fields stay private until chosen. */
-export async function reminderCommandPayload(reminder: ScannedReminderRecord) {
+export async function reminderCommandPayload(reminder: ScannedReminderRecord, revision?: string) {
 	return {
-		revision: await reminderRevision(reminder),
+		revision: revision ?? await reminderRevision(reminder),
 		id: reminder.id,
 		content: reminder.content,
 		description: reminder.description,

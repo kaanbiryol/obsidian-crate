@@ -52,7 +52,7 @@ export async function handleSyncRoute(
 		return await handleCheckChanges(request, db);
 	}
 	if (path === '/sync/changes' && method === 'GET') {
-		return await handleGetChanges(request, db);
+		return await handleGetChanges(request, db, (encryption === undefined ? await readEncryptionState(db) : encryption) !== null);
 	}
 	if (path === '/sync/manifest' && method === 'GET') {
 		return await handleGetManifest(request, db);

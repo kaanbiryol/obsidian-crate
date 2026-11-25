@@ -28,12 +28,18 @@ export async function handleCheckChanges(request: Request, db: D1Database): Prom
 		...await storageIdField(db, batchRows<{ value: string }>(storageResult)[0]?.value ?? null) });
 }
 
-export async function handleGetChanges(request: Request, db: D1Database): Promise<Response> {
+// Each encrypted entry carries a descriptor to unpack and send, so its pages are smaller
+// to keep one response within a Worker's CPU budget. Clients follow `hasMore` either way.
+const CHANGELOG_PAGE_ENTRIES = 5000;
+const ENCRYPTED_CHANGELOG_PAGE_ENTRIES = 2000;
+
+export async function handleGetChanges(request: Request, db: D1Database, encrypted = false): Promise<Response> {
 	const since = parseChangelogSince(new URL(request.url));
 	if (since === null) return corsResponse({ error: 'Invalid since parameter' }, 400);
+	const limit = encrypted ? ENCRYPTED_CHANGELOG_PAGE_ENTRIES : CHANGELOG_PAGE_ENTRIES;
 
 	const [changesResult, boundsResult] = await db.batch([
-		db.prepare('SELECT seq, path, action, hash, size, revision, created_at, descriptor FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
+		db.prepare('SELECT seq, path, action, hash, size, revision, created_at, descriptor FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT ?').bind(since, limit),
 		db.prepare(CHANGELOG_BOUNDS_SQL),
 	]);
 	const changeRows = batchRows<Record<string, unknown> & { descriptor: string | null }>(changesResult)
@@ -45,7 +51,7 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 	return corsResponse({
 		changes: changeRows,
 		lastSeq,
-		hasMore: changeRows.length === 5000,
+		hasMore: changeRows.length === limit,
 		...(cursorExpired && { cursorExpired: true }),
 	});
 }

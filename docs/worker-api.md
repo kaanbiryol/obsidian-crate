@@ -75,7 +75,7 @@ All sync routes require `vault`.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/sync/check?since=<seq>` | Lightweight check: are there changes since this sequence? |
-| `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (limit 5000 per page) |
+| `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (5000 per page, 2000 in an encrypted vault) |
 | `GET` | `/sync/manifest?limit=<n>&after=<path>&snapshotSeq=<seq>` | Stable, cursor-paginated remote manifest |
 | `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths |
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB unless the server advertises more) |
@@ -280,7 +280,7 @@ Query: `?since=<seq>`
 
 Response: `{ changes: [...], lastSeq, hasMore, cursorExpired? }`
 
-Paginated at 5000 entries. Client loops until `hasMore` is false.
+Paginated at 5000 entries, or 2000 in an encrypted vault, whose entries carry descriptors. Client loops until `hasMore` is false.
 
 ### GET /sync/manifest
 
@@ -470,7 +470,7 @@ Reads synced Markdown reminder files from the configured folder and returns web-
 
 Cold indexes are warmed in batches of at most 20 files and 2 MiB per request. While more files remain, the endpoint responds with `202` and `{ warming: true, remainingFiles }`; clients should repeat the request until it returns `200`. The web app repeats it after 200 ms while `remainingFiles` falls and waits for `Retry-After` when it does not, so the number of requests is unchanged. Individual reminder Markdown files must be no larger than 1 MiB.
 
-Response: `{ reminders: [...], projects: [...], issues: [...] }`. Each reminder includes its semantic `revision`. Oversized notes or cache records yield per-file issues while healthy reminders remain usable; responses with issues omit ETag. Warming responses include `totalFiles` and `Retry-After: 1`.
+Response: `{ reminders: [...], projects: [...], issues: [...] }`. Each reminder includes its semantic `revision`. Oversized notes or cache records yield per-file issues while healthy reminders remain usable; a response with issues has an ETag ending in `.i` and no `X-Crate-Delta-Base`, so it can answer `304` but never starts a delta. Warming responses include `totalFiles` and `Retry-After: 1`.
 
 Complete (issue-free) responses and 304s include `X-Crate-Delta-Base`: a changelog position bound to the folder, parser version, initial import and reset generation. A client holding that complete revision may send it as `since`. When the changelog can still prove every change since then, the response is `{ delta: true, changedPaths: [...], reminders: [...], projects: [...], issues: [] }`: the client replaces all reminders from `changedPaths` (written, renamed or deleted notes) with `reminders` and keeps the rest. A pruned or imported changelog, more than 20,000 vault changes, a different view, or a response with issues returns the full list instead. The Worker builds a delta from the changed notes alone when the folder is the notification folder and its one-time source scan has finished; otherwise, or when a changed note has an issue or a duplicate identity, it rebuilds the whole folder index to decide.
 

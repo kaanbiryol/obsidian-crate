@@ -7,6 +7,8 @@ import { handleListReminders } from './handlers/list';
 import { saveReminderFileCache } from './cache/index';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../sync/markdown-files';
+import { reminderRevision } from '@/reminders/core/reminderRevision';
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 
 const { DB: db, BUCKET: bucket } = env;
 beforeEach(async () => {
@@ -155,5 +157,60 @@ describe('reminder list cache with D1 and R2', () => {
 
 		expect((await response.json() as { reminders: Array<{ content: string }> }).reminders.map(reminder => reminder.content)).toEqual(['Current task']);
 		expect(bucketGet).not.toHaveBeenCalled();
+	});
+	it('stores each revision with its cache row and backfills rows cached without one', async () => {
+		await seed(twoProjects);
+		type Listed = { reminders: Array<{ id: string; revision: string }> };
+		const first = await (await list()).json() as Listed;
+		const scanned = scanReminderMarkdownContent('Reminders/Inbox.md', twoProjects['Reminders/Inbox.md'], 'Reminders').reminders[0]!;
+		expect(first.reminders[0]!.revision).toBe(await reminderRevision(scanned));
+		const stored = async () => (await db.prepare("SELECT reminders_json FROM reminder_file_cache WHERE file_path = 'Reminders/Inbox.md'").first<{ reminders_json: string }>())!.reminders_json;
+		expect(JSON.parse(await stored())).toMatchObject([{ id: 'r1', revision: first.reminders[0]!.revision }]);
+
+		// A row cached before revisions were stored is listed the same and gains its revision.
+		const legacy = JSON.parse(await stored()) as Array<Record<string, unknown>>;
+		await db.prepare("UPDATE reminder_file_cache SET reminders_json = ? WHERE file_path = 'Reminders/Inbox.md'")
+			.bind(JSON.stringify(legacy.map(({ revision: _revision, ...reminder }) => reminder))).run();
+		const bucketGet = vi.spyOn(bucket, 'get');
+		expect(await (await list()).json()).toEqual(first);
+		expect(JSON.parse(await stored())).toMatchObject([{ revision: first.reminders[0]!.revision }]);
+		expect(bucketGet).not.toHaveBeenCalled();
+
+		// The listed revision is the stored one rather than a new hash.
+		const marked = 'f'.repeat(64);
+		await db.prepare("UPDATE reminder_file_cache SET reminders_json = ? WHERE file_path = 'Reminders/Inbox.md'")
+			.bind(JSON.stringify(legacy.map(reminder => ({ ...reminder, revision: marked })))).run();
+		expect(((await (await list()).json()) as Listed).reminders[0]!.revision).toBe(marked);
+	});
+
+	it('answers 304 for an unchanged list with issues, without a delta base', async () => {
+		await seed({
+			'Reminders/Inbox.md': '# Inbox\n\n- [ ] First task <!-- crate-id:r1 -->\n',
+			'Reminders/Work.md': '# Work\n\n- [ ] Copied task <!-- crate-id:r1 -->\n',
+		});
+		const bucketGet = vi.spyOn(bucket, 'get');
+		const first = await list();
+		expect((await first.json() as { issues: unknown[] }).issues).toHaveLength(2);
+		const etag = first.headers.get('ETag')!;
+		expect(etag).toMatch(/^"[a-f0-9]{32}\.[a-f0-9]{32}\.i"$/);
+		expect(first.headers.get(DELTA_BASE_HEADER)).toBeNull();
+
+		const unchanged = await list(etag);
+		expect(unchanged.status).toBe(304);
+		expect(unchanged.headers.get(DELTA_BASE_HEADER)).toBeNull();
+		// A write elsewhere changes the vault token, and the equal revision still answers 304.
+		await writeCommittedMarkdownFile(bucket, db, 'Elsewhere.md', 'Unrelated\n', null);
+		const elsewhere = await list(etag);
+		expect(elsewhere.status).toBe(304);
+		expect(elsewhere.headers.get('ETag')).toMatch(/\.i"$/);
+		expect(elsewhere.headers.get(DELTA_BASE_HEADER)).toBeNull();
+		expect(bucketGet).toHaveBeenCalledTimes(2);
+
+		await replace('Reminders/Work.md', '# Work\n\n- [ ] Copied task <!-- crate-id:r2 -->\n');
+		const fixed = await list(etag);
+		expect(fixed.status).toBe(200);
+		expect((await fixed.json() as { issues: unknown[] }).issues).toEqual([]);
+		expect(fixed.headers.get('ETag')).toMatch(/^"[a-f0-9]{32}\.[a-f0-9]{32}"$/);
+		expect(fixed.headers.get(DELTA_BASE_HEADER)).not.toBeNull();
 	});
 });

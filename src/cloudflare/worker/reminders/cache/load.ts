@@ -1,5 +1,6 @@
 import { queryRows } from '../../d1/db';
 import type { RemoteReminderRecord } from '../types';
+import { takeStoredRevision } from './revisions';
 import {
 	REMINDER_CACHE_PARSER_VERSION,
 	type ReminderFileCacheEntry,
@@ -18,7 +19,7 @@ function parseCachedReminders(parsed: unknown): RemoteReminderRecord[] | null {
 	))) {
 		return null;
 	}
-	return parsed as RemoteReminderRecord[];
+	return (parsed as RemoteReminderRecord[]).map(takeStoredRevision);
 }
 
 /** `rowPaths` includes rows skipped for an old parser or invalid JSON, so

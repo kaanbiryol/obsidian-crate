@@ -6,6 +6,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { applySchema } from '../test-support/schema-test-harness';
 import { fetchWorkerRequest } from '../request-handler';
 import { sha256Hex } from '@/platform/sha256';
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 
 // These tests step projection manually to inspect its intermediate D1 state.
 const controlledCoordinator = { storage: { put: async () => {}, setAlarm: async () => {} } } as unknown as DurableObjectState;
@@ -102,7 +103,9 @@ it('quarantines an uncertain replacement without cancelling or changing verified
 		const list = await request('/reminders/list?folderPath=Reminders');
 		expect(list.status).toBe(200);
 		expect(await list.json()).toMatchObject({ reminders: [{ id: otherId }], issues: [{ path, reason: expect.stringContaining('Repair') as string }] });
-		expect(list.headers.has('ETag')).toBe(false);
+		// Its ETag can answer 304 but never starts a delta.
+		expect(list.headers.get('ETag')).toMatch(/\.i"$/);
+		expect(list.headers.has(DELTA_BASE_HEADER)).toBe(false);
 	}
 	await put(path, valid.replace('Due', 'Repaired'), changed.hash);
 	await drainNotificationProjections(env);

@@ -2,6 +2,7 @@ import { FILE_PATH_MATCH, filePathArgs } from '../../sync/file-identity';
 import { portablePathKey } from '../../../../protocol/portable-path';
 import type { RemoteReminderRecord } from '../types';
 import { changedRows } from '../../d1/db';
+import { withRevision } from './revisions';
 import {
 	REMINDER_CACHE_MAX_VALUE_BYTES,
 	REMINDER_CACHE_PARSER_VERSION,
@@ -18,12 +19,16 @@ export interface ReminderFileCacheWriteResult {
 	oversizedPaths: string[];
 }
 
-function serializeCacheEntry(entry: ReminderFileCacheEntry): SerializedReminderFileCacheEntry | null {
-	const remindersJson = JSON.stringify(entry.issue ? { issue: entry.issue } : entry.reminders);
-	if (new TextEncoder().encode(remindersJson).byteLength > REMINDER_CACHE_MAX_VALUE_BYTES) {
-		return null;
-	}
-	return { entry, remindersJson };
+const fits = (json: string) => new TextEncoder().encode(json).byteLength <= REMINDER_CACHE_MAX_VALUE_BYTES;
+
+/** With `revised`, the row also stores each reminder's revision, unless that alone would
+ * make it too large to cache. */
+function serializeCacheEntry(entry: ReminderFileCacheEntry, revised?: RemoteReminderRecord[]): SerializedReminderFileCacheEntry | null {
+	if (entry.issue) return { entry, remindersJson: JSON.stringify({ issue: entry.issue }) };
+	const withRevisions = revised && JSON.stringify(revised);
+	if (withRevisions && fits(withRevisions)) return { entry, remindersJson: withRevisions };
+	const remindersJson = JSON.stringify(entry.reminders);
+	return fits(remindersJson) ? { entry, remindersJson } : null;
 }
 
 function createCacheUpsertStatement(
@@ -72,7 +77,7 @@ export async function writeReminderFileCacheEntries(
 	const oversizedPaths: string[] = [];
 	const serializedEntries: SerializedReminderFileCacheEntry[] = [];
 	for (const entry of entries) {
-		const serialized = serializeCacheEntry(entry);
+		const serialized = serializeCacheEntry(entry, entry.issue ? undefined : await Promise.all(entry.reminders.map(withRevision)));
 		if (serialized) {
 			serializedEntries.push(serialized);
 		} else {
