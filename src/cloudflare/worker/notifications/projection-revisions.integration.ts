@@ -105,3 +105,34 @@ it('disables all derived schedules through an explicit policy revision', async (
 	await drainNotificationProjections(env);
 	expect(await env.DB.prepare('SELECT due_datetime, due_at FROM reminder_projections').first()).toEqual({ due_datetime: null, due_at: null });
 });
+it('queues only notes that may hold reminders when a policy keeps its folder', async () => {
+	await configure();
+	const undated = '- [ ] Someday <!-- crate-id:22222222-2222-4222-8222-222222222222 -->';
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note, null);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Someday.md', undated, null);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Plain.md', 'No reminders here.', null);
+	await drainNotificationProjections(env, 10);
+	const queued = async () => (await env.DB.prepare('SELECT path FROM notification_projection_jobs ORDER BY path').all<{ path: string }>()).results.map(row => row.path);
+	expect(await queued()).toEqual([]);
+	const put = async (changes: Record<string, unknown>) => {
+		const current = await env.DB.prepare('SELECT revision FROM notification_policy').first<{ revision: string }>();
+		const response = await handleNotificationPolicy(new Request('https://test/policy', { method: 'PUT', body: JSON.stringify({ ...policy, ...changes, expectedRevision: current!.revision }) }), env.DB);
+		expect(response.status).toBe(200);
+	};
+	await put({ enabled: false });
+	expect(await queued()).toEqual(['Reminders/Inbox.md', 'Reminders/Someday.md']);
+	await drainNotificationProjections(env, 10);
+	// A note edited while notifications are off still schedules when they turn back on.
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Plain.md', note.replace('11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333'),
+		(await getStoredFileRow(env.DB, 'Reminders/Plain.md'))!.hash);
+	await drainNotificationProjections(env, 10);
+	await put({ enabled: true, timezone: 'Asia/Tokyo' });
+	expect(await queued()).toEqual(['Reminders/Inbox.md', 'Reminders/Plain.md', 'Reminders/Someday.md']);
+	await drainNotificationProjections(env, 10);
+	expect((await jobs()).map(row => (row as { reminder_id: string }).reminder_id).sort())
+		.toEqual(['11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333']);
+	// Another folder queues every note in it.
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Tasks/Plain.md', 'No reminders here.', null);
+	await put({ folderPath: 'Tasks' });
+	expect(await queued()).toEqual(expect.arrayContaining(['Tasks/Plain.md']));
+});

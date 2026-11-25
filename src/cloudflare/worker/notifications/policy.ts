@@ -8,6 +8,7 @@ import { parseFolderPath } from '../reminders/requests';
 import { readEncryptionState } from '../encryption/state';
 import { folderLabelIssue, readFolderLabel, saveFolderLabel } from '../encryption/folder-labels';
 import type { EncryptionServerState } from '../../../encryption/server-state';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders/cache/types';
 
 const FOLDER_SCOPED_TABLES = ['auth_tokens', 'push_subscriptions'] as const;
 
@@ -56,6 +57,14 @@ export async function handleNotificationPolicy(request: Request, db: D1Database,
 	// changed folder. These run first, while the policy still names the old one.
 	const previous = '(SELECT folder_path FROM notification_policy WHERE id = 1 AND revision = ?)';
 	const expected = typeof expectedRevision === 'string' ? expectedRevision : '';
+	// Within one folder, a note verified by this parser with no reminder sources projects
+	// nothing under any timezone, all-day time or toggle, so it needs no job. A changed
+	// folder queues every note. A policy that changed since this read fails the update below.
+	const prior = request.method === 'PUT' ? await getNotificationPolicy(db) : null;
+	const sameFolder = prior?.revision === expected && prior.folderPath === folder;
+	const withoutSources = sameFolder ? `AND NOT EXISTS (SELECT 1 FROM reminder_source_state s WHERE s.file_path = files.path
+          AND s.file_revision = files.storage_key AND s.verified = 1 AND s.parser_version = ?
+          AND NOT EXISTS (SELECT 1 FROM reminder_sources r WHERE r.file_path = files.path))` : '';
 	const follow = request.method === 'PUT' ? [...FOLDER_SCOPED_TABLES.map(table => db.prepare(`UPDATE ${table} SET folder_path = ?
     WHERE folder_path = ${previous} AND folder_path != ?
       ${table === 'auth_tokens' ? "AND scope = 'reminders'" : ''}`).bind(folder, expected, folder)),
@@ -64,13 +73,14 @@ export async function handleNotificationPolicy(request: Request, db: D1Database,
 	const results = await db.batch([...follow, mutation,
 		...(encryption ? [saveFolderLabel(db, folder, parsed.value.folderLabel as string)] : []),
 		db.prepare('DELETE FROM notification_file_retries WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)').bind(revision),
-		// Every note in the folder and every projected file, each written once. Projection
-		// rows carry no policy revision: this job is what withholds their authority.
+		// Every note in the folder that may hold reminders and every projected file, each written
+		// once. Projection rows carry no policy revision: this job is what withholds their authority.
 		db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
-      SELECT path, ? FROM (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'
+      SELECT path, ? FROM (SELECT path FROM files WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md' ${withoutSources}
         UNION SELECT file_path FROM reminder_projections WHERE file_path IS NOT NULL)
       WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
-      ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, ...fileFolderArgs(folder), revision),
+      ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`)
+			.bind(revision, ...fileFolderArgs(folder), ...(sameFolder ? [REMINDER_CACHE_PARSER_VERSION] : []), revision),
 		db.prepare(`DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'
       AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)`).bind(revision),
 	]);
