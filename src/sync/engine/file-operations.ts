@@ -5,7 +5,7 @@ import { DurableRestores } from '../durability/durable-restores';
 import { arrayBufferToBase64 } from '@/platform/base64';
 import type { LocalManifest } from '../manifest/manifest';
 import type { MarkdownBaseCache } from '../merge/markdown-base-cache';
-import { assertRenamePreserved } from '../manifest/rename-dependencies';
+import { assertRenamesPreserved } from '../manifest/rename-dependencies';
 import type { UploadApplyPhase } from '../diagnostics/upload-diagnostics';
 import type { SyncWorkerApi } from '../worker-api/sync';
 import { createLargeTransferGate } from '../transfer/budget';
@@ -34,7 +34,7 @@ export function createEngineFileOperations(
 				: uploads.single({ path, content: arrayBufferToBase64(content), hash, size, contentType, expectedHash, operationId }, mergePreimage, content)),
 		batchUpload: (files: BatchUploadFile[]) => uploads.batch(files),
 		async batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>) {
-			for (const path of paths) await assertRenamePreserved(manifest, vault, path, fileLimit());
+			await assertRenamesPreserved(manifest, vault, paths, fileLimit());
 			return transport.batchDelete(paths, expectedHashes, expectedRevisions);
 		},
 		downloadFile: (path: string, size?: number) => largeTransfers(size, () => transport.downloadFile(path, size)),

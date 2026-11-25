@@ -4,6 +4,8 @@ import { readLocalFileEntry } from '../local/local-file-entry';
 import { getSyncPathIssue } from '@/protocol/portable-path';
 import { namespaceConflictLookup } from '../namespace-conflicts';
 import { isRecord } from '@/platform/validation';
+import { isVaultTFileLike } from '../local/local-delete';
+import { runConcurrentTasks } from '../concurrency';
 
 /** Baseline paths renamed since their last acknowledged upload, keyed by the old
  * path, with the path each now lives at. Deleting an old remote copy waits until
@@ -82,20 +84,36 @@ export function parseRenameDependencies(value: unknown): Map<string, string> {
 	return new Map(Object.entries(value) as Array<[string, string]>);
 }
 
-export async function assertRenamePreserved(manifest: LocalManifest, vault: Vault, path: string, maxFileBytes: number): Promise<void> {
+// Renamed copies one delete batch checks at a time.
+const CHECK_CONCURRENCY = 8;
+
+/** Defers deleting old remote copies until each renamed destination is uploaded. */
+export async function assertRenamesPreserved(manifest: LocalManifest, vault: Vault, paths: readonly string[], maxFileBytes: number): Promise<void> {
 	if (manifest.uploadJournal.pending().length) throw new Error('Remote deletion deferred until pending uploads are resolved. The previous remote copies are preserved.');
+	const checked = await runConcurrentTasks(paths.map(path => () => renamedCopyUploaded(manifest, vault, path, maxFileBytes)), CHECK_CONCURRENCY);
+	// Persist the acknowledgements before the old copies can be deleted.
+	if (checked.includes(true)) await manifest.save();
+}
+
+/** Throws while the renamed copy of `path` still waits to upload. Returns whether
+ * deleting `path` relies on that copy's acknowledged upload. */
+async function renamedCopyUploaded(manifest: LocalManifest, vault: Vault, path: string, maxFileBytes: number): Promise<boolean> {
 	const destination = manifest.renameDestination(path);
-	if (!destination) return;
-	const local = await readLocalFileEntry(vault, destination, maxFileBytes);
-	// The renamed copy was deleted or excluded locally, so nothing remains to
-	// upload; deleting the old path is the user's intent.
-	if (!local) return;
+	if (!destination) return false;
 	// The server cannot store both names after a case-only or Unicode-only rename,
 	// so the old copy must go first. File history retains it, and the renamed
 	// local file stays queued for upload.
-	if (namespaceConflictLookup([destination])(path) !== undefined) return;
+	if (namespaceConflictLookup([destination])(path) !== undefined) return false;
 	const saved = manifest.getEntry(destination);
+	// The upload recorded this size and mtime, so the file is unchanged since, as
+	// sync planning assumes too. Skip reading it again.
+	const visible = vault.getAbstractFileByPath(destination);
+	if (saved?.revision && isVaultTFileLike(visible) && visible.stat.size === saved.size
+		&& visible.stat.mtime === Date.parse(saved.modified)) return true;
+	const local = await readLocalFileEntry(vault, destination, maxFileBytes);
+	// The renamed copy was deleted or excluded locally, so nothing remains to
+	// upload; deleting the old path is the user's intent.
+	if (!local) return false;
 	if (!saved?.revision || saved.hash !== local.hash) throw new Error(`Remote deletion deferred until the renamed file is uploaded: ${destination}`);
-	// Persist the acknowledgement before the old copy can be deleted.
-	await manifest.save();
+	return true;
 }

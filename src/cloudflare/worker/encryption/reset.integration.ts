@@ -17,6 +17,7 @@ import { ENCRYPTED_FILE_CONTENT_TYPE } from '../../../encryption/file-format';
 import { createReminderOperationId } from '../../../protocol/reminder-operation';
 import { sha256Hex } from '../../../platform/sha256';
 import { UPGRADE_PROGRESS_KEY } from '../../../protocol/deployment-fence';
+import { MAINTENANCE_DELETE_LIMIT } from '../d1/db';
 
 const id = 'reset-operation', nextToken = 'b'.repeat(64);
 let state: EncryptionServerState;
@@ -118,6 +119,21 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	expect((await request('/sync/manifest', nextToken)).status).toBe(428);
 	expect((await worker.fetch(new Request('https://test/sync/manifest', { headers: { Authorization: `Bearer ${nextToken}`,
 		'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) } }), env)).status).toBe(200);
+});
+
+it('wipes a table larger than one pass across several requests and keeps the changelog floor', async () => {
+	const rows = MAINTENANCE_DELETE_LIMIT + 100;
+	await env.DB.prepare(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+		INSERT INTO changelog(path, action, revision, hash, size) SELECT 'note-' || i || '.md', 'put', 'r', 'hash', 1 FROM n`).bind(rows).run();
+	const last = (await env.DB.prepare('SELECT MAX(seq) AS seq FROM changelog').first<{ seq: number }>())!.seq;
+	expect((await start()).status).toBe(200);
+	const pass = async () => (await (await request(`/encryption/reset?id=${id}`, nextToken, 'POST', {})).json() as { complete: boolean }).complete;
+	expect(await pass()).toBe(false);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM changelog').first()).toEqual({ count: 100 });
+	expect(await env.DB.prepare('SELECT changelog_floor AS floor FROM server_state WHERE id = 1').first()).toEqual({ floor: last });
+	await finish();
+	expect(await env.DB.prepare('SELECT 1 FROM changelog').first()).toBeNull();
+	expect(await env.DB.prepare('SELECT changelog_floor AS floor FROM server_state WHERE id = 1').first()).toEqual({ floor: last });
 });
 
 it('cancels scheduled reminders and completes while Reminders is paused', async () => {

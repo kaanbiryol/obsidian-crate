@@ -16,3 +16,16 @@ export const ENCRYPTION_RESET_TABLES = {
 	custom: ['auth_tokens', 'maintenance_state', 'server_state', 'upload_leases'],
 	kept: ['crate_migrations', 'crate_release', 'crate_schema', 'object_cleanup_queue', 'request_rate_limits', 'vapid_keys'],
 } as const;
+
+/** The primary key of each `wiped` table. A reset deletes rows a slice at a time by key,
+ * since most tables are WITHOUT ROWID; reset-tables.test.ts checks these against schema.sql. */
+export const WIPED_TABLE_KEYS: Record<(typeof ENCRYPTION_RESET_TABLES.wiped)[number], string> = {
+	files: 'portable_path', file_versions: 'id', history_checkpoints: 'seq', changelog: 'seq',
+	operations: 'kind, operation_id', operation_chunks: 'kind, operation_id, idx',
+	reminder_file_cache: 'folder_path, file_path', reminder_identities: 'reminder_id', reminder_occurrences: 'reminder_id, due_key',
+	reminder_sources: 'file_path, reminder_id', reminder_source_state: 'file_path', reminder_projections: 'reminder_id',
+	notification_projection_jobs: 'path', notification_file_retries: 'path', notification_policy: 'id',
+	grants: 'kind, key', push_subscriptions: 'id',
+	reading_policy: 'id', reading_items: 'id', note_terms: 'term, saved_at, item', highlight_index: 'highlighted_at, item',
+	reading_tags: 'term', reading_tag_counts: 'section, term', reading_jobs: 'path', reading_captures: 'id',
+};

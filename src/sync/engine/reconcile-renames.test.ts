@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Vault } from 'obsidian';
 import type { FileEntry } from '../../protocol/sync-types';
 import { LocalManifest } from '../manifest/manifest';
-import { assertRenamePreserved } from '../manifest/rename-dependencies';
+import { assertRenamesPreserved } from '../manifest/rename-dependencies';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
 import { sha256Hex } from '../../platform/sha256';
 import { PersistentTestVault } from '../../test/factories/sync-vault';
@@ -40,7 +40,7 @@ async function harness(destinationUploaded: boolean, destinationExists = true) {
 			remote[diff.path] = { ...entry, revision: 'v2' };
 			manifest.setEntry(diff.path, remote[diff.path]!);
 		} else if (diff.action === 'delete') {
-			await assertRenamePreserved(manifest, vault, diff.path, 25 * 1024 * 1024);
+			await assertRenamesPreserved(manifest, vault, [diff.path], 25 * 1024 * 1024);
 			// The destination receipt must be durable before deleting the source.
 			if (destinationExists) expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
 			deleted(diff.path);
@@ -56,8 +56,8 @@ async function harness(destinationUploaded: boolean, destinationExists = true) {
 		maxFileBytes: () => 25 * 1024 * 1024,
 		deleteRemoteFiles: (files, result, options) => deleteRemoteFiles({ vault, localManifest: manifest, files: {
 		batchDelete: async paths => {
+			await assertRenamesPreserved(manifest, vault, paths, 25 * 1024 * 1024);
 			for (const path of paths) {
-				await assertRenamePreserved(manifest, vault, path, 25 * 1024 * 1024);
 				if (destinationExists) expect(disk.get('.obsidian/plugins/crate/file-manifest.json')).toContain('"revision":"v2"');
 				deleted(path); delete remote[path];
 			}
@@ -111,7 +111,7 @@ describe('targeted rename reconciliation', () => {
 		expect(h.remote[h.source]).toBeUndefined();
 		expect(h.manifest.getRenameDependencies()).toEqual({});
 		// Later deletions are no longer held back by the cleared dependency.
-		await expect(assertRenamePreserved(h.manifest, {} as Vault, h.source, 25 * 1024 * 1024)).resolves.toBeUndefined();
+		await expect(assertRenamesPreserved(h.manifest, {} as Vault, [h.source], 25 * 1024 * 1024)).resolves.toBeUndefined();
 	});
 
 	it.each([true, false])('deletes the old name of a case-only rename before uploading the new one (case-insensitive disk: %s)', async caseInsensitive => {
@@ -149,9 +149,34 @@ describe('targeted rename reconciliation', () => {
 		const manifest = new LocalManifest({ vault }, { dir: '.obsidian/plugins/crate' });
 		manifest.setEntry('Dashboard.md', { hash: 'a'.repeat(64), size: 1, modified: new Date(1).toISOString(), revision: 'v1' });
 		manifest.recordRename('Dashboard.md', destination);
-		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md', 25 * 1024 * 1024)).resolves.toBeUndefined();
+		await expect(assertRenamesPreserved(manifest, vault, ['Dashboard.md'], 25 * 1024 * 1024)).resolves.toBeUndefined();
 		manifest.recordRename(destination, 'Elsewhere.md');
-		await expect(assertRenamePreserved(manifest, vault, 'Dashboard.md', 25 * 1024 * 1024)).rejects.toThrow('renamed file is uploaded');
+		await expect(assertRenamesPreserved(manifest, vault, ['Dashboard.md'], 25 * 1024 * 1024)).rejects.toThrow('renamed file is uploaded');
+	});
+
+	it('trusts an unchanged uploaded copy without reading it again, and reads one whose stat changed', async () => {
+		const content = new TextEncoder().encode('moved').buffer;
+		const entry: FileEntry = { hash: await sha256Hex(content), size: content.byteLength, modified: new Date(1000).toISOString(), revision: 'v2' };
+		const stat = { size: content.byteLength, mtime: 1000 };
+		const readBinary = vi.fn(async () => new TextEncoder().encode('edited').buffer);
+		const vault = {
+			getAbstractFileByPath: (path: string) => ({ path, extension: 'md', stat }),
+			adapter: { readBinary, write: vi.fn(async () => {}), exists: vi.fn(async () => false) },
+		} as unknown as Vault;
+		const manifest = new LocalManifest({ vault }, { dir: '.obsidian/plugins/crate' });
+		const sources = Array.from({ length: 20 }, (_, index) => `Old/${index}.md`);
+		for (const [index, source] of sources.entries()) {
+			manifest.setEntry(source, { ...entry, revision: 'v1' });
+			manifest.recordRename(source, `New/${index}.md`);
+			manifest.setEntry(`New/${index}.md`, entry);
+		}
+		const save = vi.spyOn(manifest, 'save');
+		await expect(assertRenamesPreserved(manifest, vault, sources, 25 * 1024 * 1024)).resolves.toBeUndefined();
+		expect(readBinary).not.toHaveBeenCalled();
+		expect(save).toHaveBeenCalledTimes(1);
+		stat.mtime = 2000;
+		await expect(assertRenamesPreserved(manifest, vault, sources, 25 * 1024 * 1024)).rejects.toThrow('renamed file is uploaded');
+		expect(readBinary).toHaveBeenCalled();
 	});
 
 	it('does not upload an unselected destination or bypass the deletion guard', async () => {

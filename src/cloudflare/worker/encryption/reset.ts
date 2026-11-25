@@ -9,15 +9,35 @@ import { isEncryptionId } from '../../../encryption/encoding';
 import { validateEncryptionState, type EncryptionServerState, type ResetReceipt } from '../../../encryption/server-state';
 import { isSha256Hex } from '../../../platform/validation';
 import { sha256Hex } from '../../../platform/sha256';
-import { putMaintenanceValue, readMaintenanceValue } from '../d1/db';
+import { MAINTENANCE_DELETE_LIMIT, putMaintenanceValue, readMaintenanceValue } from '../d1/db';
 import { saveServerState } from '../d1/server-state';
 import { R2_KEYS_PER_CALL } from '../d1/platform-limits';
-import { ENCRYPTION_RESET_TABLES, READING_TABLES } from './reset-tables';
+import { ENCRYPTION_RESET_TABLES, READING_TABLES, WIPED_TABLE_KEYS } from './reset-tables';
 
 const PREFIX = 'encryption-reset:';
 // Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
 const SETUP_SUFFIX = ':setup';
 const save = (db: D1Database, key: string, value: unknown) => putMaintenanceValue(db, key, JSON.stringify(value));
+// Sequence numbers keep rising after the changelog and import snapshot are emptied.
+const keepChangelogFloor = (db: D1Database) => db.prepare(`UPDATE server_state SET changelog_floor = ${LAST_SEQ_SQL} WHERE id = 1`);
+
+/** Deletes one bounded slice of the first wiped table that still has rows, so a large
+ * vault's wipe spreads over many requests instead of one oversized transaction.
+ * Returns false once every wiped table is empty. */
+async function wipeNextSlice(db: D1Database): Promise<boolean> {
+	const tables = ENCRYPTION_RESET_TABLES.wiped;
+	const found = await db.prepare(`SELECT ${tables.map(table => `EXISTS (SELECT 1 FROM ${table}) AS ${table}`).join(', ')}`)
+		.first<Record<string, number>>();
+	const table = tables.find(name => found?.[name]);
+	if (!table) return false;
+	const key = WIPED_TABLE_KEYS[table];
+	await db.batch([
+		// The floor is raised before any changelog row goes, in the same transaction.
+		keepChangelogFloor(db),
+		db.prepare(`DELETE FROM ${table} WHERE (${key}) IN (SELECT ${key} FROM ${table} LIMIT ?)`).bind(MAINTENANCE_DELETE_LIMIT),
+	]);
+	return true;
+}
 
 /** Runs under the projection coordinator lock. The replacement credential and
  * reset receipt commit together, so a lost begin reply is safe to retry. The same
@@ -109,11 +129,12 @@ async function advanceReset(env: Env, receipt: ResetReceipt): Promise<Response> 
 		await env.BUCKET.delete(objects.objects.map(object => object.key));
 		return corsResponse(receipt);
 	}
+	if (await wipeNextSlice(env.DB)) return corsResponse(receipt);
 	const complete = { ...receipt, complete: true };
 	const setup = await env.DB.prepare('SELECT 1 FROM maintenance_state WHERE key = ?').bind(PREFIX + receipt.id + SETUP_SUFFIX).first();
 	await env.DB.batch([
-		// Sequence numbers keep rising after the changelog and import snapshot are emptied.
-		env.DB.prepare(`UPDATE server_state SET changelog_floor = ${LAST_SEQ_SQL} WHERE id = 1`),
+		keepChangelogFloor(env.DB),
+		// Earlier passes emptied these tables; deleting again keeps completion atomic with the wipe.
 		...ENCRYPTION_RESET_TABLES.wiped.map(table => env.DB.prepare(`DELETE FROM ${table}`)),
 		env.DB.prepare('DELETE FROM auth_tokens WHERE id != ?').bind(receipt.id),
 		env.DB.prepare('DELETE FROM maintenance_state WHERE key != ? AND key NOT LIKE ?')

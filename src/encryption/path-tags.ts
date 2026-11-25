@@ -28,8 +28,9 @@ export function fitsEncryptedPathLimit(path: string): boolean {
  * Unicode-insensitive name and its parent, so case variants share one server
  * identity and equal names in different folders stay unlinkable. */
 export class PathTags {
-	// Wire forms of recently used parent folders, by portable path.
-	private readonly folders = new Map<string, string>();
+	// Wire forms of recently used parent folders, by portable path. Pending ones are
+	// shared, so concurrent paths in one folder compute its tag once.
+	private readonly folders = new Map<string, Promise<string>>();
 	constructor(private readonly key: CryptoKey) {}
 
 	static async fromSecret(vaultId: string, secret: EncryptionSecret): Promise<PathTags> {
@@ -47,19 +48,23 @@ export class PathTags {
 		let parent = '', parentWire = '';
 		for (const [index, name] of segments.entries()) {
 			const plain = parent ? `${parent}/${name}` : name, folder = index < segments.length - 1;
-			let wire = folder ? this.folders.get(portablePathKey(plain)) : undefined;
+			const key = portablePathKey(plain);
+			let wire = folder ? this.folders.get(key) : undefined;
 			if (!wire) {
-				wire = `${parentWire ? `${parentWire}/` : ''}${await this.tag(parent, name)}`;
-				if (folder) this.remember(portablePathKey(plain), wire);
+				const prefix = parentWire ? `${parentWire}/` : '';
+				wire = this.tag(parent, name).then(tag => prefix + tag);
+				if (folder) this.remember(key, wire);
 			}
-			parent = plain; parentWire = wire;
+			parent = plain; parentWire = await wire;
 		}
 		if (getSyncPathIssue(parentWire)) throw new Error('This path is nested too deeply to sync in an encrypted vault.');
 		return parentWire;
 	}
 
-	private remember(folder: string, wire: string): void {
+	private remember(folder: string, wire: Promise<string>): void {
 		if (this.folders.size >= MAX_CACHED_FOLDERS) this.folders.delete(this.folders.keys().next().value!);
 		this.folders.set(folder, wire);
+		// A failed derivation is not remembered.
+		wire.catch(() => { if (this.folders.get(folder) === wire) this.folders.delete(folder); });
 	}
 }

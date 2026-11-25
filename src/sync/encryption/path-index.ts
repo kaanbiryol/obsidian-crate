@@ -1,6 +1,11 @@
 import type { PathTags } from '../../encryption/path-tags';
 import { portablePathKey } from '../../protocol/portable-path';
 import { insertBeforeExtension } from '../local/file-discovery';
+import { runConcurrentTasks } from '../concurrency';
+
+// Paths whose tags one rebuild computes at a time. WebCrypto HMACs are cheap but
+// asynchronous, so awaiting them one by one leaves a large vault's rebuild idle.
+const TAG_CONCURRENCY = 32;
 
 /** Where the local manifest keeps the server path of notes with a random server name. */
 export interface WireStore {
@@ -39,12 +44,12 @@ export class PathIndex {
 	private store?: WireStore;
 	private readonly plainByWire = new Map<string, string>();
 	private readonly opaque = new Map<string, string>();
-	private scanned = false;
+	private scan?: Promise<void>;
 	constructor(readonly tags: PathTags) {}
 
 	useStore(store: WireStore): void {
 		this.store = store;
-		this.scanned = false;
+		this.scan = undefined;
 	}
 
 	async wireFor(path: string): Promise<string> {
@@ -62,14 +67,20 @@ export class PathIndex {
 	/** The plaintext path of a server path this device has synced, if any. */
 	async plainFor(wire: string): Promise<string | undefined> {
 		const known = this.plainByWire.get(wire);
-		if (known || this.scanned || !this.store) return known;
+		if (known || !this.store) return known;
 		// Deletes carry no metadata. Server paths of synced files are rebuilt once, on
 		// demand; later ones are learned as they sync.
-		this.scanned = true;
-		for (const path of this.store.getAllPaths()) {
-			const tag = this.store.wireOf(path) ?? await this.tags.wire(path).catch(() => null);
-			if (tag && !this.plainByWire.has(tag)) this.plainByWire.set(tag, path);
-		}
+		this.scan ??= this.rebuild(this.store);
+		await this.scan;
 		return this.plainByWire.get(wire);
+	}
+
+	private async rebuild(store: WireStore): Promise<void> {
+		const paths = store.getAllPaths();
+		const tags = await runConcurrentTasks(paths.map(path => async () => store.wireOf(path) ?? await this.tags.wire(path).catch(() => null)), TAG_CONCURRENCY);
+		// Earlier paths keep a shared server path, as in a sequential walk.
+		for (const [index, tag] of tags.entries()) {
+			if (tag && !this.plainByWire.has(tag)) this.plainByWire.set(tag, paths[index]!);
+		}
 	}
 }
