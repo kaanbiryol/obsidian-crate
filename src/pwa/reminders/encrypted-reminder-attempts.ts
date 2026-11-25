@@ -77,7 +77,12 @@ export async function pruneEncryptedReminderAttempts(scope: { vaultId: string; f
 export interface IndexedReminderNote { file: { path: string; hash: string; size: number; revision: string }; path: string; reminders: unknown[]; issue?: string }
 /** The most notes an encrypted reminder list may hold; its persisted index shares the bound. */
 export const MAX_ENCRYPTED_REMINDER_FILES = 100_000;
-const indexKey = (scope: string) => `index:${scope}`;
+// Before notes were kept one per record, the whole index was one value at this key.
+const legacyIndexKey = (scope: string) => `index:${scope}`;
+// The header holds the identity; each parsed note is its own record after it, by revision.
+const indexKey = (scope: string) => `note-index:${scope}`;
+const noteRange = (scope: string) => IDBKeyRange.bound(`${indexKey(scope)}\u0000`, `${indexKey(scope)}\u0000￿`);
+const noteKey = (scope: string, revision: string) => `${indexKey(scope)}\u0000${revision}`;
 
 function isIndexedNote(value: unknown): value is IndexedReminderNote {
 	if (!isRecord(value) || !isRecord(value.file) || typeof value.path !== 'string' || !Array.isArray(value.reminders)
@@ -87,26 +92,48 @@ function isIndexedNote(value: unknown): value is IndexedReminderNote {
 		&& Number.isSafeInteger(size) && (size as number) >= 0 && value.reminders.every(isRecord);
 }
 
+function headerIdentity(raw: string | undefined, scope: string): unknown {
+	if (raw === undefined) return undefined;
+	try { const value: unknown = JSON.parse(openPrivateValue(raw, indexKey(scope))); return isRecord(value) ? value.identity : undefined; }
+	catch { return undefined; }
+}
+
 /** Parsed notes from the last complete encrypted list, sealed like other private data
  * and kept in this store so logout clears them. A cold start then downloads only
  * notes whose revision changed. `identity` binds them to the keys, folder and build. */
 export async function loadEncryptedReminderIndex(scope: string, identity: string): Promise<IndexedReminderNote[] | undefined> {
 	const db = await openAttempts();
 	try {
-		const raw = await db.get('attempts', indexKey(scope));
-		if (raw === undefined) return undefined;
-		const value: unknown = JSON.parse(openPrivateValue(raw, indexKey(scope)));
-		if (!isRecord(value) || value.identity !== identity || !Array.isArray(value.notes) || value.notes.length > MAX_ENCRYPTED_REMINDER_FILES) return undefined;
-		const notes = value.notes as unknown[];
-		return notes.every(isIndexedNote) ? notes : undefined;
+		const tx = db.transaction('attempts', 'readonly');
+		if (headerIdentity(await tx.store.get(indexKey(scope)), scope) !== identity) return undefined;
+		const keys = await tx.store.getAllKeys(noteRange(scope), MAX_ENCRYPTED_REMINDER_FILES + 1);
+		if (keys.length > MAX_ENCRYPTED_REMINDER_FILES) return undefined;
+		const values = await tx.store.getAll(noteRange(scope), MAX_ENCRYPTED_REMINDER_FILES);
+		const notes = values.map((raw, index): unknown => JSON.parse(openPrivateValue(raw, keys[index]!)));
+		return notes.every((note, index) => isIndexedNote(note) && noteKey(scope, note.file.revision) === keys[index]) ? notes as IndexedReminderNote[] : undefined;
 	} finally { db.close(); }
 }
 
+/** Seals and writes only notes the store lacks and removes notes no longer listed, so a
+ * change costs the changed notes rather than the whole folder. A different identity
+ * replaces every note. */
 export async function saveEncryptedReminderIndex(scope: string, identity: string, notes: IndexedReminderNote[], isCurrent: () => boolean): Promise<void> {
-	const encoded = sealPrivateValue(JSON.stringify({ identity, notes }), indexKey(scope));
 	const db = await openAttempts();
-	try { if (isCurrent()) await db.put('attempts', encoded, indexKey(scope)); }
-	finally { db.close(); }
+	try {
+		if (!isCurrent()) return;
+		const tx = db.transaction('attempts', 'readwrite');
+		const writes: Promise<unknown>[] = [tx.store.delete(legacyIndexKey(scope))];
+		const sameIdentity = headerIdentity(await tx.store.get(indexKey(scope)), scope) === identity;
+		const stored = new Set(sameIdentity ? await tx.store.getAllKeys(noteRange(scope)) : []);
+		if (!sameIdentity) {
+			writes.push(tx.store.delete(noteRange(scope)), tx.store.put(sealPrivateValue(JSON.stringify({ identity }), indexKey(scope)), indexKey(scope)));
+		}
+		const listed = new Map(notes.map(note => [noteKey(scope, note.file.revision), note]));
+		for (const key of stored) if (!listed.has(key)) writes.push(tx.store.delete(key));
+		// A revision's parsed note never changes, so a stored one is current.
+		for (const [key, note] of listed) if (!stored.has(key)) writes.push(tx.store.put(sealPrivateValue(JSON.stringify(note), key), key));
+		await Promise.all([...writes, tx.done]);
+	} finally { db.close(); }
 }
 
 export async function clearEncryptedReminderAttempts(isCurrent: () => boolean): Promise<void> {

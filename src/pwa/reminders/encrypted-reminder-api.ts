@@ -27,6 +27,7 @@ import { sha256Hex } from '@/platform/sha256';
 import { trimContentCache } from '@/pwa/storage/content-cache';
 import { commitEncryptedAttempt, downloadEncryptedNotes, encryptedFilePath, encryptedFilesPath, encryptedOperationContext, openEncryptedNote } from '../encryption/encrypted-folder-client';
 import { compareCodePoints } from '@/protocol/portable-path';
+import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 
 const NOTE_CONCURRENCY = 6;
 type ReminderPayload = Awaited<ReturnType<typeof reminderCommandPayload>>;
@@ -70,6 +71,11 @@ export class EncryptedReminderApi {
 	private persistedIndex?: Map<string, ScannedNote>;
 	// The last complete server inventory, by server path, and the token and delta base it was listed at.
 	private snapshot?: { files: Map<string, RemoteFile>; changeToken: string; deltaBase: string };
+	// The last list this client answered without issues: its delta base and each note's revision
+	// by plaintext path. The app's next read names that base to get only the notes changed since.
+	private answered?: { base: string; revisions: Map<string, string> };
+	private readonly answerPrefix = `e2ee.${crypto.randomUUID()}.`;
+	private answerCount = 0;
 	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch,
 		{ store = encryptedReminderStore, current = capturePwaSession() }: EncryptedReminderApiOptions = {}) {
 		this.store = store; this.current = current;
@@ -102,7 +108,7 @@ export class EncryptedReminderApi {
 		const url = new URL(path, 'https://crate.invalid');
 		if (url.pathname === '/reminders/list') {
 			if (url.searchParams.get('folderPath') !== this.localFolder) return Response.json({ error: 'Folder does not match this enrollment' }, { status: 403 });
-			return this.list(new Headers(init.headers).get('If-None-Match'));
+			return this.list(new Headers(init.headers).get('If-None-Match'), url.searchParams.get('since') ?? undefined);
 		}
 		if (!['/reminders/create', '/reminders/update', '/reminders/set-completed', '/reminders/delete', '/reminders/reorder'].includes(url.pathname)) return null;
 		if (typeof init.body !== 'string') throw new Error('Missing reminder change');
@@ -216,7 +222,7 @@ export class EncryptedReminderApi {
 	/** The app's list ETag names the server snapshot the list was built from. */
 	private get etagPrefix() { return `"e2ee-${this.keys.vaultId}-${this.keys.generation}-`; }
 
-	private async list(previousEtag: string | null): Promise<Response> {
+	private async list(previousEtag: string | null, since?: string): Promise<Response> {
 		const knownToken = previousEtag?.startsWith(this.etagPrefix) && previousEtag.endsWith('"') ? previousEtag.slice(this.etagPrefix.length, -1) : undefined;
 		for (let attempt = 0; attempt < 3; attempt++) {
 			try {
@@ -227,7 +233,7 @@ export class EncryptedReminderApi {
 				if (etag === previousEtag || !inventory.files) return new Response(null, { status: 304, headers: { ETag: etag } });
 				await this.loadIndex();
 				const nextCache = new Map(this.cached);
-				const sources: Array<{ path: string; project: string; reminders: ReminderPayload[]; issue?: string }> = [];
+				const sources: Array<{ path: string; project: string; reminders: ReminderPayload[]; issue?: string; revision?: string }> = [];
 				const nextScanned = new Map<string, ScannedNote>();
 				// The server sees only tags, so the app skips archive notes before downloading them.
 				const archive = `${await this.keys.paths.wire(reminderArchiveFolder(this.keys.folderPath))}/`;
@@ -244,7 +250,7 @@ export class EncryptedReminderApi {
 						continue;
 					}
 					nextScanned.set(file.revision, entry);
-					sources.push({ ...source, reminders: entry.reminders, issue: entry.issue });
+					sources.push({ ...source, reminders: entry.reminders, issue: entry.issue, revision: file.revision });
 				}
 				// The server lists tags; order notes by plaintext path, as an unencrypted server does.
 				sources.sort((a, b) => compareCodePoints(a.path, b.path));
@@ -258,12 +264,31 @@ export class EncryptedReminderApi {
 					void this.store.saveIndex(this.indexScope, this.indexIdentity, [...nextScanned.values()], this.current)
 						.then(() => { this.persistedIndex = nextScanned; }, () => {});
 				}
-				return Response.json(result, { headers: { ETag: etag } });
+				return this.answer(result, sources, etag, since);
 			} catch (error) {
 				if (!(error instanceof ReminderCommandError) || error.status !== 409 || attempt === 2) throw error;
 			}
 		}
 		throw new Error('Reminder inventory could not converge');
+	}
+
+	/** Answers a delta when `since` names the last list this client answered, as the Worker does
+	 * for an unencrypted folder, so the app re-reads and re-stores only the changed notes.
+	 * A list with issues gets no delta base, so the next read is complete. */
+	private answer(result: { reminders: ReminderPayload[]; projects: string[]; issues: unknown[] }, sources: Array<{ path: string; revision?: string }>,
+		etag: string, since: string | undefined): Response {
+		const previous = this.answered;
+		this.answered = undefined;
+		const revisions = new Map(sources.map(source => [source.path, source.revision ?? '']));
+		if (result.issues.length || revisions.size !== sources.length) return Response.json(result, { headers: { ETag: etag } });
+		const base = `${this.answerPrefix}${++this.answerCount}`;
+		this.answered = { base, revisions };
+		const headers = { ETag: etag, [DELTA_BASE_HEADER]: base };
+		if (!since || previous?.base !== since) return Response.json(result, { headers });
+		const changed = new Set([...revisions].filter(([path, revision]) => previous.revisions.get(path) !== revision).map(([path]) => path));
+		for (const path of previous.revisions.keys()) if (!revisions.has(path)) changed.add(path);
+		return Response.json({ delta: true, changedPaths: [...changed], reminders: result.reminders.filter(reminder => changed.has(reminder.filePath)),
+			projects: result.projects, issues: [] }, { headers });
 	}
 
 	private cleanupCursor?: string;

@@ -430,3 +430,46 @@ it('answers a retried save from its encrypted acknowledgment without contacting 
 	expect(await response?.json()).toEqual({ reminder: { id: 'one' } });
 	expect(fetch).not.toHaveBeenCalled();
 });
+
+it('answers a delta of changed and removed notes for the base it last answered', async () => {
+	const { readReminderListBody } = await import('./reminder-api');
+	const inbox = await note('Reminders/Inbox.md', '- [ ] Inbox task <!-- crate-id:inbox -->\n');
+	const work = await note('Reminders/Work.md', '- [ ] Work task <!-- crate-id:work -->\n');
+	const home = await note('Reminders/Home.md', '- [ ] Home task <!-- crate-id:home -->\n');
+	const fake = server([inbox, work, home]);
+	const api = client(fake.fetch);
+	const read = async (previous?: Response, since?: string) => {
+		const response = (await api.handle(`/reminders/list?folderPath=Reminders${since ? `&since=${encodeURIComponent(since)}` : ''}`,
+			previous ? { headers: { 'If-None-Match': previous.headers.get('ETag')! } } : {}))!;
+		return { response, body: await response.json() as Record<string, unknown> };
+	};
+	const first = await read();
+	const base = first.response.headers.get('X-Crate-Delta-Base');
+	expect(base).toBeTruthy();
+	expect(first.body.delta).toBeUndefined();
+	const edited = await note('Reminders/Work.md', '- [ ] Edited work task <!-- crate-id:work -->\n');
+	fake.set([inbox, edited]);
+	const delta = await read(first.response, base!);
+	expect(delta.body).toMatchObject({ delta: true, issues: [] });
+	expect((delta.body.changedPaths as string[]).sort()).toEqual(['Reminders/Home.md', 'Reminders/Work.md']);
+	expect((delta.body.reminders as ReminderRecord[]).map(reminder => reminder.id)).toEqual(['work']);
+	// The app's merge of the delta matches the full list the client would have answered.
+	const merged = readReminderListBody(delta.body, 'Reminders', first.body.reminders as ReminderRecord[], base!).result!;
+	const full = await list(client(fake.fetch));
+	expect(merged.reminders).toEqual(full.body!.reminders);
+	// A base this client did not answer last gets the complete list.
+	fake.set([inbox]);
+	const stale = await read(delta.response, base!);
+	expect(stale.body.delta).toBeUndefined();
+	expect((stale.body.reminders as ReminderRecord[]).map(reminder => reminder.id)).toEqual(['inbox']);
+});
+
+it('gives a list with issues no delta base, so the next read is complete', async () => {
+	const fake = server([
+		await note('Reminders/A.md', '- [ ] One <!-- crate-id:same -->\n'),
+		await note('Reminders/B.md', '- [ ] Two <!-- crate-id:same -->\n'),
+	]);
+	const { response, body } = await list(client(fake.fetch));
+	expect(body!.issues).toHaveLength(2);
+	expect(response.headers.get('X-Crate-Delta-Base')).toBeNull();
+});
