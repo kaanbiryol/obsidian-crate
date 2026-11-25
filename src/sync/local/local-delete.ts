@@ -60,7 +60,21 @@ async function readDeleteSnapshot(context: LocalDeleteContext, path: string): Pr
 	}
 }
 
-async function deletePathLocally(
+// Trash picks a free name in `.trash` and then moves the file there, which two moves at
+// once could both pick. Reads and hashes still run concurrently; final checks and moves
+// run one at a time.
+let trashQueue: Promise<unknown> = Promise.resolve();
+function oneTrashAtATime<T>(work: () => Promise<T>): Promise<T> {
+	const run = trashQueue.then(work, work);
+	trashQueue = run.catch(() => undefined);
+	return run;
+}
+
+function deletePathLocally(context: LocalDeleteContext, path: string, snapshot: DeleteSnapshot): Promise<boolean> {
+	return oneTrashAtATime(() => moveToTrashIfUnchanged(context, path, snapshot));
+}
+
+async function moveToTrashIfUnchanged(
 	context: LocalDeleteContext,
 	path: string,
 	snapshot: DeleteSnapshot,

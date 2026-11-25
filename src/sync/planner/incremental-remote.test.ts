@@ -533,6 +533,30 @@ describe('runIncrementalSync', () => {
 	});
 });
 
+describe('concurrent remote reconciliation', () => {
+	it('reconciles paths concurrently and records outcomes in changelog order', async () => {
+		const paths = Array.from({ length: 12 }, (_, index) => `notes/${String(index).padStart(2, '0')}.md`);
+		const changes = paths.map((path, index) => ({ seq: 11 + index, path, action: 'delete' as const, hash: '', size: 0, created_at: '2026-11-25T00:00:00Z' }));
+		const harness = createIncrementalHarness({ settings: { lastSeq: 10 }, lastSeq: 10 + paths.length, changes });
+		const bytes = new TextEncoder().encode('same').buffer;
+		const hash = await sha256Hex(bytes);
+		harness.localManifest.getEntry.mockImplementation((path: string) => paths.includes(path) ? { hash, size: 4, modified: '2026-11-24T00:00:00Z' } : undefined);
+		const notes = new Map(paths.map(path => [path, { path, extension: 'md' }]));
+		harness.vault.getAbstractFileByPath.mockImplementation((path: string) => notes.get(path) ?? null);
+		let active = 0, peak = 0;
+		harness.vault.adapter.readBinary.mockImplementation(async (path: string) => {
+			active++; peak = Math.max(peak, active);
+			// Later paths finish first, so recording order cannot follow completion order.
+			await new Promise(resolve => setTimeout(resolve, 20 - paths.indexOf(path)));
+			active--;
+			return bytes;
+		});
+		const result = await runIncrementalSync(harness.context, {});
+		expect(peak).toBeGreaterThan(1);
+		expect(result?.deletedPaths).toEqual(paths);
+	});
+});
+
 describe('remote renames', () => {
 	const changes = [
 		{ seq: 11, path: 'Old/note.md', action: 'delete' as const, hash: '', size: 0, created_at: '2026-11-25T00:00:00Z' },

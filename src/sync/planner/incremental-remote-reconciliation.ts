@@ -12,6 +12,8 @@ import type { FileDiff } from './types';
 import { isVaultTFileLike } from '../local/local-delete';
 import { assertLocalSyncPath, unsupportedLocalPathIssue } from '../local/local-path-safety';
 import { portablePathKey } from '../../protocol/portable-path';
+import { runConcurrentTasks } from '../concurrency';
+import { REMOTE_RECONCILE_CONCURRENCY } from '../transfer/constants';
 
 export interface IncrementalRemoteReconciliation {
 	discoveredLocalChanges: Array<{ path: string; hash: string }>;
@@ -45,10 +47,17 @@ export async function reconcileIncrementalRemoteChanges(
 	const conflicts: FileDiff[] = [];
 	const moved = await applyRemoteMoves(context, changesByPath, localChangedPaths, localDeletedPaths, result);
 
-	for (const [path, entry] of changesByPath) {
-		if (context.shouldIgnore(path) || moved.has(path)) continue;
+	// Each path reads, hashes or trashes only its own file, so several run at once. Paths one
+	// case-insensitive name can hold run in order, and outcomes are recorded in changelog
+	// order, so the result matches reconciling one path at a time. Manifest updates are
+	// made as each path settles, like before, so a cancelled run keeps them.
+	const outcomes = new Map<string, Array<() => void>>();
+	const reconcile = async (path: string, entry: ChangelogEntry): Promise<void> => {
+		const effects: Array<() => void> = [];
+		outcomes.set(path, effects);
+		const later = (effect: () => void) => { effects.push(effect); };
 		const unsupported = unsupportedLocalPathIssue(path);
-		if (unsupported) { (result.issues ??= []).push(unsupported); continue; }
+		if (unsupported) { later(() => (result.issues ??= []).push(unsupported)); return; }
 
 		try {
 			if (entry.action === 'delete') {
@@ -63,37 +72,37 @@ export async function reconcileIncrementalRemoteChanges(
 						)
 						: null;
 					if (decision?.action === 'upload') {
-						resurrectPaths.add(path);
-						continue;
+						later(() => resurrectPaths.add(path));
+						return;
 					}
 				}
 
 				const baseline = context.localManifest.getEntry(path);
 				// This device never synced the path, so there is nothing to delete here. A
 				// local file created at it is a local change for the scan to upload.
-				if (!baseline) continue;
+				if (!baseline) return;
 				const localDelete = await deletePathLocallyIfUnchanged(context, path, baseline.hash);
 				if (localDelete.status === 'changed') {
-					resurrectPaths.add(path);
-					localChangedPaths.add(path);
 					const localChange = { path, hash: localDelete.hash };
-					discoveredLocalChanges.push(localChange);
-					localChangeByPath.set(path, localChange);
-					continue;
+					later(() => {
+						resurrectPaths.add(path);
+						localChangedPaths.add(path);
+						discoveredLocalChanges.push(localChange);
+						localChangeByPath.set(path, localChange);
+					});
+					return;
 				}
 				context.localManifest.removeEntry(path);
-				if (localDelete.status === 'deleted') {
-					result.deleted++;
-					result.deletedPaths.push(path);
-				}
-				continue;
+				if (localDelete.status === 'deleted') later(() => { result.deleted++; result.deletedPaths.push(path); });
+				return;
 			}
 
 			// This device cannot store it, like an oversized local file: report it without
 			// failing the sync, so the changelog cursor still advances past it.
 			if (entry.size > context.maxFileBytes()) {
-				(result.issues ??= []).push(oversizedRemoteFileIssue(path, context.maxFileBytes()));
-				continue;
+				const issue = oversizedRemoteFileIssue(path, context.maxFileBytes());
+				later(() => (result.issues ??= []).push(issue));
+				return;
 			}
 
 			if (localDeletedPaths.has(path)) {
@@ -104,32 +113,22 @@ export async function reconcileIncrementalRemoteChanges(
 					context.localManifest.getEntry(path),
 				);
 				if (decision?.action === 'delete') {
-					remoteUnchangedLocalDeletes.add(path);
-					continue;
+					later(() => remoteUnchangedLocalDeletes.add(path));
+					return;
 				}
-				if (decision?.action === 'download' && decision.cause === 'local-deleted') {
-					restoreDeletedPaths.add(path);
-				}
-				downloadRequests.push({
-					path,
-					expectedLocalHash: null,
-					expectedRemoteHash: entry.hash,
-					remoteSize: entry.size,
+				later(() => {
+					if (decision?.action === 'download' && decision.cause === 'local-deleted') restoreDeletedPaths.add(path);
+					downloadRequests.push({ path, expectedLocalHash: null, expectedRemoteHash: entry.hash, remoteSize: entry.size });
 				});
-				continue;
+				return;
 			}
 
 			const localEntry = localChangedPaths.has(path)
 				? await readLocalFileEntry(context.vault, path, context.maxFileBytes())
 				: await readUnchangedLocalEntry(context, path);
 			if (!localEntry) {
-				downloadRequests.push({
-					path,
-					expectedLocalHash: null,
-					expectedRemoteHash: entry.hash,
-					remoteSize: entry.size,
-				});
-				continue;
+				later(() => downloadRequests.push({ path, expectedLocalHash: null, expectedRemoteHash: entry.hash, remoteSize: entry.size }));
+				return;
 			}
 
 			const decision = classifyPath(
@@ -141,30 +140,38 @@ export async function reconcileIncrementalRemoteChanges(
 
 			if (!decision) {
 				context.localManifest.setEntry(path, { ...localEntry, revision: entry.revision });
-				result.settledKeys.push(pendingChangeKey('upload', path));
+				later(() => result.settledKeys.push(pendingChangeKey('upload', path)));
 			} else if (decision.action === 'upload') {
-				if (!localChangedPaths.has(path)) {
-					localChangedPaths.add(path);
-					const localChange = { path, hash: localEntry.hash };
-					discoveredLocalChanges.push(localChange);
-					localChangeByPath.set(path, localChange);
-				}
-				if (decision.cause === 'local-edited') reclassifiedPaths.add(path);
-			} else if (decision.action === 'conflict') {
-				conflicts.push(decision);
-			} else if (decision.action === 'download') {
-				downloadRequests.push({
-					path,
-					expectedLocalHash: localEntry.hash,
-					expectedRemoteHash: entry.hash,
-					remoteSize: entry.size,
+				later(() => {
+					if (!localChangedPaths.has(path)) {
+						localChangedPaths.add(path);
+						const localChange = { path, hash: localEntry.hash };
+						discoveredLocalChanges.push(localChange);
+						localChangeByPath.set(path, localChange);
+					}
+					if (decision.cause === 'local-edited') reclassifiedPaths.add(path);
 				});
+			} else if (decision.action === 'conflict') {
+				later(() => conflicts.push(decision));
+			} else if (decision.action === 'download') {
+				later(() => downloadRequests.push({ path, expectedLocalHash: localEntry.hash, expectedRemoteHash: entry.hash, remoteSize: entry.size }));
 			}
 		} catch (error) {
 			if (isAbortError(error)) throw error;
-			recordSyncError(result, error, path);
+			later(() => recordSyncError(result, error, path));
 		}
+	};
+	const groups = new Map<string, Array<[string, ChangelogEntry]>>();
+	for (const [path, entry] of changesByPath) {
+		if (context.shouldIgnore(path) || moved.has(path)) continue;
+		const key = portablePathKey(path);
+		const group = groups.get(key);
+		if (group) group.push([path, entry]); else groups.set(key, [[path, entry]]);
 	}
+	await runConcurrentTasks([...groups.values()].map(group => async () => {
+		for (const [path, entry] of group) await reconcile(path, entry);
+	}), REMOTE_RECONCILE_CONCURRENCY, context.signal);
+	for (const path of changesByPath.keys()) for (const effect of outcomes.get(path) ?? []) effect();
 
 	return {
 		discoveredLocalChanges,
