@@ -14,9 +14,10 @@ export const bundleBudgets = {
 		// stored tag counts and its scale fixes, measure 5.0356 MB raw / 2.3297 MB gzip. Lexical 0.53,
 		// Motion 14.14, Marked 18.3 and Defuddle 0.19.13 bring it to 5.0960 MB raw / 2.3626 MB gzip.
 		// Linkedom 0.18.15, whose CSSOM parser Defuddle reads stylesheets through, and the larger
-		// embedded Worker bring it to 5.3489 MB raw / 2.4508 MB gzip.
-		maxBytes: 5349000,
-		maxGzipBytes: 2450800,
+		// embedded Worker bring it to 5.3489 MB raw / 2.4508 MB gzip. The PWA's offline indicator
+		// fix brings it to 5.3490 MB raw / 2.4509 MB gzip.
+		maxBytes: 5349100,
+		maxGzipBytes: 2450900,
 	},
 	{
 		path: 'dist/styles.css',
@@ -33,16 +34,17 @@ export const bundleBudgets = {
 		// Server-side extraction for encrypted Reading drops Defuddle from the embedded PWA:
 		// 4.043 MB raw / 1.294 MB gzip. The Lexical, Motion, Marked and Defuddle updates bring it to
 		// 4.100 MB raw / 1.311 MB gzip. Linkedom 0.18.15 and web-push 4 bring it to 4.2789 MB raw /
-		// 1.3563 MB gzip.
-		maxBytes: 4279000,
+		// 1.3563 MB gzip. The PWA's offline indicator fix brings it to 4.2791 MB raw.
+		maxBytes: 4279100,
 		maxGzipBytes: 1356400,
 	}, {
 		path: '.generated/cloudflare/worker-self-hosted.mjs',
 		// The server package's Worker: the deployable one plus chunked uploads and ranged
 		// downloads, 4.107 MB raw / 1.313 MB gzip after the Lexical, Motion, Marked and Defuddle updates.
-		// Linkedom 0.18.15 and web-push 4 bring it to 4.2861 MB raw / 1.3584 MB gzip.
-		maxBytes: 4286200,
-		maxGzipBytes: 1358500,
+		// Linkedom 0.18.15 and web-push 4 bring it to 4.2861 MB raw / 1.3584 MB gzip. The PWA's
+		// offline indicator fix brings it to 4.2863 MB raw / 1.3586 MB gzip.
+		maxBytes: 4286300,
+		maxGzipBytes: 1358600,
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
@@ -55,8 +57,8 @@ export const bundleBudgets = {
 		// steps, the failed and pending article states, notice action rows, the simplified
 		// reader header, Reading changes applied to loaded pages, released images and cancelled
 		// searches, measure 1.2256 MB raw / 401.7 KB gzip. Lexical 0.53 and Motion 14.14 bring it to
-		// 1.2335 MB raw / 404.9 KB gzip.
-		maxBytes: 1233500,
+		// 1.2335 MB raw / 404.9 KB gzip. The offline indicator fix brings it to 1.2336 MB raw.
+		maxBytes: 1233600,
 		maxGzipBytes: 404900,
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
@@ -68,8 +70,9 @@ export const bundleBudgets = {
 		// steps, the failed and pending article states, notice action rows, the simplified
 		// reader header, Reading changes applied to loaded pages, released images and cancelled
 		// searches, measure 1.9474 MB raw / 643.0 KB gzip. Lexical 0.53, Motion 14.14 and Marked 18.3
-		// bring it to 1.9769 MB raw / 654.6 KB gzip; Lucide 1.81 adds a few bytes of gzip.
-		maxBytes: 1976900,
+		// bring it to 1.9769 MB raw / 654.6 KB gzip; Lucide 1.81 adds a few bytes of gzip. The
+		// offline indicator fix brings it to 1.9770 MB raw.
+		maxBytes: 1977000,
 		maxGzipBytes: 654700,
 	}],
 };
