@@ -82,7 +82,8 @@ describe('shouldIgnoreSyncPath', () => {
 		for (const path of ['.gitignore', '.gitattributes', '.gitmodules', '.github/workflows/ci.yml',
 			'.git-backup/config', '.config/settings.json', 'note.md.bak', 'package-lock.json']) {
 			expect(shouldIgnoreSyncPath(path, context), path).toBe(false);
-			expect(shouldIgnoreSyncPath(`Projects/example/${path}`, context), path).toBe(false);
+			// Hidden files and folders below visible folders are not synced.
+			expect(shouldIgnoreSyncPath(`Projects/example/${path}`, context), path).toBe(path.startsWith('.'));
 		}
 	});
 
@@ -90,8 +91,7 @@ describe('shouldIgnoreSyncPath', () => {
 		const context = createIgnoreContext(['Archive/']);
 		expect(shouldIgnoreSyncPath('Archive/note.md', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('Projects/Archive/note.md', context)).toBe(false);
-		expect(shouldIgnoreSyncPath('Projects/example/.git/config', context)).toBe(false);
-		expect(shouldIgnoreSyncPath('Projects/.vault-config/plugins/crate/data.json', context)).toBe(false);
+		expect(shouldIgnoreSyncPath('Projects/.vault-config/plugins/crate/data.json', context)).toBe(true);
 	});
 
 	it('keeps local trash excluded even without user ignore patterns', () => {
@@ -135,6 +135,14 @@ describe('shouldIgnoreSyncPath', () => {
 		expect(shouldIgnoreConfiguredPath('.obsidian/plugins/crate/data.json', context)).toBe(true);
 		expect(shouldIgnoreConfiguredPath('notes/scratch.tmp', context)).toBe(true);
 		expect(shouldIgnoreConfiguredPath('notes/keep.md', context)).toBe(false);
+	});
+});
+
+describe('nested hidden paths', () => {
+	it('leaves out hidden files and folders below visible folders but keeps hidden root folders', () => {
+		const context = createIgnoreMatcherContext([], []);
+		for (const path of ['notes/.cache/a.json', 'notes/.env', 'a/b/.git/config']) expect(shouldIgnoreSyncPath(path, context)).toBe(true);
+		for (const path of ['.obsidian/app.json', '.obsidian/plugins/x/.hidden', '.gitignore', 'notes/a.md']) expect(shouldIgnoreSyncPath(path, context)).toBe(false);
 	});
 });
 

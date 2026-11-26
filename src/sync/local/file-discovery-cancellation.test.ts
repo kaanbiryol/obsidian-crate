@@ -12,7 +12,7 @@ it.each(['list', 'stat'] as const)('preserves cancellation from the adapter %s o
 	await expect(getAllVaultFiles(vault, () => false)).rejects.toBe(error);
 });
 
-it.each(['', '.config', 'notes', 'notes/.config'])('stops discovery after cancelling the listing of %s', async folder => {
+it.each(['', '.config', '.config/plugins'])('stops discovery after cancelling the listing of %s', async folder => {
 	const controller = new AbortController();
 	const listings: Record<string, { files: string[]; folders: string[] }> = {
 		'': { files: ['.hidden'], folders: ['.config', 'notes'] },

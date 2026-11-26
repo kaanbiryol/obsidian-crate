@@ -1,6 +1,6 @@
 import { pendingChangeKey } from '../pending/pending-change';
 import { withSyncFileContext } from '../issues';
-import { forgetNestedHiddenFolders, getAllVaultFiles, isHiddenPath } from "../local/file-discovery";
+import { getAllVaultFiles } from "../local/file-discovery";
 import type { LocalChangeScan, LocalDiffPlannerContext } from "./types";
 import { sha256Hex } from '../../platform/sha256';
 import { partitionSkippedUploads, hasLocalMetadataChange } from '../local/local-file-changes';
@@ -11,10 +11,9 @@ export async function getLocalDeletes(
 	discoveredPaths: ReadonlySet<string>,
 	prepareConcurrency: number,
 ): Promise<string[]> {
-	// Only paths discovery missed can be deletes, and each is confirmed absent before it
-	// counts; a case or Unicode variant of its name, as after a case-only rename, does not
-	// keep it. Discovery may skip a hidden folder it has not found yet, so a candidate that
-	// exists makes the next scan walk every folder.
+	// Discovery is complete or throws, so only paths it missed can be deletes.
+	// Each candidate is still confirmed absent before it counts; a case or Unicode
+	// variant of its name, as after a case-only rename, does not keep it.
 	const candidates = context.localManifest
 		.getAllPaths()
 		.filter((path) => !context.shouldIgnore(path) && !discoveredPaths.has(path));
@@ -23,7 +22,6 @@ export async function getLocalDeletes(
 		context.signal.throwIfAborted();
 		const exists = await withSyncFileContext(path, () => localPathExists(context.vault, path));
 		context.signal.throwIfAborted();
-		if (exists && isHiddenPath(path)) forgetNestedHiddenFolders(context.vault);
 		return exists ? null : path;
 	});
 
@@ -37,7 +35,7 @@ export async function getLocalChanges(
 	onUnchanged?: (path: string) => void,
 ): Promise<LocalChangeScan> {
 	const changes: Array<{ path: string; hash: string }> = [];
-	const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.signal.throwIfAborted(), true);
+	const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context), () => context.signal.throwIfAborted());
 	await context.verifyContent(allFiles);
 	context.signal.throwIfAborted();
 

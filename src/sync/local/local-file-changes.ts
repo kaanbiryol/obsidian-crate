@@ -1,5 +1,5 @@
 import type { Vault } from 'obsidian';
-import { forgetNestedHiddenFolders, getAllVaultFiles, isHiddenPath, type VaultFile } from './file-discovery';
+import { getAllVaultFiles, type VaultFile } from './file-discovery';
 import type { FileEntry } from '../../protocol/sync-types';
 import { fitsEncryptedPathLimit } from '../../encryption/path-tags';
 import { deepEncryptedFileIssue, skippedFileIssue } from '../issues';
@@ -50,7 +50,7 @@ export async function hasLocalFileChanges(
 	verifyContent?: (files: VaultFile[]) => Promise<boolean>,
 	assertActive?: () => void,
 ): Promise<boolean> {
-	const currentFiles = await getAllVaultFiles(vault, shouldIgnore, assertActive, true);
+	const currentFiles = await getAllVaultFiles(vault, shouldIgnore, assertActive);
 	const contentChanged = await verifyContent?.(currentFiles);
 	assertActive?.();
 	if (contentChanged) return true;
@@ -67,8 +67,6 @@ export async function hasLocalFileChanges(
 			const exists = await localPathExists(vault, path);
 			assertActive?.();
 			if (!exists) return true;
-			// A tracked hidden file the scan missed is in a hidden folder it did not walk.
-			if (isHiddenPath(path)) forgetNestedHiddenFolders(vault);
 		} catch {
 			assertActive?.();
 			// Treat an uncertain adapter result as unchanged until the next check.

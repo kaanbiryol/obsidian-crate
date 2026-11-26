@@ -2,7 +2,7 @@ import { registerSyncStatus } from './sync-status';
 import { registerSyncResultNotices } from './sync-result-notices';
 import { openFileHistoryModal } from '../ui/activity/file-history-modal';
 import { showConflictNotice, showSyncErrorNotice } from '../ui/sync-error-notice';
-import { Notice, Platform, TFile, TFolder, type Events, type TAbstractFile } from 'obsidian';
+import { Notice, Platform, TFile, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from './CratePlugin';
 import { SyncRuntime } from '../sync/runtime/runtime';
 import { ActivityModal } from '../ui/activity/activity-modal';
@@ -14,7 +14,6 @@ import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } f
 import { prepareRemindersForFirstUpload } from '../reminders/runtime';
 import { createNoteProjection } from './note-projection';
 import type { ForegroundSyncReason } from '../sync/runtime/foreground-sync';
-import { forgetNestedHiddenFolders, noteHiddenPathChange } from '../sync/local/file-discovery';
 
 export function initializeSyncManagers(plugin: CratePlugin): void {
 	plugin.registerDomEvent(window, 'online', () => { void refreshReminderNotificationPolicy(plugin); });
@@ -171,11 +170,8 @@ export async function stopSyncNow(plugin: CratePlugin): Promise<void> {
 }
 
 export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
-	// A created, moved or deleted folder may hold hidden folders scans have not found.
-	const folderChanged = (file: TAbstractFile) => { if (file instanceof TFolder) forgetNestedHiddenFolders(plugin.app.vault); };
 	plugin.registerEvent(
 		plugin.app.vault.on('create', (file: TAbstractFile) => {
-			folderChanged(file);
 			plugin.syncRuntime.onFileChange(file);
 		}),
 	);
@@ -188,14 +184,12 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 
 	plugin.registerEvent(
 		plugin.app.vault.on('delete', (file: TAbstractFile) => {
-			folderChanged(file);
 			plugin.syncRuntime.onFileDelete(file);
 		}),
 	);
 
 	plugin.registerEvent(
 		plugin.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
-			folderChanged(file);
 			plugin.syncRuntime.onFileRename(file, oldPath);
 		}),
 	);
@@ -203,9 +197,7 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 	// Obsidian emits raw paths for configuration and hidden files that have no TFile.
 	plugin.registerEvent(
 		(plugin.app.vault as Events).on('raw', (path: unknown) => {
-			if (typeof path !== 'string') return;
-			noteHiddenPathChange(plugin.app.vault, path);
-			plugin.syncRuntime.onRawFileChange(path);
+			if (typeof path === 'string') plugin.syncRuntime.onRawFileChange(path);
 		}),
 	);
 

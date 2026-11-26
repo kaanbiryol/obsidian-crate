@@ -110,6 +110,8 @@ Private/
 
 This keeps the `Private` folder, all Photoshop files, and one plugin's files local. Use the real plugin folder name, and your own configuration folder if it isn't `.obsidian`.
 
+Crate never syncs hidden files or folders inside other folders, such as `Projects/.git/`. Hidden folders at the top of the vault, like `.obsidian`, do sync.
+
 Exclusions apply to all your Obsidian devices. Adding a rule stops future syncing but leaves existing copies on the server. To remove those too, select **Review and remove** under **Remove excluded server files**. Your local files are kept, and the server copies stay recoverable for your history period.
 
 ## When something goes wrong

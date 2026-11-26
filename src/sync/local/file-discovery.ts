@@ -45,7 +45,6 @@ export function isVaultTFolderLike(file: TAbstractFile | null): boolean {
 export async function ensureParentFolder(vault: Vault, path: string, options: { trustIndex?: boolean } = {}): Promise<void> {
 	const folderPath = path.substring(0, path.lastIndexOf('/'));
 	if (!folderPath) return;
-	noteHiddenPathChange(vault, path);
 	if (options.trustIndex && !isHiddenPath(path) && isVaultTFolderLike(vault.getAbstractFileByPath(folderPath))) return;
 	try {
 		if (isHiddenPath(path)) await vault.adapter.mkdir(folderPath);
@@ -88,50 +87,23 @@ export function tfileToVaultFile(file: TFile): VaultFile {
 	};
 }
 
-// Finding hidden folders below visible ones means listing every visible folder. Each full
-// walk remembers what it found, so frequent scans can walk just those, like the hidden
-// root folders, until a change may have added one or the memory is this old.
-export const NESTED_HIDDEN_FOLDERS_MAX_AGE_MS = 30 * 60_000;
-const nestedHiddenFolders = new WeakMap<Vault, { folders: string[]; at: number }>();
-
-/** The next scan of this vault lists every visible folder again. */
-export function forgetNestedHiddenFolders(vault: Vault): void {
-	nestedHiddenFolders.delete(vault);
-}
-
-/** Forgets the remembered folders when `path` lies in a hidden folder below a visible one
- * that the last full walk did not find. */
-export function noteHiddenPathChange(vault: Vault, path: string): void {
-	const remembered = nestedHiddenFolders.get(vault);
-	if (!remembered) return;
-	const segments = path.split('/');
-	const hidden = segments.findIndex(segment => segment.startsWith('.'));
-	// Hidden root folders are always walked, and a hidden file in a visible folder is not synced.
-	if (hidden <= 0 || hidden === segments.length - 1) return;
-	if (!remembered.folders.includes(segments.slice(0, hidden + 1).join('/'))) forgetNestedHiddenFolders(vault);
-}
-
 /**
  * Discover all vault files — both Obsidian-indexed and hidden.
  *
  * Hidden files are discovered by recursing into dot-prefixed folders via
- * `vault.adapter.list()` + `vault.adapter.stat()`. Non-hidden folders are
- * walked to find hidden descendants. An incomplete scan rejects: callers must
+ * `vault.adapter.list()` + `vault.adapter.stat()`. Only hidden folders and files at the
+ * vault root are walked: hidden folders below visible ones are not synced, since finding
+ * them would mean listing every folder. An incomplete scan rejects: callers must
  * never use a partial snapshot as evidence that an undiscovered file was deleted.
  *
  * @param shouldIgnore  Predicate used to skip ignored paths early (avoids
  *                      stat-ing thousands of files in e.g. `.git/`).
  * @param assertActive  Cancellation check before and after each filesystem read.
- * @param reuseNestedHidden  Walk the hidden folders below visible ones that a recent full
- *                      walk found instead of listing every visible folder. Such a scan can
- *                      miss a new hidden folder for a while, so it must never be evidence
- *                      that a file is absent.
  */
 export async function getAllVaultFiles(
 	vault: Vault,
 	shouldIgnore: (path: string) => boolean,
 	assertActive?: () => void,
-	reuseNestedHidden = false,
 ): Promise<VaultFile[]> {
 	assertActive?.();
 	// Start with all indexed files
@@ -155,25 +127,6 @@ export async function getAllVaultFiles(
 	for (const folder of hiddenFolders) {
 		if (shouldIgnore(folder) || shouldIgnore(folder + '/')) continue;
 		await walkHiddenFolder(vault, folder, shouldIgnore, seen, result, assertActive);
-	}
-
-	// Discover hidden subfolders nested under non-hidden roots (e.g. notes/.config/)
-	const visibleRootFolders = root.folders.filter(folder => {
-		const name = folder.split('/').pop() ?? '';
-		return !name.startsWith('.');
-	});
-	const remembered = reuseNestedHidden ? nestedHiddenFolders.get(vault) : undefined;
-	if (remembered && Date.now() - remembered.at < NESTED_HIDDEN_FOLDERS_MAX_AGE_MS) {
-		for (const folder of remembered.folders) {
-			if (shouldIgnore(folder) || shouldIgnore(folder + '/')) continue;
-			// A removed folder's tracked files are found missing like any other deletion.
-			if ((await safeStat(vault, folder, assertActive))?.type !== 'folder') continue;
-			await walkHiddenFolder(vault, folder, shouldIgnore, seen, result, assertActive);
-		}
-	} else {
-		const folders = await walkForNestedHiddenFolders(vault, visibleRootFolders.filter(folder => !shouldIgnore(folder) && !shouldIgnore(folder + '/')),
-			shouldIgnore, seen, result, assertActive);
-		nestedHiddenFolders.set(vault, { folders, at: Date.now() });
 	}
 
 	// Include hidden files at the root level (e.g. `.gitignore`)
@@ -212,8 +165,7 @@ async function walkHiddenFolder(
 	}
 }
 
-// Folder listings and stats are slow bridge calls on mobile; a bounded pool overlaps them.
-const LISTING_CONCURRENCY = 8;
+// Stats are slow bridge calls on mobile; a bounded pool overlaps them.
 const STAT_CONCURRENCY = 8;
 
 /**
@@ -240,47 +192,6 @@ async function addStatFiles(
 			extension: getExtensionFromPath(filePath),
 		});
 	});
-}
-
-/**
- * Walk non-hidden folders and recurse into hidden descendants only. Listings run
- * concurrently; hidden folders are then walked in path order, so results stay
- * deterministic. Returns the hidden folders it walked.
- */
-async function walkForNestedHiddenFolders(
-	vault: Vault,
-	folderPaths: string[],
-	shouldIgnore: (path: string) => boolean,
-	seen: Set<string>,
-	result: VaultFile[],
-	assertActive?: () => void,
-): Promise<string[]> {
-	const pendingFolders = [...folderPaths];
-	const visitedFolders = new Set<string>();
-	const hiddenFolders: string[] = [];
-	const worker = async () => {
-		while (pendingFolders.length > 0) {
-			const currentFolder = pendingFolders.pop()!;
-			if (visitedFolders.has(currentFolder)) continue;
-			visitedFolders.add(currentFolder);
-			const listing = await safeList(vault, currentFolder, assertActive);
-			for (const subfolder of listing.folders) {
-				if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
-				const name = subfolder.split('/').pop() ?? '';
-				if (name.startsWith('.')) hiddenFolders.push(subfolder);
-				else pendingFolders.push(subfolder);
-			}
-		}
-	};
-	// Workers that find the queue empty exit; a worker that lists more folders
-	// keeps draining them, so start new workers until the queue settles.
-	while (pendingFolders.length > 0) {
-		await Promise.all(Array.from({ length: Math.min(LISTING_CONCURRENCY, pendingFolders.length) }, worker));
-	}
-	for (const folder of hiddenFolders.sort()) {
-		await walkHiddenFolder(vault, folder, shouldIgnore, seen, result, assertActive);
-	}
-	return hiddenFolders;
 }
 
 async function safeList(vault: Vault, folderPath: string, assertActive?: () => void): Promise<AdapterListing> {

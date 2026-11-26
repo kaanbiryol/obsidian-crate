@@ -63,14 +63,12 @@ describe('destructive sync requires complete discovery', () => {
 	});
 
 	for (const mode of ['full', 'expired-cursor', 'force'] as const) {
-		it.each(['root-list', 'hidden-list', 'nested-list', 'stat'])(`${mode} preserves remote files and checkpoint after %s failure`, async failure => {
+		it.each(['root-list', 'hidden-list', 'stat'])(`${mode} preserves remote files and checkpoint after %s failure`, async failure => {
 			const harness = await persistentHarness(mode === 'expired-cursor' ? 5 : 0);
 			harness.disk.write(path, 'note');
-			if (failure === 'nested-list') await harness.vault.adapter.mkdir('notes/nested');
 			const list = harness.vault.adapter.list.bind(harness.vault.adapter);
 			vi.spyOn(harness.vault.adapter, 'list').mockImplementation(async folder => {
-				if (failure === 'root-list' && !folder || failure === 'hidden-list' && folder === '.private'
-					|| failure === 'nested-list' && folder === 'notes/nested') throw new Error('temporary folder failure');
+				if (failure === 'root-list' && !folder || failure === 'hidden-list' && folder === '.private') throw new Error('temporary folder failure');
 				return list(folder);
 			});
 			if (failure === 'stat') vi.spyOn(harness.vault.adapter, 'stat').mockRejectedValue(new Error('temporary stat failure'));

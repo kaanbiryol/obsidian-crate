@@ -58,6 +58,14 @@ export function matchIgnorePattern(
 	return regex.test(path) || regex.test(basename);
 }
 
+/** A hidden file or folder below a visible folder, like `notes/.cache/a.json`. Sync leaves
+ * these out: finding them would mean listing every folder of the vault. Hidden folders at
+ * the root, like `.obsidian`, sync with everything inside them. */
+function isNestedHiddenPath(path: string): boolean {
+	const segments = path.split('/');
+	return !segments[0]!.startsWith('.') && segments.some(segment => segment.startsWith('.'));
+}
+
 export function shouldIgnoreSyncPath(
 	path: string,
 	context: IgnoreMatcherContext
@@ -75,6 +83,7 @@ export function shouldIgnoreConfiguredPath(
 ): boolean {
 	// Recovery copies created by local trash must never re-enter sync.
 	if (path === '.trash' || path.startsWith('.trash/')) return true;
+	if (isNestedHiddenPath(path)) return true;
 	for (const prefix of context.ignoredDirPrefixes) {
 		if (matchIgnorePattern(path, prefix, context.patternCache)) {
 			return true;
