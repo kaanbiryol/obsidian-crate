@@ -82,7 +82,7 @@ it('does not upload any objects when lease registration fails', async () => {
 
 it('cleans an expired object and prevents its late publication', async () => {
 	const { key, hash, id } = await expiredObject();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(1);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(1);
 	expect(await env.BUCKET.head(key)).toBeNull();
 	const result = await commitStagedFile(env.BUCKET, env.DB, {
 		path: 'Late.bin', hash, size: 4, objectKey: key, leaseId: id, content: 'data', expectedHash: null,
@@ -94,7 +94,7 @@ it('cleans an expired object and prevents its late publication', async () => {
 it('cleans expired keys and prevents a delayed bulk commit from publishing them', async () => {
 	const response = await handleBatchUpload(request(), env.BUCKET, env.DB, { commitUpload: commitStagedFile, commitNewFiles: async (bucket, db, files) => {
 		await expire();
-		expect(await cleanUploadLeases(bucket, db)).toBe(8);
+		expect((await cleanUploadLeases(bucket, db)).finished).toBe(8);
 		return commitNewFiles(bucket, db, files);
 	} });
 	const result = await response.json() as { results: Array<{ success: boolean }> };
@@ -110,7 +110,7 @@ it('keeps objects referenced by a live file or retained version', async () => {
 	const current = await getStoredFileRow(env.DB, 'Note.md');
 	await trackUploadLease(env.DB, [previous!, current!].map(file => ({ storageKey: file.storageKey, path: 'Note.md' })));
 	await expire();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(2);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(2);
 	expect(await env.BUCKET.head(previous!.storageKey)).not.toBeNull();
 	expect(await env.BUCKET.head(current!.storageKey)).not.toBeNull();
 	expect(await env.DB.prepare('SELECT id FROM upload_leases').first()).toBeNull();
@@ -121,13 +121,13 @@ it('retains missing keys to collect a late R2 upload without risking committed f
 	const live = await env.DB.prepare('SELECT storage_key, path FROM files LIMIT 1').first<{ storage_key: string; path: string }>();
 	const { id } = await trackUploadLease(env.DB, [{ storageKey: live!.storage_key, path: live!.path }, { storageKey: 'late-key', path: 'late.md' }]);
 	await expire();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(1);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(1);
 	expect(await env.DB.prepare('SELECT keys, state, attempts FROM upload_leases WHERE id = ?').bind(id).first())
 		.toEqual({ keys: '[{"storageKey":"late-key","path":"late.md"}]', state: 'deleting', attempts: 1 });
 	expect(await env.BUCKET.head(live!.storage_key)).not.toBeNull();
 	await env.BUCKET.put('late-key', 'late bytes');
 	await expire();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(1);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(1);
 	expect(await env.BUCKET.head('late-key')).toBeNull();
 	expect(await env.DB.prepare('SELECT id FROM upload_leases').first()).toBeNull();
 });
@@ -156,30 +156,54 @@ it('retries a failed R2 delete', async () => {
 	for (let i = 0; i < 3; i++) await lease([`key-${i}`]);
 	await expire();
 	vi.spyOn(env.BUCKET, 'delete').mockRejectedValueOnce(new Error('Unavailable'));
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(0);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(0);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM upload_leases WHERE attempts = 1').first()).toEqual({ n: 3 });
 	await expire();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(3);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(3);
 	expect(await env.DB.prepare('SELECT id FROM upload_leases').first()).toBeNull();
 });
 
-it('bounds one pass to ten leases or 64 objects', async () => {
+it('bounds one pass to ten leases or the objects its subrequests allow', async () => {
 	for (let i = 0; i < 12; i++) await lease([`single-${i}`]);
 	await expire();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(10);
+	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toEqual({ finished: 10, more: false });
 	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM upload_leases').first()).toEqual({ n: 2 });
 	await env.DB.prepare('DELETE FROM upload_leases').run();
 	for (let i = 0; i < 3; i++) await lease(Array.from({ length: 32 }, (_, index) => `batch-${i}-${index}`));
 	await expire();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(64);
-	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM upload_leases').first()).toEqual({ n: 1 });
+	const head = vi.spyOn(env.BUCKET, 'head');
+	// The first lease is always claimed; the objects past one pass's heads wait for the next.
+	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toEqual({ finished: 18, more: true });
+	expect(head).toHaveBeenCalledTimes(18);
+	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toEqual({ finished: 14, more: false });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM upload_leases').first()).toEqual({ n: 2 });
+});
+
+it('retries absent objects of a lease checked over several passes', async () => {
+	const keys = Array.from({ length: 32 }, (_, index) => `batch-${index}`);
+	const id = await lease(keys, false);
+	// Only the second half was put; the first half may still be uploading.
+	await Promise.all(keys.slice(16).map(key => env.BUCKET.put(key, 'content')));
+	await expire();
+	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toEqual({ finished: 2, more: true });
+	const rows = async () => (await env.DB.prepare('SELECT id, keys, state, attempts, expires_at FROM upload_leases ORDER BY expires_at')
+		.all<{ id: string; keys: string; state: string; attempts: number; expires_at: number }>()).results
+		.map(row => ({ ...row, keys: (JSON.parse(row.keys) as Array<{ storageKey: string }>).map(object => object.storageKey) }));
+	// The unchecked objects stay claimed and expired; the absent ones retry under their own lease.
+	const [deferred, retrying] = await rows();
+	expect(deferred).toMatchObject({ id, keys: keys.slice(18), state: 'deleting', attempts: 0, expires_at: 0 });
+	expect(retrying).toMatchObject({ keys: keys.slice(0, 16), state: 'deleting', attempts: 1 });
+	expect(retrying!.expires_at).toBeGreaterThan(Date.now());
+	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toEqual({ finished: 14, more: false });
+	expect((await rows()).map(row => row.keys)).toEqual([keys.slice(0, 16)]);
+	expect((await Promise.all(keys.slice(16).map(key => env.BUCKET.head(key)))).filter(Boolean)).toEqual([]);
 });
 
 it('pauses missing keys after eight attempts and includes them in diagnostics', async () => {
 	await lease(['missing-key'], false);
 	for (let i = 0; i < 8; i++) { await expire(); await cleanUploadLeases(env.BUCKET, env.DB); }
 	expect(await env.DB.prepare('SELECT attempts, expires_at FROM upload_leases').first()).toEqual({ attempts: 8, expires_at: null });
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(0);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(0);
 	const diagnostics = await (await handleDiagnostics(env.DB)).json() as { pausedUploadCleanup: Array<{ storageKey: string }> };
 	expect(diagnostics.pausedUploadCleanup[0]?.storageKey).toBe('missing-key');
 });
@@ -192,7 +216,7 @@ it('does not reclaim a successful commit whose response was lost', async () => {
 	await expect(writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Note.md', 'Hello', null)).rejects.toThrow('Response lost');
 	const current = await getStoredFileRow(env.DB, 'Note.md');
 	expect(current).not.toBeNull();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(0);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(0);
 	expect(await env.BUCKET.head(current!.storageKey)).not.toBeNull();
 });
 

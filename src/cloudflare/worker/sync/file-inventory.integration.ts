@@ -42,7 +42,7 @@ it('cleans owned batches using primary lookups among 10,000 files and protects r
 	for (const object of objects) await env.BUCKET.put(object.storageKey, 'x');
 	const { id } = await trackUploadLease(env.DB, objects);
 	await env.DB.prepare('UPDATE upload_leases SET expires_at = 1 WHERE id = ?').bind(id).run();
-	expect(await cleanUploadLeases(env.BUCKET, env.DB)).toBe(3);
+	expect((await cleanUploadLeases(env.BUCKET, env.DB)).finished).toBe(3);
 	expect(await env.BUCKET.head('key-1')).not.toBeNull();
 	expect(await env.BUCKET.head('retained')).not.toBeNull();
 	expect(await env.BUCKET.head('obsolete')).toBeNull();

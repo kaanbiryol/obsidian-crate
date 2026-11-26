@@ -47,7 +47,11 @@ export async function runScheduledMaintenance(env: Env, { firstPass = true }: { 
 		['prune folder labels', async () => { if (firstPass) await pruneFolderLabels(db).run(); }],
 		// Sessions exist only on a self-hosted server whose raised limit accepts them, so others make no R2 call.
 		...__CRATE_SELF_HOSTED__ ? [['abort expired upload sessions', bounded(async () => maxFileBytes(env) > MAX_FILE_SIZE_BYTES && await abortExpiredUploadSessions(env.BUCKET))] as [string, () => Promise<unknown>]] : [],
-		['clean unfinished uploads', async () => { removedObjects += await cleanUploadLeases(env.BUCKET, db); }],
+		['clean unfinished uploads', bounded(async () => {
+			const { finished, more } = await cleanUploadLeases(env.BUCKET, db);
+			removedObjects += finished;
+			return more;
+		})],
 	];
 	for (const [name, task] of tasks) {
 		try {

@@ -6,7 +6,9 @@ import { applySchema } from '../test-support/schema-test-harness';
 import { runScheduledMaintenance } from './run';
 import { runMaintenanceEpisode } from './lifecycle';
 import { installD1QueryCounter } from '../test-support/d1-query-test-harness';
-import { D1_QUERIES_PER_INVOCATION } from '../d1/platform-limits';
+import { D1_QUERIES_PER_INVOCATION, SUBREQUESTS_PER_INVOCATION } from '../d1/platform-limits';
+import { installStorageCostMeter } from '../test-support/storage-cost-test-harness';
+import { trackUploadLease } from '../sync/staging/upload-leases';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -82,4 +84,43 @@ it('drains thousands of expired versions within bounded passes and keeps referen
 		const plan = await (sql.includes('?') ? statement.bind(500) : statement).all<{ detail: string }>();
 		expect(plan.results.map(row => row.detail)).toEqual(['SCAN object_cleanup_queue']);
 	}
+}, 60_000);
+
+it('keeps a whole pass with expired full batch leases within the subrequest limit', async () => {
+	// Every task that can make a request has work: Reading recovery, expired versions, queued
+	// cleanup and two expired leases of a full 32-file batch each, all of them unreferenced.
+	const versions = Array.from({ length: 500 }, (_, i) => ({ storageKey: `version-${i}`, path: `notes/${i}.md` }));
+	await env.DB.batch([
+		env.DB.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, kept_at)
+			SELECT json_extract(value, '$.storageKey'), json_extract(value, '$.path'), 'hash', 1, 'replaced', 0 FROM json_each(?)`)
+			.bind(JSON.stringify(versions)),
+		env.DB.prepare("INSERT INTO object_cleanup_queue (storage_key, file_path) VALUES ('queued', 'notes/queued.md')"),
+		env.DB.prepare("INSERT INTO reading_policy (id, enabled, folder_path, generation, revision) VALUES (1, 1, 'Reading', 'g', 'r')"),
+	]);
+	const leased: string[] = [];
+	for (let lease = 0; lease < 2; lease++) {
+		const keys = Array.from({ length: 32 }, (_, i) => `lease-${lease}-${i}`);
+		await trackUploadLease(env.DB, keys.map(key => ({ storageKey: key, path: `${key}.md` })));
+		await Promise.all(keys.map(key => env.BUCKET.put(key, 'bytes')));
+		leased.push(...keys);
+	}
+	await env.DB.prepare('UPDATE upload_leases SET expires_at = 0').run();
+
+	const values = new Map<string, unknown>();
+	const setAlarm = vi.fn();
+	const state = { storage: { get: async (key: string) => values.get(key),
+		put: async (key: string, value: unknown) => { values.set(key, value); }, setAlarm } } as never;
+	const meter = await installStorageCostMeter();
+	try {
+		let passes = 0;
+		do {
+			passes++;
+			setAlarm.mockClear();
+			const { cost } = await meter.measure(() => runMaintenanceEpisode(state, env), { alarms: false });
+			expect(cost.queries + cost.r2Calls + cost.durableObjectRequests).toBeLessThanOrEqual(SUBREQUESTS_PER_INVOCATION);
+		} while (setAlarm.mock.calls.length && passes < 10);
+	} finally { await meter.restore(); }
+	// The passes still finish every lease.
+	expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM upload_leases').first()).toEqual({ n: 0 });
+	expect((await Promise.all(leased.map(key => env.BUCKET.head(key)))).filter(Boolean)).toEqual([]);
 }, 60_000);

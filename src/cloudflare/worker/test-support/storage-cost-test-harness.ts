@@ -9,7 +9,10 @@ interface StorageCost {
 	statements: number;
 	rowsRead: number;
 	rowsWritten: number;
+	/** R2 objects by method; `delete` counts each key of a multi-key delete. */
 	r2: Record<'get' | 'head' | 'put' | 'delete' | 'list', number>;
+	/** R2 method calls, each one subrequest whatever its key count. */
+	r2Calls: number;
 	durableObjectRequests: number;
 	alarms: number;
 }
@@ -25,7 +28,7 @@ export interface StorageCostMeter {
 
 type Method = (...args: never[]) => unknown;
 const emptyCost = (): StorageCost => ({ queries: 0, statements: 0, rowsRead: 0, rowsWritten: 0,
-	r2: { get: 0, head: 0, put: 0, delete: 0, list: 0 }, durableObjectRequests: 0, alarms: 0 });
+	r2: { get: 0, head: 0, put: 0, delete: 0, list: 0 }, r2Calls: 0, durableObjectRequests: 0, alarms: 0 });
 
 function billed(result: unknown): { read: number; written: number } {
 	const meta = (result as { meta?: { rows_read?: number; rows_written?: number } } | null)?.meta;
@@ -81,7 +84,10 @@ export async function installStorageCostMeter(): Promise<StorageCostMeter> {
 	const bucket = Object.getPrototypeOf(env.BUCKET) as object;
 	for (const name of ['get', 'head', 'put', 'delete', 'list'] as const) {
 		patch(bucket, name, original => function (this: unknown, ...args: never[]) {
-			if (active) active.r2[name] += name === 'delete' && Array.isArray(args[0]) ? (args[0] as unknown[]).length : 1;
+			if (active) {
+				active.r2[name] += name === 'delete' && Array.isArray(args[0]) ? (args[0] as unknown[]).length : 1;
+				active.r2Calls++;
+			}
 			return original.apply(this, args);
 		});
 	}
