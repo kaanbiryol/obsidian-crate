@@ -72,7 +72,9 @@ it('does not start while an upgrade backup is in progress', async () => {
 });
 
 it('resumes bounded deletion, revokes old devices and grants, and never repeats a completed wipe', async () => {
-	const readingTables = ['reading_policy', 'reading_items', 'note_terms', 'reading_jobs', 'operations', 'grants', 'reading_captures'];
+	const readingTables = ['reading_policy', 'reading_jobs', 'operations', 'grants', 'reading_captures'];
+	// The index can be large, so the sliced wipe removes it after the reset begins.
+	const readingIndexTables = ['reading_items', 'note_terms'];
 	await env.DB.batch([
 		env.DB.prepare("INSERT INTO reading_policy(id,enabled,folder_path,generation,revision) VALUES (1,1,'Reading','reading-generation','revision')"),
 		env.DB.prepare("INSERT INTO reading_items(portable_path,path,storage_key,hash,size,metadata_json) VALUES ('reading/private.md','Reading/private.md','r','hash',1,'private metadata')"),
@@ -99,13 +101,15 @@ it('resumes bounded deletion, revokes old devices and grants, and never repeats 
 	// Every schedule stops in the reset's own transaction.
 	expect(await env.DB.prepare('SELECT 1 FROM reminder_projections WHERE due_at IS NOT NULL').first()).toBeNull();
 	for (const table of readingTables) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
+	// Nothing writes the index without its policy, so the sliced wipe removes it.
+	expect(await env.DB.prepare('SELECT 1 FROM reading_items').first()).not.toBeNull();
 	expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 	for (const token of ['original', 'other', 'web']) expect((await request('/health', token)).status).toBe(401);
 	for (const path of ['/sync/manifest', '/encryption/pairing', '/auth/tokens']) expect((await request(path, nextToken)).status).toBe(423);
 	expect((await request(`/encryption/reset?id=${id}`, nextToken)).status).toBe(200);
 	expect(await env.DB.prepare('SELECT 1 FROM grants UNION SELECT 1 FROM push_subscriptions UNION SELECT 1 FROM server_state WHERE settings IS NOT NULL').first()).toBeNull();
 	await finish();
-	for (const table of readingTables) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
+	for (const table of [...readingTables, ...readingIndexTables]) expect(await env.DB.prepare(`SELECT 1 FROM ${table}`).first()).toBeNull();
 	expect(await readEncryptionState(env.DB)).toBeNull();
 	expect(await env.DB.prepare('SELECT reset_generation AS value FROM server_state WHERE id = 1').first()).toEqual({ value: id });
 	expect((await env.BUCKET.list()).objects).toHaveLength(0);

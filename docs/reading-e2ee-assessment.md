@@ -8,7 +8,7 @@ When vault encryption is enabled, Reading notes are encrypted with the vault key
 - The PWA uses the same recovery code as Obsidian to open the encrypted key bundle locally, remembers the vault keys, decrypts and indexes notes locally, and publishes conditional encrypted note replacements. It supports article viewing, search, favorites, archive, tags, highlights, offline article caching and queued offline edits.
 - Browser library, article, draft, outbox and immutable retry records are encrypted. Queued edits retain their exact encrypted requests after a lost response. Recovery preserves damaged records and exports wrapped local-key metadata; explicit logout clears both Reading and Reminders keys and data, while fencing newer enrollments.
 - Turning encryption on deletes the server copy, including Reading notes, retained versions, queued captures, operation receipts, derived indexes, extraction jobs and handoffs, then uploads the enabling device's vault encrypted. It refuses to start while saved links are still downloading on the server.
-- Destructive encryption reset deletes all seven Reading tables, including enrollment and handoff grants, at the start and completion of the reset.
+- Destructive encryption reset deletes the Reading policy, extraction jobs, queued captures, Reading receipts and every grant, including enrollment and handoff grants, when it starts, so nothing can publish into the old library. The derived index (items, search terms, highlights and tags) can hold millions of rows, so the reset removes it in bounded passes first, before any other table, and deletes every Reading table again on completion.
 
 ## Saving articles
 

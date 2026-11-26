@@ -12,7 +12,7 @@ import { sha256Hex } from '../../../platform/sha256';
 import { MAINTENANCE_DELETE_LIMIT, putMaintenanceValue, readMaintenanceValue } from '../d1/db';
 import { saveServerState } from '../d1/server-state';
 import { R2_KEYS_PER_CALL } from '../d1/platform-limits';
-import { ENCRYPTION_RESET_TABLES, READING_TABLES, WIPED_TABLE_KEYS } from './reset-tables';
+import { ENCRYPTION_RESET_TABLES, READING_POLICY_TABLES, WIPED_TABLE_KEYS } from './reset-tables';
 
 const PREFIX = 'encryption-reset:';
 // Marks a reset that turns encryption on: completion activates the saved state instead of removing it.
@@ -104,8 +104,9 @@ export async function handleEncryptionReset(request: Request, env: Env, principa
 		// The shared settings belong to the old mode and keys.
 		env.DB.prepare('UPDATE server_state SET settings = NULL, settings_version = NULL WHERE id = 1'),
 		// Invalidate the Reading generation and receipts in the same transaction as
-		// device revocation. Late extraction cannot publish into a replacement policy.
-		...READING_TABLES.map(table => env.DB.prepare(`DELETE FROM ${table}`)),
+		// device revocation. Late extraction cannot publish into a replacement policy. The
+		// index tables can hold millions of rows, so the sliced wipe removes them.
+		...READING_POLICY_TABLES.map(table => env.DB.prepare(`DELETE FROM ${table}`)),
 		env.DB.prepare("DELETE FROM operations WHERE kind = 'reading'"),
 		env.DB.prepare("DELETE FROM operation_chunks WHERE kind = 'reading'"),
 		// Unschedule every reminder in the same transaction, so the dispatcher sends nothing

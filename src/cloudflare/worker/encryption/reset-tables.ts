@@ -1,6 +1,10 @@
 /** Reading state an encryption reset removes when it begins, so late extraction cannot
- * publish into the replacement policy. */
-export const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 'highlight_index', 'reading_tags', 'reading_tag_counts', 'reading_jobs', 'reading_captures'] as const;
+ * publish into the replacement policy. Every index write requires the policy row, and each
+ * of these tables is small. */
+export const READING_POLICY_TABLES = ['reading_policy', 'reading_jobs', 'reading_captures'] as const;
+/** The Reading index grows with the library, so the sliced wipe removes it. Without a policy
+ * nothing writes it, and while resetting no request can read it. */
+const READING_INDEX_TABLES = ['reading_items', 'note_terms', 'highlight_index', 'reading_tags', 'reading_tag_counts'] as const;
 
 /**
  * What an encryption reset does with every table in schema.sql. Completion empties
@@ -9,10 +13,12 @@ export const READING_TABLES = ['reading_policy', 'reading_items', 'note_terms', 
  * content. reset-tables.test.ts fails when schema.sql gains a table not listed here.
  */
 export const ENCRYPTION_RESET_TABLES = {
-	wiped: ['files', 'file_versions', 'history_checkpoints', 'changelog', 'operations', 'operation_chunks',
+	// The sliced wipe empties tables in this order. The Reading index goes first, because
+	// the reset leaves it in place when it begins.
+	wiped: [...READING_INDEX_TABLES, 'files', 'file_versions', 'history_checkpoints', 'changelog', 'operations', 'operation_chunks',
 		'reminder_file_cache', 'reminder_identities', 'reminder_occurrences', 'reminder_sources', 'reminder_source_state',
 		'reminder_projections', 'notification_projection_jobs', 'notification_file_retries', 'notification_policy',
-		'grants', 'push_subscriptions', ...READING_TABLES],
+		'grants', 'push_subscriptions', ...READING_POLICY_TABLES],
 	custom: ['auth_tokens', 'maintenance_state', 'server_state', 'upload_leases'],
 	kept: ['crate_migrations', 'crate_release', 'crate_schema', 'object_cleanup_queue', 'request_rate_limits', 'vapid_keys'],
 } as const;
