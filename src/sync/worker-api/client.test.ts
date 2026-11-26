@@ -312,6 +312,7 @@ describe('SyncApiClient', () => {
 		await expect(client.testConnection()).resolves.toEqual({
 			success: false,
 			error: 'HTTP 500: boom',
+			status: 500,
 		});
 	});
 

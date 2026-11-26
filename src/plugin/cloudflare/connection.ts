@@ -8,6 +8,7 @@ import { createLogger } from '../../sync/logger';
 import { errorMessage } from '../../platform/logger';
 import { writeSyncSettings } from '../sync-connection';
 import { confirmVaultReplacement } from '../vault-replacement';
+import { wait } from '../../cloudflare/http';
 
 const logger = createLogger('CloudflareConnection');
 
@@ -55,7 +56,18 @@ export async function configureCloudflareAuthorizedDevice(
 		await seedSharedSettings(api, plugin.settings);
 	}
 
-	return await plugin.syncRuntime.testConnection();
+	return await testNewConnection(plugin, signal);
+}
+
+/** A just-created workers.dev address can still answer 404 from some Cloudflare
+ * edges for a few seconds after its first live check, so retry only that. */
+async function testNewConnection(plugin: CratePlugin, signal: AbortSignal): Promise<ConnectionTestResult> {
+	for (let attempt = 1; ; attempt++) {
+		const result = await plugin.syncRuntime.testConnection();
+		if (result.success || result.status !== 404 || attempt >= 6) return result;
+		await wait(2000);
+		signal.throwIfAborted();
+	}
 }
 
 /** Create-only, so a device that seeded the fresh deployment first keeps its settings. */

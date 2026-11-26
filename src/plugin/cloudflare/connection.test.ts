@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { endPluginLifecycle } from '../lifecycle-state';
 import { DEFAULT_SETTINGS } from '../settings';
 import { SyncApiClient } from '../../sync/worker-api/client';
+import type { ConnectionTestResult } from '../../sync/types';
 import { configureCloudflareAuthorizedDevice } from './connection';
 
 // An unencrypted server, so a test can send the seeding request through the real client.
@@ -30,7 +31,7 @@ function plugin() {
 			applyInfrastructureConfig: vi.fn(async () => {}),
 			updateSyncSettings: vi.fn(),
 			pushSharedSettingsBestEffort: vi.fn(),
-			testConnection: vi.fn(async () => ({ success: true })),
+			testConnection: vi.fn(async (): Promise<ConnectionTestResult> => ({ success: true })),
 		},
 	};
 }
@@ -187,4 +188,38 @@ it('joins a restored server with files without asking, so the first sync merges'
 	expect(confirm).not.toHaveBeenCalled();
 	expect(owner.syncRuntime.applyInfrastructureConfig).toHaveBeenCalledExactlyOnceWith(
 		{ workerUrl: 'https://crate-restored.example.workers.dev', authToken: 'token' }, expect.any(AbortSignal));
+});
+
+it('retries the connection test while a new server address still answers 404', async () => {
+	vi.useFakeTimers();
+	vi.stubGlobal('window', { setTimeout, clearTimeout });
+	try {
+		const owner = plugin();
+		owner.syncRuntime.testConnection
+			.mockResolvedValueOnce({ success: false, error: 'HTTP 404: There is nothing here yet', status: 404 })
+			.mockResolvedValueOnce({ success: false, error: 'HTTP 404: There is nothing here yet', status: 404 });
+		const connecting = configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token');
+		await vi.advanceTimersByTimeAsync(4000);
+		await expect(connecting).resolves.toEqual({ success: true });
+		expect(owner.syncRuntime.testConnection).toHaveBeenCalledTimes(3);
+	} finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});
+
+it('reports a lasting 404 after a bounded wait and does not retry other failures', async () => {
+	vi.useFakeTimers();
+	vi.stubGlobal('window', { setTimeout, clearTimeout });
+	try {
+		const owner = plugin();
+		const missing = { success: false, error: 'HTTP 404: There is nothing here yet', status: 404 };
+		owner.syncRuntime.testConnection.mockResolvedValue(missing);
+		const connecting = configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token');
+		await vi.advanceTimersByTimeAsync(10_000);
+		await expect(connecting).resolves.toEqual(missing);
+		expect(owner.syncRuntime.testConnection).toHaveBeenCalledTimes(6);
+
+		const unauthorized = { success: false, error: 'Unauthorized', status: 401 };
+		owner.syncRuntime.testConnection.mockClear().mockResolvedValue(unauthorized);
+		await expect(configureCloudflareAuthorizedDevice(owner as never, 'https://crate.example.workers.dev', 'token')).resolves.toEqual(unauthorized);
+		expect(owner.syncRuntime.testConnection).toHaveBeenCalledOnce();
+	} finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
 });

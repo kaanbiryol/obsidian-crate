@@ -163,6 +163,7 @@ export class SyncWorkerApi {
 			return {
 				success: false,
 				error: errorMessage(error),
+				...(error instanceof HttpError ? { status: error.status } : {}),
 			};
 		}
 	}

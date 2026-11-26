@@ -3,6 +3,8 @@ export interface ConnectionTestResult {
 	success: boolean;
 	error?: string;
 	code?: 'incompatible_protocol';
+	/** The HTTP status of a failed request, when the server answered. */
+	status?: number;
 }
 
 type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
