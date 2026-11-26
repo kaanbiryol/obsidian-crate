@@ -34,6 +34,30 @@ it('shares one download per image and revokes unused URLs past the idle limit', 
 	expect(fetchImage).toHaveBeenCalledTimes(3);
 });
 
+it('revokes unused URLs once held images pass the byte limit, never ones still shown', async () => {
+	const sizes: Record<string, number> = { 'a.png': 6, 'b.png': 6, 'c.png': 20 };
+	const fetchImage = vi.fn(async (path: string) => new Blob(['x'.repeat(sizes[path]!)]));
+	const urls = createImageUrls(fetchImage, 60, 10);
+	const a = new AbortController(), b = new AbortController(), c = new AbortController();
+	expect(await urls.load('a.png', a.signal)).toBe('blob:1');
+	a.abort(); await settle();
+	expect(revoked).toEqual([]);
+	// A shown image that passes the limit pushes out the unused one, though the count limit holds.
+	expect(await urls.load('b.png', b.signal)).toBe('blob:2');
+	await settle();
+	expect(revoked).toEqual(['blob:1']);
+	// Shown images stay whatever their size; once unused, the oldest go until the rest fit.
+	expect(await urls.load('c.png', c.signal)).toBe('blob:3');
+	await settle();
+	expect(revoked).toEqual(['blob:1']);
+	c.abort(); await settle();
+	expect(revoked).toEqual(['blob:1', 'blob:3']);
+	b.abort(); await settle();
+	expect(revoked).toEqual(['blob:1', 'blob:3']);
+	expect(await urls.load('b.png', new AbortController().signal)).toBe('blob:2');
+	expect(fetchImage).toHaveBeenCalledTimes(3);
+});
+
 it('cancels a download every view stopped waiting for, but not one reloaded in the same commit', async () => {
 	let finish!: () => void;
 	const signals: AbortSignal[] = [];
@@ -57,4 +81,15 @@ it('revokes every URL when cleared', async () => {
 	await urls.load('a.png', new AbortController().signal);
 	urls.clear(); await settle();
 	expect(revoked).toEqual(['blob:1']);
+});
+
+it('starts no download for a view that is already gone', async () => {
+	const fetchImage = vi.fn(async () => new Blob(['x']));
+	const urls = createImageUrls(fetchImage);
+	const gone = new AbortController();
+	gone.abort();
+	expect(await urls.load('a.png', gone.signal)).toBeNull();
+	await settle();
+	expect(fetchImage).not.toHaveBeenCalled();
+	expect(next).toBe(0);
 });

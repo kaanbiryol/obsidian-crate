@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { mapBounded } from '@/platform/map-bounded';
 import { READING_IMAGE_PATH_ATTRIBUTE } from './reading-content';
+
+/** Images of one article loading at once, so a long article does not fetch and decode all of them together. */
+const IMAGE_LOADS = 4;
 
 /** How a host shows images: whether web images load, and a loader returning a URL for a vault image. */
 export interface ReadingImageLoader {
@@ -22,7 +26,9 @@ export function useReadingImages(content: DocumentFragment | null, host: Reading
 		if (!load || !paths.length) return;
 		const controller = new AbortController();
 		// One update once every image settles, so the article and its highlights repaint once.
-		void Promise.all(paths.map(async path => [path, await load(path, controller.signal).catch(() => null)] as const)).then(results => {
+		void mapBounded(paths, IMAGE_LOADS, async path => [path, controller.signal.aborted ? null
+			// A closed article starts no more loads.
+			: await load(path, controller.signal).catch(() => null)] as const).then(results => {
 			if (controller.signal.aborted) return;
 			setLoaded({ content, urls: new Map(results.filter((entry): entry is [string, string] => entry[1] !== null)) });
 		});
