@@ -30,14 +30,16 @@ export const MAINTENANCE_DELETE_LIMIT = 5000;
 /** Deletes the expired rows at the start of the changelog in sequence order, so the
  * retained changelog stays contiguous. Entries are written in sequence order, so the
  * walk stops at the first one still retained and needs no index on `created_at`.
- * Returns true when more rows may remain. */
+ * Each pass reads only the first `MAINTENANCE_DELETE_LIMIT` rows, however long the
+ * expired backlog is, and never deletes the newest row. Returns true when more rows may remain. */
 export async function pruneChangelog(db: D1Database): Promise<boolean> {
 	// A statement that runs earlier sees an earlier clock, so it selects a subset of these rows.
-	const expired: SqlGuard<unknown> = { sql: `SELECT seq FROM changelog
-			WHERE seq < COALESCE((SELECT seq FROM changelog WHERE created_at >= datetime('now', '-' || ? || ' days') ORDER BY seq LIMIT 1),
-				(SELECT MAX(seq) FROM changelog))
-			AND seq < (SELECT MAX(seq) FROM changelog) ORDER BY seq LIMIT ?`, args: [CHANGELOG_RETENTION_DAYS, MAINTENANCE_DELETE_LIMIT] };
-	return changedRows(await db.prepare(`DELETE FROM changelog WHERE seq IN (${expired.sql})`).bind(...expired.args).run()) === MAINTENANCE_DELETE_LIMIT;
+	// The first retained row in the window, or the row after the window when all of it expired.
+	const result = await db.prepare(`DELETE FROM changelog
+		WHERE seq < (SELECT COALESCE(MIN(CASE WHEN created_at >= datetime('now', '-' || ? || ' days') THEN seq END), MAX(seq) + 1)
+			FROM (SELECT seq, created_at FROM changelog ORDER BY seq LIMIT ?))
+		AND seq < (SELECT MAX(seq) FROM changelog)`).bind(CHANGELOG_RETENTION_DAYS, MAINTENANCE_DELETE_LIMIT).run();
+	return changedRows(result) === MAINTENANCE_DELETE_LIMIT;
 }
 
 /** The stored value for `key`, or null when no row exists. */

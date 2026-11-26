@@ -9,6 +9,7 @@ import { MAINTENANCE_DELETE_LIMIT, pruneChangelog } from './d1/db';
 import { armReminderDispatcher } from './coordinator/coordinator';
 import type { Env } from './types';
 import { handleListReminders } from './reminders/handlers/list';
+import { installStorageCostMeter } from './test-support/storage-cost-test-harness';
 import {
 	FileVersionConflictError,
 	readCommittedMarkdownFileVersion,
@@ -272,6 +273,28 @@ describe('Cloudflare runtime integration', () => {
 		expect(await pruneChangelog(runtimeEnv.DB)).toBe(false);
 		expect((await runtimeEnv.DB.prepare('SELECT COUNT(*) AS rows FROM changelog').first<{ rows: number }>())?.rows).toBe(1);
 	});
+
+	it('reads a bounded window per pass however long the expired changelog is', async () => {
+		const expired = MAINTENANCE_DELETE_LIMIT * 8;
+		await runtimeEnv.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < ?)
+			INSERT INTO changelog (path, action, created_at) SELECT 'n'||x, 'put', datetime('now', '-60 days', '+'||x||' seconds') FROM n`).bind(expired).run();
+		await runtimeEnv.DB.prepare("INSERT INTO changelog (path, action) VALUES ('kept-1.md', 'put'), ('kept-2.md', 'put')").run();
+		const meter = await installStorageCostMeter();
+		try {
+			const reads: number[] = [];
+			let more = true;
+			while (more) {
+				const { result, cost } = await meter.measure(() => pruneChangelog(runtimeEnv.DB), { alarms: false });
+				more = result;
+				reads.push(cost.rowsRead);
+			}
+			expect(reads).toHaveLength(9);
+			// The first pass used to walk the whole expired backlog to find where it ends.
+			expect(Math.max(...reads)).toBeLessThanOrEqual(MAINTENANCE_DELETE_LIMIT * 4);
+		} finally { await meter.restore(); }
+		const retained = await runtimeEnv.DB.prepare('SELECT path FROM changelog ORDER BY seq').all<{ path: string }>();
+		expect(retained.results.map(row => row.path)).toEqual(['kept-1.md', 'kept-2.md']);
+	}, 60_000);
 
 	it('fences an unprojected schedule on the real dispatcher Durable Object', async () => {
 		const reminderId = 'runtime-reminder';
