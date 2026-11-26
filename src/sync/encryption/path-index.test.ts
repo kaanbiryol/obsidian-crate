@@ -3,7 +3,7 @@ import { PathTags } from '../../encryption/path-tags';
 import { PathIndex, type WireStore } from './path-index';
 
 const vaultId = '0b8e2f9c-4c7a-4d3e-9a51-2f6c1d8e7b40';
-const secret = { id: 'b4d0c0de-0000-4000-8000-000000000001', secret: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8' };
+const secret = { id: 'b4d0c0de-0000-4000-8000-000000000001', secret: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8' }; // gitleaks:allow synthetic test secret
 const tags = () => PathTags.fromSecret(vaultId, secret);
 
 const store = (paths: string[], wires: Record<string, string> = {}): WireStore => ({
