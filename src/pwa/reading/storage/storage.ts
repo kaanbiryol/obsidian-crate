@@ -6,7 +6,7 @@ import { abortTransaction } from '../../storage/abort-transaction';
 import { clearSessionStore } from '../../storage/clear-session-store';
 import { readingDatabase, readReadingValue, writeReadingValue } from './database';
 import { assertReadingSession, READING_CHANGED_EVENT, READING_SESSION_KEY, type ReadingSession } from '../session/session';
-import { readingKeys, isPendingReadingKey, isArticleImageReadingKey, isArticleItemReadingKey } from './storage-keys';
+import { readingKeys, readingKeyRange, isArticleImageReadingKey, isArticleItemReadingKey } from './storage-keys';
 import { exportWrappedLocalKeys } from '../../encryption/encryption-keys';
 
 export { readReadingArticle, removeEarlierSessionCopies, cacheReadingArticle, removeReadingArticle, readOfflineReadingItems, offlineReadingImagePaths, readOfflineReadingImage, type ReadingCache, type OfflineReadingImages } from './cache';
@@ -36,8 +36,7 @@ export function readReadingShare(id: string): Promise<ReadingDraft | undefined> 
 export async function newestReadingShare(): Promise<{ id: string; url: string } | undefined> {
 	const db = await readingDatabase();
 	let newest: { id: string; url: string; savedAt: number } | undefined;
-	for (const key of await db.getAllKeys('values')) {
-		if (!key.startsWith(readingKeys.share(''))) continue;
+	for (const key of await db.getAllKeys('values', readingKeyRange(readingKeys.share('')))) {
 		const share: (ReadingDraft & { savedAt?: unknown }) | undefined = await readDraft(key).catch(() => undefined);
 		const savedAt = typeof share?.savedAt === 'number' ? share.savedAt : 0;
 		if (share && (!newest || savedAt > newest.savedAt)) newest = { id: key.slice(readingKeys.share('').length), url: share.url, savedAt };
@@ -59,8 +58,8 @@ export function writeReadingAttempt(session: ReadingSession, id: string, attempt
 
 export async function hasEarlierReadingChanges(sessionId?: string): Promise<boolean> {
 	const db = await readingDatabase();
-	for (const key of await db.getAllKeys('values')) {
-		if (!isPendingReadingKey(key) || (sessionId !== undefined && key === readingKeys.pending(sessionId))) continue;
+	for (const key of await db.getAllKeys('values', readingKeyRange(readingKeys.pending('')))) {
+		if (sessionId !== undefined && key === readingKeys.pending(sessionId)) continue;
 		let value: unknown;
 		try { value = decodeReadingValue(key, await db.get('values', key)); } catch { return true; }
 		if (!Array.isArray(value) || value.length) return true;
@@ -72,8 +71,8 @@ export async function hasEarlierReadingChanges(sessionId?: string): Promise<bool
 export async function earlierReadingChanges(sessionId?: string): Promise<Array<[string, unknown]>> {
 	const db = await readingDatabase();
 	const changes: Array<[string, unknown]> = [];
-	for (const key of await db.getAllKeys('values')) {
-		if (!isPendingReadingKey(key) || (sessionId !== undefined && key === readingKeys.pending(sessionId))) continue;
+	for (const key of await db.getAllKeys('values', readingKeyRange(readingKeys.pending('')))) {
+		if (sessionId !== undefined && key === readingKeys.pending(sessionId)) continue;
 		let value: unknown;
 		try { value = await readReadingValue(key); } catch { value = await db.get('values', key); }
 		changes.push([key, value]);
@@ -90,7 +89,7 @@ export function removeEarlierReadingChanges(sessionId: string | undefined, revie
 		const attempts = changes.map(([key]) => readingKeys.attemptPrefix(key.slice(readingKeys.pending('').length)));
 		try {
 			for (const [key] of changes) await tx.store.delete(key);
-			for (const key of await tx.store.getAllKeys()) if (attempts.some(prefix => key.startsWith(prefix))) await tx.store.delete(key);
+			for (const prefix of attempts) await tx.store.delete(readingKeyRange(prefix));
 			await tx.done;
 		} catch (error) { await abortTransaction(tx); throw error; }
 		return true;
@@ -115,7 +114,7 @@ export function adoptEarlierReadingCaptures(session: ReadingSession): Promise<vo
 	const sameFolder = (key: string) => key !== own && key.startsWith(readingKeys.pending('reminders:')) && key.endsWith(`:${session.generation}`);
 	return readingLock(async () => {
 		const db = await readingDatabase();
-		const earlier = (await db.getAllKeys('values')).filter(sameFolder);
+		const earlier = (await db.getAllKeys('values', readingKeyRange(readingKeys.pending('reminders:')))).filter(sameFolder);
 		if (!earlier.length) return;
 		const queue = await pendingReading(session);
 		const remaining = new Map<string, PendingReading[]>();
@@ -190,7 +189,7 @@ export async function pruneReadingAttempts(session: ReadingSession): Promise<voi
 	const db = await readingDatabase(); assertReadingSession(session);
 	const prefix = readingKeys.attemptPrefix(session.id), tx = db.transaction('values', 'readwrite');
 	try {
-		for (const key of await tx.store.getAllKeys()) if (key.startsWith(prefix) && !retained.has(key.slice(prefix.length))) await tx.store.delete(key);
+		for (const key of await tx.store.getAllKeys(readingKeyRange(prefix))) if (!retained.has(key.slice(prefix.length))) await tx.store.delete(key);
 		assertReadingSession(session); await tx.done;
 	} catch (error) { await abortTransaction(tx); throw error; }
 }

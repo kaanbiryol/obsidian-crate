@@ -4,23 +4,34 @@ import { cacheReadingArticle, offlineReadingImagePaths, readOfflineReadingImage,
 import { decodeReadingValue } from './private-storage';
 import { READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { AUTH_TOKEN_KEY } from '../../config';
+import { fakeKeyRange, type FakeKeyRange } from '@/test/fakes/key-range';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('./private-storage', async importOriginal => {
 	const actual = await importOriginal<typeof import('./private-storage')>();
 	return { ...actual, decodeReadingValue: vi.fn(actual.decodeReadingValue) };
 });
-vi.mock('../../storage/single-store-database', () => ({ openSingleStoreDatabase: async () => ({
-	get: async (_store: string, key: string) => values.get(key),
-	getAllKeys: async () => [...values.keys()],
-	transaction: () => ({
-		store: {
-			getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key),
-			put: async (value: unknown, key: string) => { values.set(key, value); }, delete: async (key: string) => { values.delete(key); },
-		},
-		done: Promise.resolve(),
-	}),
-}) }));
+// Lookups go by key range: a whole-store key scan fails, and `get` calls are counted.
+const gets = vi.hoisted(() => ({ count: 0 }));
+vi.mock('../../storage/single-store-database', async () => {
+	const { keysInRange } = await import('@/test/fakes/key-range');
+	return { openSingleStoreDatabase: async () => ({
+		get: async (_store: string, key: string) => values.get(key),
+		getAllKeys: async (_store: string, range?: FakeKeyRange) => keysInRange(values.keys(), range),
+		transaction: () => ({
+			store: {
+				getAllKeys: async (range?: FakeKeyRange) => keysInRange(values.keys(), range),
+				getAll: async (range?: FakeKeyRange) => keysInRange(values.keys(), range).map(key => values.get(key)),
+				get: async (key: string) => { gets.count++; return values.get(key); },
+				put: async (value: unknown, key: string) => { values.set(key, value); },
+				delete: async (key: string | FakeKeyRange) => {
+					for (const stored of typeof key === 'string' ? [key] : keysInRange(values.keys(), key)) values.delete(stored);
+				},
+			},
+			done: Promise.resolve(),
+		}),
+	}) };
+});
 
 const session: ReadingSession = { id: 'session', token: 'token', generation: 'generation', folderPath: 'Reading', expiresAt: 1 };
 const item = (n: number, changes: Partial<ReadingItem> = {}): ReadingItem => ({ crate_reading_version: 1, crate_reading_id: `12345678-1234-4123-8123-${String(n).padStart(12, '0')}`,
@@ -30,7 +41,8 @@ const articleKeys = () => [...values.keys()].filter(key => key.startsWith('artic
 const articleKey = (n: number) => `article:${session.id}:${item(n).crate_reading_id}`;
 
 beforeEach(() => {
-	values.clear(); vi.mocked(decodeReadingValue).mockClear();
+	values.clear(); vi.mocked(decodeReadingValue).mockClear(); gets.count = 0;
+	vi.stubGlobal('IDBKeyRange', fakeKeyRange);
 	vi.stubGlobal('localStorage', { getItem: (key: string) => key === READING_SESSION_KEY ? JSON.stringify(session) : key === AUTH_TOKEN_KEY ? session.token : null });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
@@ -68,11 +80,26 @@ it('lists saved copies from their items without reading their bodies', async () 
 	await cacheReadingArticle(session, item(1, { saved_at: '2026-10-01T12:00:00Z' }), 'One');
 	await cacheReadingArticle(session, item(2, { saved_at: '2026-10-03T12:00:00Z' }), 'Two');
 	await cacheReadingArticle(session, item(3, { saved_at: '2026-10-02T12:00:00Z' }), 'Three');
-	vi.mocked(decodeReadingValue).mockClear();
+	vi.mocked(decodeReadingValue).mockClear(); gets.count = 0;
 
 	expect((await readOfflineReadingItems(session)).map(entry => entry.title)).toEqual(['Article 2', 'Article 3', 'Article 1']);
 	const decoded = vi.mocked(decodeReadingValue).mock.calls.map(([key]) => key);
 	expect(decoded.some(key => key.startsWith('article:'))).toBe(false);
+	// The items are read together by key range, not one `get` per copy.
+	expect(gets.count).toBe(0);
+});
+
+it('reads only the keys of the namespace it asks for', async () => {
+	const id = item(1).crate_reading_id;
+	await cacheReadingArticle(session, item(1), 'One');
+	// Neighbours of the copy's prefixes in key order, which a prefix range must exclude.
+	values.set(`article:${session.id};`, 'after the prefix');
+	values.set(`article-image:${session.id}:${id}x:Reading/x.png`, { type: 'image/png', data: '' });
+	values.set(`article-item:${session.id}`, 'no separator');
+	expect(await offlineReadingImagePaths(session, id)).toEqual(new Set());
+	expect((await readOfflineReadingItems(session)).map(entry => entry.crate_reading_id)).toEqual([id]);
+	await removeReadingArticle(session, id);
+	expect([...values.keys()].sort()).toEqual([`article-image:${session.id}:${id}x:Reading/x.png`, `article-item:${session.id}`, `article:${session.id};`].sort());
 });
 
 it('removes an earlier sign-in\'s items with its copies, and items whose copy is gone', async () => {

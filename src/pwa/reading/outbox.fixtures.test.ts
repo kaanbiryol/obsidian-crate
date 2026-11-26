@@ -15,13 +15,15 @@ import { testFrozenFixtures } from '@/test/frozen-fixtures';
 import { pendingReading, savePendingReading } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import type { PendingReading } from './outbox';
+import type { FakeKeyRange } from '@/test/fakes/key-range';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('../storage/single-store-database', () => ({ openSingleStoreDatabase: async () => ({
 	get: async (_store: string, key: string) => values.get(key),
 	put: async (_store: string, value: unknown, key: string) => { values.set(key, value); },
 	delete: async (_store: string, key: string) => { values.delete(key); },
-	getAllKeys: async () => [...values.keys()],
+	// Honors a key range as IndexedDB does; only an export reads every key.
+	getAllKeys: async (_store: string, range?: FakeKeyRange) => [...values.keys()].filter(key => !range || range.includes(key)),
 }) }));
 
 interface SavedQueue { session: ReadingSession; values: Record<string, unknown> }

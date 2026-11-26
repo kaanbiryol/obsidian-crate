@@ -8,7 +8,7 @@ import { readingDatabase, readReadingValue } from './database';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
 import { isReadingArticleCache, type ReadingArticleCache } from './storage-validation';
-import { isArticleImageReadingKey, isArticleItemReadingKey, isArticleReadingKey, readingKeys } from '@/pwa/reading/storage/storage-keys';
+import { readingKeyRange, readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { isReadingItem } from './record-validation';
 import { readingNoteFolder } from '../session/encryption-session';
 
@@ -34,7 +34,7 @@ const imagePrefix = (session: ReadingSession, id: string) => `${readingKeys.arti
 export async function offlineReadingImagePaths(session: ReadingSession, id: string): Promise<Set<string>> {
 	const db = await readingDatabase(); assertReadingSession(session);
 	const prefix = imagePrefix(session, id);
-	return new Set((await db.getAllKeys('values')).filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length)));
+	return new Set((await db.getAllKeys('values', readingKeyRange(prefix))).map(key => key.slice(prefix.length)));
 }
 
 /** An image stored with an article's offline copy, or undefined when there is none. */
@@ -71,11 +71,10 @@ export async function removeEarlierSessionCopies(session: ReadingSession): Promi
 	const tx = db.transaction('values', 'readwrite'), mine = readingKeys.articlePrefix(session.id);
 	try {
 		// `<session>:<id>` of each copy kept, and image and item keys, which go with their copy.
-		const copies: string[] = [], images: string[] = [], items: string[] = [];
-		for (const key of await tx.store.getAllKeys()) {
-			if (isArticleImageReadingKey(key)) { images.push(key.slice('article-image:'.length)); continue; }
-			if (isArticleItemReadingKey(key)) { items.push(key.slice('article-item:'.length)); continue; }
-			if (!isArticleReadingKey(key)) continue;
+		const copies: string[] = [];
+		const images = (await tx.store.getAllKeys(readingKeyRange('article-image:'))).map(key => key.slice('article-image:'.length));
+		const items = (await tx.store.getAllKeys(readingKeyRange('article-item:'))).map(key => key.slice('article-item:'.length));
+		for (const key of await tx.store.getAllKeys(readingKeyRange('article:'))) {
 			// Only earlier sessions' copies can go, so this session's are never read or decrypted.
 			if (key.startsWith(mine)) { copies.push(key.slice('article:'.length)); continue; }
 			const copy = readableCopy(key, await tx.store.get(key));
@@ -103,17 +102,18 @@ export async function readOfflineReadingItems(session: ReadingSession): Promise<
 	const db = await readingDatabase(); assertReadingSession(session);
 	const tx = db.transaction('values', 'readonly'), prefix = readingKeys.articlePrefix(session.id), items: ReadingItem[] = [];
 	const rows = readingKeys.articleItemPrefix(session.id), folder = readingNoteFolder(session);
-	const keys = await tx.store.getAllKeys(), listed = new Set(keys.filter(key => key.startsWith(rows)));
-	for (const key of keys) {
-		if (!key.startsWith(prefix)) continue;
-		const id = key.slice(prefix.length);
-		// Each copy's item is stored apart from its body, so listing never decrypts a body.
-		if (!listed.has(rows + id)) continue;
-		let item: unknown;
-		try { item = (decodeReadingValue(rows + id, await tx.store.get(rows + id)) as { item?: unknown } | null)?.item; } catch { continue; }
-		if (isReadingItem(item, folder) && item.crate_reading_id === id) items.push(item);
-	}
+	// Each copy's item is stored apart from its body, so listing never decrypts a body.
+	const [copies, keys, values] = await Promise.all([tx.store.getAllKeys(readingKeyRange(prefix)),
+		tx.store.getAllKeys(readingKeyRange(rows)), tx.store.getAll(readingKeyRange(rows))]);
 	await tx.done; assertReadingSession(session);
+	const saved = new Set(copies.map(key => key.slice(prefix.length)));
+	keys.forEach((key, index) => {
+		const id = key.slice(rows.length);
+		if (!saved.has(id)) return;
+		let item: unknown;
+		try { item = (decodeReadingValue(key, values[index]) as { item?: unknown } | null)?.item; } catch { return; }
+		if (isReadingItem(item, folder) && item.crate_reading_id === id) items.push(item);
+	});
 	return items.sort((a, b) => b.saved_at.localeCompare(a.saved_at));
 }
 
@@ -143,7 +143,7 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
 		await tx.store.put(encodeReadingValue(row, { item }), row);
 		if (images) {
 			const prefix = imagePrefix(session, item.crate_reading_id);
-			for (const stored of await tx.store.getAllKeys()) if (stored.startsWith(prefix) && !images.keep.has(stored.slice(prefix.length))) await tx.store.delete(stored);
+			for (const stored of await tx.store.getAllKeys(readingKeyRange(prefix))) if (!images.keep.has(stored.slice(prefix.length))) await tx.store.delete(stored);
 			for (const [path, image] of images.save) await tx.store.put(encodeReadingValue(`${prefix}${path}`, image), `${prefix}${path}`);
 		}
 		assertReadingSession(session);
@@ -159,8 +159,7 @@ export async function removeReadingArticle(session: ReadingSession, id: string):
 	try {
 		await tx.store.delete(`${readingKeys.articlePrefix(session.id)}${id}`);
 		await tx.store.delete(`${readingKeys.articleItemPrefix(session.id)}${id}`);
-		const images = imagePrefix(session, id);
-		for (const key of await tx.store.getAllKeys()) if (key.startsWith(images)) await tx.store.delete(key);
+		await tx.store.delete(readingKeyRange(imagePrefix(session, id)));
 		assertReadingSession(session);
 		await tx.done;
 	} catch (error) { await abortTransaction(tx); throw error; }

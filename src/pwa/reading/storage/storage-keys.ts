@@ -12,9 +12,13 @@ export const readingKeys = {
 	share: (id: string) => `share:${id}`,
 };
 
-export const isPendingReadingKey = (key: string) => key.startsWith('pending:');
-/** An offline article copy from any session. */
-export const isArticleReadingKey = (key: string) => key.startsWith('article:');
+/** Every key that starts with `prefix`, so a lookup reads only that namespace. Keys are all
+ * strings; the upper bound is the first string after the prefix's last character, excluded. */
+export function readingKeyRange(prefix: string): IDBKeyRange {
+	const next = `${prefix.slice(0, -1)}${String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)}`;
+	return IDBKeyRange.bound(prefix, next, false, true);
+}
+
 /** An image of an offline article copy from any session. */
 export const isArticleImageReadingKey = (key: string) => key.startsWith('article-image:');
 /** The library item of an offline article copy from any session. */

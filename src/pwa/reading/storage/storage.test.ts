@@ -5,6 +5,7 @@ import { adoptEarlierReadingCaptures, clearReadingData, earlierReadingChanges, e
 import { assertReadingSession, readingSession, READING_SESSION_KEY, type ReadingSession } from '../session/session';
 import { AUTH_TOKEN_KEY } from '../../config';
 import { isPendingReading, isReadingSession } from './storage-validation';
+import { fakeKeyRange, type FakeKeyRange } from '@/test/fakes/key-range';
 
 const values = vi.hoisted(() => new Map<string, unknown>());
 const download = vi.hoisted(() => vi.fn());
@@ -15,8 +16,10 @@ vi.mock('../../storage/single-store-database', () => ({ openSingleStoreDatabase:
 	get: async (_store: string, key: string) => values.get(key),
 	put: async (_store: string, value: unknown, key: string) => { values.set(key, value); },
 	delete: async (_store: string, key: string) => { values.delete(key); },
-	getAllKeys: async () => [...values.keys()],
-	transaction: () => ({ store: { getAllKeys: async () => [...values.keys()], get: async (key: string) => values.get(key), delete: async (key: string) => { values.delete(key); },
+	// Honors a key range as IndexedDB does; only an export reads every key.
+	getAllKeys: async (_store: string, range?: FakeKeyRange) => [...values.keys()].filter(key => !range || range.includes(key)),
+	transaction: () => ({ store: { getAllKeys: async (range?: FakeKeyRange) => [...values.keys()].filter(key => !range || range.includes(key)), get: async (key: string) => values.get(key),
+		delete: async (key: string | FakeKeyRange) => { for (const stored of [...values.keys()]) if (typeof key === 'string' ? stored === key : key.includes(stored)) values.delete(stored); },
 		put: async (value: unknown, key: string) => { values.set(key, value); }, count: async () => values.size, clear: async () => { values.clear(); } },
 		abort, done: Promise.resolve() }),
 }) }));
@@ -30,6 +33,7 @@ beforeEach(() => {
 	vi.stubGlobal('navigator', { onLine: true, locks: { request: async (_name: string, action: () => Promise<unknown>) => action() } });
 	vi.stubGlobal('location', { origin: 'https://crate.example' });
 	vi.stubGlobal('fetch', vi.fn());
+	vi.stubGlobal('IDBKeyRange', fakeKeyRange);
 });
 afterEach(() => vi.unstubAllGlobals());
 
