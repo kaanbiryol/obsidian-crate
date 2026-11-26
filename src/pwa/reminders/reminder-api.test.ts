@@ -158,4 +158,17 @@ describe('readReminderListBody', () => {
 			expect(readReminderListBody({ ...body, ...projects }, 'Reminders', base, '7.base')).toEqual({ result: null, dropDeltaBase: true });
 		}
 	});
+
+	it('replaces the changed notes\' issues in the base list, in path order', () => {
+		const issue = (path: string, reason = 'Duplicate') => ({ path, reason });
+		const issues = [issue('Reminders/A.md'), issue('Reminders/B.md'), issue('Reminders/D.md', 'Too large')];
+		// A's duplicate resolved, and C now shares B's identity.
+		const body = { delta: true, changedPaths: ['Reminders/A.md', 'Reminders/B.md', 'Reminders/C.md'], reminders: [record('a', 'Reminders/A.md')],
+			changedProjects: ['A', 'B', 'C'], issues: [issue('Reminders/C.md'), issue('Reminders/B.md')] };
+		expect(readReminderListBody(body, 'Reminders', { ...base, issues }, '7.base').result?.issues)
+			.toEqual([issue('Reminders/B.md'), issue('Reminders/C.md'), issue('Reminders/D.md', 'Too large')]);
+		// An issue must belong to a changed note.
+		expect(readReminderListBody({ ...body, issues: [issue('Reminders/D.md')] }, 'Reminders', { ...base, issues }, '7.base'))
+			.toEqual({ result: null, dropDeltaBase: true });
+	});
 });

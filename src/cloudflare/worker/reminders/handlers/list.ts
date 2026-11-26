@@ -18,6 +18,8 @@ import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { changedPathsSince, changeEtag, deltaBase, parseChangeEtags, parseDeltaBase, readVaultChangeState, vaultChangeToken } from '../../sync/change-token';
 import { sha256Hex } from '../../../../platform/sha256';
 import { isReminderNotePath } from '../../../../protocol/reminder-archive-path';
+import { compareCodePoints } from '@/protocol/portable-path';
+import { MAX_DELTA_CONFLICT_NOTES, REMINDER_IDENTITY_CONFLICT_ISSUE } from '@/reminders/core/reminder-list';
 
 // Cached rows usually hold each revision, which saves hashing every listed reminder.
 const payload = (reminder: RemoteReminderRecord) => reminderCommandPayload(reminder, storedReminderRevision(reminder));
@@ -41,17 +43,20 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	const state = await readVaultChangeState(env.DB);
 	const changeToken = await vaultChangeToken(env.DB, scope, state);
 	const base = await deltaBase(scope, state);
-	// An unchanged complete revision advances its delta base too. A list with issues
-	// has an ETag marked incomplete, which answers 304 but never gives a delta base.
-	const notModified = (etag: string, complete: boolean) => new Response(null, {
+	// An unchanged revision advances its delta base too.
+	const notModified = (etag: string) => new Response(null, {
 		status: 304,
-		headers: { ...corsHeaders(), 'Cache-Control': 'private, no-cache', ETag: etag, ...(complete ? { [DELTA_BASE_HEADER]: base } : {}) },
+		headers: { ...corsHeaders(), 'Cache-Control': 'private, no-cache', ETag: etag, [DELTA_BASE_HEADER]: base },
 	});
 	const cached = requestEtags.map(value => parseChangeEtags(value)[0]);
 	const unchanged = cached.findIndex(value => value?.changeToken === changeToken);
-	if (unchanged >= 0) return notModified(requestEtags[unchanged]!, !cached[unchanged]!.incomplete);
+	if (unchanged >= 0) return notModified(requestEtags[unchanged]!);
 
-	const since = parseDeltaBase(url.searchParams.get('since'));
+	// The notes the client's base lists with a duplicate identity. Another note's change can
+	// resolve their duplicate, so a delta re-reads them; with more, the client asks in full.
+	const conflicts = url.searchParams.getAll('conflict');
+	const named = conflicts.length <= MAX_DELTA_CONFLICT_NOTES && conflicts.every(path => isReminderNotePath(path, folderPath));
+	const since = named ? parseDeltaBase(url.searchParams.get('since')) : null;
 	const sinceSeq = since && since.scope === base.slice(base.indexOf('.') + 1) ? since.seq : null;
 	// The change state already read the changelog bounds, so this is one more query.
 	const changedPaths = sinceSeq === null ? null
@@ -61,8 +66,9 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	if (sinceSeq !== null) {
 		const issuedAtBase = await vaultChangeToken(env.DB, scope, { ...state, seq: sinceSeq });
 		const current = cached.find(value => value?.changeToken === issuedAtBase);
-		if (current && changedPaths?.length === 0) return notModified(changeEtag(changeToken, current.revision, !current.incomplete), !current.incomplete);
+		if (current && changedPaths?.length === 0) return notModified(changeEtag(changeToken, current.revision));
 	}
+	const deltaPaths = changedPaths && [...new Set([...changedPaths, ...conflicts])];
 
 	const warmingResponse = (remainingFiles: number, totalFiles: number) => corsResponse({ warming: true, remainingFiles, totalFiles }, 202, {
 		'Cache-Control': 'private, no-store',
@@ -76,31 +82,32 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	}
 
 	// Cache rows do not depend on the folder listing, so read them alongside it: the
-	// changed notes for a delta, or every note when no conditional answer is possible.
-	const changedCache = changedPaths ? loadReminderFileCache(env.DB, folderPath, changedPaths) : undefined;
-	const folderCache = !changedPaths && requestEtags.length === 0 ? loadReminderFileCache(env.DB, folderPath) : undefined;
+	// delta's notes, or every note when no conditional answer is possible.
+	const changedCache = deltaPaths ? loadReminderFileCache(env.DB, folderPath, deltaPaths) : undefined;
+	const folderCache = !deltaPaths && requestEtags.length === 0 ? loadReminderFileCache(env.DB, folderPath) : undefined;
 	// Their failures are handled where they are awaited.
 	changedCache?.catch(() => undefined);
 	folderCache?.catch(() => undefined);
 	const headers = { 'Cache-Control': 'private, no-cache' };
 
-	// A delta comes from the changed notes' rows alone, so its cost follows the changes
-	// rather than the folder's size. One note is one project, so the projects of the
-	// changed notes that still exist are all the client needs to update its list.
-	if (changedPaths && !requestEtags.includes('*')) {
-		const files = await listStoredMarkdownFileMetadataByPaths(env.DB, changedPaths);
-		const reminders = await loadReminderDelta(env, folderPath, files, changedCache);
-		if (reminders) {
+	// A delta comes from the rows of its notes and of the notes sharing their identities
+	// alone, so its cost follows the changes rather than the folder's size. One note is one
+	// project, so the projects of the listed notes that still exist are all the client needs
+	// to update its list.
+	if (deltaPaths && !requestEtags.includes('*')) {
+		const files = await listStoredMarkdownFileMetadataByPaths(env.DB, deltaPaths);
+		const delta = await loadReminderDelta(env, folderPath, files, changedCache);
+		if (delta) {
 			// The folder's content revision needs the whole listing. This one never equals a
 			// content revision, so a later full read that sends it is answered in full.
 			const revision = (await sha256Hex(`delta:${changeToken}`)).slice(0, 32);
 			return corsResponse({
 				delta: true,
-				changedPaths,
-				reminders: await Promise.all(reminders.map(payload)),
-				changedProjects: reminderProjects(files, folderPath),
-				issues: [],
-			}, 200, { ...headers, ETag: changeEtag(changeToken, revision, true), [DELTA_BASE_HEADER]: base });
+				changedPaths: [...new Set([...deltaPaths, ...delta.files.map(file => file.path)])].sort(compareCodePoints),
+				reminders: await Promise.all(delta.reminders.map(payload)),
+				changedProjects: reminderProjects(delta.files, folderPath),
+				issues: delta.issues,
+			}, 200, { ...headers, ETag: changeEtag(changeToken, revision), [DELTA_BASE_HEADER]: base });
 		}
 	}
 	// Archived reminders are kept out of the index, its cache and the revision.
@@ -109,12 +116,10 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 		`parser:${REMINDER_CACHE_PARSER_VERSION}`,
 		...metadata.map((file) => `${file.path}\0${file.hash}\0${file.size}`),
 	].join('\n'))).slice(0, 32);
-	const etag = changeEtag(changeToken, revision, true);
-	if (requestEtags.includes('*')) return notModified(etag, true);
-	// Issues follow from the folder's files and parser alone, so an equal revision has
-	// the completeness it had when it was issued.
-	const same = cached.find(value => value?.revision === revision);
-	if (same) return notModified(changeEtag(changeToken, revision, !same.incomplete), !same.incomplete);
+	const etag = changeEtag(changeToken, revision);
+	if (requestEtags.includes('*')) return notModified(etag);
+	// Issues follow from the folder's files and parser alone, so an equal revision is unchanged.
+	if (cached.some(value => value?.revision === revision)) return notModified(etag);
 	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata, folderCache);
 	if (!workspace.ready) {
 		// Beyond one more batch, later requests warm from a cursor instead of listing the
@@ -124,18 +129,17 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 		}
 		return warmingResponse(workspace.remainingFiles, metadata.length);
 	}
-	// A complete, issue-free revision can be the base of a later delta. Issues
-	// include duplicate identities, whose visibility can change in unchanged notes.
-	const complete = workspace.issues.length === 0;
-	const fullHeaders = { ...headers, ...(complete ? { ETag: etag, [DELTA_BASE_HEADER]: base } : { ETag: changeEtag(changeToken, revision, false) }) };
-	if (complete && changedPaths) {
-		const paths = new Set(changedPaths);
+	const fullHeaders = { ...headers, ETag: etag, [DELTA_BASE_HEADER]: base };
+	// Duplicates can appear or remain in unchanged notes, which then list a conflict, and
+	// resolve in the notes the client named; every other unchanged note is as it was.
+	if (deltaPaths) {
+		const paths = new Set([...deltaPaths, ...workspace.issues.filter(issue => issue.reason === REMINDER_IDENTITY_CONFLICT_ISSUE).map(issue => issue.path)]);
 		return corsResponse({
 			delta: true,
-			changedPaths,
+			changedPaths: [...paths].sort(compareCodePoints),
 			reminders: await Promise.all(workspace.reminders.filter(reminder => paths.has(reminder.filePath)).map(payload)),
 			changedProjects: reminderProjects(metadata.filter(file => paths.has(file.path)), folderPath),
-			issues: [],
+			issues: workspace.issues.filter(issue => paths.has(issue.path)),
 		}, 200, fullHeaders);
 	}
 	return corsResponse({

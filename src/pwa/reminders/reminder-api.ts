@@ -26,29 +26,30 @@ function parseReminderListResponse(value: unknown, folderPath: string): {
 
 const isStringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === 'string');
 
-/** A delta replaces every reminder from `changedPaths` with `reminders`; other
- * notes keep the base snapshot's records. `changedProjects` lists the projects of the
- * changed paths that still exist, which replace those paths' projects in the base list.
+/** A delta replaces every reminder and issue from `changedPaths` with `reminders` and
+ * `issues`; other notes keep the base snapshot's. `changedProjects` lists the projects of
+ * the changed paths that still exist, which replace those paths' projects in the base list.
  * Validated as strictly as a full list. */
 function parseReminderDeltaResponse(value: unknown, folderPath: string): {
-	changedPaths: string[]; reminders: ReminderRecord[]; changedProjects: string[];
+	changedPaths: string[]; reminders: ReminderRecord[]; changedProjects: string[]; issues: ReminderSourceIssue[];
 } | null {
 	if (!value || typeof value !== 'object' || Array.isArray(value) || (value as { delta?: unknown }).delta !== true) return null;
 	const result = value as Record<string, unknown>;
 	const { changedPaths, changedProjects } = result;
+	const issues = parseReminderSourceIssues(result.issues);
 	if (!isStringArray(changedPaths) || !changedPaths.every(path => isPathInFolder(path, folderPath))
-		|| !isReminderList(result.reminders, folderPath) || !isStringArray(changedProjects)
-		|| !Array.isArray(result.issues) || result.issues.length) return null;
+		|| !isReminderList(result.reminders, folderPath) || !isStringArray(changedProjects) || !issues) return null;
 	const changed = new Set(changedPaths);
-	if (!result.reminders.every(reminder => changed.has(reminder.filePath))) return null;
+	if (!result.reminders.every(reminder => changed.has(reminder.filePath)) || !issues.every(issue => changed.has(issue.path))) return null;
 	const possible = new Set(changedPaths.map(path => getProjectFromPath(path, folderPath)));
 	if (!changedProjects.every(project => possible.has(project))) return null;
-	return { changedPaths, reminders: result.reminders, changedProjects };
+	return { changedPaths, reminders: result.reminders, changedProjects, issues };
 }
 
 /** Reads a list response against the confirmed base. A delta is never read as a
  * full list; an unusable delta reports `dropDeltaBase` so the next read is full. */
-export function readReminderListBody(body: unknown, folderPath: string, base: { reminders: ReminderRecord[]; projects: readonly string[] }, requestedSince: string | undefined): {
+export function readReminderListBody(body: unknown, folderPath: string,
+	base: { reminders: ReminderRecord[]; projects: readonly string[]; issues?: readonly ReminderSourceIssue[] }, requestedSince: string | undefined): {
 	result: { reminders: ReminderRecord[]; projects: string[]; issues: ReminderSourceIssue[] } | null;
 	dropDeltaBase: boolean;
 } {
@@ -58,7 +59,7 @@ export function readReminderListBody(body: unknown, folderPath: string, base: { 
 	const merged = delta ? applyReminderDelta(base.reminders, delta) : null;
 	// Delta records were validated above and base records on entry; recheck only their combination.
 	const result = delta && merged && isScopedReminderList(merged, folderPath)
-		? { reminders: merged, projects: applyProjectChanges(base.projects, delta, folderPath), issues: [] }
+		? { reminders: merged, projects: applyProjectChanges(base.projects, delta, folderPath), issues: applyIssueChanges(base.issues ?? [], delta) }
 		: null;
 	return { result, dropDeltaBase: !result };
 }
@@ -72,6 +73,12 @@ function applyReminderDelta(base: ReminderRecord[], delta: { changedPaths: strin
 		if (note) note.push(reminder); else notes.set(reminder.filePath, [reminder]);
 	}
 	return [...notes.keys()].sort(compareCodePoints).flatMap(path => notes.get(path)!);
+}
+
+/** Issues in the server's order: one per note, by path. */
+function applyIssueChanges(base: readonly ReminderSourceIssue[], delta: { changedPaths: string[]; issues: ReminderSourceIssue[] }): ReminderSourceIssue[] {
+	const changed = new Set(delta.changedPaths);
+	return [...base.filter(issue => !changed.has(issue.path)), ...delta.issues].sort((left, right) => compareCodePoints(left.path, right.path));
 }
 
 /** One note is one project, so only the changed paths' projects can come or go. */

@@ -545,7 +545,8 @@ which meters D1, R2 and Durable Object use including the alarms a request arms
 (the `X-Crate-D1-Usage` header leaves those out). It bounds rows written per
 reminder edit regardless of note size, request round trips, and the rows read by a
 pass with nothing to project. `reminders/list-delta.integration.ts` checks that a
-web app merging deltas built from changed notes ends with the full list.
+web app merging deltas built from changed notes ends with the full list, including its
+issues: an oversized note's, and duplicate identities that appear and resolve in unchanged notes.
 
 `maintenance/object-cleanup.test.ts` and `maintenance/run.test.ts` distinguish nonfatal
 post-commit cleanup from scheduled failure reporting. The corresponding

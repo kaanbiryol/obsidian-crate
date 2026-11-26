@@ -1,4 +1,5 @@
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
+import { MAX_DELTA_CONFLICT_NOTES, MAX_DELTA_CONFLICT_QUERY_CHARS, REMINDER_IDENTITY_CONFLICT_ISSUE, type ReminderSourceIssue } from '@/reminders/core/reminder-list';
 /** HTTP freshness of the confirmed reminder list, kept outside React state. */
 export function createReminderListCursor() {
 	let etag: string | undefined;
@@ -15,12 +16,16 @@ export function createReminderListCursor() {
 		isFresh(maxAgeMs: number | undefined, now = Date.now()): boolean {
 			return maxAgeMs !== undefined && lastCheckedAt !== null && now - lastCheckedAt < maxAgeMs;
 		},
-		/** Ask for notes changed since a complete confirmed snapshot only. */
-		request(folderPath: string, complete: boolean): { path: string; headers: Headers; since?: string } {
+		/** Ask for notes changed since the confirmed snapshot, naming its notes with a duplicate
+		 * identity: another note's change can resolve their duplicate. */
+		request(folderPath: string, issues: readonly ReminderSourceIssue[]): { path: string; headers: Headers; since?: string } {
 			const headers = new Headers();
 			if (etag) headers.set('If-None-Match', etag);
-			const since = deltaBase && complete ? deltaBase : undefined;
-			return { path: `/reminders/list?folderPath=${encodeURIComponent(folderPath)}${since ? `&since=${encodeURIComponent(since)}` : ''}`, headers, since };
+			const conflicts = issues.filter(issue => issue.reason === REMINDER_IDENTITY_CONFLICT_ISSUE).map(issue => issue.path);
+			const named = conflicts.map(path => `&conflict=${encodeURIComponent(path)}`).join('');
+			const since = deltaBase && conflicts.length <= MAX_DELTA_CONFLICT_NOTES && named.length <= MAX_DELTA_CONFLICT_QUERY_CHARS ? deltaBase : undefined;
+			const query = since ? `&since=${encodeURIComponent(since)}${named}` : '';
+			return { path: `/reminders/list?folderPath=${encodeURIComponent(folderPath)}${query}`, headers, since };
 		},
 		/** Other vault changes refresh the ETag and delta base of unchanged reminders. */
 		notModified(headers: Headers, at: number): void {

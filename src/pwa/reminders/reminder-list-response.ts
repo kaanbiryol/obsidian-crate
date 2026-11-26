@@ -22,7 +22,7 @@ export type ReminderListResponseOutcome =
  * `body` is the parsed JSON (null when unreadable) and is ignored for a 304. */
 export function decideReminderListResponse(
 	response: { status: number; headers: Headers; body: unknown },
-	context: { folderPath: string; confirmed: { reminders: ReminderRecord[]; projects: readonly string[] }; since?: string; lastCheckedAt: number | null },
+	context: { folderPath: string; confirmed: { reminders: ReminderRecord[]; projects: readonly string[]; issues?: readonly ReminderSourceIssue[] }; since?: string; lastCheckedAt: number | null },
 ): ReminderListResponseOutcome {
 	if (response.status === 304) return { kind: 'not-modified' };
 	const { result, dropDeltaBase } = readReminderListBody(response.body, context.folderPath, context.confirmed, context.since);

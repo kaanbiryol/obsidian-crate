@@ -175,7 +175,7 @@ describe('reminder list cache with D1 and R2', () => {
 		expect(((await (await list()).json()) as Listed).reminders[0]!.revision).toBe(marked);
 	});
 
-	it('answers 304 for an unchanged list with issues, without a delta base', async () => {
+	it('answers 304 for an unchanged list with issues, with a delta base', async () => {
 		await seed({
 			'Reminders/Inbox.md': '# Inbox\n\n- [ ] First task <!-- crate-id:r1 -->\n',
 			'Reminders/Work.md': '# Work\n\n- [ ] Copied task <!-- crate-id:r1 -->\n',
@@ -184,18 +184,18 @@ describe('reminder list cache with D1 and R2', () => {
 		const first = await list();
 		expect((await first.json() as { issues: unknown[] }).issues).toHaveLength(2);
 		const etag = first.headers.get('ETag')!;
-		expect(etag).toMatch(/^"[a-f0-9]{32}\.[a-f0-9]{32}\.i"$/);
-		expect(first.headers.get(DELTA_BASE_HEADER)).toBeNull();
+		expect(etag).toMatch(/^"[a-f0-9]{32}\.[a-f0-9]{32}"$/);
+		expect(first.headers.get(DELTA_BASE_HEADER)).not.toBeNull();
 
 		const unchanged = await list(etag);
 		expect(unchanged.status).toBe(304);
-		expect(unchanged.headers.get(DELTA_BASE_HEADER)).toBeNull();
+		expect(unchanged.headers.get(DELTA_BASE_HEADER)).not.toBeNull();
 		// A write elsewhere changes the vault token, and the equal revision still answers 304.
 		await writeCommittedMarkdownFile(bucket, db, 'Elsewhere.md', 'Unrelated\n', null);
 		const elsewhere = await list(etag);
 		expect(elsewhere.status).toBe(304);
-		expect(elsewhere.headers.get('ETag')).toMatch(/\.i"$/);
-		expect(elsewhere.headers.get(DELTA_BASE_HEADER)).toBeNull();
+		expect(elsewhere.headers.get('ETag')).not.toBe(etag);
+		expect(elsewhere.headers.get(DELTA_BASE_HEADER)).not.toBeNull();
 		expect(bucketGet).toHaveBeenCalledTimes(2);
 
 		await replace('Reminders/Work.md', '# Work\n\n- [ ] Copied task <!-- crate-id:r2 -->\n');

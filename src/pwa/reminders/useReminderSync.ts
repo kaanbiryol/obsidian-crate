@@ -188,7 +188,9 @@ export function useReminderSync({
 			const connectivity = connectivityRef.current;
 			dispatch({ type: 'read-started', silent: Boolean(options.silent) });
 			try {
-				const { path, headers, since } = cursor.request(config.folderPath, issuesRef.current.length === 0);
+				// A delta replaces the issues of its notes in the ones this request was based on.
+				const issues = issuesRef.current;
+				const { path, headers, since } = cursor.request(config.folderPath, issues);
 				const response = await fetchReadyReminderList(
 					apiFetch,
 					path,
@@ -204,7 +206,7 @@ export function useReminderSync({
 				const body: unknown = response.status === 304 ? undefined : await response.json().catch(() => null);
 				if (!readApplies()) return;
 				const outcome = decideReminderListResponse({ status: response.status, headers: response.headers, body },
-					{ folderPath: config.folderPath, confirmed: snapshotRef.current, since, lastCheckedAt: cursor.lastCheckedAt });
+					{ folderPath: config.folderPath, confirmed: { ...snapshotRef.current, issues }, since, lastCheckedAt: cursor.lastCheckedAt });
 				if (outcome.kind === 'not-modified') {
 					const savedAt = Date.now();
 					cursor.notModified(response.headers, savedAt);

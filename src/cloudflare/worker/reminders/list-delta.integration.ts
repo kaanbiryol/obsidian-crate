@@ -12,7 +12,10 @@ import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '..
 import { readReminderListBody } from '@/pwa/reminders/reminder-api';
 import { DELTA_BASE_HEADER } from '@/protocol/http-headers';
 import { drainNotificationProjections } from '../notifications/projection';
-import type { ReminderRecord } from '@/pwa/reminders/types';
+import type { ReminderRecord, ReminderSourceIssue } from '@/pwa/reminders/types';
+import { createReminderListCursor } from '@/pwa/reminders/reminder-list-cursor';
+import { MAX_REMINDER_NOTE_BYTES, REMINDER_NOTE_SIZE_ISSUE } from '@/reminders/core/constants';
+import { REMINDER_IDENTITY_CONFLICT_ISSUE } from '@/reminders/core/reminder-list';
 
 beforeEach(async () => {
 	await applySchema(env.DB);
@@ -29,6 +32,10 @@ async function write(name: string, ...lines: string[]) {
 
 /** Lists like the web app, recording whether the whole folder cache was read. */
 async function list(headers: Record<string, string> = {}, since?: string) {
+	return send(`/reminders/list?folderPath=Reminders${since ? `&since=${encodeURIComponent(since)}` : ''}`, headers);
+}
+
+async function send(path: string, headers: HeadersInit) {
 	const prepare = env.DB.prepare.bind(env.DB);
 	let fullCacheRead = false, folderListed = false, queries = 0;
 	env.DB.prepare = (sql: string) => {
@@ -38,8 +45,7 @@ async function list(headers: Record<string, string> = {}, since?: string) {
 		return prepare(sql);
 	};
 	try {
-		const query = since ? `&since=${encodeURIComponent(since)}` : '';
-		const response = await handleListReminders(new Request(`https://worker.test/reminders/list?folderPath=Reminders${query}`, { headers }), env);
+		const response = await handleListReminders(new Request(`https://worker.test${path}`, { headers }), env);
 		return { response, body: response.status === 200 ? await response.json() as Record<string, unknown> : null, fullCacheRead, folderListed, queries };
 	} finally { env.DB.prepare = prepare; }
 }
@@ -64,8 +70,8 @@ it('merges deltas from changed notes into the same list as a full response', asy
 		['delete a note', () => remove('Reminders/Gamma.md'), true],
 		['delete a note without reminders', () => remove('Reminders/Empty.md'), true],
 		['rename a note by letter case', async () => { await remove('Reminders/Beta.md'); await write('beta.md', task('b1'), task('b2')); }, true],
-		// A copied identity hides both copies; only the full index can report it.
-		['duplicate an unchanged identity', () => write('Delta.md', task('d1'), task('b1')), false],
+		// A copied identity hides both copies, including the one in the unchanged note.
+		['duplicate an unchanged identity', () => write('Delta.md', task('d1'), task('b1')), true],
 	];
 	for (const [name, change, fast] of changes) {
 		await change();
@@ -153,4 +159,84 @@ it('reads each note once while scanning the folder for its sources', { timeout: 
 	expect(await env.DB.prepare('SELECT count(*) AS n FROM reminder_source_state').first()).toEqual({ n: notes });
 	// Before: each batch of 100 read every note before its cursor again, 6,500 rows here.
 	expect(meter.usage.rowsRead).toBeLessThan(notes * 1.5);
+});
+
+interface Confirmed { reminders: ReminderRecord[]; projects: string[]; issues: ReminderSourceIssue[]; etag: string; base: string }
+const confirmed = (read: Awaited<ReturnType<typeof list>>, result: Omit<Confirmed, 'etag' | 'base'>): Confirmed =>
+	({ ...result, etag: read.response.headers.get('ETag')!, base: read.response.headers.get(DELTA_BASE_HEADER)! });
+
+/** Reads again as the web app does: a delta request from the confirmed base, merged into it. */
+async function refresh(state: Confirmed) {
+	const cursor = createReminderListCursor();
+	cursor.confirmed({ etag: state.etag, deltaBase: state.base }, 0);
+	const request = cursor.request('Reminders', state.issues);
+	const read = await send(request.path, request.headers);
+	const merged = readReminderListBody(read.body, 'Reminders', state, request.since).result;
+	return { read, merged, next: merged ? confirmed(read, merged) : null };
+}
+
+async function full() {
+	const body = (await list()).body!;
+	return { reminders: body.reminders, projects: body.projects, issues: body.issues };
+}
+
+it('gives a folder with an oversized note deltas for edits to its other notes', async () => {
+	await write('Alpha.md', task('a1'));
+	await write('Big.md', task('big'), 'x'.repeat(MAX_REMINDER_NOTE_BYTES));
+	await write('Beta.md', task('b1'));
+	while (await revalidateReminderSources(env, 4)) { /* finish the one-time source scan */ }
+	const first = await list();
+	expect(first.body!.issues).toEqual([{ path: 'Reminders/Big.md', reason: REMINDER_NOTE_SIZE_ISSUE }]);
+	// Before, a list with any issue had no delta base, so each later read listed the whole folder.
+	expect(first.response.headers.get(DELTA_BASE_HEADER)).not.toBeNull();
+	let state = confirmed(first, first.body as never);
+	const changes: Array<[() => Promise<void>, string[]]> = [
+		[() => write('Alpha.md', task('a1', 'Renamed')), ['Reminders/Big.md']],
+		[() => write('Gamma.md', task('g1'), task('a1')), ['Reminders/Alpha.md', 'Reminders/Big.md', 'Reminders/Gamma.md']],
+		// Gamma keeps its last verified sources while oversized, yet no longer hides Alpha's a1.
+		[() => write('Gamma.md', task('g1'), task('a1'), 'x'.repeat(MAX_REMINDER_NOTE_BYTES)), ['Reminders/Big.md', 'Reminders/Gamma.md']],
+	];
+	for (const [change, issues] of changes) {
+		await change();
+		const { read, merged, next } = await refresh(state);
+		expect(read.body).toMatchObject({ delta: true });
+		expect(read.fullCacheRead).toBe(false);
+		expect(read.folderListed).toBe(false);
+		expect(merged).toEqual(await full());
+		expect(merged!.issues.map(issue => issue.path)).toEqual(issues);
+		state = next!;
+	}
+	expect(state.reminders.map(reminder => reminder.id)).toEqual(['a1', 'b1']);
+});
+
+it('shows a duplicate identity appear and resolve in an unchanged note through deltas', async () => {
+	await write('Alpha.md', task('a1'));
+	await write('Beta.md', task('b1'), task('b2'));
+	await write('Gamma.md', task('g1'));
+	while (await revalidateReminderSources(env, 4)) { /* finish the one-time source scan */ }
+	const first = await list();
+	let state = confirmed(first, first.body as never);
+	const steps: Array<[string, () => Promise<void>, string[]]> = [
+		// Beta is unchanged, yet its copy of b1 is hidden and it lists the conflict.
+		['copy an identity into another note', () => write('Alpha.md', task('a1'), task('b1')), ['Reminders/Alpha.md', 'Reminders/Beta.md']],
+		['edit an unrelated note while the duplicate stays', () => write('Gamma.md', task('g1', 'Renamed')), ['Reminders/Alpha.md', 'Reminders/Beta.md']],
+		// Only Alpha changed, and Beta's copy of b1 shows again.
+		['remove the copy', () => write('Alpha.md', task('a1')), []],
+		['copy it again', () => write('Gamma.md', task('g1'), task('b2')), ['Reminders/Beta.md', 'Reminders/Gamma.md']],
+		['delete the note with the copy', async () => {
+			const file = (await getStoredFileRow(env.DB, 'Reminders/Gamma.md'))!;
+			await commitFileDelete(env.DB, { path: 'Reminders/Gamma.md', expectedHash: file.hash, expectedRevision: file.storageKey, previousFile: file });
+		}, []],
+	];
+	for (const [name, change, conflicts] of steps) {
+		await change();
+		const { read, merged, next } = await refresh(state);
+		expect(read.body, name).toMatchObject({ delta: true });
+		expect(read.fullCacheRead, name).toBe(false);
+		expect(read.folderListed, name).toBe(false);
+		expect(merged, name).toEqual(await full());
+		expect(merged!.issues, name).toEqual(conflicts.map(path => ({ path, reason: REMINDER_IDENTITY_CONFLICT_ISSUE })));
+		state = next!;
+	}
+	expect(state.reminders.map(reminder => reminder.id)).toEqual(['a1', 'b1', 'b2']);
 });

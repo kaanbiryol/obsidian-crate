@@ -28,7 +28,7 @@ export function beginStartupRead(folderPath: string, authToken: string, readUnve
 	const list = cached.then(snapshot => {
 		const startup = createReminderListCursor();
 		if (snapshot) startup.hydrate(snapshot);
-		const request = startup.request(folderPath, (snapshot?.issues ?? []).length === 0);
+		const request = startup.request(folderPath, snapshot?.issues ?? []);
 		const response = readUnverified(request.path, { headers: request.headers });
 		// Failures are handled where the response is used.
 		response.catch(() => undefined);
