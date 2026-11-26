@@ -52,3 +52,23 @@ export async function addAwaitingReviewChanges(
 		if (entry) changesByPath.set(path, { seq, path, action: 'put', hash: entry.hash, size: entry.size, created_at: entry.modified, revision: entry.revision });
 	}
 }
+
+/** A sync that held paths may have moved the cursor past their remote changes. Replan
+ * each held path no longer held from its current server version. Returns false when one
+ * this device synced is gone from the server: only a full comparison verifies that
+ * absence before deleting the local copy. */
+export async function addHeldRecheckChanges(
+	context: Pick<IncrementalSyncPlannerContext, 'heldRecheckPaths' | 'getRemoteEntries' | 'shouldIgnore' | 'localManifest'>,
+	changesByPath: Map<string, ChangelogEntry>,
+	seq: number,
+): Promise<boolean> {
+	const paths = [...new Set(context.heldRecheckPaths?.())].filter(path => !changesByPath.has(path) && !context.shouldIgnore(path));
+	if (!paths.length) return true;
+	const remote = await context.getRemoteEntries(paths);
+	for (const path of paths) {
+		const entry = getPathEntry(remote, path);
+		if (entry) changesByPath.set(path, { seq, path, action: 'put', hash: entry.hash, size: entry.size, created_at: entry.modified, revision: entry.revision });
+		else if (context.localManifest.getEntry(path)) return false;
+	}
+	return true;
+}

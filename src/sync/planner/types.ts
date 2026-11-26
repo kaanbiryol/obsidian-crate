@@ -141,6 +141,8 @@ export interface IncrementalSyncPlannerContext {
 	reconcileVersionConflicts(keys: PendingKey[], result: SyncResult): Promise<void>;
 	/** Paths whose incoming version is saved for review. */
 	awaitingReviewPaths?(): string[];
+	/** Paths an earlier sync left unchecked, whose remote changes the cursor may be past. */
+	heldRecheckPaths?(): readonly string[];
 	getRemoteEntries(paths: string[]): Promise<Record<string, FileEntry>>;
 	/** The largest file this device syncs with its server. */
 	maxFileBytes(): number;

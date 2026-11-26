@@ -40,6 +40,9 @@ import { syncStoragePaths } from '../manifest/storage-paths';
 import { isMarkdownNoteInFolder } from '../../protocol/note-paths';
 
 const logger = createLogger('SyncEngine');
+/** Held paths a later sync rechecks one by one, in metadata requests of 50; beyond this
+ * a full comparison with the server is cheaper. */
+const MAX_HELD_RECHECK_PATHS = 500;
 
 /** What the engine needs from its owner. Read at call time, so the owner may replace one. */
 export interface SyncEngineHooks {
@@ -139,7 +142,7 @@ export class SyncEngine {
 			getSyncIntervalSeconds: () => this.settings.automaticSync ? this.settings.syncInterval : 0,
 			getLastSeq: () => this.settings.lastSeq,
 			getQueuedKeyCount: () => this.queueController.getQueuedKeyCount(),
-			fullSyncRequested: () => this.settings.fullSyncRequested === true,
+			fullSyncRequested: () => this.settings.fullSyncRequested === true || !!this.settings.heldRecheckPaths?.length,
 			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await this.hasUnsyncedLocalChanges(),
 			verifyLocalContent: () => this.localChanges.verifyTracked(),
 			getManualCheckSeconds: () => this.settings.syncInterval,
@@ -572,12 +575,27 @@ export class SyncEngine {
 		// A rename's old name is deleted only after its new name uploads, so it waits with it.
 		for (const [source, destination] of Object.entries(this.localManifest.getRenameDependencies())) if (held.has(destination)) held.add(source);
 		const result = await this.runTrackedWorkflow(() => this.contexts.runStandardSync(held, progressCallback));
-		// The cursor may now be past a remote change to a held file. If that file's local change
-		// is later discarded, only a full comparison with the server finds the change again.
-		if (held.size > 0 && result.success && !this.lifecycle.abortSignal.aborted) {
-			await this.requestFullSync().catch(error => logger.warn('Could not save the full sync request:', errorMessage(error)));
+		if (!this.lifecycle.abortSignal.aborted) {
+			await this.rememberHeldPaths(held, result.success).catch(error => logger.warn('Could not save the held files to recheck:', errorMessage(error)));
 		}
 		return result;
+	}
+
+	/** The cursor may now be past a remote change to a held file. If that file's local change
+	 * is later discarded, nothing else brings the change back, so a later sync rechecks the
+	 * file against the server. A successful sync rechecked every earlier path it did not
+	 * hold; a failed one may not have. Too many paths fall back to one full comparison. */
+	private async rememberHeldPaths(held: ReadonlySet<string>, succeeded: boolean): Promise<void> {
+		const previous = this.settings.heldRecheckPaths ?? [];
+		const next = [...new Set([...held, ...succeeded ? [] : previous])].sort();
+		if (next.length > MAX_HELD_RECHECK_PATHS) {
+			delete this.settings.heldRecheckPaths;
+			await this.requestFullSync();
+			return;
+		}
+		if (next.length === previous.length && next.every((path, index) => path === previous[index])) return;
+		if (next.length) this.settings.heldRecheckPaths = next; else delete this.settings.heldRecheckPaths;
+		await this.hooks.persistSettings();
 	}
 
 

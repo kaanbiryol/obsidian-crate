@@ -32,6 +32,10 @@ export interface PersistedSyncSettings {
 	 * under it while moving the cursor past them, so the next standard sync compares the
 	 * whole server inventory. A successful full sync clears it. */
 	fullSyncRequested?: boolean;
+	/** Paths the last successful sync left unchecked in Sync activity. The cursor may be past
+	 * a remote change to them, so a later sync that no longer holds one rechecks it against
+	 * the server, instead of comparing the whole server inventory. */
+	heldRecheckPaths?: string[];
 	/** The storage identity of the server the checkpoint was built against. Another one
 	 * at this address is a new or restored server that these baselines do not describe. */
 	serverStorageId?: string;
@@ -88,6 +92,7 @@ export function normalizePersistedSyncSettings(
 	const workerUrl = normalizeWorkerUrl(normalizeString(value?.workerUrl));
 	const scopeUrl = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.workerUrl));
 	const authority = normalizeWorkerUrl(normalizeString(value?.checkpointScope?.authority));
+	const heldRecheckPaths = normalizeStringArray(value?.heldRecheckPaths, []);
 	return {
 		workerUrl,
 		...(workerUrl && scopeUrl === workerUrl && authority ? { checkpointScope: { workerUrl, authority } } : {}),
@@ -102,6 +107,7 @@ export function normalizePersistedSyncSettings(
 		encryptedVaultId: normalizeNullableString(value?.encryptedVaultId),
 		replaceVault: normalizeBoolean(value?.replaceVault, defaults.replaceVault),
 		...(value?.fullSyncRequested === true ? { fullSyncRequested: true } : {}),
+		...(heldRecheckPaths.length ? { heldRecheckPaths } : {}),
 		...(isStorageId(value?.serverStorageId) ? { serverStorageId: value.serverStorageId } : {}),
 	};
 }

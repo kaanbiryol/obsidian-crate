@@ -388,6 +388,7 @@ export class SyncEngineContexts {
 			uploadPreparedFiles: this.uploadPreparedFiles,
 			reconcileVersionConflicts: this.reconcileVersionConflicts,
 			awaitingReviewPaths: () => d.conflictStore.awaitingReviewPaths(path => d.localManifest.getEntry(path)?.revision),
+			heldRecheckPaths: () => d.getSettings().heldRecheckPaths ?? [],
 			getRemoteEntries: async paths => (await d.api.getFileMetadata(paths)).files,
 		}, {
 			progressCallback,

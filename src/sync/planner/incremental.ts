@@ -14,7 +14,7 @@ import type { SyncResult } from '../types';
 import { reconcileIncrementalRemoteChanges } from './incremental-remote-reconciliation';
 import { createPathRecord } from '../../protocol/path-record';
 import { namespaceConflictLookup } from '../namespace-conflicts';
-import { addAwaitingReviewChanges, readIncrementalChangelog } from './incremental-changelog';
+import { addAwaitingReviewChanges, addHeldRecheckChanges, readIncrementalChangelog } from './incremental-changelog';
 import { ServerBehindError } from '../worker-api/read-contracts';
 import { forgetServerBaselines } from '../engine/server-identity';
 
@@ -44,6 +44,10 @@ export async function runIncrementalSync(
 		changelogRead = true;
 		const { changesByPath, changeCount, latestSeq } = changelog;
 		await addAwaitingReviewChanges(context, changesByPath, latestSeq);
+		if (!await addHeldRecheckChanges(context, changesByPath, latestSeq)) {
+			logger.info('A file left unchecked earlier is gone from the server, falling back to full sync');
+			return null;
+		}
 
 		logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
 

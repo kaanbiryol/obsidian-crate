@@ -105,14 +105,61 @@ it('finds a skipped remote edit after the unchecked local change is undone', asy
 	expect((await writer.engine.sync()).errors).toEqual([]);
 	reader.disk.write('shared.md', 'local edit');
 	expect((await reader.engine.sync(undefined, { held: ['shared.md'] })).errors).toEqual([]);
-	expect(reader.settings.fullSyncRequested).toBe(true);
+	expect(reader.settings.heldRecheckPaths).toEqual(['shared.md']);
+	expect(reader.settings.fullSyncRequested).toBeUndefined();
 
 	// Undoing the local edit leaves nothing to upload, and the cursor is past the remote
 	// edit. Before: incremental sync never looked at the file again.
 	reader.disk.write('shared.md', 'base');
+	const manifest = vi.spyOn(reader.api, 'getManifest');
 	expect((await reader.engine.sync()).errors).toEqual([]);
 	expect(reader.disk.text('shared.md')).toBe('remote edit');
-	expect(reader.settings.fullSyncRequested).toBeUndefined();
+	expect(reader.settings.heldRecheckPaths).toBeUndefined();
+	// The file is rechecked alone, without reading the whole server inventory.
+	expect(manifest).not.toHaveBeenCalled();
+});
+
+it('keeps incremental syncs while the same file stays unchecked', async () => {
+	const writer = await device('repeat-writer');
+	writer.disk.write('draft.md', 'base');
+	writer.disk.write('other.md', 'one');
+	expect((await writer.engine.sync()).errors).toEqual([]);
+	const reader = await device('repeat-reader');
+	expect((await reader.engine.sync()).errors).toEqual([]);
+	reader.disk.write('draft.md', 'local draft');
+
+	const manifest = vi.spyOn(reader.api, 'getManifest');
+	for (const text of ['two', 'three']) {
+		writer.disk.write('other.md', text);
+		expect((await writer.engine.sync()).errors).toEqual([]);
+		expect((await reader.engine.sync(undefined, { held: ['draft.md'] })).errors).toEqual([]);
+		expect(reader.disk.text('other.md')).toBe(text);
+	}
+	expect(manifest).not.toHaveBeenCalled();
+	expect(reader.settings.heldRecheckPaths).toEqual(['draft.md']);
+});
+
+it('verifies a skipped remote delete with a full comparison once the file is checked again', async () => {
+	const writer = await device('delete-writer');
+	writer.disk.write('gone.md', 'base');
+	writer.disk.write('keep.md', 'keep');
+	expect((await writer.engine.sync()).errors).toEqual([]);
+	const reader = await device('delete-reader');
+	expect((await reader.engine.sync()).errors).toEqual([]);
+
+	writer.disk.remove('gone.md');
+	expect((await writer.engine.sync()).errors).toEqual([]);
+	reader.disk.write('gone.md', 'local edit');
+	expect((await reader.engine.sync(undefined, { held: ['gone.md'] })).errors).toEqual([]);
+	expect(reader.disk.text('gone.md')).toBe('local edit');
+
+	reader.disk.write('gone.md', 'base');
+	const manifest = vi.spyOn(reader.api, 'getManifest');
+	expect((await reader.engine.sync()).errors).toEqual([]);
+	expect(manifest).toHaveBeenCalled();
+	expect(reader.disk.has('gone.md')).toBe(false);
+	expect(await serverPaths()).toEqual(['keep.md']);
+	expect(reader.settings.heldRecheckPaths).toBeUndefined();
 });
 
 it('tells the device that owns an unfinished first upload to sync again', async () => {

@@ -464,8 +464,12 @@ paths in both directions, as they skip ignored paths: no upload, delete,
 download, merge or conflict copy, and their baselines and pending changes stay.
 Only the planners see them; the queue and other ignore checks do not. The
 cursor still advances, so it can pass a remote change to a held file. A
-successful held sync therefore requests one full sync, which finds that change
-again if the local edit is later discarded. When the held file itself syncs,
+successful held sync therefore saves its held paths (`heldRecheckPaths`), and a
+later incremental sync that no longer holds one replans it from its current
+server metadata, which finds that change again if the local edit is later
+discarded. A saved path gone from the server falls back to one full sync, which
+verifies the absence before deleting the local copy; more than 500 held paths
+request a full sync instead. When the held file itself syncs,
 its conditional write meets the newer server version and reconciles as any
 concurrent edit does.
 
