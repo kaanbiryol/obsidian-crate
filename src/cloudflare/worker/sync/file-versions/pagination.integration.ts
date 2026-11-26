@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { applySchema } from '../../test-support/schema-test-harness';
-import { handleListFileVersions } from './list';
+import { handleListFileVersions, SEARCH_WINDOW } from './list';
 import { handleRestoreFileVersion } from './handlers';
 import { parseFileVersions } from '../../../../sync/worker-api/version-contract';
 import { createReminderOperationId } from '../../../../protocol/reminder-operation';
@@ -69,4 +69,29 @@ it('pages more than 100 retained revisions for one exact filename', async () => 
 	} while (cursor);
 	expect(keys).toHaveLength(205);
 	expect(new Set(keys).size).toBe(205);
+});
+
+it('searches a bounded window per request and continues after it to find a rare name', async () => {
+	const hash = await sha256Hex('retained bytes');
+	const keptAt = Date.now() - 1000;
+	for (let offset = 0; offset < SEARCH_WINDOW * 2; offset += 500) {
+		await env.DB.batch(Array.from({ length: 500 }, (_, i) => env.DB.prepare(`INSERT INTO file_versions
+			(storage_key, path, hash, size, reason, created_at, kept_at) VALUES (?, ?, ?, 14, 'deleted', '2026-09-09 12:00:00', ?)`)
+			.bind(`bulk/${offset + i}`, `bulk/${offset + i}.md`, hash, keptAt - offset - i)));
+	}
+	// The one match is older than two full windows of other versions.
+	await env.DB.prepare(`INSERT INTO file_versions (storage_key, path, hash, size, reason, created_at, kept_at)
+		VALUES ('rare', 'rare-name.md', ?, 14, 'deleted', '2026-09-09 12:00:00', ?)`).bind(hash, keptAt - SEARCH_WINDOW * 3).run();
+	const pages = [];
+	let cursor: string | undefined;
+	do {
+		const page = await list({ search: 'rare-name', ...(cursor ? { cursor } : {}) });
+		pages.push(page);
+		cursor = page.nextCursor;
+	} while (cursor && pages.length < 10);
+	// Before: one request read every retained version looking for 101 matches.
+	expect(pages.length).toBeGreaterThan(1);
+	expect(pages.slice(0, -1).every(page => page.versions.length === 0 && page.hasMore)).toBe(true);
+	expect(pages.flatMap(page => page.versions.map(version => version.path))).toEqual(['rare-name.md']);
+	expect(pages.at(-1)!.hasMore).toBe(false);
 });

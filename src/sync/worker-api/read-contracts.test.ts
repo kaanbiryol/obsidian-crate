@@ -46,7 +46,9 @@ describe('authoritative read contracts', () => {
 	});
 	it('requires paginated history support instead of presenting a silently truncated older response', () => {
 		expect(() => parseFileVersions({ versions: [] })).toThrow('Invalid retained-file history response');
-		expect(() => parseFileVersions({ versions: [], hasMore: true, nextCursor: 'cursor' })).toThrow();
+		expect(() => parseFileVersions({ versions: [], hasMore: true })).toThrow('Invalid retained-file page');
+		// A search window without matches still continues after it.
+		expect(parseFileVersions({ versions: [], hasMore: true, nextCursor: 'cursor' })).toEqual({ versions: [], hasMore: true, nextCursor: 'cursor' });
 		expect(parseFileVersions({ versions: [], hasMore: false })).toEqual({ versions: [], hasMore: false });
 	});
 });
