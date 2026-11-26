@@ -1,5 +1,5 @@
 import { PwaButton as BaseButton } from '../../components/PwaButton';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { discardReviewedReminderDraft, type inspectReminderDraft } from './reminder-drafts';
 import { ReminderQuarantineNotice } from '../notices/ReminderQuarantineNotice';
 import { PwaModalSheet } from '../../components/PwaModalSheet';

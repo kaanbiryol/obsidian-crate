@@ -1,5 +1,5 @@
 import { useSharedFeatures } from '../shared-features';
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { IconButton } from '@/ui/shared/IconButton';
 

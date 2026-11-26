@@ -1,5 +1,5 @@
 import type { ReadingItem } from '../../core/model';
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Notice, Platform } from 'obsidian';
 import type CratePlugin from '../../../plugin/CratePlugin';

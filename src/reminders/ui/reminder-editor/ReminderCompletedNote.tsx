@@ -1,4 +1,3 @@
-import React from 'react';
 import { ThemeIcon } from '../../../ui/shared/ThemeIcon';
 import { formatCompletedAt } from '../format/dateFormatting';
 

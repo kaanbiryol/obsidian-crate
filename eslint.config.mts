@@ -2,7 +2,7 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import obsidianmd from "eslint-plugin-obsidianmd";
 import globals from "globals";
-import { globalIgnores } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import workerImportBoundary from './scripts/worker-import-boundary.mjs';
 import tabIndentation from './scripts/tab-indentation.mjs';
 
@@ -13,7 +13,7 @@ const pluginAdapterImports = {
 	message: 'Obsidian adapters belong to the plugin host; use portable components from ui/shared.',
 };
 
-export default tseslint.config(
+export default defineConfig(
 	{
 		languageOptions: {
 			globals: {
@@ -63,6 +63,11 @@ export default tseslint.config(
 			parserOptions: {
 				projectService: false,
 			},
+		},
+		// These obsidianmd rules need type information, which these files do not load.
+		rules: {
+			'obsidianmd/no-await-chainable': 'off',
+			'obsidianmd/no-misused-promises': 'off',
 		},
 	},
 	{
@@ -130,6 +135,7 @@ export default tseslint.config(
 				'obsidianmd/no-unsupported-api': 'off',
 				'obsidianmd/no-view-references-in-plugin': 'off',
 			'obsidianmd/platform': 'off',
+			'obsidianmd/prefer-active-doc': 'off',
 			'obsidianmd/prefer-create-el': 'off',
 			'obsidianmd/prefer-file-manager-trash-file': 'off',
 			'obsidianmd/prefer-instanceof': 'off',
@@ -164,6 +170,7 @@ export default tseslint.config(
 			'obsidianmd/platform': 'off',
 			'@typescript-eslint/no-deprecated': 'off',
 			'@typescript-eslint/no-misused-promises': 'off',
+			'obsidianmd/no-misused-promises': 'off',
 		},
 	},
 	{
@@ -174,7 +181,16 @@ export default tseslint.config(
 				paths: [{ name: 'obsidian', message: 'Shared UI must work in both the plugin and PWA; keep Obsidian APIs in ui/plugin.' }],
 				patterns: [pluginAdapterImports],
 			}],
+			// The PWA has no activeDocument or Node.instanceOf; those are Obsidian globals.
+			'obsidianmd/prefer-active-doc': 'off',
+			'obsidianmd/prefer-instanceof': 'off',
 		},
+	},
+	{
+		// Bundled dependencies such as Defuddle already ship lookbehind regex literals, so the
+		// plugin needs lookbehind support (iOS 16.4 or later) regardless of Crate's own patterns.
+		files: ['src/reminders/core/**/*.ts'],
+		rules: { 'obsidianmd/regex-lookbehind': 'off' },
 	},
 	{
 		// Indent with tabs, as .editorconfig sets.

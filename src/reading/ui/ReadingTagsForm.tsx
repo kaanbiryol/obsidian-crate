@@ -1,4 +1,4 @@
-import React, { useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Button } from '../../ui/shared/Button';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';
 import { useOpenReadingForm } from './open-forms';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'motion/react';
 import { SPRING_CONFIG } from './navigation/motion';
 import { useReducedMotion } from './useReducedMotion';

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useRef } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
 import { ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/ui/shared/Button';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';

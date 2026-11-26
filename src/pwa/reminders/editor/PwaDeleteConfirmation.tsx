@@ -1,4 +1,3 @@
-import React from 'react';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 
 /** Confirmation content for the dedicated delete screen in the reminder sheet. */

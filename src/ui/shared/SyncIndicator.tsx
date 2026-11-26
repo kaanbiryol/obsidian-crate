@@ -1,4 +1,3 @@
-import React from 'react';
 import { useSyncIndicatorMotion } from './useSyncIndicatorMotion';
 
 export type SyncIndicatorState = 'syncing' | 'synced' | 'error' | 'offline' | 'pending' | 'cached';

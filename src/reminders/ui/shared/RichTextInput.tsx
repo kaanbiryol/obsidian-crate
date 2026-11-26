@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useRef } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { createEditor, $getRoot, COMPOSITION_END_COMMAND, COMPOSITION_END_TAG, HISTORY_PUSH_TAG, IS_APPLE_WEBKIT, IS_IOS, IS_SAFARI, SKIP_DOM_SELECTION_TAG, SKIP_SCROLL_INTO_VIEW_TAG } from 'lexical';
 import { registerPlainText } from '@lexical/plain-text';
 import { createEmptyHistoryState, registerHistory } from '@lexical/history';

@@ -1,5 +1,5 @@
 import { PwaOpeningDock } from '../components/PwaOpeningDock';
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { FeatureSwitcherButton } from '../components/FeatureSwitcherButton';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { IconButton } from '@/ui/shared/IconButton';

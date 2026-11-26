@@ -1,6 +1,6 @@
 import { PwaButton } from '../../components/PwaButton';
 import { PwaNotice } from '../../components/PwaNotice';
-import React, { useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { reminderCacheHealth } from '../cache/reminder-cache-database';
 
 const explanations = {

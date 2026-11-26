@@ -1,4 +1,3 @@
-import React from 'react';
 import { Button } from '@/ui/shared/Button';
 
 export function ScheduleSwitcher({ value, onChange, inert = false }: {

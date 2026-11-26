@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 
 import { ProgressMeter } from '../shared/ProgressMeter';
 import { ShadowDOMNativeMotionButton } from '../../../ui/shared/ShadowDOMNativeMotionButton';

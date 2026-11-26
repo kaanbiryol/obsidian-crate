@@ -1,4 +1,3 @@
-import React from 'react';
 import { SPINNER_SPOKES } from './spinner-spokes';
 
 /** An omitted progress value shows the rotating spinner's full opacity trail. */

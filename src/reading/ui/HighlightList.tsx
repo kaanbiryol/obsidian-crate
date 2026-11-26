@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { youtubeVideoId, youtubeMomentUrl } from '../core/youtube';
 import { timestampLabel } from '../core/transcript';
 import type { ReadingHighlight } from '../core/highlights';

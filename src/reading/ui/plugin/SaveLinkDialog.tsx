@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import { useId } from 'react';
 import { readingUrl } from '../../core/model';
 import { ReadingDialog, type ReadingDialogProps } from '../ReadingDialog';
 import { SaveLinkForm } from '../SaveLinkForm';

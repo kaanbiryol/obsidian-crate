@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { FeatureNavigationContext } from '../navigation/feature-navigation';
 import { createPwaOpeningDockHtml } from '../shell/opening-dock';
 import type { StartTab } from '../types';

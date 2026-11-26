@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import { useId } from 'react';
 import { useOpenReadingForm } from './open-forms';
 
 /** Header-submitted note editor: the excerpt for context, then one growing field. */

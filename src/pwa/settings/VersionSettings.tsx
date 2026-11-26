@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { parseCrateServerInfo, type CrateServerInfo } from '@/protocol/server-info';
 import release from '@/cloudflare/server-release.json';
 import { PWA_ASSET_VERSION } from '@/pwa/shell/version';

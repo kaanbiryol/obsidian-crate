@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { readingFaviconUrl, type ReadingMetadata } from '../core/model';
 import { readingSource } from '../core/reading-presentation';
 

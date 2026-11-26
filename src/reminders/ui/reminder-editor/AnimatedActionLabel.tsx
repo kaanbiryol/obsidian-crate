@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useReducedMotion } from '../../../ui/shared/useReducedMotion';
 
 /** Resize around live metadata without scaling text or delaying parsed values. */

@@ -1,6 +1,6 @@
 import { downloadJson } from '../../storage/download';
 import { PwaButton as BaseButton } from '../../components/PwaButton';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { PendingReminderChange } from '../outbox/reminder-outbox-types';
 
 /** Expired changes, and unconfirmed ones the server keeps rejecting, leave the device only after review. */

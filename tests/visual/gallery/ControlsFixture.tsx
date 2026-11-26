@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/ui/shared/Button';
 import { IconButton } from '@/ui/shared/IconButton';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';

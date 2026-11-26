@@ -1,4 +1,4 @@
-import React, { useLayoutEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { ProjectPickerContent } from '@/reminders/ui/reminder-editor/ProjectPickerContent';
 import {
 	applyReminderTextUpdate,

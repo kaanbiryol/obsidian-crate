@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, KeyRound, Link2 } from 'lucide-react';
 import { PwaButton as Button } from '../components/PwaButton';
 import { SettingsSection } from '../settings/SettingsSection';

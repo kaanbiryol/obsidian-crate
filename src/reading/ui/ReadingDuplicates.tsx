@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@/ui/shared/Button';
 import type { ReadingItem } from '../core/model';
 import { duplicateReadingGroups } from '../core/duplicates';

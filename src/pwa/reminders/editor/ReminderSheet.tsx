@@ -1,4 +1,4 @@
-import React, { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
 import { useKeyboardHeight } from '@/pwa/hooks/useKeyboardHeight';
 import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-editor/pickerCopy';

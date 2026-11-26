@@ -1,7 +1,7 @@
 import { youtubeVideoId } from '../../core/youtube';
 import { useRemindersSettingsStore } from '@/reminders/settings';
 import { useReducedMotion } from '@/ui/shared/useReducedMotion';
-import React, { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Notice, TFile } from 'obsidian';
 import { readingImageType } from '../../core/article-images';
 import type { ReadingImageHost, ReadingImageLoader } from '../useReadingImages';

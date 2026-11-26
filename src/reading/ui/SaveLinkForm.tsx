@@ -1,4 +1,3 @@
-import React from 'react';
 import { TextField } from '../../ui/shared/TextField';
 import { Button } from '../../ui/shared/Button';
 import { useOpenReadingForm } from './open-forms';

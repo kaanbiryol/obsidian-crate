@@ -1,4 +1,4 @@
-import React, { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'react';
 
 type TextFieldProps = InputHTMLAttributes<HTMLInputElement> & {
 	label: string;

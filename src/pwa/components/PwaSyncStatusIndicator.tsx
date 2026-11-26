@@ -1,5 +1,4 @@
 import { Button as BaseButton } from '@/ui/shared/Button';
-import React from 'react';
 import { SyncIndicator, type SyncIndicatorState } from '../../ui/shared/SyncIndicator';
 
 interface PwaSyncStatusIndicatorProps {

@@ -1,7 +1,7 @@
 import { downloadJson } from '../../storage/download';
 import { PwaButton as BaseButton } from '../../components/PwaButton';
 import { PwaNotice } from '../../components/PwaNotice';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { QuarantinedReminderEntry } from '../outbox/reminder-outbox-storage';
 
 export function ReminderQuarantineNotice({ entries, folderPath, onRemove, kind = 'changes' }: {

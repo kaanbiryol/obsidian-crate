@@ -1,4 +1,3 @@
-import React from 'react';
 import type { SyncState } from '../../sync/types';
 import { SyncIndicator } from '../shared/SyncIndicator';
 

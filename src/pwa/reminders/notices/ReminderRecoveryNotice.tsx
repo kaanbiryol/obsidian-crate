@@ -1,7 +1,6 @@
 import { downloadJson } from '../../storage/download';
 import { PwaButton } from '../../components/PwaButton';
 import { PwaNotice } from '../../components/PwaNotice';
-import React from 'react';
 import type { PendingReminderChange } from '../outbox/reminder-outbox-types';
 
 export function ReminderRecoveryNotice({ changes, folderPath, onResume }: {

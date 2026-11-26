@@ -13,8 +13,10 @@ export const bundleBudgets = {
 		// grouped connection options, the simplified reader header and the Reading change feed with
 		// stored tag counts and its scale fixes, measure 5.0356 MB raw / 2.3297 MB gzip. Lexical 0.53,
 		// Motion 14.14, Marked 18.3 and Defuddle 0.19.13 bring it to 5.0960 MB raw / 2.3626 MB gzip.
-		maxBytes: 5096000,
-		maxGzipBytes: 2362600,
+		// Linkedom 0.18.15, whose CSSOM parser Defuddle reads stylesheets through, and the larger
+		// embedded Worker bring it to 5.3489 MB raw / 2.4508 MB gzip.
+		maxBytes: 5349000,
+		maxGzipBytes: 2450800,
 	},
 	{
 		path: 'dist/styles.css',
@@ -30,15 +32,17 @@ export const bundleBudgets = {
 		// The deployable Worker embeds the complete reminders PWA assets.
 		// Server-side extraction for encrypted Reading drops Defuddle from the embedded PWA:
 		// 4.043 MB raw / 1.294 MB gzip. The Lexical, Motion, Marked and Defuddle updates bring it to
-		// 4.100 MB raw / 1.311 MB gzip.
-		maxBytes: 4107200,
-		maxGzipBytes: 1313500,
+		// 4.100 MB raw / 1.311 MB gzip. Linkedom 0.18.15 and web-push 4 bring it to 4.2789 MB raw /
+		// 1.3563 MB gzip.
+		maxBytes: 4279000,
+		maxGzipBytes: 1356400,
 	}, {
 		path: '.generated/cloudflare/worker-self-hosted.mjs',
 		// The server package's Worker: the deployable one plus chunked uploads and ranged
 		// downloads, 4.107 MB raw / 1.313 MB gzip after the Lexical, Motion, Marked and Defuddle updates.
-		maxBytes: 4107200,
-		maxGzipBytes: 1313500,
+		// Linkedom 0.18.15 and web-push 4 bring it to 4.2861 MB raw / 1.3584 MB gzip.
+		maxBytes: 4286200,
+		maxGzipBytes: 1358500,
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
@@ -64,8 +68,8 @@ export const bundleBudgets = {
 		// steps, the failed and pending article states, notice action rows, the simplified
 		// reader header, Reading changes applied to loaded pages, released images and cancelled
 		// searches, measure 1.9474 MB raw / 643.0 KB gzip. Lexical 0.53, Motion 14.14 and Marked 18.3
-		// bring it to 1.9769 MB raw / 654.6 KB gzip.
+		// bring it to 1.9769 MB raw / 654.6 KB gzip; Lucide 1.81 adds a few bytes of gzip.
 		maxBytes: 1976900,
-		maxGzipBytes: 654600,
+		maxGzipBytes: 654700,
 	}],
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PluginReminderSourceNotice } from '@/reminders/ui/plugin/PluginReminderSourceNotice';
 import { PluginRemindersAppShell } from '@/reminders/ui/plugin/PluginRemindersAppShell';
 import { ReminderCard } from '@/reminders/ui/shared/ReminderCard';

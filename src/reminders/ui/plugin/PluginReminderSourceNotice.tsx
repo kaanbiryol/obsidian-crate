@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { ReminderSourceIssue } from '../../data/reminder-source-issues';
 import { Button } from '@/ui/shared/Button';
 import { ThemeIcon } from '@/ui/shared/ThemeIcon';

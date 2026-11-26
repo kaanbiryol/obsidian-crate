@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import { Notice } from 'obsidian';
 import type CratePlugin from '@/plugin/CratePlugin';
 import { getReadingLibrary, subscribeReadingRuntime } from '@/reading/runtime';

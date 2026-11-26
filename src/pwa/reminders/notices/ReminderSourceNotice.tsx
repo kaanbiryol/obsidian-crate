@@ -1,6 +1,6 @@
 import { PwaButton } from '../../components/PwaButton';
 import { PwaNotice } from '../../components/PwaNotice';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { ReminderSourceIssue } from '../types';
 
 export function ReminderSourceNotice({ issues, refreshing, isOffline, onRefresh }: {
