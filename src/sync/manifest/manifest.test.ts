@@ -381,6 +381,27 @@ describe('LocalManifest', () => {
 			expect(Object.keys((await reload()).getRenameDependencies())).toHaveLength(2000);
 		});
 
+		it('writes only the rename dependencies each save changes', async () => {
+			const disk = new Map<string, string>();
+			diskAdapter(disk);
+			for (let index = 0; index < 2000; index++) manifest.setEntry(`notes/${index}.md`, entry('a'));
+			await manifest.save();
+			manifest.recordRename('notes', 'archive', 'folder');
+			await manifest.save();
+			// Each renamed copy's old path settles on its own, as uploads finish.
+			for (let index = 0; index < 20; index++) {
+				manifest.removeEntry(`notes/${index}.md`);
+				await manifest.save();
+			}
+			const records = disk.get(log)!.trim().split('\n').slice(2);
+			// Before: every record repeated the remaining 2,000 dependencies.
+			expect(records).toHaveLength(20);
+			expect(records.every(record => record.length < 300)).toBe(true);
+			const restored = await reload();
+			expect(Object.keys(restored.getRenameDependencies())).toEqual(Object.keys(manifest.getRenameDependencies()));
+			expect(Object.keys(restored.getRenameDependencies())).toHaveLength(1980);
+		});
+
 		it('appends only new upload diagnostics to each record and reloads the newest 50', async () => {
 			const disk = new Map<string, string>();
 			diskAdapter(disk);
@@ -428,7 +449,7 @@ describe('LocalManifest', () => {
 			await manifest.save();
 			manifest.removeEntry('a.md');
 			await manifest.save();
-			expect(disk.get(log)!.trim().split('\n').at(-1)).toContain('"changes":{"renameDependencies":null}');
+			expect(disk.get(log)!.trim().split('\n').at(-1)).toContain('"changes":{"renameChanges":{"delete":["a.md"],"set":[]}}');
 			expect((await reload()).getRenameDependencies()).toEqual({});
 		});
 

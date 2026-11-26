@@ -516,9 +516,12 @@ temporary checkpoint. A mutation revision ensures edits made during a save are
 included in a follow-up checkpoint before that save finishes.
 
 **Change log:** after a full checkpoint, saves append one JSON line to
-`file-manifest.log` with only the changed or removed entries and the recovery state
-fields (renames, upload receipts, restore intents) that changed since the
-previous record, with `null` clearing a field. Upload diagnostics are appended:
+`file-manifest.log` with only the changed or removed entries and the small recovery
+state fields (restore intents, initial import and configuration state) that changed
+since the previous record, with `null` clearing a field. Rename dependencies and
+upload receipts, which a large folder move fills with one row per file, carry only
+their changed rows: replay deletes the listed keys, then sets the listed rows in
+order, which also keeps their insertion order. Upload diagnostics are appended:
 a record carries only the rows recorded since the previous one, and loading keeps
 the newest 50. A queue flush in a large vault rewrites neither the whole baseline
 nor unchanged recovery state. The

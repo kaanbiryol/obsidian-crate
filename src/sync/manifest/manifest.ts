@@ -1,5 +1,5 @@
 import { encodeCheckpoint, parseCheckpoint, sameCheckpointRecoveryState } from './manifest-checkpoint';
-import { encodeLogHeader, encodeLogRecord, encodeLogState, replayManifestLog, type EncodedLogState } from './manifest-log';
+import { diffOrdered, encodeLogHeader, encodeLogRecord, encodeLogState, replayManifestLog, type EncodedLogState } from './manifest-log';
 import { UploadJournal } from '../durability/upload-journal';
 import { parseRestoreIntents, type RestoreIntent } from '../durability/restore-intent';
 import { parseInitialConfigPull, type InitialConfigPull } from './initial-config-pull';
@@ -46,6 +46,9 @@ export class LocalManifest {
 	private logBytes = 0;
 	/** Recovery state as of the checkpoint plus log on disk; records write only differences. */
 	private persistedState?: EncodedLogState;
+	/** Rename dependencies and upload receipts as last written, which records diff against. */
+	private persistedRenames: ReadonlyMap<string, string> = new Map();
+	private persistedReceipts: ReadonlyMap<string, string> = new Map();
 	private manifest: FileManifest;
 	private dirty: boolean;
 	private revision = 0;
@@ -134,6 +137,8 @@ export class LocalManifest {
 			this.initialImportToken = selected.initialImportToken;
 			this.renames = new RenameDependencies(selected.renames);
 			this.persistedState = encodeLogState(selected);
+			this.persistedRenames = new Map(selected.renames);
+			this.persistedReceipts = receiptMap(selected.settledUploads);
 			await this.uploadJournal.load(selected.settledUploads ?? []);
 			if (this.closed) return;
 			this.generation = selected.generation;
@@ -219,9 +224,14 @@ export class LocalManifest {
 			if (entry) set[path] = entry;
 			else deleted.push(path);
 		}
-		const state = encodeLogState(this.recoveryState());
+		const recovery = this.recoveryState();
+		const state = encodeLogState(recovery);
 		const diagnostics = [...this.uploadDiagnostics];
+		const receipts = receiptMap(recovery.settledUploads);
+		const renameChanges = diffOrdered(this.persistedRenames, recovery.renames);
+		const receiptChanges = diffOrdered(this.persistedReceipts, receipts);
 		const record = encodeLogRecord({ generation: this.generation + 1, set, deleted, state, previous: this.persistedState,
+			renames: renameChanges, settledUploads: receiptChanges,
 			uploadDiagnostics: diagnostics.filter(row => !this.persistedDiagnostics.has(row)) });
 		if (this.logBytes + record.length > MAX_LOG_BYTES) return false;
 		// The first record after a compaction replaces any older log with its header.
@@ -233,6 +243,8 @@ export class LocalManifest {
 		this.generation++;
 		this.logBytes += record.length;
 		this.persistedState = state;
+		if (renameChanges) this.persistedRenames = new Map(recovery.renames);
+		if (receiptChanges) this.persistedReceipts = receipts;
 		this.persistedDiagnostics = new Set(diagnostics);
 		return true;
 	}
@@ -242,7 +254,9 @@ export class LocalManifest {
 		const adapter = this.app.vault.adapter;
 		this.logActive = false;
 		this.generation++;
-		const state = encodeLogState(this.recoveryState());
+		const recovery = this.recoveryState();
+		const state = encodeLogState(recovery);
+		const renames = new Map(recovery.renames), receipts = receiptMap(recovery.settledUploads);
 		const diagnostics = [...this.uploadDiagnostics];
 		const data = this.serialize();
 		await adapter.write(this.tmpPath, data);
@@ -254,6 +268,8 @@ export class LocalManifest {
 		// older base, so loading ignores it.
 		this.logBytes = 0;
 		this.persistedState = state;
+		this.persistedRenames = renames;
+		this.persistedReceipts = receipts;
 		this.persistedDiagnostics = new Set(diagnostics);
 		this.logActive = true;
 	}
@@ -415,4 +431,9 @@ export class LocalManifest {
 	getFileCount(): number {
 		return Object.keys(this.manifest.files).length;
 	}
+}
+
+/** Upload receipts as an ordered map, for diffing like rename dependencies. */
+function receiptMap(ids: readonly string[]): Map<string, string> {
+	return new Map(ids.map(id => [id, id]));
 }
