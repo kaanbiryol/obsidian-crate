@@ -473,3 +473,42 @@ it('gives a list with issues no delta base, so the next read is complete', async
 	expect(body!.issues).toHaveLength(2);
 	expect(response.headers.get('X-Crate-Delta-Base')).toBeNull();
 });
+
+it('answers a delta after a restart for the base the previous instance answered', async () => {
+	const inbox = await note('Reminders/Inbox.md', '- [ ] Inbox task <!-- crate-id:inbox -->\n');
+	const work = await note('Reminders/Work.md', '- [ ] Work task <!-- crate-id:work -->\n');
+	const fake = server([inbox, work]);
+	const first = await list(client(fake.fetch));
+	const base = first.response.headers.get('X-Crate-Delta-Base')!;
+	expect(base).toMatch(/^e2ee\.[0-9a-f]{64}$/);
+	fake.set([inbox, await note('Reminders/Work.md', '- [ ] Edited work task <!-- crate-id:work -->\n')]);
+	const read = async (api: EncryptedReminderApi, since: string) => {
+		const response = (await api.handle(`/reminders/list?folderPath=Reminders&since=${encodeURIComponent(since)}`, { headers: { 'If-None-Match': first.response.headers.get('ETag')! } }))!;
+		return { response, body: await response.json() as Record<string, unknown> };
+	};
+	// A new instance, as after the app was killed, restores the base from the persisted index.
+	const delta = await read(client(fake.fetch), base);
+	expect(delta.body).toMatchObject({ delta: true, changedPaths: ['Reminders/Work.md'], issues: [] });
+	expect((delta.body.reminders as ReminderRecord[]).map(reminder => reminder.content)).toEqual(['Edited work task']);
+	// The same notes always get the same base.
+	const next = delta.response.headers.get('X-Crate-Delta-Base')!;
+	expect((await list(client(fake.fetch))).response.headers.get('X-Crate-Delta-Base')).toBe(next);
+	// A base the index does not hold, or any base without an index, gets the complete list.
+	const unknown = await read(client(fake.fetch), base);
+	expect(unknown.body.delta).toBeUndefined();
+	expect((unknown.body.reminders as ReminderRecord[]).map(reminder => reminder.id).sort()).toEqual(['inbox', 'work']);
+	indexes.clear();
+	const missing = await read(client(fake.fetch), next);
+	expect(missing.body.delta).toBeUndefined();
+	expect(missing.response.headers.get('X-Crate-Delta-Base')).toBe(next);
+});
+
+it('never answers a delta for a base issued under other keys', async () => {
+	const fake = server([await note('Reminders/Inbox.md', '- [ ] Inbox task <!-- crate-id:inbox -->\n')]);
+	const base = (await list(client(fake.fetch))).response.headers.get('X-Crate-Delta-Base')!;
+	keys = { ...keys, generation: keys.generation + 1 };
+	fake.set([await note('Reminders/Inbox.md', '- [ ] Edited inbox task <!-- crate-id:inbox -->\n')]);
+	const response = (await client(fake.fetch).handle(`/reminders/list?folderPath=Reminders&since=${encodeURIComponent(base)}`))!;
+	expect((await response.json() as Record<string, unknown>).delta).toBeUndefined();
+	expect(response.headers.get('X-Crate-Delta-Base')).not.toBe(base);
+});

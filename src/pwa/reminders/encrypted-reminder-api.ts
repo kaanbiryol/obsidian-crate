@@ -73,9 +73,8 @@ export class EncryptedReminderApi {
 	private snapshot?: { files: Map<string, RemoteFile>; changeToken: string; deltaBase: string };
 	// The last list this client answered without issues: its delta base and each note's revision
 	// by plaintext path. The app's next read names that base to get only the notes changed since.
+	// The base is a digest of those revisions, so the persisted index restores it after a restart.
 	private answered?: { base: string; revisions: Map<string, string> };
-	private readonly answerPrefix = `e2ee.${crypto.randomUUID()}.`;
-	private answerCount = 0;
 	constructor(private readonly keys: FeatureKeys, private readonly fetch: ApiFetch,
 		{ store = encryptedReminderStore, current = capturePwaSession() }: EncryptedReminderApiOptions = {}) {
 		this.store = store; this.current = current;
@@ -95,10 +94,15 @@ export class EncryptedReminderApi {
 		this.indexLoaded = true;
 		try {
 			const notes = await this.store.loadIndex(this.indexScope, this.indexIdentity);
-			if (notes) this.persistedIndex = new Map(notes.map(note => [note.file.revision, note as ScannedNote]));
-			for (const note of notes ?? []) {
+			if (!notes) return;
+			this.persistedIndex = new Map(notes.map(note => [note.file.revision, note as ScannedNote]));
+			for (const note of notes) {
 				if (!this.scanned.has(note.file.revision)) this.scanned.set(note.file.revision, note as ScannedNote);
 			}
+			// The index holds the last complete list's notes, so a base the previous instance
+			// answered for them still names them. Any other base gets a complete list.
+			const revisions = new Map(notes.map(note => [note.path, note.file.revision]));
+			if (!this.answered) this.answered = { base: await this.deltaBase(revisions), revisions };
 		} catch { /* A missing or unreadable index only costs downloads. */ }
 	}
 	private context(operationId: string) { return encryptedOperationContext(this.keys.vaultId, 'vault', operationId); }
@@ -264,7 +268,7 @@ export class EncryptedReminderApi {
 					void this.store.saveIndex(this.indexScope, this.indexIdentity, [...nextScanned.values()], this.current)
 						.then(() => { this.persistedIndex = nextScanned; }, () => {});
 				}
-				return this.answer(result, sources, etag, since);
+				return await this.answer(result, sources, etag, since);
 			} catch (error) {
 				if (!(error instanceof ReminderCommandError) || error.status !== 409 || attempt === 2) throw error;
 			}
@@ -272,17 +276,26 @@ export class EncryptedReminderApi {
 		throw new Error('Reminder inventory could not converge');
 	}
 
-	/** Answers a delta when `since` names the last list this client answered, as the Worker does
-	 * for an unencrypted folder, so the app re-reads and re-stores only the changed notes.
-	 * A list with issues gets no delta base, so the next read is complete. */
-	private answer(result: { reminders: ReminderPayload[]; projects: string[]; issues: unknown[] }, sources: Array<{ path: string; revision?: string }>,
-		etag: string, since: string | undefined): Response {
-		const previous = this.answered;
-		this.answered = undefined;
+	/** The delta base of a list: a digest of the keys, folder, build and each note's revision by
+	 * plaintext path. The same notes always get the same base, so it names exactly the notes the
+	 * app's copy was built from, in any instance, and never those of other keys or folders. */
+	private async deltaBase(revisions: Map<string, string>): Promise<string> {
+		const entries = [...revisions].sort(([a], [b]) => compareCodePoints(a, b));
+		return `e2ee.${await sha256Hex(JSON.stringify([this.indexIdentity, entries]))}`;
+	}
+
+	/** Answers a delta when `since` names the last list this client answered, or the one its
+	 * persisted index holds, as the Worker does for an unencrypted folder, so the app re-reads
+	 * and re-stores only the changed notes. A list with issues gets no delta base, so the next
+	 * read is complete. */
+	private async answer(result: { reminders: ReminderPayload[]; projects: string[]; issues: unknown[] }, sources: Array<{ path: string; revision?: string }>,
+		etag: string, since: string | undefined): Promise<Response> {
 		const revisions = new Map(sources.map(source => [source.path, source.revision ?? '']));
-		if (result.issues.length || revisions.size !== sources.length) return Response.json(result, { headers: { ETag: etag } });
-		const base = `${this.answerPrefix}${++this.answerCount}`;
-		this.answered = { base, revisions };
+		const complete = !result.issues.length && revisions.size === sources.length;
+		const base = complete ? await this.deltaBase(revisions) : undefined;
+		const previous = this.answered;
+		this.answered = base ? { base, revisions } : undefined;
+		if (!base) return Response.json(result, { headers: { ETag: etag } });
 		const headers = { ETag: etag, [DELTA_BASE_HEADER]: base };
 		if (!since || previous?.base !== since) return Response.json(result, { headers });
 		const changed = new Set([...revisions].filter(([path, revision]) => previous.revisions.get(path) !== revision).map(([path]) => path));
