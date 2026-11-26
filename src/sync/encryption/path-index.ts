@@ -56,10 +56,11 @@ export class PathIndex {
 		return this.opaque.get(portablePathKey(path)) ?? this.store?.wireOf(path) ?? this.tags.wire(path);
 	}
 
-	/** Record where a verified file is stored, so later writes reach the same server path. */
-	async learn(path: string, wire: string): Promise<void> {
+	/** Record where a verified file is stored, so later writes reach the same server path.
+	 * `tagged` says the caller already checked that `wire` is the path's own tag. */
+	async learn(path: string, wire: string, tagged = false): Promise<void> {
 		this.plainByWire.set(wire, path);
-		if (wire === await this.tags.wire(path)) return;
+		if (tagged || wire === await this.tags.wire(path)) return;
 		this.opaque.set(portablePathKey(path), wire);
 		this.store?.noteWire(path, wire);
 	}

@@ -66,7 +66,8 @@ export class EncryptedFiles {
 	private binding(wire: string, { historical = false }: OpenOptions): PathBinding {
 		return async metadataPath => {
 			const path = await resolveEncryptedPath(this.paths.tags, wire, metadataPath);
-			if (!historical) await this.paths.learn(path, wire);
+			// Resolving checked that the file is stored at its path's own tag.
+			if (!historical) await this.paths.learn(path, wire, true);
 			return path;
 		};
 	}

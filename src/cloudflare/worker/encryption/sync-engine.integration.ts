@@ -7,7 +7,7 @@ import { SyncTestDevice } from '../test-support/sync-engine-test-harness';
 import { createSharedCheckpoint } from '../sync/history-checkpoints';
 import { createEncryptionFixture, storeEncryptionState } from '../test-support/encryption-test-harness';
 import type { VaultKeyBundle } from '../../../encryption/key-bundle';
-import type { PathTags } from '../../../encryption/path-tags';
+import { PathTags } from '../../../encryption/path-tags';
 import { SyncWorkerApi } from '../../../sync/worker-api/sync';
 import { createReadingNote } from '../../../reading/core/notes';
 import { vaultEntry } from '../../../sync/runtime/vault-event-gate';
@@ -330,4 +330,18 @@ it('uploads each Reading note with the card the server lists it by', async () =>
 	expect(rows).toEqual([{ stale: 1, carded: 0 }, { stale: 0, carded: 1 }]);
 	expect((await env.DB.prepare('SELECT count(*) AS n FROM note_terms').first<{ n: number }>())!.n).toBeGreaterThan(0);
 	expect(JSON.stringify(rows) + JSON.stringify((await env.DB.prepare('SELECT * FROM reading_items').all()).results)).not.toContain('Synced article');
+});
+
+it('computes each listed file\'s path tag once when reading the encrypted manifest', async () => {
+	const first = await device('first');
+	await first.disk.vault.createFolder('Notes');
+	for (let index = 0; index < 40; index++) first.disk.write(`Notes/note-${index}.md`, `Note ${index}`);
+	await sync(first);
+	const reader = await device('reader');
+	const wire = vi.spyOn(PathTags.prototype, 'wire');
+	const manifest = await reader.api.getManifest();
+	expect(Object.keys(manifest.files)).toHaveLength(40);
+	// Opening each file's metadata checks its tag. Before: learning the path and keying the
+	// manifest by plaintext path computed it twice more.
+	expect(wire).toHaveBeenCalledTimes(40);
 });

@@ -124,7 +124,9 @@ export class SyncWorkerApi {
 		if (!encryption) return files;
 		const wires = Object.keys(files).sort();
 		const entries = await encryption.metadata(wires.map(path => ({ path, entry: files[path]! })));
-		const tagged = await Promise.all(entries.map(async item => await encryption.paths.tags.wire(item.path).catch(() => null) === item.wire));
+		// `metadata` opens a live file only at its path's own tag, so each entry is tagged
+		// without computing the tag again for every file of a large inventory.
+		const tagged = entries.map(() => true);
 		const plain = createPathRecord<FileEntry>();
 		for (const { index, path } of assignPlainPaths(entries, tagged)) {
 			const { wire, entry } = entries[index]!;
