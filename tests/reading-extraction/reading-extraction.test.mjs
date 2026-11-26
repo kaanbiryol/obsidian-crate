@@ -162,14 +162,11 @@ test('Defuddle extracts documents in the deployed workerd runtime without networ
 			const converted = await extract('<p><a href="javascript:alert(1)">Keep label</a> <a href="https://name:secret@example.com/">No credentials</a></p><script>private source</script><iframe src="https://tracking.test"></iframe>', undefined, true);
 			assert.equal(converted.result.markdown, 'Keep label No credentials');
 		});
-		await t.test('public X posts exclude login prompts, replies, metrics, and streamed duplicates', async () => {
+		await t.test('X pages without Defuddle\'s post API are refused instead of saving the login shell', async () => {
+			// X posts are read through Defuddle's X extractors, which need network access this runtime lacks.
 			const post = `<article><a href="/writer">Writer</a><div dir="auto"><span>A saved post with enough readable words for an article.\nAnother line with <a href="https://example.com/read">a source</a>.</span></div><a data-base-ui-tooltip-trigger href="/writer/status/123">Sep 21</a><div data-engagement-action="reply">987</div></article>`;
 			const fixture = `<html><head><meta property="og:title" content="Writer (@writer) on X"></head><body><nav>Log in Sign up</nav>${post}<div hidden id="S:0">${post}<article><div dir="auto">Unrelated reply from somebody else.</div><a data-base-ui-tooltip-trigger href="/other/status/456">Sep 21</a></article></div><footer>Terms of service</footer></body></html>`;
-			const extracted = await extract(fixture, 'https://x.com/writer/status/123?s=12');
-			assert.equal(extracted.status, 200);
-			assert.equal(extracted.result.author, 'Writer (@writer)');
-			assert.equal(extracted.result.markdown, 'A saved post with enough readable words for an article.  \nAnother line with [a source](https://example.com/read).');
-			assert.equal((await extract(fixture, 'https://x.com/other/status/999')).status, 422);
+			assert.equal((await extract(fixture, 'https://x.com/writer/status/123?s=12')).status, 422);
 			assert.equal((await extract('<html><body>Log in to read this post. Sign up to discover what people are talking about.</body></html>', 'https://x.com/writer/status/123')).status, 422);
 		});
 		await t.test('React IDs cannot force a whole-page fallback; original fragments survive', async () => {

@@ -28,7 +28,9 @@ test('Reading recovers an unavailable source across server restart without dupli
     const bucket = await runtime.mf.getR2Bucket('BUCKET');
     const bytes = await (await bucket.get(file.storage_key)).arrayBuffer();
     // The next index rebuild must read this source; simulate temporary loss of its object.
+    // A rebuild reads only notes whose row does not name the current revision, so mark the row stale.
     await runtime.db.prepare('UPDATE reading_policy SET index_scope = NULL, index_cursor = NULL').run();
+    await runtime.db.prepare("UPDATE reading_items SET storage_key = 'stale'").run();
     await bucket.delete(file.storage_key);
     assert.equal((await request('/reading/items?section=inbox')).status, 503);
     const retry = { ...capture, operationId: operation() };

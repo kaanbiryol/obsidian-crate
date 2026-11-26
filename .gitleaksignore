@@ -1,3 +1,6 @@
 # Public OAuth client identifier used with PKCE, not a client secret. Scope the
 # exception to this historical line; keep all other credential rules enabled.
 765ff1ea7bb2a93ebe6f92a654f1d9e802a4a574:vite.config.mts:generic-api-key:21
+
+# Synthetic path-tag test secret, not a credential.
+46d3db69e260520f19816c1fc0ded7b25cad2023:src/sync/encryption/path-index.test.ts:generic-api-key:6
