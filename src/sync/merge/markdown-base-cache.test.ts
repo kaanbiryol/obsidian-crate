@@ -52,6 +52,17 @@ function createManifest(entries: Record<string, FileEntry>) {
 }
 
 describe('MarkdownBaseCache', () => {
+	it('creates its folder once per session, and again after a failed write', async () => {
+		const { cache, adapter } = createCacheHarness();
+		const put = async (text: string) => { const content = toArrayBuffer(text); await cache.putBase(`${text}.md`, await sha256Hex(content), content); };
+		await put('one'); await put('two'); await put('three');
+		expect(adapter.mkdir).toHaveBeenCalledOnce();
+		adapter.writeBinary.mockRejectedValueOnce(new Error('folder removed'));
+		await put('four');
+		await put('five');
+		expect(adapter.mkdir).toHaveBeenCalledTimes(2);
+	});
+
 	it('does not read or hash existing cache contents during background seeding', async () => {
 		const { cache, files, adapter } = createCacheHarness();
 		const content = toArrayBuffer('unchanged');

@@ -37,7 +37,8 @@ export async function verifyUnchangedPendingPaths(context: PendingVerificationCo
 			}
 			if (kind === 'delete') continue;
 			const before = await adapter.stat(path);
-			if (!before || before.type !== 'file' || before.size > MAX_FILE_SIZE_BYTES || !isCurrent(key)) continue;
+			// A different size cannot hash to the baseline, so the file is not read.
+			if (!before || before.type !== 'file' || before.size !== baseline.size || !isCurrent(key)) continue;
 			// An unverified baseline time does not parse, so it never matches.
 			if (context.replayed?.has(key) && before.size === baseline.size && Date.parse(baseline.modified) === before.mtime) {
 				matches.push({ key, path, baseline, modified: baseline.modified });

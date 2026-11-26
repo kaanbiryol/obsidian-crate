@@ -80,7 +80,8 @@ export class MarkdownBaseCache {
 		const write = (async () => {
 			try {
 				await this.ensureCacheDir();
-				await this.app.vault.adapter.writeBinary(this.getCachePath(hash), content);
+				try { await this.app.vault.adapter.writeBinary(this.getCachePath(hash), content); }
+				catch (error) { this.cacheDirReady = false; throw error; }
 				this.invalidHashes.delete(hash);
 				this.writtenHashes.add(hash);
 				// Bound session bookkeeping; an evicted hash can safely be written again.
@@ -191,12 +192,17 @@ export class MarkdownBaseCache {
 		);
 	}
 
+	// Created once per session; a failed write creates it again on the next one.
+	private cacheDirReady = false;
+
 	private async ensureCacheDir(): Promise<void> {
+		if (this.cacheDirReady) return;
 		try {
 			await this.app.vault.adapter.mkdir(this.cacheDir);
 		} catch {
 			// Directory may already exist.
 		}
+		this.cacheDirReady = true;
 	}
 
 	private getCachePath(hash: string): string {

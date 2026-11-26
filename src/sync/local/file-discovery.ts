@@ -6,7 +6,7 @@ import { runConcurrentTasks } from '../concurrency';
  * discovered via the low-level vault adapter.
  */
 
-import type { Vault, TFile } from 'obsidian';
+import type { Vault, TFile, TAbstractFile } from 'obsidian';
 import { errorMessage } from '../../platform/logger';
 import { assertPortablePaths } from '../../protocol/portable-path';
 
@@ -33,10 +33,20 @@ export function isHiddenPath(path: string): boolean {
 }
 
 /** Create a file's parent folder, through the adapter for hidden paths, if it is missing. */
-export async function ensureParentFolder(vault: Vault, path: string): Promise<void> {
+/** A folder in the vault's in-memory index, which answers without a filesystem call.
+ * Hidden folders are not indexed, so callers fall back to the adapter. */
+export function isVaultTFolderLike(file: TAbstractFile | null): boolean {
+	return typeof file === 'object' && file !== null && typeof file.path === 'string'
+		&& 'children' in file && Array.isArray(file.children);
+}
+
+/** `trustIndex` skips creating a folder the vault index lists, saving a failing filesystem
+ * call; the caller then recovers when the index is stale and the folder is gone. */
+export async function ensureParentFolder(vault: Vault, path: string, options: { trustIndex?: boolean } = {}): Promise<void> {
 	const folderPath = path.substring(0, path.lastIndexOf('/'));
 	if (!folderPath) return;
 	noteHiddenPathChange(vault, path);
+	if (options.trustIndex && !isHiddenPath(path) && isVaultTFolderLike(vault.getAbstractFileByPath(folderPath))) return;
 	try {
 		if (isHiddenPath(path)) await vault.adapter.mkdir(folderPath);
 		else await vault.createFolder(folderPath);

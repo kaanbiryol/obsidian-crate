@@ -300,3 +300,15 @@ it('records a merge base only for Markdown uploads', async () => {
 	expect(manifest.getEntry('scan.pdf')).toMatchObject({ hash: file.hash, revision: 'r' });
 	await manifest.close();
 });
+
+it('prunes a settled record without probing for saved bytes it never had', async () => {
+	const { disk, create, file } = fixture();
+	const manifest = create();
+	const [upload] = await manifest.uploadJournal.prepare([file], 20000);
+	const exists = vi.spyOn(disk.vault.adapter, 'exists');
+	const remove = vi.spyOn(disk.vault.adapter, 'remove');
+	await manifest.uploadJournal.pruneCompleted([upload!.operationId]);
+	expect(disk.has(`${TEST_PLUGIN_DIR}/pending-uploads/${upload!.operationId}.json`)).toBe(false);
+	expect(exists).not.toHaveBeenCalled();
+	expect(remove.mock.calls.map(([path]) => path)).toEqual([`${TEST_PLUGIN_DIR}/pending-uploads/${upload!.operationId}.json`]);
+});

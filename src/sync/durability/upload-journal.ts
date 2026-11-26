@@ -15,6 +15,8 @@ export const isUnfinishedUploadRecord = (path: string): boolean => path.endsWith
 export class UploadJournal {
 	private entries = new Map<string, JournalUpload>();
 	private completed = new Set<string>();
+	// Operations whose bytes are saved beside their record, so pruning removes only those.
+	private withContent = new Set<string>();
 	private writing: Promise<void> = Promise.resolve();
 	private closed = false;
 	private sequence = 0;
@@ -44,7 +46,10 @@ export class UploadJournal {
 				continue;
 			}
 			const fileId = path.slice(this.directory.length + 1, -5);
-			if (path === this.path(fileId) && this.completed.has(fileId)) continue;
+			if (path === this.path(fileId) && this.completed.has(fileId)) {
+				if (present.has(`${this.directory}/${fileId}.bin`)) this.withContent.add(fileId);
+				continue;
+			}
 			let raw: unknown;
 			try { raw = JSON.parse(await this.adapter.read(path)); } catch { throw new Error('Unreadable upload journal. Preserve the vault and its sync metadata before resetting.'); }
 			if (!isRecord(raw) || raw.authority !== this.authority || !isRecord(raw.file)) throw new Error('Upload journal belongs to another server or is damaged. Preserve it before resetting sync.');
@@ -52,6 +57,7 @@ export class UploadJournal {
 			const chunked = file.contentFile !== undefined;
 			if (raw.version !== UPLOAD_JOURNAL_VERSION) throw new Error('Unsupported upload journal. Preserve pending uploads and compare local and remote files before continuing.');
 			if (chunked && !present.has(`${this.directory}/${String(file.contentFile)}`)) throw new Error('A pending upload lost its saved bytes. Preserve the vault and compare local and remote files before resetting sync.');
+			if (chunked) this.withContent.add(fileId);
 			if (typeof raw.sequence !== 'number' || !Number.isSafeInteger(raw.sequence) || raw.sequence < 1) throw new Error('Invalid upload journal sequence');
 			this.sequence = Math.max(this.sequence, raw.sequence);
 			if (typeof file.operationId !== 'string' || reminderOperationDay(file.operationId) === null
@@ -133,6 +139,7 @@ export class UploadJournal {
 				throw error;
 			}
 			this.entries.set(durable.operationId, durable);
+			if (contentPath) this.withContent.add(durable.operationId);
 			return durable;
 		});
 		this.writing = task.then(() => {}, () => {});
@@ -151,9 +158,9 @@ export class UploadJournal {
 	async pruneCompleted(ids: string[]): Promise<void> {
 		for (const id of ids) {
 			try { await this.adapter.remove(this.path(id)); } catch { continue; }
-			// Bytes without their record are removed on the next load if this fails.
-			const contentPath = `${this.directory}/${id}.bin`;
-			if (await this.adapter.exists(contentPath)) try { await this.adapter.remove(contentPath); } catch { /* See above. */ }
+			// Bytes without their record are removed on the next load if this fails, or if
+			// this session never knew of them.
+			if (this.withContent.delete(id)) try { await this.adapter.remove(`${this.directory}/${id}.bin`); } catch { /* See above. */ }
 			this.entries.delete(id);
 			this.completed.delete(id);
 		}

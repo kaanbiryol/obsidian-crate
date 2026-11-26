@@ -178,3 +178,53 @@ it('preserves edits to an earlier incoming binary copy when the transfer retries
 	expect([...h.files.values()]).toContainEqual(remote);
 	expect(h.files.get('image.png')).toEqual(original);
 });
+
+describe('indexed folders', () => {
+	it('writes a new file below indexed folders without a filesystem call per folder', async () => {
+		const h = harness('existing.md', encode('kept'));
+		const folders = new Set(['notes', 'notes/deep']);
+		const fileIndex = h.vault.getAbstractFileByPath.getMockImplementation()!;
+		h.vault.getAbstractFileByPath.mockImplementation((target: string) => folders.has(target) ? { path: target, children: [] } as never : fileIndex(target));
+		const outcome = await applyRemoteContentIfUnchanged(h.context, 'notes/deep/new.md', encode('incoming'), null);
+		expect(outcome).toEqual({ status: 'applied' });
+		expect(decode(h.files.get('notes/deep/new.md')!)).toBe('incoming');
+		// Only the file itself is checked; its indexed folders are neither stat'd nor created again.
+		expect(h.vault.adapter.stat.mock.calls.map(([path]) => path)).toEqual(['notes/deep/new.md']);
+		expect(h.vault.createFolder).not.toHaveBeenCalled();
+	});
+
+	it('still finds a file blocking a folder the index does not know', async () => {
+		const h = harness('notes', encode('a file named like the folder'));
+		h.vault.getAbstractFileByPath.mockReturnValue(null);
+		const outcome = await applyRemoteContentIfUnchanged(h.context, 'notes/new.md', encode('incoming'), null);
+		expect(outcome).toMatchObject({ status: 'deferred' });
+		expect(h.files.has('notes/new.md')).toBe(false);
+	});
+});
+
+describe('a stale folder index', () => {
+	function indexedFolder(path: string) {
+		const h = harness('existing.md', encode('kept'));
+		const fileIndex = h.vault.getAbstractFileByPath.getMockImplementation()!;
+		h.vault.getAbstractFileByPath.mockImplementation((target: string) => target === path ? { path: target, children: [] } as never : fileIndex(target));
+		return h;
+	}
+
+	it('recreates a folder removed outside Obsidian and writes the download', async () => {
+		const h = indexedFolder('notes');
+		h.vault.createBinary.mockRejectedValueOnce(new Error('ENOENT: no such directory'));
+		const outcome = await applyRemoteContentIfUnchanged(h.context, 'notes/new.md', encode('incoming'), null);
+		expect(outcome).toEqual({ status: 'applied' });
+		expect(h.vault.createFolder).toHaveBeenCalledWith('notes');
+		expect(decode(h.files.get('notes/new.md')!)).toBe('incoming');
+	});
+
+	it('defers a download whose indexed folder was replaced by a file', async () => {
+		const h = indexedFolder('notes');
+		h.files.set('notes', encode('now a file'));
+		h.vault.createBinary.mockRejectedValueOnce(new Error('ENOTDIR'));
+		const outcome = await applyRemoteContentIfUnchanged(h.context, 'notes/new.md', encode('incoming'), null);
+		expect(outcome).toMatchObject({ status: 'deferred', reason: expect.stringContaining('A local file blocks the folder notes') as string });
+		expect(h.files.has('notes/new.md')).toBe(false);
+	});
+});

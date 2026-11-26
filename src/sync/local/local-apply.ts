@@ -1,6 +1,6 @@
 import type { TFile, Vault } from 'obsidian';
 import { createConflictCopy, getIncomingConflictFileName } from '../conflict/conflict';
-import { ensureParentFolder, isHiddenPath } from './file-discovery';
+import { ensureParentFolder, isHiddenPath, isVaultTFolderLike } from './file-discovery';
 import type { RecordConflictInput } from '../conflict/store';
 import { isVaultTFileLike } from './local-delete';
 import type { DiffApplyOutcome } from '../transfer/types';
@@ -30,6 +30,8 @@ async function prepareLocalFilePath(vault: Vault, path: string): Promise<void> {
 	assertLocalSyncPath(path);
 	for (let end = path.indexOf('/'); end >= 0; end = path.indexOf('/', end + 1)) {
 		const parent = path.slice(0, end);
+		// An indexed folder needs no filesystem call; each one costs a bridge round trip on mobile.
+		if (isVaultTFolderLike(vault.getAbstractFileByPath(parent))) continue;
 		if ((await vault.adapter.stat(parent))?.type === 'file') throw new LocalPathObstructionError(parent, true);
 	}
 	if ((await vault.adapter.stat(path))?.type !== 'folder') return;
@@ -106,7 +108,7 @@ export async function applyRemoteContentIfUnchanged(
 ): Promise<DiffApplyOutcome> {
 	const obstruction = await preparePath(context, path, content);
 	if (obstruction) return obstruction;
-	await ensureParentFolder(context.vault, path);
+	await ensureParentFolder(context.vault, path, { trustIndex: true });
 	const snapshot = await readLocalSnapshot(context.vault, path);
 	const matchesPlan = expectedLocalHash === null
 		? !snapshot.exists
@@ -130,7 +132,7 @@ export async function preserveLocalVersionsAndApplyRemote(
 ): Promise<DiffApplyOutcome> {
 	const obstruction = await preparePath(context, path, remoteContent);
 	if (obstruction) return obstruction;
-	await ensureParentFolder(context.vault, path);
+	await ensureParentFolder(context.vault, path, { trustIndex: true });
 	if (!isUtf8Text(path, initialLocalContent) || !isUtf8Text(path, remoteContent)) {
 		return applySnapshot(context, path, remoteContent, await readLocalSnapshot(context.vault, path));
 	}
@@ -221,6 +223,24 @@ async function writeLocalContent(
 	// createBinary checks adapter.exists for hidden paths too. Its return value
 	// can be null for unindexed files; only the completed write matters here.
 	// Never fall back to an overwriting write if the host rejects creation.
+	await createRecreatingParent(vault, path, content);
+}
+
+/** The vault index can still list a folder removed or replaced outside Obsidian, so the
+ * parent checks above trusted it. When creation fails, the parent is checked on disk: a
+ * missing one is created and creation tried once more; a file there defers the download. */
+async function createRecreatingParent(vault: Vault, path: string, content: ArrayBuffer): Promise<void> {
+	try {
+		await vault.createBinary(path, content);
+		return;
+	} catch (error) {
+		const parent = path.slice(0, Math.max(0, path.lastIndexOf('/')));
+		if (!parent) throw error;
+		const stat = await vault.adapter.stat(parent);
+		if (stat?.type === 'file') throw new LocalPathObstructionError(parent, true);
+		if (stat) throw error;
+		await ensureParentFolder(vault, path);
+	}
 	await vault.createBinary(path, content);
 }
 
@@ -231,7 +251,8 @@ async function applySnapshot(context: LocalApplyContext, path: string, content: 
 	} catch (error) {
 		// An existing file kept with its incoming copy saved for review does not fail the sync.
 		if (error instanceof IncomingFileReviewError && error.saved) return { status: 'deferred', reason: error.message, review: true };
-		if (error instanceof LocalFileChangedError || error instanceof IncomingFileReviewError) return { status: 'deferred', reason: error.message };
+		if (error instanceof LocalFileChangedError || error instanceof IncomingFileReviewError
+			|| error instanceof LocalPathObstructionError) return { status: 'deferred', reason: error.message };
 		throw error;
 	}
 }

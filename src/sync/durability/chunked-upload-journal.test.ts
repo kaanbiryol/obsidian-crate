@@ -35,6 +35,15 @@ it('saves a chunked upload\'s bytes beside its record, never as base64 in it, an
 	expect(disk.has(`${directory}/${upload.operationId}.bin`)).toBe(false);
 });
 
+it('removes a chunked upload\'s bytes with its record in the session that saved them', async () => {
+	const { disk, create, file } = await fixture();
+	const manifest = create();
+	const upload = await manifest.uploadJournal.prepareChunked(file, bytes, 20000);
+	await manifest.uploadJournal.pruneCompleted([upload.operationId]);
+	expect(disk.has(`${directory}/${upload.operationId}.json`)).toBe(false);
+	expect(disk.has(`${directory}/${upload.operationId}.bin`)).toBe(false);
+});
+
 it('removes bytes whose record was never written and fails closed on a record without its bytes', async () => {
 	const { disk, create, file } = await fixture();
 	const manifest = create();
