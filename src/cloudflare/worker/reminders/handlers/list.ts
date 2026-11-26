@@ -1,11 +1,12 @@
 import { corsHeaders, corsResponse } from '../../http/cors';
-import { listStoredMarkdownFileMetadataByPrefix } from '../../sync/markdown-files';
+import { listStoredMarkdownFileMetadataByPaths, listStoredMarkdownFileMetadataByPrefix } from '../../sync/markdown-files';
 import type { Env } from '../../types';
 import { parseFolderPath } from '../requests';
 import {
 	loadIncrementalReminderIndex,
 	loadReminderDelta,
 	REMINDER_CACHE_PARSER_VERSION,
+	reminderProjects,
 } from '../cache/index';
 import { loadReminderFileCache } from '../cache/load';
 import { storedReminderRevision } from '../cache/revisions';
@@ -68,6 +69,27 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	// Their failures are handled where they are awaited.
 	changedCache?.catch(() => undefined);
 	folderCache?.catch(() => undefined);
+	const headers = { 'Cache-Control': 'private, no-cache' };
+
+	// A delta comes from the changed notes' rows alone, so its cost follows the changes
+	// rather than the folder's size. One note is one project, so the projects of the
+	// changed notes that still exist are all the client needs to update its list.
+	if (changedPaths && !requestEtags.includes('*')) {
+		const files = await listStoredMarkdownFileMetadataByPaths(env.DB, changedPaths);
+		const reminders = await loadReminderDelta(env, folderPath, files, changedCache);
+		if (reminders) {
+			// The folder's content revision needs the whole listing. This one never equals a
+			// content revision, so a later full read that sends it is answered in full.
+			const revision = (await sha256Hex(`delta:${changeToken}`)).slice(0, 32);
+			return corsResponse({
+				delta: true,
+				changedPaths,
+				reminders: await Promise.all(reminders.map(payload)),
+				changedProjects: reminderProjects(files, folderPath),
+				issues: [],
+			}, 200, { ...headers, ETag: changeEtag(changeToken, revision, true), [DELTA_BASE_HEADER]: base });
+		}
+	}
 	// Archived reminders are kept out of the index, its cache and the revision.
 	const metadata = (await listStoredMarkdownFileMetadataByPrefix(env.DB, folderPath)).filter(file => isReminderNotePath(file.path, folderPath));
 	const revision = (await sha256Hex([
@@ -80,18 +102,6 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	// the completeness it had when it was issued.
 	const same = cached.find(value => value?.revision === revision);
 	if (same) return notModified(changeEtag(changeToken, revision, !same.incomplete), !same.incomplete);
-	const headers = { 'Cache-Control': 'private, no-cache' };
-	const delta = changedPaths && await loadReminderDelta(env, folderPath, metadata, changedPaths, changedCache);
-	if (changedPaths && delta) {
-		return corsResponse({
-			delta: true,
-			changedPaths,
-			reminders: await Promise.all(delta.reminders.map(payload)),
-			projects: delta.projects,
-			issues: [],
-		}, 200, { ...headers, ETag: etag, [DELTA_BASE_HEADER]: base });
-	}
-
 	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata, folderCache);
 	if (!workspace.ready) {
 		return corsResponse({
@@ -113,7 +123,7 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 			delta: true,
 			changedPaths,
 			reminders: await Promise.all(workspace.reminders.filter(reminder => paths.has(reminder.filePath)).map(payload)),
-			projects: workspace.projects,
+			changedProjects: reminderProjects(metadata.filter(file => paths.has(file.path)), folderPath),
 			issues: [],
 		}, 200, fullHeaders);
 	}

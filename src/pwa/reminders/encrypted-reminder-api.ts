@@ -287,8 +287,10 @@ export class EncryptedReminderApi {
 		if (!since || previous?.base !== since) return Response.json(result, { headers });
 		const changed = new Set([...revisions].filter(([path, revision]) => previous.revisions.get(path) !== revision).map(([path]) => path));
 		for (const path of previous.revisions.keys()) if (!revisions.has(path)) changed.add(path);
+		// One note is one project: the projects of the changed notes that still exist.
+		const changedProjects = new Set([...changed].map(path => getProjectFromPath(path, this.keys.folderPath)));
 		return Response.json({ delta: true, changedPaths: [...changed], reminders: result.reminders.filter(reminder => changed.has(reminder.filePath)),
-			projects: result.projects, issues: [] }, { headers });
+			changedProjects: result.projects.filter(project => changedProjects.has(project)), issues: [] }, { headers });
 	}
 
 	private cleanupCursor?: string;

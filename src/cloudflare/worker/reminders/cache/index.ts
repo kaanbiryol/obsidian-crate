@@ -87,16 +87,15 @@ export async function loadIncrementalReminderIndex(
  * Returns null when the full index must decide: another folder than the notification
  * folder, more unindexed notes than one warming batch, a source issue or a duplicate.
  */
+/** Reminders of the changed notes, from `files`: the stored rows of the changed paths that
+ * still exist. Null when only the full index can answer. */
 export async function loadReminderDelta(
 	env: Env,
 	folderPath: string,
-	metadata: StoredMarkdownFileMetadata[],
-	changedPaths: readonly string[],
-	/** Cache rows for `changedPaths`, when the caller already started reading them. */
+	files: StoredMarkdownFileMetadata[],
+	/** Cache rows for the changed paths, when the caller already started reading them. */
 	preloaded?: ReturnType<typeof loadReminderFileCache>,
-): Promise<{ reminders: RemoteReminderRecord[]; projects: string[] } | null> {
-	const changed = new Set(changedPaths);
-	const files = metadata.filter(file => changed.has(file.path));
+): Promise<RemoteReminderRecord[] | null> {
 	const { entries: cached } = await (preloaded ?? loadReminderFileCache(env.DB, folderPath, files.map(file => file.path)));
 	const stale = files.filter(file => cached.get(file.path)?.fileHash !== file.hash);
 	if (selectReminderIndexWarmBatch(stale).length < stale.length) return null;
@@ -114,5 +113,10 @@ export async function loadReminderDelta(
 		.bind(reminderSourceScanKey(folderPath), REMINDER_CACHE_PARSER_VERSION, ...duplicate.args)
 		.first<{ folder: string | null; indexed: number | null; duplicate: number }>();
 	if (check?.folder !== folderPath || !check.indexed || check.duplicate) return null;
-	return { reminders, projects: [...new Set(metadata.map(file => getProjectFromPath(file.path, folderPath)))].sort(compareProjects) };
+	return reminders;
+}
+
+/** Projects of these notes, in list order; one note is one project. */
+export function reminderProjects(files: readonly { path: string }[], folderPath: string): string[] {
+	return [...new Set(files.map(file => getProjectFromPath(file.path, folderPath)))].sort(compareProjects);
 }

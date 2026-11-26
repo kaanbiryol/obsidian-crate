@@ -2,7 +2,7 @@ import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
 import { queryRows } from '../d1/db';
-import { compareCodePoints } from '../../../protocol/portable-path';
+import { compareCodePoints, portablePathKey } from '../../../protocol/portable-path';
 import { stageMarkdownFile } from './markdown-file-staging';
 import { commitStagedFile, type CommitContext } from './mutations';
 import {
@@ -54,6 +54,23 @@ export async function listStoredMarkdownFileMetadataByPrefix(
 		size: row.size,
 		storageKey: row.storage_key,
 	}));
+}
+
+/** The stored rows of exactly these paths, sorted like the folder listing; a path with
+ * no file, or whose file differs only in letter case or Unicode form, is left out. */
+export async function listStoredMarkdownFileMetadataByPaths(
+	db: D1Database,
+	paths: readonly string[],
+): Promise<StoredMarkdownFileMetadata[]> {
+	if (!paths.length) return [];
+	const wanted = new Set(paths);
+	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key: string }>(
+		db.prepare('SELECT path, hash, size, storage_key FROM files WHERE portable_path IN (SELECT value FROM json_each(?))')
+			.bind(JSON.stringify([...new Set(paths.map(portablePathKey))])),
+	);
+	return rows.filter(row => wanted.has(row.path))
+		.sort((a, b) => compareCodePoints(a.path, b.path))
+		.map(row => ({ path: row.path, hash: row.hash, size: row.size, storageKey: row.storage_key }));
 }
 
 export async function readStoredMarkdownFiles(

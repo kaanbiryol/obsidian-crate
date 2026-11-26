@@ -204,7 +204,7 @@ export function useReminderSync({
 				const body: unknown = response.status === 304 ? undefined : await response.json().catch(() => null);
 				if (!readApplies()) return;
 				const outcome = decideReminderListResponse({ status: response.status, headers: response.headers, body },
-					{ folderPath: config.folderPath, confirmed: snapshotRef.current.reminders, since, lastCheckedAt: cursor.lastCheckedAt });
+					{ folderPath: config.folderPath, confirmed: snapshotRef.current, since, lastCheckedAt: cursor.lastCheckedAt });
 				if (outcome.kind === 'not-modified') {
 					const savedAt = Date.now();
 					cursor.notModified(response.headers, savedAt);

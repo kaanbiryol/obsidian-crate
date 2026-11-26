@@ -359,7 +359,7 @@ describe('delta refresh', () => {
 		const pending = load();
 		expect(options.apiFetch.mock.lastCall![0]).toBe('/reminders/list?folderPath=Reminders&since=7.base');
 		const edited = work('three');
-		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md', 'Reminders/Gone.md'], reminders: [edited], projects: ['Inbox', 'Work'], issues: [] }),
+		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md', 'Reminders/Gone.md'], reminders: [edited], changedProjects: ['Work'], issues: [] }),
 			{ headers: { ETag: 'second', 'X-Crate-Delta-Base': '9.base' } }), pending);
 		expect(rendered.current.reminders).toEqual([original, edited]);
 		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith({ folderPath: 'Reminders', reminders: [original, edited], projects: ['Inbox', 'Work'], savedAt: expect.any(Number) as number, etag: 'second', issues: [], deltaBase: '9.base' });
@@ -369,7 +369,7 @@ describe('delta refresh', () => {
 		const { rendered, options, original, load, settle } = harness();
 		await settle(0, full([original, work('two')]), load());
 		// A delta reminder outside its declared notes is rejected whole.
-		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md'], reminders: [reminder('stray')], projects: [], issues: [] })), load());
+		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md'], reminders: [reminder('stray')], changedProjects: [], issues: [] })), load());
 		expect(rendered.current.reminders).toEqual([original, work('two')]);
 		expect(rendered.current.error).toMatch(/invalid reminder data/);
 		const next = load();
@@ -381,7 +381,7 @@ describe('delta refresh', () => {
 	it('rejects a delta whose records duplicate an unchanged note identity', async () => {
 		const { rendered, original, load, settle } = harness();
 		await settle(0, full([original, work('two')]), load());
-		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md'], reminders: [work('one')], projects: ['Inbox', 'Work'], issues: [] })), load());
+		await settle(1, new Response(JSON.stringify({ delta: true, changedPaths: ['Reminders/Work.md'], reminders: [work('one')], changedProjects: ['Work'], issues: [] })), load());
 		expect(rendered.current.reminders).toEqual([original, work('two')]);
 		expect(rendered.current.error).toMatch(/invalid reminder data/);
 	});

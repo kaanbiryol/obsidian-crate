@@ -454,7 +454,7 @@ it('answers a delta of changed and removed notes for the base it last answered',
 	expect((delta.body.changedPaths as string[]).sort()).toEqual(['Reminders/Home.md', 'Reminders/Work.md']);
 	expect((delta.body.reminders as ReminderRecord[]).map(reminder => reminder.id)).toEqual(['work']);
 	// The app's merge of the delta matches the full list the client would have answered.
-	const merged = readReminderListBody(delta.body, 'Reminders', first.body.reminders as ReminderRecord[], base!).result!;
+	const merged = readReminderListBody(delta.body, 'Reminders', { reminders: first.body.reminders as ReminderRecord[], projects: first.body.projects as string[] }, base!).result!;
 	const full = await list(client(fake.fetch));
 	expect(merged.reminders).toEqual(full.body!.reminders);
 	// A base this client did not answer last gets the complete list.

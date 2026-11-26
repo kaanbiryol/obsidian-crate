@@ -119,7 +119,7 @@ describe('fetchReadyReminderList', () => {
 
 describe('readReminderListBody', () => {
 	const record = (id: string, filePath: string) => ({ id, content: id, priority: 4 as const, completed: false, project: 'Inbox', filePath });
-	const base = [record('a', 'Reminders/A.md'), record('b', 'Reminders/B.md')];
+	const base = { reminders: [record('a', 'Reminders/A.md'), record('b', 'Reminders/B.md')], projects: ['A', 'B'] };
 
 	it('reads a full list as-is', () => {
 		const body = { reminders: [record('c', 'Reminders/C.md')], projects: ['Inbox'], issues: [] };
@@ -127,7 +127,7 @@ describe('readReminderListBody', () => {
 	});
 
 	it('merges a requested delta into the confirmed base in note order', () => {
-		const body = { delta: true, changedPaths: ['Reminders/B.md'], reminders: [record('b2', 'Reminders/B.md')], projects: ['Inbox'], issues: [] };
+		const body = { delta: true, changedPaths: ['Reminders/B.md'], reminders: [record('b2', 'Reminders/B.md')], changedProjects: ['B'], issues: [] };
 		const { result, dropDeltaBase } = readReminderListBody(body, 'Reminders', base, '7.base');
 		expect(result?.reminders.map(item => item.id)).toEqual(['a', 'b2']);
 		expect(dropDeltaBase).toBe(false);
@@ -135,13 +135,27 @@ describe('readReminderListBody', () => {
 
 	it('orders merged notes by code point, as the server sorts paths', () => {
 		const notes = [record('emoji', 'Reminders/😀.md'), record('kana', 'Reminders/ｱ.md')];
-		const body = { delta: true, changedPaths: ['Reminders/😀.md'], reminders: [record('emoji2', 'Reminders/😀.md')], projects: ['Inbox'], issues: [] };
-		expect(readReminderListBody(body, 'Reminders', notes, '7.base').result?.reminders.map(item => item.id)).toEqual(['kana', 'emoji2']);
+		const body = { delta: true, changedPaths: ['Reminders/😀.md'], reminders: [record('emoji2', 'Reminders/😀.md')], changedProjects: ['😀'], issues: [] };
+		expect(readReminderListBody(body, 'Reminders', { reminders: notes, projects: [] }, '7.base').result?.reminders.map(item => item.id)).toEqual(['kana', 'emoji2']);
 	});
 
 	it('drops the delta base for an unrequested or invalid delta', () => {
-		const body = { delta: true, changedPaths: ['Reminders/B.md'], reminders: [], projects: ['Inbox'], issues: [] };
+		const body = { delta: true, changedPaths: ['Reminders/B.md'], reminders: [], changedProjects: [], issues: [] };
 		expect(readReminderListBody(body, 'Reminders', base, undefined)).toEqual({ result: null, dropDeltaBase: true });
 		expect(readReminderListBody({ ...body, changedPaths: ['Other/B.md'] }, 'Reminders', base, '7.base')).toEqual({ result: null, dropDeltaBase: true });
+	});
+
+	it('replaces the changed notes\' projects in the base list', () => {
+		// B was deleted, C created and A edited; the base keeps D, whose note did not change.
+		const body = { delta: true, changedPaths: ['Reminders/A.md', 'Reminders/B.md', 'Reminders/C.md'],
+			reminders: [record('c', 'Reminders/C.md')], changedProjects: ['A', 'C'], issues: [] };
+		expect(readReminderListBody(body, 'Reminders', { ...base, projects: ['A', 'B', 'D'] }, '7.base').result?.projects).toEqual(['A', 'C', 'D']);
+	});
+
+	it('rejects a delta whose projects are missing or not from its changed notes', () => {
+		const body = { delta: true, changedPaths: ['Reminders/B.md'], reminders: [], issues: [] };
+		for (const projects of [{}, { projects: ['B'] }, { changedProjects: ['A'] }, { changedProjects: [1] }]) {
+			expect(readReminderListBody({ ...body, ...projects }, 'Reminders', base, '7.base')).toEqual({ result: null, dropDeltaBase: true });
+		}
 	});
 });

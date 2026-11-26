@@ -4,7 +4,7 @@ import type { CachedReminderSnapshot } from './types';
 
 const record = (id: string, filePath: string) => ({ id, content: id, priority: 4 as const, completed: false, project: 'Inbox', filePath });
 const confirmed = [record('a', 'Reminders/A.md')];
-const context = { folderPath: 'Reminders', confirmed, lastCheckedAt: 10 };
+const context = { folderPath: 'Reminders', confirmed: { reminders: confirmed, projects: ['A'] }, lastCheckedAt: 10 };
 
 describe('decideReminderListResponse', () => {
 	it('keeps the confirmed list on 304 without reading a body', () => {
@@ -27,7 +27,7 @@ describe('decideReminderListResponse', () => {
 	});
 
 	it('drops the delta base for an invalid delta', () => {
-		const body = { delta: true, changedPaths: ['Other/B.md'], reminders: [], projects: ['Inbox'], issues: [] };
+		const body = { delta: true, changedPaths: ['Other/B.md'], reminders: [], changedProjects: [], issues: [] };
 		expect(decideReminderListResponse({ status: 200, headers: new Headers(), body }, { ...context, since: '7' }))
 			.toMatchObject({ kind: 'invalid', dropDeltaBase: true });
 	});
