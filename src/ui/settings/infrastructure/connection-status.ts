@@ -1,6 +1,6 @@
 import { Setting } from 'obsidian';
 import type { SettingsSectionContext } from '../section-helpers';
-import { openSyncActivity, runSyncNow, stopSyncNow } from '../../../plugin/sync-integration';
+import { openSyncActivity, runSyncNow } from '../../../plugin/sync-integration';
 import { syncConnectionFailureMessage } from './self-hosted-errors';
 
 export function renderConnectionStatus({ containerEl, plugin }: Omit<SettingsSectionContext, 'rerender'>): () => void {
@@ -18,16 +18,13 @@ export function renderConnectionStatus({ containerEl, plugin }: Omit<SettingsSec
 			: state.lastError;
 		setting.setDesc(`${status} · Last successful sync: ${lastSync}${issue ? ` · ${issue}` : ''}`);
 	};
-	setting.addButton(button => button.setButtonText('Sync now').onClick(async () => {
+	// Sync activity shows progress and owns Stop sync, so one button covers both.
+	setting.addButton(button => button.setButtonText('Sync now').setCta().onClick(async () => {
 		button.setDisabled(true);
-		try { await runSyncNow(plugin); } finally { button.setDisabled(false); }
-	}));
-	setting.addButton(button => button.setButtonText('Stop sync').onClick(async () => {
-		button.setDisabled(true);
-		try { await stopSyncNow(plugin); } finally { button.setDisabled(false); render(); }
-	}));
-	setting.addButton(button => button.setButtonText('View activity').onClick(() => {
-		openSyncActivity(plugin);
+		try {
+			openSyncActivity(plugin);
+			await runSyncNow(plugin);
+		} finally { button.setDisabled(false); }
 	}));
 	render();
 	runtime.addStateChangeListener(render);

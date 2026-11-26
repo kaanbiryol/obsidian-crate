@@ -4,8 +4,10 @@ import type { SyncState } from '../../../sync/types';
 import { showSyncErrorNotice } from '../../sync-error-notice';
 
 vi.mock('obsidian', () => createObsidianUiModule());
-vi.mock('../../activity/activity-modal', () => ({ ActivityModal: vi.fn() }));
+const openActivity = vi.hoisted(() => vi.fn());
+vi.mock('../../activity/activity-modal', () => ({ ActivityModal: vi.fn(function () { return { open: openActivity }; }) }));
 vi.mock('../../sync-error-notice', () => ({ showSyncErrorNotice: vi.fn() }));
+import { ActivityModal } from '../../activity/activity-modal';
 import { renderConnectionStatus } from './connection-status';
 
 afterEach(() => { resetObsidianUiMocks(); vi.clearAllMocks(); });
@@ -28,18 +30,24 @@ describe('connection status', () => {
 		cleanup();
 	});
 
-	it('can stop an active sync without disconnecting the vault', async () => {
+	it('opens sync activity, which owns Stop sync, when Sync now starts a sync', async () => {
 		const stopSync = vi.fn(async () => {});
+		const sync = vi.fn().mockResolvedValue({ outcome: 'success', success: true, errors: [], conflicts: [] });
 		const cleanup = renderConnectionStatus({ containerEl: new FakeElement('div') as never, plugin: {
-			refreshSettingsTab: vi.fn(),
+			settings: {},
 			syncRuntime: {
-				getState: () => ({ status: 'syncing', lastSync: null }),
-				stopSync, addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+				getState: () => ({ status: 'idle', lastSync: null }),
+				sync, stopSync, isConfigured: () => true, addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
 			},
 		} as never });
-		const button = MockSetting.instances[0]!.buttons.find(button => button.buttonEl.textContent === 'Stop sync')!;
-		button.click();
-		await vi.waitFor(() => expect(stopSync).toHaveBeenCalledOnce());
+		const buttons = MockSetting.instances[0]!.buttons;
+		expect(buttons.map(button => button.buttonEl.textContent)).toEqual(['Sync now']);
+		buttons[0]!.click();
+		await vi.waitFor(() => expect(sync).toHaveBeenCalledOnce());
+		expect(openActivity).toHaveBeenCalledOnce();
+		const actions = vi.mocked(ActivityModal).mock.calls[0]![3] as { stop: () => Promise<void> };
+		await actions.stop();
+		expect(stopSync).toHaveBeenCalledOnce();
 		cleanup();
 	});
 
