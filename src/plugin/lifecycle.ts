@@ -21,6 +21,8 @@ import { handleCloudflareOAuthProtocol } from "./cloudflare/operations";
 import { createCloudflareDeploymentService, createCloudflareSavedLogin } from './cloudflare/create-services';
 import { showCloudflareServerUpdateNotice } from "../ui/cloudflare/update-notice";
 import { showGetStartedNotice } from "../ui/settings/get-started-notice";
+import { registerUsageWarnings } from "./cloudflare/usage-warnings";
+import { usageWarningNotices } from "../ui/cloudflare/usage-warning-notice";
 import { beginPluginLifecycle, endPluginLifecycle, markStartupSyncSettled, setSyncReady, startupSyncSettled } from './lifecycle-state';
 
 import { registerCheckpointBackupCleanup } from '../sync/durability/checkpoint-backup-cleanup';
@@ -62,6 +64,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
 	registerSharedFeatures(plugin);
 	showCloudflareServerUpdateNotice(plugin);
 	showGetStartedNotice(plugin);
+	registerUsageWarnings(plugin, usageWarningNotices(plugin), signal);
 	registerSyncCommands(plugin);
 	registerPluginProtocols(plugin);
 	void reconcileNotificationsAfterStartupSync(plugin, signal, syncReady);

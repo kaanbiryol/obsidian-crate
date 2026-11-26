@@ -19,7 +19,8 @@ export function normalizeUsageSnapshot(value: unknown): UsageSnapshot | null {
 		for (const metric of group.metrics) {
 			if (!metric || typeof metric.label !== 'string' || !Number.isFinite(metric.used) || metric.used < 0
 				|| (metric.allowance !== undefined && (!Number.isFinite(metric.allowance) || metric.allowance < 0))
-				|| (metric.bytes !== undefined && typeof metric.bytes !== 'boolean')) return null;
+				|| (metric.bytes !== undefined && typeof metric.bytes !== 'boolean')
+				|| (metric.key !== undefined && typeof metric.key !== 'string')) return null;
 		}
 	}
 	return snapshot;

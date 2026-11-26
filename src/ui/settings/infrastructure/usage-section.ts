@@ -13,6 +13,11 @@ export function renderUsageSection({ containerEl, plugin }: Omit<SettingsSection
 	let active = true;
 	const current = () => active && plugin.settings.cloudflareDeployment?.accountId === accountId;
 	container.createEl('p', { cls: 'setting-item-description', text: 'Usage reported by Cloudflare across your account, including other apps. Saved results stay visible until you refresh.' });
+	new Setting(container).setName('Warn before R2 billing')
+		.setDesc('About once a day, check Cloudflare usage and show a notice when R2 reaches 80% of its free allowance. Cloudflare bills R2 usage beyond it.')
+		.addToggle(toggle => toggle.setValue(plugin.settings.usageWarnings).onChange(async value => {
+			await plugin.writeSettings({ usageWarnings: value });
+		}));
 	const controls = new Setting(container).setName('Usage metrics')
 		.addButton(button => button.setButtonText('Refresh').setDisabled(!connection.connected).onClick(async () => {
 			status.setText('Refreshing usage…');

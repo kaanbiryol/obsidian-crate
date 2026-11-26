@@ -39,6 +39,7 @@ async function loadLifecycleModule({ realSharedSettings = false } = {}) {
 	vi.doMock('./server-setup', () => ({ ensureServerSetup: vi.fn(async () => ({ issues: [], unreachable: false })) }));
 	vi.doMock('../sync/durability/checkpoint-backup-cleanup', () => ({ registerCheckpointBackupCleanup: vi.fn() }));
 	vi.doMock('./crate-update/sync', () => ({ registerCrateUpdateSync: vi.fn() }));
+	vi.doMock('./cloudflare/usage-warnings', () => ({ registerUsageWarnings: vi.fn() }));
 	vi.doMock('obsidian', () => ({
 		Notice: class Notice {
 			constructor(message?: string | object) {

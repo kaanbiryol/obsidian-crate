@@ -6,6 +6,7 @@ import { normalizeReadingSettings } from '../reading/settings';
  */
 
 import { normalizeUsageSnapshot } from '../cloudflare/usage/snapshot';
+import { normalizeUsageWarningState } from '../cloudflare/usage/usage-warnings';
 import { normalizeWorkerUrl } from '../sync/connection/worker-url';
 import { type CrateSettings, type PersistedCrateSettings, DEFAULT_SETTINGS } from './settings-types';
 import { normalizePersistedSyncSettings } from '../sync/settings';
@@ -24,6 +25,8 @@ export function normalizePersistedCrateSettings(
 		...sync,
 		reading: normalizeReadingSettings(value?.reading),
 		usageSnapshot: normalizeUsageSnapshot(value?.usageSnapshot),
+		usageWarnings: typeof value?.usageWarnings === 'boolean' ? value.usageWarnings : DEFAULT_SETTINGS.usageWarnings,
+		usageWarningState: normalizeUsageWarningState(value?.usageWarningState),
 		cloudflareDeployment: normalizeCloudflareDeployment(value?.cloudflareDeployment),
 		cloudflareRestore: validRestoreState(value?.cloudflareRestore) ? structuredClone(value.cloudflareRestore) : null,
 		debugLogging: typeof value?.debugLogging === 'boolean' ? value.debugLogging : DEFAULT_SETTINGS.debugLogging,

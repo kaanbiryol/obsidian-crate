@@ -39,6 +39,8 @@ Next, [run your first sync](/docs/getting-started/first-sync/).
 
 Open **Settings → Crate → Usage** and select **Refresh** to see what Cloudflare reports. These numbers are estimates, not a spending cap. They can include other apps in the same account and may lag behind. File history you keep uses storage too.
 
+Crate also checks about once a day while Obsidian is open and shows a notice when file storage or operations reach 80% of the free allowance, and again once they pass it. The warnings never pause sync. To turn them off, open **Settings → Crate → Usage** and turn off **Warn before R2 billing**.
+
 For billing and account management, use your Cloudflare dashboard.
 
 ## If setup doesn't finish

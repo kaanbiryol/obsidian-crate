@@ -1,5 +1,6 @@
 import type { ServerRestoreState } from '../cloudflare/restore/state';
 import type { UsageSnapshot } from '../cloudflare/usage/snapshot';
+import type { UsageWarningState } from '../cloudflare/usage/usage-warnings';
 import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment/types';
 import { DEFAULT_SYNC_SETTINGS, type PersistedSyncSettings } from '../sync/settings';
 import type { SharedSettings } from '../protocol/shared-settings';
@@ -9,6 +10,9 @@ export interface PersistedCrateSettings extends PersistedSyncSettings {
 	cloudflareRestore?: ServerRestoreState | null;
 	reading: ReadingSettings;
 	usageSnapshot?: UsageSnapshot | null;
+	/** This device checks Cloudflare usage about once a day and warns before R2 bills. */
+	usageWarnings: boolean;
+	usageWarningState?: UsageWarningState | null;
 	cloudflareDeployment: CloudflareDeploymentMetadata | null;
 	debugLogging: boolean;
 	/** This device hid the get started checklist in settings. */
@@ -29,6 +33,8 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	...DEFAULT_SYNC_SETTINGS,
 	reading: { ...DEFAULT_READING_SETTINGS },
 	usageSnapshot: null,
+	usageWarnings: true,
+	usageWarningState: null,
 	cloudflareDeployment: null,
 	deviceId: '',
 	debugLogging: false,

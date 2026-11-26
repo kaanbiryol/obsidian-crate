@@ -1,7 +1,11 @@
 import { API_BASE_URL, type HttpTransport } from '../http';
 
+/** Identifies the metrics that Cloudflare bills past their free allowance. */
+export type BilledUsageMetric = 'r2-class-a' | 'r2-class-b' | 'r2-storage';
+
 export interface UsageMetric {
 	label: string;
+	key?: BilledUsageMetric;
 	used: number;
 	allowance?: number;
 	bytes?: boolean;
@@ -83,8 +87,8 @@ export async function fetchCloudflareUsage(
 				throw new Error(`Cloudflare reported unrecognized operations (${details}); remaining allowance is unavailable.`);
 			}
 			return [
-				{ label: 'Class A operations', used: a, allowance: 1_000_000 },
-				{ label: 'Class B operations', used: b, allowance: 10_000_000 },
+				{ label: 'Class A operations', key: 'r2-class-a', used: a, allowance: 1_000_000 },
+				{ label: 'Class B operations', key: 'r2-class-b', used: b, allowance: 10_000_000 },
 			];
 		} },
 		{ label: 'Storage · sum of today’s resource peaks', load: async () => {
@@ -95,7 +99,7 @@ export async function fetchCloudflareUsage(
 			return results.map((result, i) => {
 				if (result.status === 'rejected') throw new Error('Storage metrics are unavailable. Try again later.');
 				if (!result.value.length) throw new Error('No storage samples available yet.');
-				return { label: i === 0 ? 'D1 storage' : 'R2 storage', bytes: true, allowance: STORAGE_ALLOWANCES[i],
+				return { label: i === 0 ? 'D1 storage' : 'R2 storage', ...(i === 1 ? { key: 'r2-storage' as const } : {}), bytes: true, allowance: STORAGE_ALLOWANCES[i],
 					used: result.value.reduce((total, row) => total + (i === 0 ? number(row.max?.databaseSizeBytes) : number(row.max?.payloadSize) + number(row.max?.metadataSize)), 0) };
 			});
 		} },

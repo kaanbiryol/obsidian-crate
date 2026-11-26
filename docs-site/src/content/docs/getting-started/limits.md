@@ -92,7 +92,7 @@ As a guide, a vault of 50,000 notes and 5 GB of PDFs uploads within one day of t
 
 File storage includes 10 GB a month for free. Your vault counts toward it, and so does server history. A shorter history period uses less, and [encryption](#with-encryption) uses more.
 
-To see where you stand, open **Settings → Crate → Usage** and select **Refresh**. It compares your usage, including storage, with the free allowances. File storage beyond its free allowance is billed rather than stopped.
+To see where you stand, open **Settings → Crate → Usage** and select **Refresh**. It compares your usage, including storage, with the free allowances. File storage beyond its free allowance is billed rather than stopped. Crate warns you at 80% of it, checking about once a day while Obsidian is open.
 
 ## With encryption
 

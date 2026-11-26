@@ -13,11 +13,12 @@ afterEach(() => { vi.clearAllMocks(); });
 function setup(snapshot: UsageSnapshot | null = null) {
 	const connection = { snapshot, connected: true, needsAuthorization: false, fetchUsage, connect: vi.fn(), disconnect: vi.fn() };
 	const root = new FakeElement('div');
+	const writeSettings = vi.fn(async () => {});
 	const cleanup = renderUsageSection({ containerEl: root as never, plugin: {
-		settings: { cloudflareDeployment: { accountId: 'account-a' } }, cloudflareSavedLogin: connection,
+		settings: { cloudflareDeployment: { accountId: 'account-a' }, usageWarnings: true }, cloudflareSavedLogin: connection, writeSettings,
 	} as never });
 	const actions = MockSetting.instances.find(s => s.nameEl.textContent === 'Usage metrics')!;
-	return { connection, root, cleanup, actions };
+	return { connection, root, cleanup, actions, writeSettings };
 }
 
 async function flush() { for (let i = 0; i < 5; i++) await Promise.resolve(); }
@@ -44,6 +45,14 @@ describe('usage settings', () => {
 		await flush();
 		expect(root.collectText()).not.toContain('Old results');
 	});
+});
+
+it('turns R2 billing warnings off for this device', () => {
+	const { writeSettings } = setup();
+	const toggle = MockSetting.instances.find(s => s.nameEl.textContent === 'Warn before R2 billing')!.toggles[0]!;
+	expect(toggle.value).toBe(true);
+	toggle.change(false);
+	expect(writeSettings).toHaveBeenCalledWith({ usageWarnings: false });
 });
 
 it('shows the last saved numbers and their date immediately without another request', () => {

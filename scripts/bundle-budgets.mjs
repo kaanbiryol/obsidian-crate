@@ -15,9 +15,10 @@ export const bundleBudgets = {
 		// Motion 14.14, Marked 18.3 and Defuddle 0.19.13 bring it to 5.0960 MB raw / 2.3626 MB gzip.
 		// Linkedom 0.18.15, whose CSSOM parser Defuddle reads stylesheets through, and the larger
 		// embedded Worker bring it to 5.3489 MB raw / 2.4508 MB gzip. The PWA's offline indicator
-		// fix brings it to 5.3490 MB raw / 2.4509 MB gzip.
-		maxBytes: 5349100,
-		maxGzipBytes: 2450900,
+		// fix brings it to 5.3490 MB raw / 2.4509 MB gzip. The single sync now button and the daily
+		// R2 billing warnings bring it to 5.3525 MB raw / 2.4521 MB gzip.
+		maxBytes: 5352500,
+		maxGzipBytes: 2452100,
 	},
 	{
 		path: 'dist/styles.css',
