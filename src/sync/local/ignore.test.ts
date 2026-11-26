@@ -138,6 +138,20 @@ describe('shouldIgnoreSyncPath', () => {
 	});
 });
 
+describe('compiled file patterns', () => {
+	it('matches names and paths like each pattern alone, and follows a list edited in place', () => {
+		const patterns = ['*.tmp', 'drafts/*.md', 'a?c'];
+		const context = createIgnoreMatcherContext([], patterns);
+		expect(shouldIgnoreSyncPath('notes/x.tmp', context)).toBe(true);
+		expect(shouldIgnoreSyncPath('drafts/x.md', context)).toBe(true);
+		expect(shouldIgnoreSyncPath('notes/drafts/x.md', context)).toBe(false);
+		expect(shouldIgnoreSyncPath('notes/abc', context)).toBe(true);
+		expect(shouldIgnoreSyncPath('notes/x.md', context)).toBe(false);
+		patterns.push('*.md');
+		expect(shouldIgnoreSyncPath('notes/x.md', context)).toBe(true);
+	});
+});
+
 describe('nested hidden paths', () => {
 	it('leaves out hidden files and folders below visible folders but keeps hidden root folders', () => {
 		const context = createIgnoreMatcherContext([], []);

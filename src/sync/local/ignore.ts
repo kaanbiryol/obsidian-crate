@@ -23,6 +23,45 @@ export function createIgnoreMatcherContext(
 	};
 }
 
+function patternSource(pattern: string): string {
+	return Array.from(pattern).map(char => {
+		if (char === '*') return '.*';
+		if (char === '?') return '.';
+		return char.replace(/[\\^$+.|(){}[\]]/g, '\\$&');
+	}).join('');
+}
+
+function compilePattern(pattern: string): RegExp | null {
+	try {
+		return new RegExp(`^${patternSource(pattern)}$`);
+	} catch (error) {
+		logger.warn(`Invalid ignore pattern "${pattern}":`, errorMessage(error));
+		return null;
+	}
+}
+
+/** A context's file patterns joined into one expression per kind, so each path costs two
+ * tests instead of two per pattern: patterns with a `/` match the whole path, the others
+ * also match the file name. */
+interface CompiledPatterns { patterns: string[]; withSlash: RegExp | null; anyName: RegExp | null }
+const compiled = new WeakMap<IgnoreMatcherContext, CompiledPatterns>();
+
+function compiledPatterns(context: IgnoreMatcherContext): CompiledPatterns {
+	let value = compiled.get(context);
+	// A pattern list edited in place compiles again.
+	if (value && value.patterns.length === context.ignorePatterns.length
+		&& value.patterns.every((pattern, index) => pattern === context.ignorePatterns[index])) return value;
+	const join = (patterns: string[]) => {
+		const valid = patterns.filter(pattern => compilePattern(pattern));
+		return valid.length ? new RegExp(`^(?:${valid.map(patternSource).join('|')})$`) : null;
+	};
+	const files = context.ignorePatterns.filter(pattern => !pattern.endsWith('/'));
+	value = { patterns: [...context.ignorePatterns], withSlash: join(files.filter(pattern => pattern.includes('/'))),
+		anyName: join(files.filter(pattern => !pattern.includes('/'))) };
+	compiled.set(context, value);
+	return value;
+}
+
 export function matchIgnorePattern(
 	path: string,
 	pattern: string,
@@ -36,17 +75,7 @@ export function matchIgnorePattern(
 
 	let regex = patternCache.get(pattern);
 	if (!regex) {
-		const regexPattern = Array.from(pattern).map(char => {
-			if (char === '*') return '.*';
-			if (char === '?') return '.';
-			return char.replace(/[\\^$+.|(){}[\]]/g, '\\$&');
-		}).join('');
-		try {
-			regex = new RegExp(`^${regexPattern}$`);
-		} catch (error) {
-			logger.warn(`Invalid ignore pattern "${pattern}":`, errorMessage(error));
-			regex = /^$/;
-		}
+		regex = compilePattern(pattern) ?? /^$/;
 		patternCache.set(pattern, regex);
 	}
 
@@ -62,8 +91,7 @@ export function matchIgnorePattern(
  * these out: finding them would mean listing every folder of the vault. Hidden folders at
  * the root, like `.obsidian`, sync with everything inside them. */
 function isNestedHiddenPath(path: string): boolean {
-	const segments = path.split('/');
-	return !segments[0]!.startsWith('.') && segments.some(segment => segment.startsWith('.'));
+	return !path.startsWith('.') && path.includes('/.');
 }
 
 export function shouldIgnoreSyncPath(
@@ -90,14 +118,10 @@ export function shouldIgnoreConfiguredPath(
 		}
 	}
 
-	for (const pattern of context.ignorePatterns) {
-		if (pattern.endsWith('/')) continue;
-		if (matchIgnorePattern(path, pattern, context.patternCache)) {
-			return true;
-		}
-	}
-
-	return false;
+	const { withSlash, anyName } = compiledPatterns(context);
+	if (withSlash?.test(path)) return true;
+	if (!anyName) return false;
+	return anyName.test(path) || anyName.test(path.slice(path.lastIndexOf('/') + 1));
 }
 
 export interface SyncIgnoreMatcher {

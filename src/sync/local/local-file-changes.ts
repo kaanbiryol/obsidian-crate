@@ -62,7 +62,7 @@ export async function hasLocalFileChanges(
 
 	for (const path of manifest.getAllPaths()) {
 		assertActive?.();
-		if (shouldIgnore(path) || currentPaths.has(path)) continue;
+		if (currentPaths.has(path) || shouldIgnore(path)) continue;
 		try {
 			const exists = await localPathExists(vault, path);
 			assertActive?.();
