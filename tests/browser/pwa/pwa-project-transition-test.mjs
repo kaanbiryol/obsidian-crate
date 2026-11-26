@@ -231,6 +231,11 @@ try {
       await page.goto(`${origin}/notifications?folder=Reminders&project=Personal%2FFinance`);
       await expect(page.getByRole('heading', { name: 'Personal/Finance', exact: true })).toBeVisible();
       await page.waitForFunction(() => history.state?.reminderProject === 'Personal/Finance');
+      // The heading can show while the app is still opening, when the layer is inert and keeps
+      // the edge for itself; wait until it hands the edge to native history.
+      const projectLayer = page.locator('.pwa-project-layer');
+      await expect(projectLayer).toHaveAttribute('data-pwa-back', 'true');
+      await expect(projectLayer).not.toHaveAttribute('inert', '');
       await checkBackGesture(page, '.pwa-project-layer', true);
       await page.goBack();
       await page.waitForFunction(() => history.state?.reminderProjectList === true);
