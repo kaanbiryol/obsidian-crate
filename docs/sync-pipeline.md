@@ -303,8 +303,11 @@ missing and marked for repair; background seeding can repair it only when the
 local file still matches the manifest hash. Existing cache files are not read or
 hashed by the seed pass. Missing/known-corrupt entries are seeded in groups of up
 to 32 files or 8 MiB of declared content (one larger eligible file may occupy a
-group), yielding and checking cancellation between groups. Non-Markdown files
-retain whole-file conflict handling.
+group), yielding and checking cancellation between groups. Seeding runs once:
+after a complete pass the cache saves `state.json`, and later startups skip the
+listing, since every sync writes the bases it uploads, downloads or merges. The
+cache folder, one file per note, is listed for pruning at most once a day.
+Non-Markdown files retain whole-file conflict handling.
 
 The remote compare-and-swap is
 committed before the local file is replaced, and the local hash is checked again

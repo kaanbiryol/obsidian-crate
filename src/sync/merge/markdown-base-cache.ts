@@ -12,9 +12,13 @@ const HASH_RE = /^[a-f0-9]{64}$/;
 const SEED_CONCURRENCY = 2;
 const SEED_BATCH_FILES = 32;
 const SEED_BATCH_BYTES = 8 * 1024 * 1024;
-// Unreferenced bases are hash-verified, local-only and small, so cleanup after
-// syncs can wait instead of listing the whole cache folder every time.
-export const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+// Unreferenced bases are hash-verified, local-only and small, so cleanup can wait instead
+// of listing the whole cache folder, one file per note, every time.
+export const PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** Written after a complete seed. Every later sync writes the bases it uploads, downloads
+ * or merges, so a seeded cache needs no startup listing; it also keeps the last prune time
+ * across restarts. */
+const STATE_FILE = 'state.json';
 
 export interface MarkdownBaseCacheManifest {
 	getAllPaths(): string[];
@@ -34,6 +38,8 @@ export class MarkdownBaseCache {
 	private readonly pendingWrites = new Map<string, Promise<void>>();
 	private readonly invalidHashes = new Set<string>();
 	private lastPruneAt: number | null = null;
+	/** Set by a complete seed, or by the state file one left; only then does a prune record it. */
+	private seeded = false;
 
 	constructor(app: Pick<App, 'vault'>, pluginManifest: Pick<PluginManifest, 'dir'>) {
 		this.app = app;
@@ -101,11 +107,18 @@ export class MarkdownBaseCache {
 		manifest: MarkdownBaseCacheManifest,
 		options: MarkdownBaseCacheSeedOptions,
 	): Promise<void> {
+		// Notes synced before startup; later syncs write the bases they transfer themselves.
+		const synced = manifest.getAllPaths().filter(isMarkdownPath);
+		const state = await this.readState();
+		if (state) {
+			this.seeded = true;
+			this.lastPruneAt = state.prunedAt;
+			return;
+		}
 		// One listing replaces an exists() call per note; it also serves the prune below.
 		const listing = await this.listCacheFiles();
 		const cachedHashes = new Set(listing.map(getHashFromCachePath));
-		const paths = manifest.getAllPaths()
-			.filter(isMarkdownPath)
+		const paths = synced
 			.filter((path) => {
 				const entry = manifest.getEntry(path);
 				return entry !== undefined
@@ -114,6 +127,7 @@ export class MarkdownBaseCache {
 					&& (this.invalidHashes.has(entry.hash) || !cachedHashes.has(entry.hash));
 			});
 
+		let failed = false;
 		const seed = (path: string) => async () => {
 			if (options.signal.aborted) {
 				return;
@@ -137,6 +151,8 @@ export class MarkdownBaseCache {
 					await this.putBase(path, entry.hash, content);
 				}
 			} catch (error) {
+				// The next startup seeds again rather than leave this note without a base.
+				failed = true;
 				logger.debug(`Skipped Markdown base cache seed for ${path}:`, errorMessage(error));
 			}
 		};
@@ -157,7 +173,21 @@ export class MarkdownBaseCache {
 			bytes += size;
 		}
 		await options.runConcurrent(batch, SEED_CONCURRENCY);
-		if (!options.signal.aborted) await this.removeUnreferenced(listing, getReferencedMarkdownHashes(manifest));
+		if (options.signal.aborted) return;
+		this.seeded = !failed;
+		await this.removeUnreferenced(listing, getReferencedMarkdownHashes(manifest));
+	}
+
+	private get statePath(): string { return `${this.cacheDir}/${STATE_FILE}`; }
+
+	private async readState(): Promise<{ prunedAt: number } | null> {
+		try {
+			const value = JSON.parse(await this.app.vault.adapter.read(this.statePath)) as { prunedAt?: unknown };
+			return typeof value.prunedAt === 'number' ? { prunedAt: value.prunedAt } : null;
+		} catch {
+			// Missing or damaged: seed again.
+			return null;
+		}
 	}
 
 	async pruneReferencedHashes(referencedHashes: Set<string>): Promise<void> {
@@ -181,6 +211,15 @@ export class MarkdownBaseCache {
 
 	private async removeUnreferenced(listing: string[], referencedHashes: Set<string>): Promise<void> {
 		this.lastPruneAt = Date.now();
+		// An empty cache is cheap to list, so only a seeded cache with bases records its state.
+		// A seed that was interrupted or failed must run again at the next startup.
+		if (this.seeded && (listing.length || this.writtenHashes.size)) {
+			try {
+				await this.app.vault.adapter.write(this.statePath, JSON.stringify({ prunedAt: this.lastPruneAt }));
+			} catch (error) {
+				logger.debug('Could not save the Markdown base cache state:', errorMessage(error));
+			}
+		}
 		// Pruning is best effort; a failed removal is retried by a later prune.
 		await Promise.allSettled(
 			listing

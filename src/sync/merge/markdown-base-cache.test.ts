@@ -28,6 +28,12 @@ function createCacheHarness() {
 		writeBinary: vi.fn(async (path: string, content: ArrayBuffer) => {
 			files.set(path, content);
 		}),
+		read: vi.fn(async (path: string) => {
+			const content = files.get(path);
+			if (!content) throw new Error(`missing ${path}`);
+			return fromArrayBuffer(content);
+		}),
+		write: vi.fn(async (path: string, text: string) => { files.set(path, toArrayBuffer(text)); }),
 		mkdir: vi.fn(async () => {}),
 		list: vi.fn(async (path: string) => ({
 			files: Array.from(files.keys()).filter((filePath) => filePath.startsWith(`${path}/`)),
@@ -37,11 +43,12 @@ function createCacheHarness() {
 			files.delete(path);
 		}),
 	};
-	const cache = new MarkdownBaseCache({
+	const open = () => new MarkdownBaseCache({
 		vault: { adapter },
 	} as never, { dir: PLUGIN_DIR });
+	const cache = open();
 
-	return { adapter, cache, files };
+	return { adapter, cache, files, open };
 }
 
 function createManifest(entries: Record<string, FileEntry>) {
@@ -257,4 +264,46 @@ it('prunes after syncs at most once per interval', async () => {
 		expect(adapter.list).toHaveBeenCalledTimes(2);
 		expect(files.has(orphan)).toBe(false);
 	} finally { vi.useRealTimers(); }
+});
+
+it('skips the startup listing once a seed completed, and keeps the prune time across restarts', async () => {
+	const { adapter, cache, files, open } = createCacheHarness();
+	const content = toArrayBuffer('note');
+	const hash = await sha256Hex(content);
+	files.set('a.md', content);
+	const manifest = createManifest({ 'a.md': { hash, size: content.byteLength, modified: '2026-01-01' } });
+	const options = { signal: new AbortController().signal, runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())) };
+
+	await cache.seedFromManifest(manifest, options);
+	expect(adapter.list).toHaveBeenCalledOnce();
+	expect(await cache.readBase('a.md', hash)).toEqual(content);
+
+	// Before: every startup listed the cache folder, which holds one file per note.
+	const restarted = open();
+	adapter.list.mockClear();
+	await restarted.seedFromManifest(manifest, options);
+	await restarted.pruneUnreferenced(manifest);
+	expect(adapter.list).not.toHaveBeenCalled();
+});
+
+it('seeds again at the next startup when a seed was interrupted, even after a prune', async () => {
+	const { adapter, cache, files, open } = createCacheHarness();
+	const content = toArrayBuffer('note');
+	const hash = await sha256Hex(content);
+	files.set('a.md', content);
+	const manifest = createManifest({ 'a.md': { hash, size: content.byteLength, modified: '2026-01-01' } });
+	const run = async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task()));
+	const aborted = new AbortController();
+	aborted.abort();
+
+	await cache.seedFromManifest(manifest, { signal: aborted.signal, runConcurrent: run });
+	// A sync writes a base, then prunes, as after the first sync of a session.
+	await cache.putBase('b.md', 'f'.repeat(64), toArrayBuffer('other'));
+	await cache.pruneUnreferenced(manifest);
+
+	const restarted = open();
+	adapter.list.mockClear();
+	await restarted.seedFromManifest(manifest, { signal: new AbortController().signal, runConcurrent: run });
+	expect(adapter.list).toHaveBeenCalled();
+	expect(await restarted.readBase('a.md', hash)).toEqual(content);
 });
