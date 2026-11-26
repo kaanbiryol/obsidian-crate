@@ -70,6 +70,21 @@ describe('PWA reminder refresh around local writes', () => {
 		expect(reminderSyncStatus({ ...rendered.current, changes: [], storageError: null }).state).toBe('synced');
 	});
 
+	it.each([200, 304])('stays offline when HTTP %s answers a refresh sent before the browser went offline', async status => {
+		const { rendered, original, load, settle } = harness();
+		act(() => { window.dispatchEvent(new window.Event('online')); });
+		const pending = load();
+		act(() => { window.dispatchEvent(new window.Event('offline')); });
+		await settle(0, status === 200 ? response([original]) : new Response(null, { status: 304 }), pending);
+		expect(rendered.current.dataMode).toBe('live');
+		expect(rendered.current.isOffline).toBe(true);
+		// A refresh sent while offline that still gets an answer shows the server is reachable.
+		const next = load();
+		await settle(1, new Response(null, { status: 304 }), next);
+		expect(rendered.current.isOffline).toBe(false);
+		act(() => { window.dispatchEvent(new window.Event('online')); });
+	});
+
 	it('replaces indexing progress with attention only when the refresh fails', async () => {
 		vi.useFakeTimers();
 		const { rendered, load, settle, warming } = harness();

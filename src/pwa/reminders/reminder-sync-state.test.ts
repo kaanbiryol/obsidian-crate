@@ -22,16 +22,23 @@ describe('reminder sync view state', () => {
 	it('hydrates the offline copy as cached, then confirms the server list as live and answered', () => {
 		const hydrated = run([{ type: 'cache-hydrated', snapshot, issues: [issue], savedAt: 5 }]);
 		expect(hydrated).toMatchObject({ loading: false, snapshot, issues: [issue], lastUpdatedAt: 5, dataMode: 'cached', answered: false });
-		const unchanged = run([{ type: 'confirmed', savedAt: 9 }], hydrated);
+		const unchanged = run([{ type: 'confirmed', savedAt: 9, answered: true }], hydrated);
 		expect(unchanged).toMatchObject({ snapshot, lastUpdatedAt: 9, dataMode: 'live', answered: true });
 		const next = { reminders: [], projects: [] };
-		expect(run([{ type: 'list-received', issues: [] }, { type: 'confirmed', snapshot: next, savedAt: 10 }], unchanged))
+		expect(run([{ type: 'list-received', issues: [] }, { type: 'confirmed', snapshot: next, savedAt: 10, answered: true }], unchanged))
 			.toMatchObject({ snapshot: next, issues: [], error: null, lastUpdatedAt: 10 });
 		expect(run([{ type: 'connectivity-changed' }], unchanged).answered).toBe(false);
 	});
 
+	it('does not count a response to a request sent before the latest connectivity change as an answer', () => {
+		const offline = run([{ type: 'connectivity-changed' }, { type: 'confirmed', snapshot, savedAt: 2, answered: false }]);
+		expect(offline).toMatchObject({ snapshot, lastUpdatedAt: 2, dataMode: 'live', answered: false });
+		// A later request already answered under the current connection keeps its answer.
+		expect(run([{ type: 'confirmed', savedAt: 3, answered: true }, { type: 'confirmed', savedAt: 4, answered: false }], offline).answered).toBe(true);
+	});
+
 	it('shows unavailable data only for a rejected first list', () => {
-		const loaded = run([{ type: 'confirmed', snapshot, savedAt: 1 }]);
+		const loaded = run([{ type: 'confirmed', snapshot, savedAt: 1, answered: true }]);
 		expect(run([{ type: 'list-rejected', message: 'Invalid', showErrorState: false }], loaded)).toMatchObject({ error: 'Invalid', dataMode: 'live' });
 		expect(run([{ type: 'list-rejected', message: 'Invalid', showErrorState: true }])).toMatchObject({ error: 'Invalid', dataMode: 'error' });
 	});
@@ -56,7 +63,7 @@ describe('reminder sync view state', () => {
 		const authority = {};
 		const empty = { reminders: [], projects: [] };
 		const state = run([
-			{ type: 'confirmed', snapshot, savedAt: 1 }, { type: 'list-received', issues: [issue] },
+			{ type: 'confirmed', snapshot, savedAt: 1, answered: true }, { type: 'list-received', issues: [issue] },
 			{ type: 'read-started', silent: true }, { type: 'error', message: 'Later failure' }, { type: 'hydration-finished', authority },
 			{ type: 'reset', snapshot: empty },
 		]);

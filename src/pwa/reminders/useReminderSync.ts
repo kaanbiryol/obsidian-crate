@@ -70,7 +70,10 @@ export function useReminderSync({
 	enabledRef.current = enabled;
 	const [state, dispatch] = useReducer(reduceReminderSync, undefined, initialReminderSyncState);
 	const { snapshot: { reminders, projects }, loading, refreshing, indexingProgress, error, issues, dataMode, lastUpdatedAt } = state;
-	const isOffline = !useOnlineStatus(() => dispatch({ type: 'connectivity-changed' })) && !state.answered;
+	// Counts the browser's online and offline events, so a response knows whether its request
+	// was sent under the current connection.
+	const connectivityRef = useRef(0);
+	const isOffline = !useOnlineStatus(() => { connectivityRef.current += 1; dispatch({ type: 'connectivity-changed' }); }) && !state.answered;
 	const issuesRef = useRef<ReminderSourceIssue[]>([]);
 	const snapshotRef = useRef(state.snapshot);
 	const hydratedCacheRef = useRef(false);
@@ -113,11 +116,12 @@ export function useReminderSync({
 	// Confirmed state committed with persist: 'later' that the offline copy does not hold yet.
 	const unsavedRef = useRef<{ folderPath: string; savedAt: number } | null>(null);
 	const commitConfirmedSnapshot = useCallback(async (nextReminders: ReminderRecord[], nextProjects = snapshotRef.current.projects,
-		{ etag, deltaBase, persist = true }: { etag?: string; deltaBase?: string; persist?: boolean | 'later' } = {}) => {
+		{ etag, deltaBase, persist = true, connectivity = connectivityRef.current }:
+		{ etag?: string; deltaBase?: string; persist?: boolean | 'later'; connectivity?: number } = {}) => {
 		const savedAt = Date.now();
 		const snapshot = publishSnapshot(nextReminders, nextProjects);
 		cursor.confirmed({ etag, deltaBase }, savedAt);
-		dispatch({ type: 'confirmed', snapshot, savedAt });
+		dispatch({ type: 'confirmed', snapshot, savedAt, answered: connectivity === connectivityRef.current });
 		if (persist === 'later') { unsavedRef.current = { folderPath: config.folderPath, savedAt }; return; }
 		if (!persist) return;
 		unsavedRef.current = null;
@@ -181,6 +185,7 @@ export function useReminderSync({
 			const readToken = requestCoordinatorRef.current.beginRead();
 			// A local change, an invalidation or a newer read leaves this one unusable for good.
 			const readApplies = () => sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken);
+			const connectivity = connectivityRef.current;
 			dispatch({ type: 'read-started', silent: Boolean(options.silent) });
 			try {
 				const { path, headers, since } = cursor.request(config.folderPath, issuesRef.current.length === 0);
@@ -203,7 +208,7 @@ export function useReminderSync({
 				if (outcome.kind === 'not-modified') {
 					const savedAt = Date.now();
 					cursor.notModified(response.headers, savedAt);
-					dispatch({ type: 'confirmed', savedAt });
+					dispatch({ type: 'confirmed', savedAt, answered: connectivity === connectivityRef.current });
 					void refreshCachedReminderSnapshot(
 						config.folderPath,
 						savedAt,
@@ -218,7 +223,7 @@ export function useReminderSync({
 				}
 				issuesRef.current = outcome.result.issues;
 				dispatch({ type: 'list-received', issues: outcome.result.issues });
-				void commitConfirmedSnapshot(outcome.result.reminders, outcome.result.projects, { etag: outcome.etag, deltaBase: outcome.deltaBase });
+				void commitConfirmedSnapshot(outcome.result.reminders, outcome.result.projects, { etag: outcome.etag, deltaBase: outcome.deltaBase, connectivity });
 			} catch (loadError) {
 				if (!readApplies()) return;
 				const cached = needsDiskFallback(cursor.lastCheckedAt) ? await loadCachedReminderSnapshot(config.folderPath) : undefined;

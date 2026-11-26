@@ -28,8 +28,10 @@ export interface ReminderSyncViewState {
 export type ReminderSyncEvent =
 	/** The same confirmed list, presented again (for example after a rejected reorder). */
 	| { type: 'presented'; snapshot: ConfirmedReminderSnapshot }
-	/** The server confirmed the list: a new snapshot, or unchanged after a 304. */
-	| { type: 'confirmed'; savedAt: number; snapshot?: ConfirmedReminderSnapshot }
+	/** The server confirmed the list: a new snapshot, or unchanged after a 304. `answered` is
+	 * false for a request sent before the browser's latest online or offline event, whose
+	 * response says nothing about the connection now. */
+	| { type: 'confirmed'; savedAt: number; snapshot?: ConfirmedReminderSnapshot; answered: boolean }
 	| { type: 'cache-hydrated'; snapshot: ConfirmedReminderSnapshot; issues: ReminderSourceIssue[]; savedAt: number }
 	| { type: 'read-started'; silent: boolean }
 	| { type: 'indexing'; progress: ReminderIndexingProgress }
@@ -72,7 +74,7 @@ export function reduceReminderSync(state: ReminderSyncViewState, event: Reminder
 		case 'presented': return patch(state, { snapshot: event.snapshot });
 		case 'confirmed': return patch(state, {
 			...(event.snapshot && { snapshot: event.snapshot }),
-			lastUpdatedAt: event.savedAt, dataMode: 'live', answered: true,
+			lastUpdatedAt: event.savedAt, dataMode: 'live', answered: state.answered || event.answered,
 		});
 		case 'cache-hydrated': return patch(state, {
 			loading: false, snapshot: event.snapshot, issues: event.issues, lastUpdatedAt: event.savedAt, dataMode: 'cached',
