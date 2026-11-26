@@ -180,7 +180,7 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 		},
 		saveLastChecked: at => plugin.app.saveLocalStorage(LAST_NOTIFICATION_CHECK_KEY, at),
 	}, controller.signal);
-	const offIndexChange = index.onIndexChange(notifications.refresh);
+	const offIndexChange = index.onIndexChange(notifications.refreshSoon);
 	controller.signal.addEventListener('abort', offIndexChange, { once: true });
 	const backend: ReminderBackend = {
 		index,

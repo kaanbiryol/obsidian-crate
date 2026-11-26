@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MAX_CHECK_DELAY_MS, startLocalReminderNotifications, type LocalNotification, type LocalNotificationHost } from './local-notifications';
+import { MAX_CHECK_DELAY_MS, REFRESH_COALESCE_MS, startLocalReminderNotifications, type LocalNotification, type LocalNotificationHost } from './local-notifications';
 import { desktopNotificationsActive } from './runtime';
 import { notificationDatetime } from './core/notification-time';
 import type { IndexedReminder } from './data/reminder-index';
@@ -19,10 +19,12 @@ function harness(initial: IndexedReminder[] | null, lastChecked: number | null =
 	let reminders = initial;
 	let last = lastChecked;
 	let active = true;
+	let allDayTime = '09:00';
+	let reads = 0;
 	const shown: LocalNotification[] = [];
 	const host: LocalNotificationHost = {
-		reminders: () => reminders,
-		schedule: () => ({ allDayTime: '09:00', timezone: 'UTC' }),
+		reminders: () => { reads += 1; return reminders; },
+		schedule: () => ({ allDayTime, timezone: 'UTC' }),
 		isActive: () => active,
 		show: notification => shown.push(notification),
 		loadLastChecked: () => last,
@@ -35,7 +37,9 @@ function harness(initial: IndexedReminder[] | null, lastChecked: number | null =
 		start: () => startLocalReminderNotifications(host, controller.signal),
 		setReminders: (next: IndexedReminder[] | null) => { reminders = next; },
 		setActive: (value: boolean) => { active = value; },
+		setAllDayTime: (value: string) => { allDayTime = value; },
 		lastChecked: () => last,
+		reads: () => reads,
 	};
 }
 
@@ -115,9 +119,48 @@ describe('local reminder notifications', () => {
 		expect(h.shown.map(n => n.tag)).toEqual(['day']);
 	});
 
+	it('coalesces a burst of index changes into one check', () => {
+		const h = harness([reminder('a', at(5 * MINUTE))]);
+		const notifications = h.start();
+		const before = h.reads();
+		h.setReminders([reminder('a', at(20 * MINUTE))]);
+		for (let i = 0; i < 50; i++) notifications.refreshSoon();
+		expect(h.reads()).toBe(before);
+		vi.advanceTimersByTime(REFRESH_COALESCE_MS);
+		expect(h.reads()).toBe(before + 1);
+		vi.advanceTimersByTime(10 * MINUTE);
+		expect(h.shown).toEqual([]);
+		vi.advanceTimersByTime(10 * MINUTE);
+		expect(h.shown.map(n => n.tag)).toEqual(['a']);
+	});
+
+	it('follows a reminder moved back to a due time it had before', () => {
+		const h = harness([reminder('a', at(5 * MINUTE))]);
+		const notifications = h.start();
+		h.setReminders([reminder('a', at(20 * MINUTE))]);
+		notifications.refresh();
+		h.setReminders([reminder('a', at(5 * MINUTE))]);
+		notifications.refresh();
+		vi.advanceTimersByTime(5 * MINUTE);
+		expect(h.shown.map(n => n.tag)).toEqual(['a']);
+	});
+
+	it('uses a changed all-day time on the next check', () => {
+		vi.setSystemTime(Date.parse('2026-11-15T08:00:00.000Z'));
+		const h = harness([reminder('day', undefined, { dueDate: '2026-11-15' })], Date.now());
+		const notifications = h.start();
+		h.setAllDayTime('10:00');
+		notifications.refresh();
+		vi.advanceTimersByTime(60 * MINUTE);
+		expect(h.shown).toEqual([]);
+		vi.advanceTimersByTime(60 * MINUTE);
+		expect(h.shown.map(n => n.tag)).toEqual(['day']);
+	});
+
 	it('stops when its backend stops', () => {
 		const h = harness([reminder('a', at(MINUTE))]);
-		h.start();
+		const notifications = h.start();
+		notifications.refreshSoon();
 		h.controller.abort();
 		vi.advanceTimersByTime(2 * MINUTE);
 		expect(h.shown).toEqual([]);
