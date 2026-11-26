@@ -7,6 +7,7 @@ import { handleListReminders } from './handlers/list';
 import { scanReminderMarkdownContent } from '@/reminders/core/markdownScan';
 import { REMINDER_CACHE_PARSER_VERSION } from './cache/index';
 import { sha256Hex } from '../../../platform/sha256';
+import { installStorageCostMeter } from '../test-support/storage-cost-test-harness';
 
 // A repeatable local workerd/D1/R2 measurement, not a hosted CPU or mobile claim.
 beforeEach(async () => {
@@ -118,4 +119,30 @@ it.for([1000, 10000])('warms a cold %i-reminder folder through bounded requests'
 		wallMs: Math.round(performance.now() - start), longestRequestMs: Math.round(longestRequestMs),
 		samples: await measureWarmLists(count),
 	}), 'capacity');
+});
+
+it('reads each cold note about once while warming, not the whole folder per batch', { timeout: 120_000 }, async () => {
+	const files = 1000;
+	await seedFiles(files, 1, false);
+	const meter = await installStorageCostMeter();
+	try {
+		const reads: number[] = [];
+		for (let request = 0; request <= files; request++) {
+			const { result: response, cost } = await meter.measure(() => handleListReminders(listRequest(), env), { alarms: false });
+			reads.push(cost.rowsRead);
+			if (response.status === 200) {
+				expect((await response.json() as { reminders: unknown[] }).reminders).toHaveLength(files);
+				break;
+			}
+			expect(response.status).toBe(202);
+		}
+		// The first and last requests list the folder; the ones between read one batch each.
+		// Before: every request read the folder's files and cache rows, about 2,000 rows here.
+		const between = reads.slice(1, -1);
+		expect(between.length).toBeGreaterThan(40);
+		expect(Math.max(...between)).toBeLessThan(200);
+		expect(reads.reduce((sum, value) => sum + value, 0)).toBeLessThan(20 * files);
+	} finally {
+		await meter.restore();
+	}
 });

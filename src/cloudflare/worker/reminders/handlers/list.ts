@@ -9,6 +9,8 @@ import {
 	reminderProjects,
 } from '../cache/index';
 import { loadReminderFileCache } from '../cache/load';
+import { REMINDER_INDEX_WARM_MAX_FILES } from '../cache/types';
+import { continueReminderIndexWarm, readReminderWarmCursor, saveReminderWarmCursor } from '../cache/warm-cursor';
 import { storedReminderRevision } from '../cache/revisions';
 import type { RemoteReminderRecord } from '../types';
 import { reminderCommandPayload } from '@/reminders/core/reminderFileCommand';
@@ -62,6 +64,17 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 		if (current && changedPaths?.length === 0) return notModified(changeEtag(changeToken, current.revision, !current.incomplete), !current.incomplete);
 	}
 
+	const warmingResponse = (remainingFiles: number, totalFiles: number) => corsResponse({ warming: true, remainingFiles, totalFiles }, 202, {
+		'Cache-Control': 'private, no-store',
+		'Retry-After': '1',
+	});
+	// A folder still warming resumes after the last indexed note, without listing the folder.
+	const warmCursor = requestEtags.includes('*') ? null : await readReminderWarmCursor(env.DB, folderPath);
+	if (warmCursor) {
+		const progress = await continueReminderIndexWarm(env, folderPath, warmCursor);
+		return warmingResponse(progress.remainingFiles, progress.totalFiles);
+	}
+
 	// Cache rows do not depend on the folder listing, so read them alongside it: the
 	// changed notes for a delta, or every note when no conditional answer is possible.
 	const changedCache = changedPaths ? loadReminderFileCache(env.DB, folderPath, changedPaths) : undefined;
@@ -104,14 +117,12 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	if (same) return notModified(changeEtag(changeToken, revision, !same.incomplete), !same.incomplete);
 	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata, folderCache);
 	if (!workspace.ready) {
-		return corsResponse({
-			warming: true,
-			remainingFiles: workspace.remainingFiles,
-			totalFiles: metadata.length,
-		}, 202, {
-			'Cache-Control': 'private, no-store',
-			'Retry-After': '1',
-		});
+		// Beyond one more batch, later requests warm from a cursor instead of listing the
+		// folder each time. Notes this request indexed are skipped there.
+		if (workspace.remainingFiles > REMINDER_INDEX_WARM_MAX_FILES) {
+			await saveReminderWarmCursor(env.DB, folderPath, { after: '', remaining: workspace.remainingFiles, total: metadata.length }).catch(() => {});
+		}
+		return warmingResponse(workspace.remainingFiles, metadata.length);
 	}
 	// A complete, issue-free revision can be the base of a later delta. Issues
 	// include duplicate identities, whose visibility can change in unchanged notes.
