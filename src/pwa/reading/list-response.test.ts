@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
-import { loadReading, queryReadingItems, queryReadingTags } from './api';
+import { loadReading, queryReadingItems, queryReadingTags, reloadReadingAfterWrites, takeCommittedReadingArticle } from './api';
+import { sha256Hex } from '@/platform/sha256';
 import { removeEarlierSessionCopies } from './storage/storage';
 import { type ReadingSession } from './session/session';
 
@@ -89,4 +90,20 @@ it('asks only what changed after the first read, and reads the first page again 
 	respond({ revision: '1.7', reset: true }, { items: [item(3)], issues: [], cursor: null, revision: '1.7' });
 	expect(await loadReading(own)).toMatchObject({ revision: '1.7', items: [{ title: 'Article 3' }] });
 	expect(network.mock.calls.at(-1)![0]).toBe('/reading/items?section=inbox');
+});
+
+it('keeps a committed body for the open reader once, and only when it matches its hash', async () => {
+	const own = { ...session, id: 'committed-session' }, edited = { ...item(1), favorite: true };
+	const markdown = '==Article== text.', markdownHash = await sha256Hex(markdown);
+	respond({ items: [edited], issues: [], cursor: null });
+	await reloadReadingAfterWrites(own, [{ itemId: edited.crate_reading_id, article: { item: edited, etag: '"new"', markdownHash, markdown } }]);
+	expect(takeCommittedReadingArticle({ ...own, generation: 'other' }, edited.crate_reading_id)).toBeUndefined();
+	respond({ items: [edited], issues: [], cursor: null });
+	await reloadReadingAfterWrites(own, [{ itemId: edited.crate_reading_id, article: { item: edited, etag: '"new"', markdownHash, markdown } }]);
+	expect(takeCommittedReadingArticle(own, edited.crate_reading_id)).toEqual({ item: edited, etag: '"new"', markdownHash, markdown });
+	expect(takeCommittedReadingArticle(own, edited.crate_reading_id)).toBeUndefined();
+
+	respond({ items: [edited], issues: [], cursor: null });
+	await reloadReadingAfterWrites(own, [{ itemId: edited.crate_reading_id, article: { item: edited, etag: '"new"', markdownHash, markdown: 'Tampered.' } }]);
+	expect(takeCommittedReadingArticle(own, edited.crate_reading_id)).toEqual({ item: edited, etag: '"new"', markdownHash });
 });

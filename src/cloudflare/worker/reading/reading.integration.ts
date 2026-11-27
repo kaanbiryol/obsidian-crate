@@ -356,8 +356,15 @@ it('persists highlights with replay receipts and rejects concurrent highlight re
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reading/Highlights.md', content, null);
 	const highlights = [{ start: 0, end: 5, text: 'Hello' }];
 	const body = { id: item.crate_reading_id, before: {}, changes: { highlights }, operationId: id() };
-	expect((await command('update', body)).status).toBe(200);
-	expect((await command('update', body)).status).toBe(200);
+	const first = await command('update', body);
+	expect(first.status).toBe(200);
+	// The markers rewrote the body, so it travels with the committed item; a replayed receipt has neither.
+	const { article } = await first.json() as { article: { markdown?: string; markdownHash: string } };
+	expect(article.markdown?.endsWith('==Hello== **world**!')).toBe(true);
+	expect(article.markdownHash).toBe(await sha256Hex(article.markdown!));
+	const replay = await command('update', body);
+	expect(replay.status).toBe(200);
+	expect(await replay.json()).not.toHaveProperty('article');
 	const saved = (await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, 'Reading/Highlights.md'))!;
 	const confirmedHighlights = parseReadingNote(saved.content)!.highlights;
 	expect(confirmedHighlights?.[0]).toMatchObject(highlights[0]!);

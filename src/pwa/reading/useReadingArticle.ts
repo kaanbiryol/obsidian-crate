@@ -3,11 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readingUrlIdentity, type ReadingItem } from '@/reading/core/model';
 import type { ReadingSection } from '@/reading/core/reading-presentation';
-import { loadReadingArticle, loadReadingImage, queryReadingItems } from './api';
+import { loadReadingArticle, loadReadingImage, queryReadingItems, takeCommittedReadingArticle, type LoadedReadingArticle } from './api';
 import { readReadingArticle, cacheReadingArticle, removeReadingArticle, offlineReadingImagePaths, type OfflineReadingImages, type ReadingCache } from './storage/storage';
 import { linkedVaultImages, readingImageType } from '@/reading/core/article-images';
 import { arrayBufferToBase64 } from '@/platform/base64';
 import { mapBounded } from '@/platform/map-bounded';
+import { sha256Hex } from '@/platform/sha256';
 import { assertReadingSession, type ReadingSession } from './session/session';
 import { presentReadingItems } from './pending-view';
 import { dismissReadingArticleHistory, hasReadingArticleHistory, openReadingArticleHistory } from './storage/article-history';
@@ -34,6 +35,15 @@ async function offlineImages(session: ReadingSession, item: ReadingItem, markdow
 		catch { /* Shown from the server when online. */ }
 	});
 	return { save, keep: new Set(linked) };
+}
+
+/** The body this device's own update committed for the open article: the one the response
+ * carried, or the shown one when the update left it unchanged. Anything else downloads. */
+async function committedBody(session: ReadingSession, reader: OpenReadingArticle, expected: ReturnType<typeof bodySource>): Promise<LoadedReadingArticle | undefined> {
+	const committed = takeCommittedReadingArticle(session, reader.item.crate_reading_id), source = committed && bodySource(committed.item);
+	if (!committed || source!.sourceHighlights !== expected.sourceHighlights || source!.sourceExtractionStatus !== expected.sourceExtractionStatus) return undefined;
+	const markdown = committed.markdown ?? (reader.markdown !== null && await sha256Hex(reader.markdown) === committed.markdownHash ? reader.markdown : undefined);
+	return markdown === undefined ? undefined : { item: committed.item, markdown, etag: committed.etag };
 }
 
 /** Article navigation and stale-request guards share one lifetime. */
@@ -138,7 +148,7 @@ export function useReadingArticle({ session, cache, pending, isCurrentSession, r
 					setReader(current => current?.item.crate_reading_id === copy.item.crate_reading_id ? { ...current, markdown: copy.markdown, availableOffline: true, etag: copy.etag, ...expected } : current);
 					return;
 				}
-				const article = await loadReadingArticle(session, reader.item.crate_reading_id, saved?.etag) ?? saved!;
+				const article = await committedBody(session, reader, expected) ?? await loadReadingArticle(session, reader.item.crate_reading_id, saved?.etag) ?? saved!;
 				if (!active || request !== navigation.current) return;
 				let cached = false, failed = false;
 				if (saved) {

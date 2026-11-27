@@ -57,6 +57,8 @@ it('answers an unchanged item with 304 before reading R2 and returns the committ
 	const saved = await update.json() as { saved: boolean; article: { item: { favorite: boolean; path: string }; etag: string; markdownHash: string } };
 	expect(saved).toMatchObject({ saved: true, article: { item: { favorite: true, path: 'Reading/Article.md' }, markdownHash: await sha256Hex(markdown) } });
 	expect(saved.article.etag).not.toBe(etag);
+	// The body is unchanged, so the response does not repeat it.
+	expect(saved.article).not.toHaveProperty('markdown');
 	// The returned ETag is the item's own: a client holding it reads 304.
 	expect((await route(`item?id=${note.crate_reading_id}`, { headers: { 'If-None-Match': etag } })).status).toBe(200);
 	const after = await route(`item?id=${note.crate_reading_id}`, { headers: { 'If-None-Match': saved.article.etag } });

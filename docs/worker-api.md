@@ -603,9 +603,11 @@ folder. Every file commit, deletion, move, restore and initial import writes tha
 row and its search terms in the same D1 batch as the file, from the bytes it commits, so
 page and item reads never re-check `files`, and `GET /reading/item` reads the note's R2
 object by the revision its row names. Update and retry responses add
-`article: { item, etag, markdownHash }`: the committed item, its `GET /reading/item` ETag and
-the SHA-256 of its article body. A client keeps a saved body whose hash matches under the
-new ETag. A replayed receipt omits `article`.
+`article: { item, etag, markdownHash, markdown? }`: the committed item, its `GET /reading/item`
+ETag and the SHA-256 of its article body. `markdown` is the new body, present only when the
+change rewrote it (a text highlight adds `==` markers). A client keeps a saved body whose hash
+matches under the new ETag, and an open reader shows the committed body without downloading
+the article again. A replayed receipt omits `article`.
 
 `GET /reading/item` answers an indexed note with an `ETag` derived from the index format,
 Reading folder scope, item ID, path and the file revision its row names. A matching

@@ -26,7 +26,11 @@ const ENCRYPTED_READING_PATH = new RegExp(`^/reading/(?:${ENCRYPTED_READING_ACTI
 let encryptedClient: { identity: string; api: EncryptedReadingApi } | undefined;
 // The last library read per sign-in, so a refresh asks the server only what changed since.
 let lastLibrary: { identity: string; cache: ReadingCache } | undefined;
-onReadingEncryptionReset(() => { encryptedClient = undefined; lastLibrary = undefined; });
+/** Articles that update responses committed, by item ID, until the open reader takes its own. */
+const committedArticles = new Map<string, { identity: string; article: CommittedArticle }>();
+const MAX_COMMITTED_ARTICLES = 5;
+onReadingEncryptionReset(() => { encryptedClient = undefined; lastLibrary = undefined; committedArticles.clear(); });
+const libraryIdentity = (session: ReadingSession) => JSON.stringify([session.token, session.id, session.generation, session.folderPath]);
 
 /** The server answers within 20 seconds; larger bodies also need time to travel. An encrypted
  * capture uploads its images, and an encrypted extract downloads them. */
@@ -132,7 +136,7 @@ export async function queryReadingTags(session: ReadingSession, section: Reading
  * travel with a new one so the loaded sections apply them too. A confirmed first page also lets
  * earlier sign-ins' offline copies go. */
 export async function loadReading(session: ReadingSession): Promise<ReadingCache> {
-	const identity = JSON.stringify([session.token, session.id, session.generation, session.folderPath]);
+	const identity = libraryIdentity(session);
 	const previous = lastLibrary?.identity === identity ? lastLibrary.cache : undefined;
 	if (previous?.revision) {
 		const changes = await queryReadingChanges(session, previous.revision);
@@ -163,12 +167,32 @@ export interface ReadingWrite { itemId: string; article?: unknown; deleted?: tru
 // Saved copies of edited items refresh a few at a time.
 const ITEM_RELOAD_CONCURRENCY = 3;
 
+/** The note an update committed. `markdown` is its body when the update rewrote it. */
+export interface CommittedArticle { item: ReadingItem; etag: string; markdownHash: string; markdown?: string }
+
 /** The committed item from an update response, or null when the server sent none. */
-function committedArticle(value: unknown, folder: string, id: string): { item: ReadingItem; etag?: string; markdownHash?: string } | null {
+function committedArticle(value: unknown, folder: string, id: string): { item: ReadingItem; etag?: string; markdownHash?: string; markdown?: string } | null {
 	if (!value || typeof value !== 'object') return null;
-	const { item, etag, markdownHash } = value as { item?: unknown; etag?: unknown; markdownHash?: unknown };
+	const { item, etag, markdownHash, markdown } = value as { item?: unknown; etag?: unknown; markdownHash?: unknown; markdown?: unknown };
 	if (!isReadingItem(item, folder) || item.crate_reading_id !== id || !item.path) return null;
-	return { item, ...(typeof etag === 'string' && etag.length <= MAX_REVISION_LENGTH ? { etag } : {}), ...(isSha256Hex(markdownHash) ? { markdownHash } : {}) };
+	return { item, ...(typeof etag === 'string' && etag.length <= MAX_REVISION_LENGTH ? { etag } : {}), ...(isSha256Hex(markdownHash) ? { markdownHash } : {}),
+		...(typeof markdown === 'string' ? { markdown } : {}) };
+}
+
+/** Kept for the open reader. A body that does not match its hash is left out, so the reader downloads it. */
+async function rememberCommittedArticle(session: ReadingSession, article: CommittedArticle): Promise<void> {
+	const { markdown, ...rest } = article;
+	const kept = markdown !== undefined && await sha256Hex(markdown) === article.markdownHash ? article : rest;
+	committedArticles.delete(article.item.crate_reading_id);
+	committedArticles.set(article.item.crate_reading_id, { identity: libraryIdentity(session), article: kept });
+	for (const id of committedArticles.keys()) { if (committedArticles.size <= MAX_COMMITTED_ARTICLES) break; committedArticles.delete(id); }
+}
+
+/** The article this session's last update to `id` committed, once. */
+export function takeCommittedReadingArticle(session: ReadingSession, id: string): CommittedArticle | undefined {
+	const committed = committedArticles.get(id);
+	committedArticles.delete(id);
+	return committed?.identity === libraryIdentity(session) ? committed.article : undefined;
 }
 
 /** Moves an offline copy to the committed revision when its body is unchanged, so an open
@@ -186,7 +210,9 @@ export async function reloadReadingAfterWrites(session: ReadingSession, writes: 
 	await mapBounded([...latest.values()], ITEM_RELOAD_CONCURRENCY, async write => {
 		if (write.deleted) return;
 		const article = committedArticle(write.article, readingNoteFolder(session), write.itemId);
-		if (article?.etag && article.markdownHash) await refreshSavedArticle(session, article.item, article.etag, article.markdownHash);
+		if (!article?.etag || !article.markdownHash) return;
+		await refreshSavedArticle(session, article.item, article.etag, article.markdownHash);
+		await rememberCommittedArticle(session, { ...article, etag: article.etag, markdownHash: article.markdownHash });
 	});
 	return loadReading(session);
 }

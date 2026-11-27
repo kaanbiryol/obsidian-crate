@@ -124,9 +124,10 @@ export async function mutateReading(env: Env, principal: AuthPrincipal, current:
 	if (!result.committed) throw new ReadingError('This note changed. Refresh before editing it.', 409);
 	// The note as committed, so the client needs no `GET /reading/item`: `etag` is that item's
 	// ETag and `markdownHash` its body's SHA-256, which tells whether a saved body still matches.
-	const saved = parseReadingNote(content)!;
+	// A changed body, as a text highlight makes, travels too, so the reader need not download it.
+	const saved = parseReadingNote(content)!, markdown = readReadingFrontmatter(content)?.body ?? '';
 	const article = { item: { ...saved, path: source.path }, etag: await readingItemEtag(current, saved.crate_reading_id, { path: source.path, storage_key: staged.objectKey, hash: staged.hash }),
-		markdownHash: await sha256Hex(readReadingFrontmatter(content)?.body ?? '') };
+		markdownHash: await sha256Hex(markdown), ...markdown !== (readReadingFrontmatter(source.content)?.body ?? '') ? { markdown } : {} };
 	return readingResponse({ ...response, article });
 }
 

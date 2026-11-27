@@ -2,7 +2,8 @@ import { act } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { ReadingItem } from '@/reading/core/model';
 import { renderHook } from '../../test/react-hooks';
-import { loadReadingArticle } from './api';
+import { loadReadingArticle, takeCommittedReadingArticle } from './api';
+import { sha256Hex } from '@/platform/sha256';
 import { cacheReadingArticle, offlineReadingImagePaths, readReadingArticle, removeReadingArticle, type ReadingCache } from './storage/storage';
 import { READING_SESSION_KEY, type ReadingSession } from './session/session';
 import { AUTH_TOKEN_KEY } from '../config';
@@ -13,6 +14,7 @@ vi.mock('./storage/storage', async importOriginal => ({
 	...await importOriginal<typeof import('./storage/storage')>(),
 	readReadingArticle: vi.fn(), cacheReadingArticle: vi.fn(async () => true), removeReadingArticle: vi.fn(async () => {}), offlineReadingImagePaths: vi.fn(async () => new Set<string>()),
 }));
+vi.mock('./api', async importOriginal => ({ ...await importOriginal<typeof import('./api')>(), takeCommittedReadingArticle: vi.fn() }));
 vi.mock('./storage/article-history', () => ({
 	openReadingArticleHistory: async (id: string) => {
 		location.href = `https://example.test/notifications?section=reading&item=${id}`;
@@ -175,6 +177,45 @@ it('shows a saved copy already moved to an edited item instead of downloading it
 	await act(async () => { update(highlighted); });
 	expect(network).toHaveBeenCalledOnce();
 	expect(hook.current.reader).toMatchObject({ item: highlighted, markdown: 'Confirmed online text.', availableOffline: true });
+});
+
+it('shows the body its own highlight committed instead of downloading the article again', async () => {
+	vi.mocked(readReadingArticle).mockResolvedValue(undefined);
+	network.mockResolvedValueOnce(Response.json({ item, markdown: 'Confirmed online text.' }));
+	const { hook, update } = harness();
+	await act(async () => { await hook.current.open(item); });
+	const highlighted = { ...item, highlights: [{ start: 0, end: 9, text: 'Confirmed' }] };
+	const markdown = '==Confirmed== online text.';
+	vi.mocked(takeCommittedReadingArticle).mockReturnValueOnce({ item: highlighted, etag: '"new"', markdownHash: await sha256Hex(markdown), markdown });
+	await act(async () => { update(highlighted); });
+	expect(network).toHaveBeenCalledOnce();
+	expect(hook.current.reader).toMatchObject({ item: highlighted, markdown, etag: '"new"', availableOffline: false });
+});
+
+it('keeps the shown body when its own update left the body unchanged', async () => {
+	vi.mocked(readReadingArticle).mockResolvedValue(undefined);
+	network.mockResolvedValueOnce(Response.json({ item, markdown: 'Confirmed online text.' }));
+	const { hook, update } = harness();
+	await act(async () => { await hook.current.open(item); });
+	const highlighted = { ...item, highlights: [{ start: 0, end: 0, text: 'Photo', image: 'photo.png' }] };
+	vi.mocked(takeCommittedReadingArticle).mockReturnValueOnce({ item: highlighted, etag: '"new"', markdownHash: await sha256Hex('Confirmed online text.') });
+	await act(async () => { update(highlighted); });
+	// Hashing the shown body takes longer than one render.
+	await vi.waitFor(() => expect(hook.current.reader).toMatchObject({ item: highlighted, markdown: 'Confirmed online text.', etag: '"new"' }));
+	expect(network).toHaveBeenCalledOnce();
+});
+
+it('downloads the article when the committed body does not match what the reader shows', async () => {
+	vi.mocked(readReadingArticle).mockResolvedValue(undefined);
+	network.mockResolvedValueOnce(Response.json({ item, markdown: 'Confirmed online text.' }));
+	const { hook, update } = harness();
+	await act(async () => { await hook.current.open(item); });
+	const highlighted = { ...item, highlights: [{ start: 0, end: 9, text: 'Confirmed' }] };
+	vi.mocked(takeCommittedReadingArticle).mockReturnValueOnce({ item: highlighted, etag: '"new"', markdownHash: await sha256Hex('Another body.') });
+	network.mockResolvedValueOnce(Response.json({ item: highlighted, markdown: '==Confirmed== online text.' }));
+	await act(async () => { update(highlighted); });
+	await vi.waitFor(() => expect(hook.current.reader).toMatchObject({ item: highlighted, markdown: '==Confirmed== online text.' }));
+	expect(network).toHaveBeenCalledTimes(2);
 });
 
 it('keeps the open article when a refresh lists a page without it', async () => {
