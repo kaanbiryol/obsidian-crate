@@ -31,7 +31,7 @@ export function releaseReminderIdentityOwners<T extends ReminderIdentityOwner>(
 	const releasedKeys = new Set(released.map(key));
 	for (const owner of released) owners?.get(owner.id)?.delete(owner.filePath);
 	return entries.filter(entry => {
-		if (entry.filePath !== replacedFilePath && !releasedKeys.has(key(entry))) return true;
+		if (entry.filePath !== replacedFilePath && !(releasedKeys.size && releasedKeys.has(key(entry)))) return true;
 		owners?.get(entry.id)?.delete(entry.filePath);
 		return false;
 	});

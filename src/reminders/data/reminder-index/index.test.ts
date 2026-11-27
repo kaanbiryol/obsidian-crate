@@ -7,7 +7,7 @@ vi.mock('@/reminders/data/vaultScanner', () => ({
 	isInRemindersFolder: vi.fn(),
 }));
 
-import { createReminderIndex, type IndexedReminder } from '@/reminders/data/reminder-index';
+import { COALESCED_CHANGE_DELAY_MS, createReminderIndex, type IndexedReminder } from '@/reminders/data/reminder-index';
 import * as vaultScanner from '@/reminders/data/vaultScanner';
 import type { ScanResult } from '@/reminders/data/vaultScanner';
 
@@ -52,6 +52,7 @@ describe('reminderIndex', () => {
 
 	afterEach(() => {
 		vi.useRealTimers();
+		vi.unstubAllGlobals();
 	});
 
 	it.each([false, true])('waits for an initial scan deferred by sync (partial: %s)', async (partial) => {
@@ -352,5 +353,63 @@ describe('reminderIndex', () => {
 
 		expect(index.getById('r1')?.content).toBe('Persisted task');
 		expect(listener).toHaveBeenCalledOnce();
+	});
+	it('keeps identity owners in step across rescans and removals without rebuilding them', async () => {
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [makeReminder({ id: 'r1', filePath: 'Reminders/A.md' }), makeReminder({ id: 'r2', filePath: 'Reminders/B.md' })],
+			filesScanned: 2, totalLines: 2, issues: [], scanDurationMs: 1, discoveredProjects: ['A', 'B'],
+		});
+		vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
+		const seen: Array<Record<string, string[]>> = [];
+		const maps = new Set<unknown>();
+		vi.mocked(vaultScanner.scanFile).mockImplementation(async (_app, file, _folder, options) => {
+			maps.add(options?.identityOwners);
+			seen.push(Object.fromEntries([...options?.identityOwners ?? []].map(([id, paths]) => [id, [...paths].sort()])));
+			return { filePath: file.path, reminders: [makeReminder({ id: 'r3', filePath: file.path })], lineCount: 1 };
+		});
+		const index = createReminderIndex(app, 'Reminders');
+		await index.load();
+		await index.rescanFile(makeMockFile('Reminders/A.md'));
+		index.removeFile('Reminders/B.md');
+		await index.rescanFile(makeMockFile('Reminders/C.md'));
+		expect(seen).toEqual([
+			{ r1: ['Reminders/A.md'], r2: ['Reminders/B.md'] },
+			{ r1: [], r2: [], r3: ['Reminders/A.md'] },
+		]);
+		expect(maps.size).toBe(1);
+
+		// A rename drops the map, so the next scan sees the moved records.
+		index.renameFile('Reminders/A.md', 'Reminders/D.md');
+		await index.rescanFile(makeMockFile('Reminders/E.md'));
+		expect(seen.at(-1)).toEqual({ r3: ['Reminders/C.md', 'Reminders/D.md'] });
+		expect(maps.size).toBe(2);
+	});
+
+	it('publishes one trailing change for rescans while changes are coalesced', async () => {
+		vi.useFakeTimers();
+		vi.stubGlobal('window', globalThis);
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [], filesScanned: 0, totalLines: 0, issues: [], scanDurationMs: 1, discoveredProjects: [],
+		});
+		vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
+		vi.mocked(vaultScanner.scanFile).mockImplementation(async (_app, file) => (
+			{ filePath: file.path, reminders: [makeReminder({ id: file.path, filePath: file.path })], lineCount: 1 }));
+		let syncing = true;
+		const index = createReminderIndex(app, 'Reminders', { shouldCoalesceChanges: () => syncing });
+		const listener = vi.fn();
+		await index.load();
+		index.onIndexChange(listener);
+		const version = index.getVersion();
+		await index.rescanFile(makeMockFile('Reminders/A.md'));
+		await index.rescanFile(makeMockFile('Reminders/B.md'));
+		expect(listener).not.toHaveBeenCalled();
+		expect(index.getVersion()).toBe(version);
+		expect(index.getAll()).toHaveLength(2);
+		await vi.advanceTimersByTimeAsync(COALESCED_CHANGE_DELAY_MS);
+		expect(listener).toHaveBeenCalledOnce();
+
+		syncing = false;
+		await index.rescanFile(makeMockFile('Reminders/C.md'));
+		expect(listener).toHaveBeenCalledTimes(2);
 	});
 });

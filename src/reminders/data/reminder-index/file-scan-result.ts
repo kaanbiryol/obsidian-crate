@@ -15,8 +15,8 @@ export interface FileScanState {
 	discoveredProjects: Set<string>;
 	lookupStore: ReminderLookupStore;
 	optimisticState: ReminderOptimisticState;
-	/** Identity owners shared by a deferred-scan flush, kept in step with the index. */
-	batchOwners?: ReminderIdentityOwners;
+	/** The index's identity owners, when built; kept in step with the records. */
+	identityOwners?: ReminderIdentityOwners;
 }
 
 export interface FileScanUpdate {
@@ -50,9 +50,9 @@ export function applyFileScanResult(state: FileScanState, { filePath, project, d
 	state.optimisticState.clearFileState(filePath, [...persistedReminders, ...result.reminders]);
 
 	const released = result.releasedOwners ?? [];
-	const ambiguousOwners = releaseReminderIdentityOwners(state.batchOwners, state.ambiguousOwners, released, filePath);
-	const reminders = releaseReminderIdentityOwners(state.batchOwners, state.reminders, released, filePath);
-	if (state.batchOwners) addReminderIdentityOwners(state.batchOwners, result.reminders);
+	const ambiguousOwners = releaseReminderIdentityOwners(state.identityOwners, state.ambiguousOwners, released, filePath);
+	const reminders = releaseReminderIdentityOwners(state.identityOwners, state.reminders, released, filePath);
+	if (state.identityOwners) addReminderIdentityOwners(state.identityOwners, result.reminders);
 
 	reminders.push(...result.reminders);
 	// A move can release an indexed owner that has not received its own

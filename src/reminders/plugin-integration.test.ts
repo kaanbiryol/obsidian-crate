@@ -82,6 +82,7 @@ const gatedIndexOptions: Record<keyof ReminderIndexOptions, unknown> = {
 	shouldDeferScan: expect.any(Function),
 	shouldDeferWrites: expect.any(Function),
 	shouldDeferCollisionRepair: expect.any(Function),
+	shouldCoalesceChanges: expect.any(Function),
 	editor: expect.any(Object),
 };
 

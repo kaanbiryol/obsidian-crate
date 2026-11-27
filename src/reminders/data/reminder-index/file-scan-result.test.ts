@@ -50,8 +50,8 @@ it('keeps previous entries and records a source issue when the scan failed', () 
 });
 
 it('transfers released identity owners from another file in one rebuild', () => {
-	const batchOwners: ReminderIdentityOwners = new Map([['a', new Set(['Old.md'])], ['x', new Set(['Ambiguous.md'])]]);
-	const current = state([reminder('a', 'Old.md')], { ambiguousOwners: [{ id: 'x', filePath: 'Ambiguous.md' }], batchOwners });
+	const identityOwners: ReminderIdentityOwners = new Map([['a', new Set(['Old.md'])], ['x', new Set(['Ambiguous.md'])]]);
+	const current = state([reminder('a', 'Old.md')], { ambiguousOwners: [{ id: 'x', filePath: 'Ambiguous.md' }], identityOwners });
 
 	const outcome = applyFileScanResult(current, {
 		filePath: 'New.md', project: 'Work',
@@ -64,8 +64,8 @@ it('transfers released identity owners from another file in one rebuild', () => 
 	expect(outcome.ambiguousOwners).toEqual([]);
 	expect(current.lookupStore.getById('a')?.filePath).toBe('New.md');
 	expect(current.lookupStore.getByFile('Old.md')).toEqual([]);
-	expect(batchOwners.get('a')).toEqual(new Set(['New.md']));
-	expect(batchOwners.get('x')?.size).toBe(0);
+	expect(identityOwners.get('a')).toEqual(new Set(['New.md']));
+	expect(identityOwners.get('x')?.size).toBe(0);
 	expect(current.scannedDigests.has('New.md')).toBe(false);
 });
 

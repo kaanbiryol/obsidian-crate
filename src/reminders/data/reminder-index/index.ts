@@ -69,12 +69,18 @@ export interface ReminderIndexOptions {
 	shouldDeferCollisionRepair?: () => boolean;
 	/** Writes normalization of notes open in an editor through that editor. */
 	editor?: ReminderEditorWriter;
+	/** While true, single-file changes publish one trailing notification instead of one
+	 * per file, such as while sync writes many notes. */
+	shouldCoalesceChanges?: () => boolean;
 }
+
+/** How long coalesced changes wait before listeners hear about them. */
+export const COALESCED_CHANGE_DELAY_MS = 250;
 
 export function createReminderIndex(
 	app: App,
 	remindersFolderPath: string,
-	{ signal, shouldDeferScan = () => false, shouldDeferWrites = shouldDeferScan, shouldDeferCollisionRepair = () => false, editor }: ReminderIndexOptions = {},
+	{ signal, shouldDeferScan = () => false, shouldDeferWrites = shouldDeferScan, shouldDeferCollisionRepair = () => false, editor, shouldCoalesceChanges = () => false }: ReminderIndexOptions = {},
 ): ReminderIndex {
 	let reminders: IndexedReminder[] = [];
 	let isLoaded = false;
@@ -106,9 +112,14 @@ export function createReminderIndex(
 		scanQueue = result.then(() => undefined, () => undefined);
 		return result;
 	};
-	signal?.addEventListener('abort', () => { deferredPaths.clear(); deferredLoad = false; }, { once: true });
+	let coalescedChange: number | undefined;
+	signal?.addEventListener('abort', () => {
+		deferredPaths.clear(); deferredLoad = false;
+		if (coalescedChange !== undefined) { window.clearTimeout(coalescedChange); coalescedChange = undefined; }
+	}, { once: true });
 
 	function notifyListeners(): void {
+		if (coalescedChange !== undefined) { window.clearTimeout(coalescedChange); coalescedChange = undefined; }
 		version++;
 		for (const listener of listeners) {
 			try {
@@ -119,19 +130,24 @@ export function createReminderIndex(
 		}
 	}
 
-	// A deferred-scan flush shares one identity-owner map across its files and
-	// publishes the combined result with a single notification.
-	let batch: { owners?: ReminderIdentityOwners; changed: boolean } | undefined;
+	// A deferred-scan flush publishes the combined result with a single notification.
+	let batch: { changed: boolean } | undefined;
 	function publishChange(): void {
 		if (batch) batch.changed = true;
-		else notifyListeners();
+		else if (!shouldCoalesceChanges()) notifyListeners();
+		else coalescedChange ??= window.setTimeout(() => { if (!signal?.aborted) notifyListeners(); }, COALESCED_CHANGE_DELAY_MS);
 	}
 
-	function buildIdentityOwners(): ReminderIdentityOwners {
+	// Identity owners of the indexed records, built on first use and kept in step by
+	// single-file scans and removals, so a rescan does not rebuild one per reminder.
+	// Anything else that replaces records drops it for a rebuild.
+	let identityOwners: ReminderIdentityOwners | undefined;
+	function currentIdentityOwners(): ReminderIdentityOwners {
+		if (identityOwners) return identityOwners;
 		const owners: ReminderIdentityOwners = new Map();
 		addReminderIdentityOwners(owners, reminders);
 		addReminderIdentityOwners(owners, ambiguousOwners);
-		return owners;
+		return identityOwners = owners;
 	}
 
 	/** Runs inside the scan queue; returns whether the index changed. */
@@ -153,10 +169,9 @@ export function createReminderIndex(
 
 		log.info(` Rescanning file: ${filePath}`);
 
-		const identityOwners = batch ? (batch.owners ??= buildIdentityOwners()) : buildIdentityOwners();
 		const result = await scanFile(app, file, remindersFolderPath, {
 			signal,
-			identityOwners,
+			identityOwners: currentIdentityOwners(),
 			shouldDeferScan: () => shouldDeferScan(filePath),
 			shouldDeferNormalization: () => !scan.current || file.path !== scan.path || shouldDeferWrites(filePath),
 			shouldDeferCollisionRepair,
@@ -171,7 +186,7 @@ export function createReminderIndex(
 			deferredPaths.add(filePath);
 		}
 		const outcome = applyFileScanResult({
-			reminders, ambiguousOwners, sourceIssues, scannedDigests, discoveredProjects, lookupStore, optimisticState, batchOwners: batch?.owners,
+			reminders, ambiguousOwners, sourceIssues, scannedDigests, discoveredProjects, lookupStore, optimisticState, identityOwners,
 		}, { filePath, project: getProjectFromPath(filePath, remindersFolderPath), digest: result.writeDeferred ? undefined : digest, result });
 		if (!outcome.applied) {
 			log.error(` Keeping the previous reminder index for ${filePath}: ${outcome.error}`);
@@ -246,6 +261,7 @@ export function createReminderIndex(
 			const wasLoaded = isLoaded;
 			const merged = applyVaultScanResult({ reminders, ambiguousOwners, sourceIssues, discoveredProjects, isLoaded }, result);
 			({ reminders, ambiguousOwners, sourceIssues, discoveredProjects } = merged);
+			identityOwners = undefined;
 			for (const path of merged.retryPaths) deferredPaths.add(path);
 			isLoaded = true;
 			if (!merged.complete) {
@@ -317,9 +333,14 @@ export function createReminderIndex(
 
 		removeFile(filePath: string) {
 			invalidateScans(filePath);
-			if (batch) batch.owners = undefined;
 			deferredPaths.delete(filePath);
 			sourceIssues.delete(filePath);
+			// Every record of the file leaves, so the file leaves each identity it owned.
+			if (identityOwners) {
+				for (const owners of [reminders, ambiguousOwners]) {
+					for (const owner of owners) if (owner.filePath === filePath) identityOwners.get(owner.id)?.delete(filePath);
+				}
+			}
 			ambiguousOwners = ambiguousOwners.filter(owner => owner.filePath !== filePath);
 			log.info(` Removing file from index: ${filePath}`);
 			const before = reminders.length;
@@ -335,7 +356,7 @@ export function createReminderIndex(
 
 		renameFile(oldPath: string, newPath: string) {
 			invalidateScans(oldPath, newPath);
-			if (batch) batch.owners = undefined;
+			identityOwners = undefined;
 			if (deferredPaths.delete(oldPath)) deferredPaths.add(newPath);
 			const issue = sourceIssues.get(oldPath);
 			if (issue) { sourceIssues.delete(oldPath); sourceIssues.set(newPath, { ...issue, path: newPath }); }

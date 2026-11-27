@@ -135,6 +135,8 @@ export async function setupReminderBackend(plugin: ReminderRuntimeHost, folderPa
 		shouldDeferWrites: gate.shouldDeferWrites,
 		shouldDeferCollisionRepair: gate.shouldDeferCollisionRepair,
 		editor,
+		// Sync can write thousands of notes; views and notifications refresh once per burst.
+		shouldCoalesceChanges: () => plugin.syncRuntime.isWritingVault(),
 	});
 	const onSyncStateChanged = () => {
 		gate.onSyncStateChanged();
