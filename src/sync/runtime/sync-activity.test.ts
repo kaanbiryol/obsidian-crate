@@ -3,6 +3,7 @@ import { createTestSettings } from '../../test/factories/settings';
 import { createEmptySyncResult } from '../sync-result';
 import type { RequestDiagnostic } from '../diagnostics/request-diagnostics';
 import { recordSyncHistory } from './sync-activity';
+import { MAX_SYNC_HISTORY } from '../settings';
 
 const session = '11111111-1111-4111-8111-111111111111';
 const request = (second: number): RequestDiagnostic => ({
@@ -19,4 +20,17 @@ describe('recordSyncHistory', () => {
 		expect(entry.requestDiagnostics?.requests).toEqual([request(3)]);
 		expect(settings.syncHistory.map(item => item.requestDiagnostics?.requests.length)).toEqual([1, 2]);
 	});
+
+	it('keeps rows that only the entry about to be dropped held', () => {
+		const settings = createTestSettings({ syncHistory: [] });
+		for (let second = 1; second <= MAX_SYNC_HISTORY; second++) {
+			recordSyncHistory(settings, 'sync', createEmptySyncResult(), { requestDiagnostics: { clientSession: session, requests: [request(second)] } });
+		}
+		// The window still holds the oldest entry's row, and that entry is dropped now.
+		const entry = recordSyncHistory(settings, 'sync', createEmptySyncResult(), { requestDiagnostics: { clientSession: session,
+			requests: [request(1), request(MAX_SYNC_HISTORY + 1)] } });
+		expect(entry.requestDiagnostics?.requests).toEqual([request(1), request(MAX_SYNC_HISTORY + 1)]);
+		expect(settings.syncHistory).toHaveLength(MAX_SYNC_HISTORY);
+	});
 });
+

@@ -1,13 +1,13 @@
 import type { SyncHistoryEntry, SyncResult } from '../types';
 import { getSyncIssues } from '../issues';
-import { MAX_SYNC_HISTORY_PATHS, updateSyncProgress, type SyncSettings } from '../settings';
+import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, updateSyncProgress, type SyncSettings } from '../settings';
 import type { RequestDiagnostic, RequestDiagnostics } from '../diagnostics/request-diagnostics';
 import type { UploadDiagnostic } from '../diagnostics/upload-diagnostics';
 
 const requestKey = (row: RequestDiagnostic) => `${row.at}|${row.operationId}|${row.method}|${row.route}`;
 const uploadKey = (row: UploadDiagnostic) => `${row.at}|${row.operationId}|${row.phase}|${row.pathHash}`;
 
-/** The diagnostic rows no earlier entry holds. The request and upload logs are rolling
+/** The diagnostic rows no kept entry holds. The request and upload logs are rolling
  * windows, so storing each whole window would repeat most rows in every entry. */
 function newDiagnostics(history: readonly SyncHistoryEntry[], diagnostics: RequestDiagnostics): RequestDiagnostics {
 	const requests = new Set<string>(), uploads = new Set<string>();
@@ -45,7 +45,8 @@ export function recordSyncHistory(
 		mergedPaths: limitHistoryPaths(result.mergedPaths),
 		deletedPaths: limitHistoryPaths(result.deletedPaths),
 		...details.timings ? { timings: details.timings } : {},
-		...details.requestDiagnostics ? { requestDiagnostics: newDiagnostics(settings.syncHistory, details.requestDiagnostics) } : {},
+		// The oldest entry is dropped below, so its rows count as new.
+		...details.requestDiagnostics ? { requestDiagnostics: newDiagnostics(settings.syncHistory.slice(0, MAX_SYNC_HISTORY - 1), details.requestDiagnostics) } : {},
 	};
 
 	updateSyncProgress(settings, { syncHistory: [entry, ...settings.syncHistory] });
