@@ -87,6 +87,8 @@ describe('periodic sync activity', () => {
 		vi.spyOn(SyncApiClient.prototype, 'refreshFileLimit').mockResolvedValue();
 		const changes = vi.spyOn(SyncWorkerApi.prototype, 'getChanges').mockResolvedValue({ changes: [], hasMore: false, lastSeq: 11 });
 		if (!success) changes.mockRejectedValue(new Error('temporary changelog failure'));
+		// The check finds another device's file, so the periodic check starts a sync.
+		changes.mockResolvedValueOnce({ changes: [{ seq: 11, path: 'new.md', action: 'put', hash: 'theirs', size: 4, created_at: new Date(0).toISOString() }], hasMore: false, lastSeq: 11 });
 		vi.spyOn(SyncApiClient.prototype, 'getManifest').mockRejectedValue(new Error('temporary manifest failure'));
 		const engine = (h.runtime as unknown as { syncEngine: SyncEngine }).syncEngine;
 		await runPeriodicCheck(engine);
