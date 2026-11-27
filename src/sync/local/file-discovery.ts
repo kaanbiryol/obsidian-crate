@@ -114,6 +114,18 @@ export async function getAllVaultFiles(
 	shouldIgnore: (path: string) => boolean,
 	assertActive?: () => void,
 ): Promise<VaultFile[]> {
+	const result = await listVaultFiles(vault, shouldIgnore, assertActive);
+	portablePaths(vault).assert(result.map(file => file.path));
+	return result;
+}
+
+/** The files `getAllVaultFiles` discovers, without checking that their paths can sync,
+ * for a listing that syncs nothing, such as a preview. */
+export async function listVaultFiles(
+	vault: Vault,
+	shouldIgnore: (path: string) => boolean,
+	assertActive?: () => void,
+): Promise<VaultFile[]> {
 	assertActive?.();
 	// Start with all indexed files
 	const indexedFiles = vault.getFiles();
@@ -143,7 +155,6 @@ export async function getAllVaultFiles(
 		shouldIgnore, seen, result, assertActive);
 
 	assertActive?.();
-	portablePaths(vault).assert(result.map(file => file.path));
 	return result;
 }
 

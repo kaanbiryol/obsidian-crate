@@ -1,6 +1,6 @@
 import { Notice, Setting, type TextAreaComponent } from 'obsidian';
 import { matchIgnorePattern } from '../../sync/local/ignore';
-import { getAllVaultFiles } from '../../sync/local/file-discovery';
+import { listVaultFiles } from '../../sync/local/file-discovery';
 import type CratePlugin from '../../plugin/CratePlugin';
 import { ExclusionPreviewModal } from './exclusion-preview-modal';
 import { renderExclusionCleanup } from './exclusion-cleanup';
@@ -33,7 +33,7 @@ export function renderExclusionsSetting(
 				const draft = input.inputEl.value;
 				const patterns = patternsFromText(draft);
 				const patternCache = new Map<string, RegExp>();
-				const matches = (await getAllVaultFiles(plugin.app.vault, () => false))
+				const matches = (await listVaultFiles(plugin.app.vault, () => false))
 					.filter(file => patterns.some(pattern => matchIgnorePattern(file.path, pattern, patternCache)))
 					.map(file => file.path).sort();
 				if (input.inputEl.value !== draft) return;

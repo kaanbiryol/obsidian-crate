@@ -4,6 +4,7 @@ import { shouldIgnoreSyncPath } from './ignore';
 import {
 	getAllVaultFiles,
 	getExtensionFromPath,
+	listVaultFiles,
 	insertBeforeExtension,
 	isHiddenPath,
 } from './file-discovery';
@@ -154,6 +155,16 @@ describe('getAllVaultFiles', () => {
 		expect(files.filter(f => f.path === '.config-hidden/config.json')).toHaveLength(1);
 		expect(files.find(f => f.path === '.gitignore')?.extension).toBe('');
 		expect(stat).not.toHaveBeenCalledWith('.config-hidden/plugins/cache.db');
+	});
+
+	it('lists colliding paths for a preview without checking them for sync', async () => {
+		const indexed = (paths: string[]) => paths.map(path => ({ path, stat: { size: 1, mtime: 1 }, extension: 'md' })) as unknown as TFile[];
+		let files = indexed(['Notes/A.md', 'notes/a.md']);
+		const vault = { getFiles: () => files, adapter: { list: vi.fn(async () => ({ files: [], folders: [] })), stat: vi.fn() } } as unknown as Vault;
+		expect((await listVaultFiles(vault, () => false)).map(file => file.path)).toEqual(['Notes/A.md', 'notes/a.md']);
+		await expect(getAllVaultFiles(vault, () => false)).rejects.toThrow('Unicode-normalizing device');
+		files = indexed(['Notes/A.md']);
+		await expect(getAllVaultFiles(vault, () => false)).resolves.toHaveLength(1);
 	});
 
 	it('rejects an incomplete scan when adapter listing the root fails', async () => {
