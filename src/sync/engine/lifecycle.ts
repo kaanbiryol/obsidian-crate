@@ -127,13 +127,7 @@ export class SyncEngineLifecycle {
 		this.lastCheckAttempt = Date.now();
 
 		try {
-			const { hasChanges, cursorExpired } = await dependencies.checkForChanges(dependencies.getLastSeq());
-			// A sync walks the vault itself, so only look for missed local edits
-			// when nothing else would start one.
-			const syncNeeded = hasChanges || cursorExpired || dependencies.getQueuedKeyCount() > 0
-				|| dependencies.fullSyncRequested?.() || await dependencies.hasLocalFileChanges();
-
-			if (!syncNeeded) {
+			if (!await this.syncNeeded(true)) {
 				logger.debug('Periodic check: no changes');
 				this.consecutiveCheckFailures = 0;
 				dependencies.onCheckSuccess();
@@ -157,6 +151,17 @@ export class SyncEngineLifecycle {
 				errorMessage(error),
 			);
 		}
+	}
+
+	/** Server changes, queued work or a requested full sync. `includeLocal` also walks the
+	 * vault for edits its file events missed. */
+	async syncNeeded(includeLocal: boolean): Promise<boolean> {
+		const dependencies = this.dependencies;
+		const { hasChanges, cursorExpired } = await dependencies.checkForChanges(dependencies.getLastSeq());
+		// A sync walks the vault itself, so only look for missed local edits
+		// when nothing else would start one.
+		return hasChanges || cursorExpired === true || dependencies.getQueuedKeyCount() > 0
+			|| dependencies.fullSyncRequested?.() === true || (includeLocal && await dependencies.hasLocalFileChanges());
 	}
 
 	private stopPeriodicSync(): void {

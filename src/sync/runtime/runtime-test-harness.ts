@@ -2,7 +2,7 @@ import { afterEach, expect, vi } from 'vitest';
 import { TFolder } from 'obsidian';
 import { SyncEngine, type SyncEngineHooks } from '../engine/engine';
 import type { SyncApiClient } from '../worker-api/client';
-import { SyncRuntime } from './runtime';
+import { SyncRuntime, type SyncRuntimeOptions } from './runtime';
 import type { CrateSettings } from '../../plugin/settings-types';
 import { createTestSettings } from '@/test/factories/settings';
 
@@ -57,7 +57,7 @@ export function createDeferred<T>(): Deferred<T> {
 	return { promise, resolve, reject };
 }
 
-export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}, prepareReminderScope?: () => Promise<void>) {
+export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}, prepareReminderScope?: () => Promise<void>, options: Pick<SyncRuntimeOptions, 'fileEventsInBackground'> = {}) {
 	const settings = createTestSettings({ deviceId: 'device-1', ignorePatterns: ['.trash/', '*.tmp'], ...settingsOverrides });
 	const plugin = {
 		registerDomEvent: vi.fn(),
@@ -95,6 +95,7 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 	const engineHooks: SyncEngineHooks[] = [];
 	const runtime = new SyncRuntime(plugin as never, settings, secretStorage as never, persistSettings, {
 		prepareReminderScope,
+		...options,
 		createEngine: (host, api, engineSettings, hooks) => {
 			engineHooks.push(hooks);
 			return new SyncEngine(host, api, engineSettings, hooks);

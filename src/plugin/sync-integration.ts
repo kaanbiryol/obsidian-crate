@@ -27,6 +27,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 			createNoteProjection: createNoteProjection(() => [plugin.remindersSettings.remindersFolderPath],
 				() => plugin.settings.reading?.enabled ? plugin.settings.reading.folderPath : null),
 			prepareInitialUpload: () => prepareRemindersForFirstUpload(plugin),
+			fileEventsInBackground: Platform.isDesktopApp,
 		},
 	);
 	registerSyncStatus(plugin, plugin.syncRuntime, () => openSyncActivity(plugin));

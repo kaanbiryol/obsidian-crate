@@ -45,6 +45,9 @@ export interface SyncRuntimeOptions {
 	createNoteProjection?: NoteProjectionFactory;
 	/** Runs when a first upload starts, before it lists vault files. */
 	prepareInitialUpload?: () => Promise<void>;
+	/** True where the vault's file events keep arriving while the app is in the background
+	 * (desktop), so a foreground sync asks only the server instead of walking the vault. */
+	fileEventsInBackground?: boolean;
 	/** Tests substitute the client or engine an initialization builds. */
 	createApiClient?: (workerUrl: string, authToken: string) => SyncApiClient;
 	createEngine?: (plugin: Plugin, api: SyncApiClient, settings: SyncRuntimeSettings, hooks: SyncEngineHooks) => SyncEngine;
@@ -76,7 +79,7 @@ export class SyncRuntime {
 	private readonly foregroundSync = new ForegroundSyncScheduler({
 		canSync: () => this.settings.automaticSync && this.vaultEvents.isOpen && this.isConfigured()
 			&& this.syncEngine !== null && this.syncEngine.getState().status !== 'syncing',
-		sync: () => this.sync(),
+		sync: () => this.foregroundSyncIfNeeded(),
 	});
 	private readonly serverStatus: RuntimeServerStatus;
 	private readonly createNoteProjection: NoteProjectionFactory;
@@ -532,6 +535,17 @@ export class SyncRuntime {
 	triggerForegroundSync(reason: ForegroundSyncReason): void {
 		if (!this.settings.automaticSync) this.scheduleServerCheck();
 		else this.foregroundSync.trigger(reason);
+	}
+
+	/** Syncs only when the server, queued work or (without background file events) a vault
+	 * walk finds something; a failed check leaves the sync to report the failure. */
+	private async foregroundSyncIfNeeded(): Promise<void> {
+		const engine = this.requireEngine();
+		let needed = true;
+		try { needed = await engine.foregroundSyncNeeded(!this.options.fileEventsInBackground); }
+		catch { /* The sync reports why the server is unavailable. */ }
+		if (!needed || this.syncEngine !== engine || engine.getState().status === 'syncing') return;
+		await this.sync();
 	}
 
 	/** Authenticate a changed transport address without losing pending disk work. */

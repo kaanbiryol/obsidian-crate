@@ -475,6 +475,15 @@ export class SyncEngine {
 		return this.localChanges.hasUnsyncedChanges();
 	}
 
+	/** Whether a foreground sync has work. Without `includeLocal` the vault is not walked:
+	 * only an unfinished upload counts as local work, since file events reported the rest. */
+	async foregroundSyncNeeded(includeLocal: boolean): Promise<boolean> {
+		if (this.localManifest.uploadJournal.pending().length > 0) return true;
+		const needed = await this.lifecycle.syncNeeded(includeLocal);
+		if (!needed && this.periodicCheckFailed) this.updateState({ status: 'idle', lastError: null });
+		return needed;
+	}
+
 	async createExclusionCleanupReview() {
 		return createExclusionCleanupReview({
 			getManifest: () => this.api.getManifest(),

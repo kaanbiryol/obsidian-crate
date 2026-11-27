@@ -1,5 +1,4 @@
 import { createLogger } from '../logger';
-import type { SyncResult } from '../types';
 
 const logger = createLogger('SyncRuntime');
 export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
@@ -15,7 +14,7 @@ export class ForegroundSyncScheduler {
 
 	constructor(private readonly context: {
 		canSync: () => boolean;
-		sync: () => Promise<SyncResult>;
+		sync: () => Promise<unknown>;
 	}) {}
 
 	trigger(reason: ForegroundSyncReason): void {

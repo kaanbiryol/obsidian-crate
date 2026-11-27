@@ -22,6 +22,7 @@ describe('SyncRuntime foreground sync', () => {
 			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 			sync,
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
+			foregroundSyncNeeded: vi.fn(async () => true),
 		});
 
 		runtime.triggerForegroundSync('focus');
@@ -43,6 +44,7 @@ describe('SyncRuntime foreground sync', () => {
 			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
 			sync,
 			forceFullSync: vi.fn(async () => createEmptySyncResult()),
+			foregroundSyncNeeded: vi.fn(async () => true),
 		});
 
 		runtime.triggerForegroundSync('focus');
@@ -79,5 +81,35 @@ describe('SyncRuntime foreground sync', () => {
 		disabledRuntime.triggerForegroundSync('focus');
 		await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
 		expect(disabledSync).not.toHaveBeenCalled();
+	});
+
+	it('skips the sync when the check finds nothing, and walks the vault only without background file events', async () => {
+		for (const fileEventsInBackground of [true, false]) {
+			const { runtime } = createRuntimeHarness({}, undefined, { fileEventsInBackground });
+			const sync = vi.fn(async () => createEmptySyncResult());
+			const foregroundSyncNeeded = vi.fn(async () => false);
+			await initializeRuntime(runtime, {
+				getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
+				sync, foregroundSyncNeeded,
+			});
+
+			runtime.triggerForegroundSync('focus');
+			await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
+			expect(foregroundSyncNeeded).toHaveBeenCalledWith(!fileEventsInBackground);
+			expect(sync).not.toHaveBeenCalled();
+		}
+	});
+
+	it('still syncs when the check fails, so the sync reports the failure', async () => {
+		const { runtime } = createRuntimeHarness();
+		const sync = vi.fn(async () => createEmptySyncResult());
+		await initializeRuntime(runtime, {
+			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
+			sync, foregroundSyncNeeded: vi.fn(async () => { throw new Error('Failed to fetch'); }),
+		});
+
+		runtime.triggerForegroundSync('focus');
+		await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
+		expect(sync).toHaveBeenCalledOnce();
 	});
 });

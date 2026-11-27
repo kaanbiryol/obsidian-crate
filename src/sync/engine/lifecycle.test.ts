@@ -269,3 +269,22 @@ describe('SyncEngine periodic check backoff', () => {
 		}
 	});
 });
+
+describe('SyncEngine foreground check', () => {
+	it('walks the vault only when file events may have been missed', async () => {
+		const harness = createHarness();
+		harness.api.checkForChanges.mockResolvedValue({ hasChanges: false });
+		try {
+			await harness.engine.initialize();
+			const walk = vi.spyOn(harness.engine, 'hasUnsyncedLocalChanges').mockResolvedValue(true);
+			await expect(harness.engine.foregroundSyncNeeded(false)).resolves.toBe(false);
+			expect(walk).not.toHaveBeenCalled();
+			await expect(harness.engine.foregroundSyncNeeded(true)).resolves.toBe(true);
+			expect(walk).toHaveBeenCalledOnce();
+			harness.api.checkForChanges.mockResolvedValue({ hasChanges: true });
+			await expect(harness.engine.foregroundSyncNeeded(false)).resolves.toBe(true);
+		} finally {
+			harness.engine.destroy();
+		}
+	});
+});
