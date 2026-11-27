@@ -1,6 +1,23 @@
 import type { SyncHistoryEntry, SyncResult } from '../types';
 import { getSyncIssues } from '../issues';
 import { MAX_SYNC_HISTORY_PATHS, updateSyncProgress, type SyncSettings } from '../settings';
+import type { RequestDiagnostic, RequestDiagnostics } from '../diagnostics/request-diagnostics';
+import type { UploadDiagnostic } from '../diagnostics/upload-diagnostics';
+
+const requestKey = (row: RequestDiagnostic) => `${row.at}|${row.operationId}|${row.method}|${row.route}`;
+const uploadKey = (row: UploadDiagnostic) => `${row.at}|${row.operationId}|${row.phase}|${row.pathHash}`;
+
+/** The diagnostic rows no earlier entry holds. The request and upload logs are rolling
+ * windows, so storing each whole window would repeat most rows in every entry. */
+function newDiagnostics(history: readonly SyncHistoryEntry[], diagnostics: RequestDiagnostics): RequestDiagnostics {
+	const requests = new Set<string>(), uploads = new Set<string>();
+	for (const entry of history) {
+		for (const row of entry.requestDiagnostics?.requests ?? []) requests.add(requestKey(row));
+		for (const row of entry.requestDiagnostics?.uploads ?? []) uploads.add(uploadKey(row));
+	}
+	return { ...diagnostics, requests: diagnostics.requests.filter(row => !requests.has(requestKey(row))),
+		...(diagnostics.uploads ? { uploads: diagnostics.uploads.filter(row => !uploads.has(uploadKey(row))) } : {}) };
+}
 
 export function recordSyncHistory(
 	settings: SyncSettings,
@@ -27,7 +44,8 @@ export function recordSyncHistory(
 		downloadedPaths: limitHistoryPaths(result.downloadedPaths),
 		mergedPaths: limitHistoryPaths(result.mergedPaths),
 		deletedPaths: limitHistoryPaths(result.deletedPaths),
-		...details,
+		...details.timings ? { timings: details.timings } : {},
+		...details.requestDiagnostics ? { requestDiagnostics: newDiagnostics(settings.syncHistory, details.requestDiagnostics) } : {},
 	};
 
 	updateSyncProgress(settings, { syncHistory: [entry, ...settings.syncHistory] });
