@@ -149,6 +149,8 @@ export class SyncEngine {
 			manualCheckDue: () => this.hooks.onManualCheckDue?.(),
 			checkForChanges: async (lastSeq: number) => {
 				void this.retryReminderScope();
+				// After a sync, this device's own uploads follow the cursor and are not changes to fetch.
+				if (lastSeq > 0) return { hasChanges: await this.hasRemoteChanges() };
 				return this.api.checkForChanges(lastSeq);
 			},
 			sync: async () => {

@@ -98,6 +98,19 @@ describe('periodic sync status', () => {
 		h.engine.destroy();
 	});
 
+	it.each([
+		['its own upload', false, 'mine'],
+		['an edit from another device', true, 'theirs'],
+	] as const)('after a sync, decides %s needs a sync: %s', async (_name, needed, hash) => {
+		const h = createHarness({ lastSeq: 10 });
+		h.localManifest.setEntry('a.md', { hash: 'mine', size: 4, modified: new Date(1000).toISOString() });
+		h.api.checkForChanges.mockResolvedValue({ lastSeq: 11, hasChanges: true });
+		h.api.getChanges.mockResolvedValue({ changes: [{ seq: 11, path: 'a.md', action: 'put', hash, size: 4, created_at: new Date(1000).toISOString() }], lastSeq: 11, hasMore: false });
+		await expect(h.engine.foregroundSyncNeeded(false)).resolves.toBe(needed);
+		expect(h.api.getChanges).toHaveBeenCalledExactlyOnceWith(10);
+		h.engine.destroy();
+	});
+
 	it('does not turn a cancelled request into a connectivity failure', async () => {
 		const h = fixture();
 		h.api.checkForChanges.mockRejectedValue(new DOMException('Cancelled', 'AbortError'));
