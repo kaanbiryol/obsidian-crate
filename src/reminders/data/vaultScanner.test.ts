@@ -159,6 +159,33 @@ describe('vaultScanner', () => {
 		expect(process).toHaveBeenCalledOnce();
 	});
 
+	it('keeps several note reads in flight while scanning notes in path order', async () => {
+		const files = Array.from({ length: 12 }, (_, index) => makeMockFile(`Reminders/${String(index).padStart(2, '0')}.md`));
+		let inFlight = 0, mostInFlight = 0;
+		const pending: Array<() => void> = [];
+		const readBinary = vi.fn(async (path: string) => {
+			inFlight++; mostInFlight = Math.max(mostInFlight, inFlight);
+			await new Promise<void>(resolve => pending.push(resolve));
+			inFlight--;
+			if (path.endsWith('/05.md')) throw new Error('disk error');
+			return new TextEncoder().encode(`- [ ] Task <!-- crate-id:${path.slice(10, 12)} -->`).buffer;
+		});
+		const app = { vault: {
+			getAbstractFileByPath: () => Object.assign(new TFolder(), { path: 'Reminders', children: [...files].reverse() }),
+			adapter: { readBinary },
+		} } as unknown as App;
+		const scanning = scanVault(app, 'Reminders');
+		while (readBinary.mock.calls.length < files.length + 1 || pending.length) {
+			await new Promise(resolve => setTimeout(resolve, 0));
+			pending.splice(0).forEach(resolve => resolve());
+		}
+		const result = await scanning;
+		expect(mostInFlight).toBe(8);
+		expect(result.reminders.map(reminder => reminder.id)).toEqual(files.map((_, index) => String(index).padStart(2, '0')).filter(id => id !== '05'));
+		// The failed note is read once more by its own scan, which reports it.
+		expect(result.issues).toEqual([expect.objectContaining({ path: 'Reminders/05.md', reason: 'disk error' })]);
+	});
+
 	it('returns an empty result when the reminders folder does not exist', async () => {
 		const app = {
 			vault: {

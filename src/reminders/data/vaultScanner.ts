@@ -270,6 +270,9 @@ export async function scanFile(
 	}
 }
 
+/** Note reads a folder scan keeps in flight ahead of the note it is scanning. */
+const SCAN_READ_AHEAD = 8;
+
 interface ScanVaultOptions {
 	signal?: AbortSignal;
 	/** Called before each file; true stops the scan and leaves the whole load for later. */
@@ -331,13 +334,27 @@ export async function scanVault(
 	let complete = true;
 	const deferredPaths: string[] = [];
 	const writeDeferredPaths: string[] = [];
-	for (const file of reminderFiles) {
+	// Reads are slow bridge calls on mobile. Files are scanned one at a time in path order,
+	// since each scan claims identities the next one checks, while the next reads are in flight.
+	// A failed read gives no content, so the scan reads again and reports the error itself.
+	const reads = new Map<TFile, Promise<string | undefined>>();
+	const readAhead = (from: number) => {
+		for (const file of reminderFiles.slice(from, from + SCAN_READ_AHEAD)) {
+			if (!reads.has(file)) reads.set(file, readVaultMarkdown(app.vault, file).catch(() => undefined));
+		}
+	};
+	for (const [index, file] of reminderFiles.entries()) {
+		if (signal?.aborted) break;
+		if (shouldStop()) { deferred = true; complete = false; break; }
+		readAhead(index);
+		const preread = await reads.get(file);
+		reads.delete(file);
 		if (signal?.aborted) break;
 		if (shouldStop()) { deferred = true; complete = false; break; }
 		const result = await scanFile(app, file, remindersFolderPath, {
 			signal, identityOwners, shouldDeferScan: () => shouldDeferScan(file.path),
 			shouldDeferNormalization: () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair,
-			editor,
+			editor, preread,
 		});
 		if (result.deferred) { deferred = true; deferredPaths.push(file.path); }
 		if (result.writeDeferred) writeDeferredPaths.push(file.path);
