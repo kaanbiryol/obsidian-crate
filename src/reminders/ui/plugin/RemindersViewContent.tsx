@@ -49,12 +49,11 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ isFu
 		openReminderCreationModal(plugin, defaultProject, refresh);
 	}, [plugin, refresh]);
 
-	const renderCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (
+	const renderCard = useCallback<ReminderCardRenderer>(({ reminder, hideProject }) => (
 		<ReminderCardWrapper
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}
 			onUpdate={refresh}
-			index={index}
 			hideProject={hideProject}
 			colorScheme={isDarkMode ? "dark" : "light"}
 		/>

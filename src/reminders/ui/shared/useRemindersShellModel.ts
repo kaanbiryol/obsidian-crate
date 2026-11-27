@@ -10,8 +10,9 @@ import { useReminderClock } from './useReminderClock';
 
 type ViewMode = Parameters<typeof getCurrentHeaderData>[0];
 
-/** Renders one reminder card for a shell's lists and project detail. */
-export type ReminderCardRenderer = (props: { reminder: Reminder; index: number; hideProject: boolean }) => ReactNode;
+/** Renders one reminder card for a shell's lists and project detail. It gets no list
+ * position, so a memoized card does not re-render when a reminder above it is removed. */
+export type ReminderCardRenderer = (props: { reminder: Reminder; hideProject: boolean }) => ReactNode;
 
 /** Header, add, card and reorder behavior shared by the plugin and PWA shells.
  * Host chrome (navigation, buttons, safe areas) stays in each shell. */
@@ -32,10 +33,10 @@ export function useRemindersShellModel({ reminders, projects, upcomingDays, view
 	const handleAdd = useCallback(() => {
 		if (!addDisabled) onAdd(getReminderCreateProject(viewMode, selectedProject));
 	}, [addDisabled, onAdd, selectedProject, viewMode]);
-	const panelCardRenderer = useCallback((reminder: Reminder, index: number) =>
-		renderCard({ reminder, index, hideProject: viewMode === 'browse' && selectedProject !== null }), [renderCard, selectedProject, viewMode]);
-	const listCardRenderer = useCallback((reminder: Reminder, index: number) =>
-		renderCard({ reminder, index, hideProject: viewMode === 'inbox' }), [renderCard, viewMode]);
+	const panelCardRenderer = useCallback((reminder: Reminder) =>
+		renderCard({ reminder, hideProject: viewMode === 'browse' && selectedProject !== null }), [renderCard, selectedProject, viewMode]);
+	const listCardRenderer = useCallback((reminder: Reminder) =>
+		renderCard({ reminder, hideProject: viewMode === 'inbox' }), [renderCard, viewMode]);
 	const currentProject = getReorderProject(viewMode, selectedProject);
 	const handleReorder = useCallback((orderedIds: string[]) => currentProject ? onReorder(currentProject, orderedIds) : undefined, [currentProject, onReorder]);
 	return {

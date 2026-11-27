@@ -23,7 +23,6 @@ import { useRemindersSettingsStore } from '@/reminders/settings';
 interface ReminderCardWrapperProps {
 	reminder: Reminder;
 	onUpdate?: () => void;
-	index?: number;
 	hideProject?: boolean;
 	colorScheme: ProjectColorScheme;
 }
@@ -37,7 +36,6 @@ interface ReminderCardWrapperProps {
 export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
 	reminder,
 	onUpdate,
-	index,
 	hideProject = false,
 	colorScheme,
 }: ReminderCardWrapperProps) {
@@ -87,7 +85,6 @@ export const ReminderCardWrapper = React.memo(function ReminderCardWrapper({
 				reminder={reminder}
 				completionPreview={completionPreview}
 				animationConfig={{ enabled: false }}
-				index={index}
 				hideProject={hideProject}
 				colorScheme={colorScheme}
 			/>

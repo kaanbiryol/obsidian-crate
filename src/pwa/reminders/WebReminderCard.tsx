@@ -9,7 +9,6 @@ export const WebReminderCard = memo(function WebReminderCard({
 	reminder,
 	listStyle,
 	colorScheme,
-	index,
 	hideProject,
 	onEdit,
 	onToggleComplete,
@@ -17,7 +16,6 @@ export const WebReminderCard = memo(function WebReminderCard({
 	reminder: SharedReminder;
 	listStyle?: ListStyle;
 	colorScheme: ProjectColorScheme;
-	index: number;
 	hideProject: boolean;
 	onEdit: (id: string) => void;
 	onToggleComplete: (id: string, completed: boolean) => void | Promise<void>;
@@ -43,7 +41,6 @@ export const WebReminderCard = memo(function WebReminderCard({
 				reminder={reminder}
 				completionPreview={completionPreview}
 				animationConfig={{ enabled: false }}
-				index={index}
 				hideProject={hideProject}
 			/>
 		</div>

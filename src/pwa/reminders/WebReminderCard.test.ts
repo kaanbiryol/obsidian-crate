@@ -10,7 +10,6 @@ function render(colorScheme: 'light' | 'dark') {
 	return renderToStaticMarkup(React.createElement(WebReminderCard, {
 		reminder,
 		colorScheme,
-		index: 0,
 		hideProject: false,
 		onEdit: () => {},
 		onToggleComplete: () => {},

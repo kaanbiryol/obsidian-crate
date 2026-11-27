@@ -60,13 +60,12 @@ export function RemindersApp() {
 		showToast,
 	});
 
-	const renderSharedCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (
+	const renderSharedCard = useCallback<ReminderCardRenderer>(({ reminder, hideProject }) => (
 		<WebReminderCard
 			listStyle={preferences.listStyle}
 			colorScheme={colorScheme}
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}
-			index={index}
 			hideProject={hideProject}
 			onEdit={editReminder}
 			onToggleComplete={toggleReminderCompleted}
