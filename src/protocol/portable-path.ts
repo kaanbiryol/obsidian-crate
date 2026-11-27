@@ -70,6 +70,59 @@ export function assertPortablePaths(paths: Iterable<string>): void {
 	}
 }
 
+/** Each folder key above `key`, nearest the root first. */
+function ancestorKeys(key: string): string[] {
+	const ancestors: string[] = [];
+	for (let slash = key.indexOf('/'); slash > 0; slash = key.indexOf('/', slash + 1)) ancestors.push(key.slice(0, slash));
+	return ancestors;
+}
+
+/**
+ * `assertPortablePaths` for successive snapshots of one file set, such as a vault's files
+ * at each scan. Paths accepted earlier were checked against every other accepted path, so
+ * only paths added since the last snapshot are checked, against the paths kept. A snapshot
+ * that fails is checked in full for the same error, and the next one starts over.
+ */
+export class PortablePathSet {
+	private readonly keyByPath = new Map<string, string>();
+	private readonly pathByKey = new Map<string, string>();
+	/** Folder keys above accepted files, with the number of files below each. */
+	private readonly folderFiles = new Map<string, number>();
+
+	assert(paths: Iterable<string>): void {
+		const current = new Set(paths);
+		for (const [path, key] of this.keyByPath) if (!current.has(path)) this.remove(path, key);
+		for (const path of current) {
+			if (this.keyByPath.has(path)) continue;
+			const key = getSyncPathIssue(path) ? undefined : portablePathKey(path);
+			const folders = key === undefined ? [] : ancestorKeys(key);
+			if (key === undefined || this.pathByKey.has(key) || this.folderFiles.has(key) || folders.some(folder => this.pathByKey.has(folder))) {
+				this.clear();
+				assertPortablePaths(current);
+				throw new Error(`Invalid sync path: ${path}`);
+			}
+			this.keyByPath.set(path, key);
+			this.pathByKey.set(key, path);
+			for (const folder of folders) this.folderFiles.set(folder, (this.folderFiles.get(folder) ?? 0) + 1);
+		}
+	}
+
+	private remove(path: string, key: string): void {
+		this.keyByPath.delete(path);
+		this.pathByKey.delete(key);
+		for (const folder of ancestorKeys(key)) {
+			const count = this.folderFiles.get(folder)! - 1;
+			if (count) this.folderFiles.set(folder, count); else this.folderFiles.delete(folder);
+		}
+	}
+
+	private clear(): void {
+		this.keyByPath.clear();
+		this.pathByKey.clear();
+		this.folderFiles.clear();
+	}
+}
+
 /** Historical changes need valid names, but need not coexist as live files. */
 export function assertPortablePathNames(paths: Iterable<string>): void {
 	for (const path of paths) {

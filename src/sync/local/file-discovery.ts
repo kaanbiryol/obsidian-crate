@@ -8,7 +8,7 @@ import { runConcurrentTasks } from '../concurrency';
 
 import type { Vault, TFile, TAbstractFile } from 'obsidian';
 import { errorMessage } from '../../platform/logger';
-import { assertPortablePaths } from '../../protocol/portable-path';
+import { PortablePathSet } from '../../protocol/portable-path';
 
 /**
  * Normalised file descriptor that works for both indexed and hidden files.
@@ -87,6 +87,15 @@ export function tfileToVaultFile(file: TFile): VaultFile {
 	};
 }
 
+// Every scan of a vault checks its paths for collisions; only paths new since the last
+// accepted scan need checking, so each vault keeps the set it last accepted.
+const vaultPaths = new WeakMap<Vault, PortablePathSet>();
+function portablePaths(vault: Vault): PortablePathSet {
+	let paths = vaultPaths.get(vault);
+	if (!paths) vaultPaths.set(vault, paths = new PortablePathSet());
+	return paths;
+}
+
 /**
  * Discover all vault files — both Obsidian-indexed and hidden.
  *
@@ -134,7 +143,7 @@ export async function getAllVaultFiles(
 		shouldIgnore, seen, result, assertActive);
 
 	assertActive?.();
-	assertPortablePaths(result.map(file => file.path));
+	portablePaths(vault).assert(result.map(file => file.path));
 	return result;
 }
 
