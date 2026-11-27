@@ -3,7 +3,7 @@ import type { ReadingItem } from '@/reading/core/model';
 import { isRecord } from '@/platform/validation';
 import { base64ToArrayBuffer } from '@/platform/base64';
 import { readingImageType } from '@/reading/core/article-images';
-import { decodeReadingValue, encodeReadingValue } from './private-storage';
+import { decodeReadingValue, encodeReadingValue, forgetEncryptionChecks } from './private-storage';
 import { readingDatabase, readReadingValue } from './database';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
@@ -138,6 +138,7 @@ export async function cacheReadingArticle(session: ReadingSession, item: Reading
 		const replaced = saved as ReadingArticleCache | undefined;
 		if (refresh && !replaced) { await tx.done; return false; }
 		const usedAt = replaced?.usedAt ?? Date.now();
+		await forgetEncryptionChecks(tx.store);
 		await tx.store.put(encodeReadingValue(key, { item, markdown, usedAt, ...etag ? { etag } : {} }), key);
 		const row = `${readingKeys.articleItemPrefix(session.id)}${item.crate_reading_id}`;
 		await tx.store.put(encodeReadingValue(row, { item }), row);

@@ -1,6 +1,7 @@
 import type { IDBPDatabase, DBSchema } from 'idb';
 import { openSingleStoreDatabase } from '../../storage/single-store-database';
-import { encodeReadingValue, decodeReadingValue } from './private-storage';
+import { encodeReadingValue, decodeReadingValue, forgetEncryptionChecks } from './private-storage';
+import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
 
 interface ReadingDatabase extends DBSchema { values: { key: string; value: unknown } }
@@ -39,5 +40,11 @@ export async function readReadingValue(key: string): Promise<unknown> {
 export async function writeReadingValue(key: string, value: unknown, session: ReadingSession): Promise<void> {
 	const db = await readingDatabase();
 	assertReadingSession(session);
-	if (value === null) await db.delete('values', key); else await db.put('values', encodeReadingValue(key, value), key);
+	if (value === null) { await db.delete('values', key); return; }
+	const tx = db.transaction('values', 'readwrite');
+	try {
+		await forgetEncryptionChecks(tx.store);
+		await tx.store.put(encodeReadingValue(key, value), key);
+		await tx.done;
+	} catch (error) { await abortTransaction(tx); throw error; }
 }

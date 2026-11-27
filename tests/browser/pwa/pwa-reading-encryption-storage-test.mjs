@@ -93,12 +93,29 @@ for (const engine of [chromium, webkit]) {
       await t.prepareReadingEncryption(session);
       const recovered = await t.readReadingDraft(session);
 
+      // A checked store reads only shares on the next unlock, never offline copies.
+      const get = IDBObjectStore.prototype.get;
+      const read = [];
+      IDBObjectStore.prototype.get = function(key) { read.push(key); return get.call(this, key); };
+      t.resetReadingEncryption();
+      try { await t.prepareReadingEncryption(session); } finally { IDBObjectStore.prototype.get = get; }
+      const skippedArticles = !read.some(key => String(key).startsWith('article'));
+      // A plaintext write drops the check in its own transaction, so the next unlock converts it.
+      t.lockReadingStorage(false);
+      await t.saveReadingDraft(session, { url: 'https://private.example/plaintext' });
+      t.resetReadingEncryption();
+      await t.prepareReadingEncryption(session);
+      const reencrypted = (await db.get('values', 'draft:reader')).encryptedReading;
+      await t.saveReadingDraft(session, original);
+
       // A transaction failure may not leave a half-migrated plaintext session.
       t.resetReadingEncryption();
       // Migration writes keys in order, so the queue fails after the draft was rewritten, which
-      // must roll back.
+      // must roll back. Plaintext written without dropping the check, as by a tab running an
+      // older version, is found by the read it fails and converted on the next unlock.
       await db.put('values', original, 'draft:reader');
       await db.put('values', [{ originalBody: 'private queued edit' }], 'pending:reader');
+      const refusedPlaintext = await t.readReadingDraft(session).then(() => false, () => true);
       const put = IDBObjectStore.prototype.put;
       IDBObjectStore.prototype.put = function(value, key) {
         if (key === 'pending:reader') throw new DOMException('Quota full', 'QuotaExceededError');
@@ -122,7 +139,8 @@ for (const engine of [chromium, webkit]) {
       try { await t.readReadingDraft(session); } catch { locked = true; }
       return { migrated: migrated.encryptedReading, opened, unrelated, recovered, migrationFailed, rolledBack,
         healthyArticle: healthyArticle.markdown, preservedArticles, refusedReplacement, preservedReplacement,
-        preservedNewSession: JSON.stringify(survived) === JSON.stringify(ciphertext), staleRejected, locked };
+        preservedNewSession: JSON.stringify(survived) === JSON.stringify(ciphertext), staleRejected, locked,
+        skippedArticles, reencrypted, refusedPlaintext };
     });
     assert.equal(result.migrated, 1);
     assert.equal(result.opened.url, 'https://private.example/draft');
@@ -134,7 +152,8 @@ for (const engine of [chromium, webkit]) {
     assert.equal(result.staleRejected, true);
     assert.equal(result.locked, true);
     assert.equal(result.healthyArticle, 'Healthy offline article');
-    for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement']) assert.equal(result[key], true, key);
+    for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement', 'skippedArticles', 'refusedPlaintext']) assert.equal(result[key], true, key);
+    assert.equal(result.reencrypted, 1);
     console.log(`Reading encryption migration, damaged-cache isolation, key recovery and stale-session fencing passed (${engine.name()})`);
     for (const kind of ['empty', 'pending', 'damaged']) {
       const startup = await browser.newPage();

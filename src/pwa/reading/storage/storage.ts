@@ -1,4 +1,4 @@
-import { decodeReadingValue, encodeReadingValue } from './private-storage';
+import { decodeReadingValue, encodeReadingValue, forgetEncryptionChecks } from './private-storage';
 import type { PendingReading } from '../outbox';
 import { isPendingReading, isReadingDraft } from './storage-validation';
 import { downloadJson } from '../../storage/download';
@@ -135,6 +135,7 @@ export function adoptEarlierReadingCaptures(session: ReadingSession): Promise<vo
 		// One transaction, so a capture is never in both queues or in neither.
 		const tx = db.transaction('values', 'readwrite');
 		try {
+			await forgetEncryptionChecks(tx.store);
 			await tx.store.put(encodeReadingValue(own, queue), own);
 			for (const [key, kept] of remaining) {
 				if (kept.length) await tx.store.put(encodeReadingValue(key, kept), key);
@@ -166,7 +167,8 @@ export async function exportReadingData(): Promise<void> {
 	const data: Record<string, unknown> = {}, unreadable: string[] = [];
 	for (const key of await db.getAllKeys('values')) {
 		// Offline images are copies of vault files the server keeps, and items repeat their copy's.
-		if (key === 'share-key' || key === 'share-key-id' || isArticleImageReadingKey(key) || isArticleItemReadingKey(key)) continue;
+		if (key === 'share-key' || key === 'share-key-id' || isArticleImageReadingKey(key) || isArticleItemReadingKey(key)
+			|| key.startsWith(readingKeys.encryptionCheck(''))) continue;
 		const raw = await db.get('values', key);
 		try { data[key] = await readReadingValue(key); }
 		catch { data[key] = raw; unreadable.push(key); }

@@ -6,10 +6,10 @@ import { loadEncryptionState, loadVaultKeys, assertEncryptionActive, EncryptionV
 import type { EncryptionServerState } from '@/encryption/server-state';
 import { unlockLocalState, type FeatureKeys } from '../../encryption/encryption-keys';
 import { abortTransaction } from '../../storage/abort-transaction';
-import { lockReadingStorage, unlockReadingStorage, encodeReadingValue } from '../storage/private-storage';
+import { lockReadingStorage, unlockReadingStorage, encodeReadingValue, forgetPlaintextReadingFound, plaintextReadingFound } from '../storage/private-storage';
 import { assertReadingSession, isReadingSessionCurrent, type ReadingSession } from './session';
 import { readingDatabase } from '../storage/database';
-import { isSessionReadingKey } from '@/pwa/reading/storage/storage-keys';
+import { isSessionReadingKey, readingKeyRange, readingKeys } from '@/pwa/reading/storage/storage-keys';
 import { rememberRecoveryKey } from '../../encryption/web-app-unlock';
 
 let pending: { identity: string; promise: Promise<FeatureKeys | null> } | undefined;
@@ -49,12 +49,22 @@ export function prepareReadingEncryption(session: ReadingSession, refresh = fals
 		if (!current()) throw new Error('Reading sign-in changed.');
 		const tx = db.transaction('values', 'readwrite');
 		try {
-			for (const key of await tx.store.getAllKeys()) if (isSessionReadingKey(key, session.id)) {
+			// A store checked since its last plaintext write reads only shares, which the
+			// service worker writes without this key. Otherwise every value of the session is
+			// read, including offline images.
+			const check = readingKeys.encryptionCheck(session.id);
+			const found = plaintextReadingFound();
+			const checked = !found && await tx.store.get(check) === 1;
+			const keys = checked ? await tx.store.getAllKeys(readingKeyRange(readingKeys.share('')))
+				: (await tx.store.getAllKeys()).filter(key => isSessionReadingKey(key, session.id));
+			for (const key of keys) {
 				const value = await tx.store.get(key);
 				if (!(value && typeof value === 'object' && 'encryptedReading' in value)) await tx.store.put(encodeReadingValue(key, value), key);
 			}
+			if (!checked) await tx.store.put(1, check);
 			if (!current()) throw new Error('Reading sign-in changed.');
 			await tx.done;
+			if (found) forgetPlaintextReadingFound();
 		} catch (error) { await abortTransaction(tx); throw error; }
 		if (!current()) throw new Error('Reading sign-in changed.');
 		rememberEncryptionUnlock(state.vaultId);

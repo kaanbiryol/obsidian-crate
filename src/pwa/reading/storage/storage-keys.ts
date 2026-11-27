@@ -10,6 +10,9 @@ export const readingKeys = {
 	articleItemPrefix: (sessionId: string) => `article-item:${sessionId}:`,
 	attemptPrefix: (sessionId: string) => `attempt:${sessionId}:`,
 	share: (id: string) => `share:${id}`,
+	/** Present once every record of the session was checked for plaintext. Any plaintext
+	 * write removes all of them in its own transaction (see `forgetEncryptionChecks`). */
+	encryptionCheck: (sessionId: string) => `encryption-check:${sessionId}`,
 };
 
 /** Every key that starts with `prefix`, so a lookup reads only that namespace. Keys are all
