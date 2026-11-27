@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { youtubeVideoId, youtubeMomentUrl } from '../core/youtube';
 import { timestampLabel } from '../core/transcript';
 import type { ReadingHighlight } from '../core/highlights';
@@ -38,6 +38,55 @@ function highlightDate(value: string): string {
 	return (date.getFullYear() === new Date().getFullYear() ? SHORT_DATE : LONG_DATE).format(date);
 }
 
+type HighlightEntry<T> = { item: T; highlight: ReadingHighlight };
+interface HighlightActions<T> {
+	view: (item: T, highlight: ReadingHighlight) => void;
+	openItem: (item: T) => void;
+	annotate: (item: T, highlight: ReadingHighlight) => void;
+	remove: (item: T, highlight: ReadingHighlight) => void;
+	copy: (key: string, text: string) => void;
+	play: (seconds: number) => void;
+}
+interface HighlightRowProps<T> {
+	item: T; highlight: ReadingHighlight; rowKey: string; seconds?: number; copied: boolean; disabled: boolean; images?: ReadingImageLoader;
+	actions: HighlightActions<T>; can: { view: boolean; openItem: boolean; annotate: boolean; remove: boolean };
+}
+
+/** One row. It is memoized, and its props stay equal while its highlight does: actions are
+ * stable and the list passes which ones exist, so typing a search re-renders no other row. */
+const HighlightRow = memo(function HighlightRow<T extends ReadingMetadata & { path?: string }>({ item, highlight, rowKey, seconds, copied, disabled, images, actions, can }: HighlightRowProps<T>) {
+	const withActions = can.annotate || can.remove;
+	const viewLabel = youtubeVideoId(item.source_url) ? 'View in transcript' : 'View in article';
+	const momentControls = seconds !== undefined && <>
+		<Button className="crate-reading-highlights__seek" aria-label={`Seek to ${timestampLabel(seconds)}`} onClick={() => actions.play(seconds)}><ThemeIcon id="play" size="xs" aria-hidden="true" /><span>{timestampLabel(seconds)}</span></Button>
+		<a className="crate-reading-highlights__link" href={youtubeMomentUrl(item.source_url, seconds)} target="_blank" rel="noopener noreferrer" aria-label="Open moment on YouTube" title="Open moment on YouTube"><ThemeIcon id="external-link" size="s" aria-hidden="true" /></a>
+	</>;
+	return <li className="crate-reading-highlights__item" data-openable={can.view ? '' : undefined}>
+		{can.view && <Button className="crate-reading-highlights__open" data-reading-id={item.crate_reading_id} disabled={disabled} onClick={() => actions.view(item, highlight)}>
+			<span className="crate-reading__sr-only">{viewLabel}</span>
+		</Button>}
+		{highlight.image !== undefined
+			? <figure className="crate-reading-highlights__figure"><HighlightImage item={item} highlight={highlight} images={images} />
+				{highlight.text && <figcaption className="crate-reading-highlights__caption">{highlight.text}</figcaption>}</figure>
+			: <blockquote className="crate-reading-highlights__excerpt">{highlight.text}</blockquote>}
+		{highlight.note && <p className="crate-reading-highlights__note">{highlight.note}</p>}
+		{withActions
+			? <div className="crate-reading-highlights__toolbar">
+				{highlight.createdAt ? <time className="crate-reading-highlights__date" dateTime={highlight.createdAt}>{highlightDate(highlight.createdAt)}</time> : <span className="crate-reading-highlights__date" />}
+				{can.annotate && <IconButton icon="notepad-text" iconSize="s" label={highlight.note ? 'Edit note' : 'Add note'} disabled={disabled} onClick={() => actions.annotate(item, highlight)} />}
+				{highlight.image === undefined && <IconButton icon={copied ? 'check' : 'copy'} iconSize="s" label={copied ? 'Text copied' : 'Copy text'} onClick={() => actions.copy(rowKey, highlight.text)} />}
+				{momentControls}
+				{can.remove && <IconButton className="crate-reading-highlights__delete" icon="trash-2" iconSize="s" tone="danger" label="Delete highlight" disabled={disabled} onClick={() => actions.remove(item, highlight)} />}
+			</div>
+			: <div className="crate-reading-highlights__meta">
+				{can.openItem && <Button className="crate-reading-highlights__source" disabled={disabled} aria-label={`${readingTitle(item)}, open ${youtubeVideoId(item.source_url) ? 'video' : 'article'}`}
+					onClick={() => actions.openItem(item)}><ReadingSourceIcon item={item} /><span>{readingTitle(item)}</span></Button>}
+				{highlight.createdAt ? <time dateTime={highlight.createdAt}>{highlightDate(highlight.createdAt)}</time> : <span />}
+				{momentControls && <div className="crate-reading-highlights__actions">{momentControls}</div>}
+			</div>}
+	</li>;
+}) as <T extends ReadingMetadata & { path?: string }>(props: HighlightRowProps<T>) => ReactElement;
+
 /**
  * Compact rows: the row opens the passage. With row actions a toolbar holds the
  * date, then note, copy and delete controls as separate targets. With `onOpenItem`
@@ -48,7 +97,7 @@ export function HighlightList<T extends ReadingMetadata & { path?: string }>({ e
 	images?: ReadingImageLoader;
 	moment?: (highlight: ReadingHighlight) => number | undefined;
 	onPlay?: (seconds: number) => void;
-	entries: { item: T; highlight: ReadingHighlight }[];
+	entries: HighlightEntry<T>[];
 	onView?: (item: T, highlight: ReadingHighlight) => void;
 	onOpenItem?: (item: T) => void;
 	onAnnotate?: (item: T, highlight: ReadingHighlight) => void;
@@ -56,7 +105,6 @@ export function HighlightList<T extends ReadingMetadata & { path?: string }>({ e
 	onCopy?: () => void;
 	disabled?: boolean;
 }) {
-	const withActions = Boolean(onAnnotate || onDelete);
 	const [copied, setCopied] = useState<string | null>(null);
 	// Restore the copy icon, matching the reader's link copy confirmation.
 	useEffect(() => {
@@ -64,44 +112,27 @@ export function HighlightList<T extends ReadingMetadata & { path?: string }>({ e
 		const timer = window.setTimeout(() => setCopied(null), 2500);
 		return () => window.clearTimeout(timer);
 	}, [copied]);
-	const copy = async (key: string, text: string) => {
-		try {
-			await navigator.clipboard.writeText(text);
-			setCopied(key);
-			onCopy?.();
-		} catch { setCopied(null); }
-	};
+	// Callers pass new handlers on every render; rows call the latest through stable actions.
+	const latest = useRef({ onView, onOpenItem, onAnnotate, onDelete, onCopy, onPlay });
+	useLayoutEffect(() => { latest.current = { onView, onOpenItem, onAnnotate, onDelete, onCopy, onPlay }; });
+	const actions = useMemo<HighlightActions<T>>(() => ({
+		view: (item, highlight) => latest.current.onView?.(item, highlight),
+		openItem: item => latest.current.onOpenItem?.(item),
+		annotate: (item, highlight) => latest.current.onAnnotate?.(item, highlight),
+		remove: (item, highlight) => latest.current.onDelete?.(item, highlight),
+		play: seconds => latest.current.onPlay?.(seconds),
+		copy: (key, text) => {
+			navigator.clipboard.writeText(text).then(() => {
+				setCopied(key);
+				latest.current.onCopy?.();
+			}).catch(() => setCopied(null));
+		},
+	}), []);
+	const view = Boolean(onView), openItem = Boolean(onOpenItem), annotate = Boolean(onAnnotate), remove = Boolean(onDelete);
+	const can = useMemo(() => ({ view, openItem, annotate, remove }), [view, openItem, annotate, remove]);
 	return <ul className="crate-reading-highlights" aria-label="Highlights">{entries.map(({ item, highlight }, index) => {
 		const key = `${item.crate_reading_id}:${highlight.id ?? index}`;
-		const seconds = moment?.(highlight);
-		const viewLabel = youtubeVideoId(item.source_url) ? 'View in transcript' : 'View in article';
-		const momentControls = seconds !== undefined && <>
-			<Button className="crate-reading-highlights__seek" aria-label={`Seek to ${timestampLabel(seconds)}`} onClick={() => onPlay?.(seconds)}><ThemeIcon id="play" size="xs" aria-hidden="true" /><span>{timestampLabel(seconds)}</span></Button>
-			<a className="crate-reading-highlights__link" href={youtubeMomentUrl(item.source_url, seconds)} target="_blank" rel="noopener noreferrer" aria-label="Open moment on YouTube" title="Open moment on YouTube"><ThemeIcon id="external-link" size="s" aria-hidden="true" /></a>
-		</>;
-		return <li className="crate-reading-highlights__item" data-openable={onView ? '' : undefined} key={key}>
-			{onView && <Button className="crate-reading-highlights__open" data-reading-id={item.crate_reading_id} disabled={disabled} onClick={() => onView(item, highlight)}>
-				<span className="crate-reading__sr-only">{viewLabel}</span>
-			</Button>}
-			{highlight.image !== undefined
-				? <figure className="crate-reading-highlights__figure"><HighlightImage item={item} highlight={highlight} images={images} />
-					{highlight.text && <figcaption className="crate-reading-highlights__caption">{highlight.text}</figcaption>}</figure>
-				: <blockquote className="crate-reading-highlights__excerpt">{highlight.text}</blockquote>}
-			{highlight.note && <p className="crate-reading-highlights__note">{highlight.note}</p>}
-			{withActions
-				? <div className="crate-reading-highlights__toolbar">
-					{highlight.createdAt ? <time className="crate-reading-highlights__date" dateTime={highlight.createdAt}>{highlightDate(highlight.createdAt)}</time> : <span className="crate-reading-highlights__date" />}
-					{onAnnotate && <IconButton icon="notepad-text" iconSize="s" label={highlight.note ? 'Edit note' : 'Add note'} disabled={disabled} onClick={() => onAnnotate(item, highlight)} />}
-					{highlight.image === undefined && <IconButton icon={copied === key ? 'check' : 'copy'} iconSize="s" label={copied === key ? 'Text copied' : 'Copy text'} onClick={() => void copy(key, highlight.text)} />}
-					{momentControls}
-					{onDelete && <IconButton className="crate-reading-highlights__delete" icon="trash-2" iconSize="s" tone="danger" label="Delete highlight" disabled={disabled} onClick={() => onDelete(item, highlight)} />}
-				</div>
-				: <div className="crate-reading-highlights__meta">
-					{onOpenItem && <Button className="crate-reading-highlights__source" disabled={disabled} aria-label={`${readingTitle(item)}, open ${youtubeVideoId(item.source_url) ? 'video' : 'article'}`}
-						onClick={() => onOpenItem(item)}><ReadingSourceIcon item={item} /><span>{readingTitle(item)}</span></Button>}
-					{highlight.createdAt ? <time dateTime={highlight.createdAt}>{highlightDate(highlight.createdAt)}</time> : <span />}
-					{momentControls && <div className="crate-reading-highlights__actions">{momentControls}</div>}
-				</div>}
-		</li>;
+		return <HighlightRow key={key} rowKey={key} item={item} highlight={highlight} seconds={moment?.(highlight)} copied={copied === key}
+			disabled={disabled} images={images} actions={actions} can={can} />;
 	})}</ul>;
 }
