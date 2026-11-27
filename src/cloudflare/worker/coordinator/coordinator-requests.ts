@@ -6,6 +6,7 @@ import { maxFileBytes } from '../server/file-limit';
 import { MAX_BUFFERED_FILE_BYTES } from '../../../protocol/sync-limits';
 
 import { armReadingCoordinator, publishExtraction, type Publication } from '../reading/extraction/jobs';
+import { extractInTransfer } from '../reading/encrypted-extract';
 import { getSharedCheckpoint, downloadCheckpointFile } from '../sync/history-checkpoints';
 import { armDispatcher } from '../notifications/dispatcher';
 import { COORDINATOR_PATHS, INTERNAL_MUTATION_HEADER, TRANSFER_PATHS, UPLOAD_SESSION_TRANSFER_PATH } from './coordinator';
@@ -35,6 +36,9 @@ export async function handleCoordinatorRequest(
 			: __CRATE_SELF_HOSTED__ && path === UPLOAD_SESSION_TRANSFER_PATH ? '/sync/upload-session' : '/sync/batch-upload';
 		return withStateLock(() => fetchWorkerRequest(new Request(target, request), env, { kind: 'transfer' }));
 	}
+	// Parsing a page exceeds the public Worker's CPU budget. It changes no state and
+	// mostly waits on the network, so it takes no lock and one slow page delays no other.
+	if (path === TRANSFER_PATHS.readingExtract && request.method === 'POST') return extractInTransfer(request, env);
 	if (path === COORDINATOR_PATHS.commitNewFiles && request.method === 'POST') {
 		const prepared = await prepareCoordinatedNewFiles(request, env);
 		return withStateLock(() => commitCoordinatedNewFiles(prepared, state, env));

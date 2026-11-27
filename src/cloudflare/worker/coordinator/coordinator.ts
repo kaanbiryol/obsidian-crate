@@ -52,6 +52,7 @@ export const TRANSFER_PATHS = {
 	batchDownload: '/batch-download',
 	historyCheckpoint: '/history-checkpoint',
 	historyCheckpointFile: '/history-checkpoint-file',
+	readingExtract: '/reading-extract',
 } as const;
 /** Self-hosted only, so it stays out of `TRANSFER_PATHS`: the Cloudflare bundle leaves it out. */
 export const UPLOAD_SESSION_TRANSFER_PATH = '/sync-upload-session';
@@ -81,8 +82,8 @@ export function forwardToCoordinator(env: AlarmBinding, request: Request): Promi
 	return coordinatorStub(env).fetch(forwarded);
 }
 
-/** A random instance of the upload or read transfer pool. These hold no storage. */
-export function transferStub(env: AlarmBinding, pool: 'transfer' | 'transfer-read'): DurableObjectStub {
+/** A random instance of the upload, read or article extraction pool. These hold no storage. */
+export function transferStub(env: AlarmBinding, pool: 'transfer' | 'transfer-read' | 'reading-extract'): DurableObjectStub {
 	const shard = crypto.getRandomValues(new Uint8Array(1))[0]! % TRANSFER_SHARDS;
 	return roleStub(env, `__crate__/${pool}/${shard}`);
 }

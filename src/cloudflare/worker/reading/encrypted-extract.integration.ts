@@ -6,6 +6,18 @@ import { applySchema } from '../test-support/schema-test-harness';
 import worker from '../index';
 import { createEncryptionFixture } from '../test-support/encryption-test-harness';
 import { sha256Hex } from '@/platform/sha256';
+import { TRANSFER_PATHS } from '../coordinator/coordinator';
+import { forwardTransferRequest } from '../sync/transfer-dispatch';
+import { extractInTransfer, forwardEncryptedExtract } from './encrypted-extract';
+
+// Pool objects run the built Worker without this test's network stub, so the
+// extraction pool's handler runs here with the environment the request carried.
+vi.mock('../sync/transfer-dispatch', () => ({
+	forwardTransferRequest: vi.fn(async (request: Request, env: Parameters<typeof extractInTransfer>[1], path: string) => {
+		const target = new URL(request.url); target.pathname = path;
+		return extractInTransfer(new Request(target, request), env);
+	}),
+}));
 
 const link = 'https://private.example/confidential-article';
 const article = '<!doctype html><html><head><title>Confidential title</title></head><body><article><h1>Confidential title</h1><p>Enough original prose for the extractor to keep this paragraph as the article body.</p><p>A second paragraph keeps the article long enough to count as readable content.</p></article></body></html>';
@@ -39,6 +51,8 @@ it('returns the article for an encrypted Reading folder without storing the link
 	const response = await extract(link);
 	expect(response.status, await response.clone().text()).toBe(200);
 	expect(response.headers.get('Cache-Control')).toBe('no-store');
+	// Parsing runs in the extraction pool, beyond the public Worker's CPU budget.
+	expect(vi.mocked(forwardTransferRequest).mock.calls.at(-1)?.[2]).toBe(TRANSFER_PATHS.readingExtract);
 	const { article: captured } = await response.json() as { article: { title: string; markdown: string } };
 	expect(captured.title).toBe('Confidential title');
 	expect(captured.markdown).toContain('Enough original prose');
@@ -115,4 +129,22 @@ it('downloads no images for a retry, which keeps its note\'s images', async () =
 	fetch.mockClear();
 	expect((await extract(link, { images: false })).status).toBe(200);
 	expect(fetch.mock.calls.map(([request]) => request.url)).toEqual([link]);
+});
+
+it('replaces any image choice the client put in the link with the server policy', async () => {
+	vi.mocked(forwardTransferRequest).mockClear();
+	const request = new Request('https://test/reading/encrypted-extract?images=1', { method: 'POST', body: '{}' });
+	await forwardEncryptedExtract(request, env, false);
+	expect(new URL(vi.mocked(forwardTransferRequest).mock.calls[0]![0].url).searchParams.has('images')).toBe(false);
+	await forwardEncryptedExtract(new Request('https://test/reading/encrypted-extract', { method: 'POST', body: '{}' }), env, true);
+	expect(new URL(vi.mocked(forwardTransferRequest).mock.calls[1]![0].url).searchParams.get('images')).toBe('1');
+});
+
+it('answers in the extraction pool as the public Worker would', async () => {
+	const { transferStub } = await import('../coordinator/coordinator');
+	// A link with credentials is refused before any download, so no network is needed.
+	const response = await transferStub(env, 'reading-extract').fetch(`https://do${TRANSFER_PATHS.readingExtract}`,
+		{ method: 'POST', body: JSON.stringify({ url: 'http://user:secret@private.example/' }) });
+	expect(response.status).toBe(400);
+	expect(await response.json()).toMatchObject({ error: 'Enter a complete HTTP or HTTPS link without credentials.' });
 });

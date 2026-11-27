@@ -15,7 +15,7 @@ import { loadReadingMutation, mutateReading } from '../reading/mutations';
 
 /** The library mutations and the action each one performs. */
 const MUTATION_ACTIONS: Partial<Record<string, string>> = { '/reading/capture': 'capture', '/reading/update': 'update', '/reading/retry': 'retry', '/reading/delete': 'delete' };
-import { extractForEncryptedReading } from '../reading/encrypted-extract';
+import { forwardEncryptedExtract } from '../reading/encrypted-extract';
 import { isLibraryRead, loadLibraryRead, readLibrary } from '../reading/library-read';
 import { PLAINTEXT_ONLY_PATHS } from './policy';
 import { takenReadingPaths } from '../reading/taken-names';
@@ -79,7 +79,7 @@ async function handleEncryptedLibraryRoute(request: Request, env: Env, path: str
 		// As in unencrypted vaults, the web app then saves the link as a bookmark.
 		if (!current.enabled) throw new ReadingError('Allow article fetching in Reading settings before downloading articles.', 403, 'reading_fetching_off');
 		const images = (featurePolicyValue === undefined ? await featurePolicy(env.DB) : parseStoredFeaturePolicy(featurePolicyValue)).readingImages !== 'remote';
-		return await extractForEncryptedReading(request, env, images);
+		return await forwardEncryptedExtract(request, env, images);
 	}
 	return await handleEncryptedFolderFiles(request, env, path, 'reading', current.folder_path, encryption) ?? readingResponse({ error: 'Not found' }, 404);
 }
