@@ -1,6 +1,7 @@
 import type { IDBPDatabase, DBSchema } from 'idb';
 import { openSingleStoreDatabase } from '../../storage/single-store-database';
-import { encodeReadingValue, decodeReadingValue, forgetEncryptionChecks } from './private-storage';
+import { encodeReadingValue, decodeReadingValue, forgetEncryptionChecks, onPlaintextReadingFound } from './private-storage';
+import { readingKeyRange, readingKeys } from './storage-keys';
 import { abortTransaction } from '../../storage/abort-transaction';
 import { assertReadingSession, type ReadingSession } from '../session/session';
 
@@ -21,6 +22,12 @@ export function readingDatabase(): Promise<IDBPDatabase<ReadingDatabase>> {
 	void request.catch(() => { if (opening === request) opening = undefined; });
 	return request;
 }
+// Plaintext an earlier version wrote without dropping the checks: drop them now, so the
+// next unlock converts it even after a reload. A failed delete leaves it to a later read.
+onPlaintextReadingFound(() => {
+	void readingDatabase().then(db => db.delete('values', readingKeyRange(readingKeys.encryptionCheck('')))).catch(() => undefined);
+});
+
 /** Storage internals retain raw keys so exports can preserve unknown records. */
 export async function readReadingValue(key: string): Promise<unknown> {
 	const db = await readingDatabase();

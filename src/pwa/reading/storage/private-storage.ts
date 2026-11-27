@@ -7,9 +7,13 @@ let lockReason: string | undefined;
 let plaintextReadable = false;
 // A plaintext record was found where encryption is required, such as one an older tab wrote.
 let plaintextFound = false;
+let onPlaintextFound: (() => void) | undefined;
 /** Whether a read refused a plaintext record that the migration must convert. */
 export const plaintextReadingFound = (): boolean => plaintextFound;
 export function forgetPlaintextReadingFound(): void { plaintextFound = false; }
+/** Called when a read refuses plaintext, so storage can drop the encryption checks that
+ * would otherwise let later unlocks, after a reload too, skip converting it. */
+export function onPlaintextReadingFound(listener: () => void): void { onPlaintextFound = listener; }
 /** Called in the transaction of every write; a plaintext write drops all encryption checks,
  * so the next unlock reads the store again. A thrown encode aborts the deletion with it. */
 export async function forgetEncryptionChecks(store: { delete(range: IDBKeyRange): Promise<void> }): Promise<void> {
@@ -30,6 +34,7 @@ export function decodeReadingValue(key: string, value: unknown): unknown {
 	}
 	if (required && !plaintextReadable) {
 		plaintextFound = true;
+		onPlaintextFound?.();
 		throw new Error(lockReason ?? 'Private Reading storage needs migration before opening.');
 	}
 	return value;

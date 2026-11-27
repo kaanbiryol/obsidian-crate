@@ -116,6 +116,9 @@ for (const engine of [chromium, webkit]) {
       await db.put('values', original, 'draft:reader');
       await db.put('values', [{ originalBody: 'private queued edit' }], 'pending:reader');
       const refusedPlaintext = await t.readReadingDraft(session).then(() => false, () => true);
+      // The refusal also drops the stored check, so an unlock after a reload converts it too.
+      await new Promise(resolve => setTimeout(resolve, 50));
+      const checkDropped = await db.get('values', 'encryption-check:reader') === undefined;
       const put = IDBObjectStore.prototype.put;
       IDBObjectStore.prototype.put = function(value, key) {
         if (key === 'pending:reader') throw new DOMException('Quota full', 'QuotaExceededError');
@@ -140,7 +143,7 @@ for (const engine of [chromium, webkit]) {
       return { migrated: migrated.encryptedReading, opened, unrelated, recovered, migrationFailed, rolledBack,
         healthyArticle: healthyArticle.markdown, preservedArticles, refusedReplacement, preservedReplacement,
         preservedNewSession: JSON.stringify(survived) === JSON.stringify(ciphertext), staleRejected, locked,
-        skippedArticles, reencrypted, refusedPlaintext };
+        skippedArticles, reencrypted, refusedPlaintext, checkDropped };
     });
     assert.equal(result.migrated, 1);
     assert.equal(result.opened.url, 'https://private.example/draft');
@@ -152,7 +155,7 @@ for (const engine of [chromium, webkit]) {
     assert.equal(result.staleRejected, true);
     assert.equal(result.locked, true);
     assert.equal(result.healthyArticle, 'Healthy offline article');
-    for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement', 'skippedArticles', 'refusedPlaintext']) assert.equal(result[key], true, key);
+    for (const key of ['preservedArticles', 'refusedReplacement', 'preservedReplacement', 'skippedArticles', 'refusedPlaintext', 'checkDropped']) assert.equal(result[key], true, key);
     assert.equal(result.reencrypted, 1);
     console.log(`Reading encryption migration, damaged-cache isolation, key recovery and stale-session fencing passed (${engine.name()})`);
     for (const kind of ['empty', 'pending', 'damaged']) {
