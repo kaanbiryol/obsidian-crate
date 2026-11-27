@@ -385,6 +385,25 @@ describe('reminderIndex', () => {
 		expect(maps.size).toBe(2);
 	});
 
+	it('drops a removed note from identities it shared with another note', async () => {
+		vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+			reminders: [], filesScanned: 2, totalLines: 2, issues: [], scanDurationMs: 1, discoveredProjects: ['A', 'B'],
+			ambiguousOwners: [{ id: 'dup', filePath: 'Reminders/A.md' }, { id: 'dup', filePath: 'Reminders/B.md' }],
+		});
+		vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
+		const seen: Array<Record<string, string[]>> = [];
+		vi.mocked(vaultScanner.scanFile).mockImplementation(async (_app, file, _folder, options) => {
+			seen.push(Object.fromEntries([...options?.identityOwners ?? []].map(([id, paths]) => [id, [...paths].sort()])));
+			return { filePath: file.path, reminders: [], lineCount: 0 };
+		});
+		const index = createReminderIndex(app, 'Reminders');
+		await index.load();
+		await index.rescanFile(makeMockFile('Reminders/C.md'));
+		index.removeFile('Reminders/A.md');
+		await index.rescanFile(makeMockFile('Reminders/D.md'));
+		expect(seen).toEqual([{ dup: ['Reminders/A.md', 'Reminders/B.md'] }, { dup: ['Reminders/B.md'] }]);
+	});
+
 	it('publishes one trailing change for rescans while changes are coalesced', async () => {
 		vi.useFakeTimers();
 		vi.stubGlobal('window', globalThis);
