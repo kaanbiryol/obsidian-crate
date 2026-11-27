@@ -1,12 +1,12 @@
 import { readingHighlights } from '@/reading/core/highlights';
-import { readingUrlIdentity, type ReadingChanges, type ReadingItem } from '@/reading/core/model';
+import { readingItemUrlIdentity, readingUrlIdentity, type ReadingChanges, type ReadingItem } from '@/reading/core/model';
 import type { PendingReading } from './outbox';
 
 /** Keep durable local edits visible while a confirmed library refresh is in flight. */
 export function presentReadingItems(items: ReadingItem[], pending: PendingReading[]): ReadingItem[] {
 	if (!pending.length) return items;
 	const visible = [...items];
-	const urls = new Set(items.filter(item => item.source_url).map(item => readingUrlIdentity(item.source_url)));
+	const urls = new Set(items.filter(item => item.source_url).map(readingItemUrlIdentity));
 	const changesById = new Map<string, ReadingChanges & Pick<Partial<ReadingItem>, 'extraction_status' | 'highlight_format'>>();
 	const deleted = new Set<string>();
 	for (const op of pending) {

@@ -11,6 +11,11 @@ interface ReadingSyncPublication {
 	completed: boolean;
 }
 
+/** Whether two reads of the queue hold the same changes, as stored. */
+function samePendingReading(current: readonly PendingReading[], next: readonly PendingReading[]): boolean {
+	return current === next || current.length === next.length && current.every((op, index) => JSON.stringify(op) === JSON.stringify(next[index]));
+}
+
 /** Feature-owned durable hydration. Authentication and unlocking belong to the app. */
 export function useReadingSession(connection: ReadingConnection) {
 	const [session, setSession] = useState<ReadingSession | null>(null);
@@ -26,21 +31,24 @@ export function useReadingSession(connection: ReadingConnection) {
 	const authority = useRef<ReadingSession | null>(null);
 	// The session and mode the shown state was read for.
 	const hydratedFor = useRef<{ target: ReadingSession | null; readOnly: boolean } | null>(null);
+	// Each refresh reads the queue again. An unchanged queue keeps its array, so the library
+	// never takes it for new local changes to show over the pages it already lists.
+	const keepPending = useCallback((next: PendingReading[]) => setPending(current => samePendingReading(current, next) ? current : next), []);
 	const isCurrentSession = useCallback((expected: ReadingSession) => {
 		return alive.current && sameReadingSession(authority.current, expected) && isReadingSessionCurrent(expected);
 	}, []);
 	const publishPending = useCallback((expected: ReadingSession, next: PendingReading[]) => {
 		if (!isCurrentSession(expected)) return false;
-		setPending(next);
+		keepPending(next);
 		return true;
-	}, [isCurrentSession]);
+	}, [isCurrentSession, keepPending]);
 	const publishSyncResult = useCallback((expected: ReadingSession, result: ReadingSyncPublication) => {
 		if (!isCurrentSession(expected)) return false;
 		if (result.cache) setCache(result.cache);
-		setPending(result.pending);
+		keepPending(result.pending);
 		if (result.completed) { setError(null); setLibraryFailed(false); }
 		return true;
-	}, [isCurrentSession]);
+	}, [isCurrentSession, keepPending]);
 	const reportLibraryFailure = useCallback((expected: ReadingSession) => {
 		if (isCurrentSession(expected)) setLibraryFailed(true);
 	}, [isCurrentSession]);

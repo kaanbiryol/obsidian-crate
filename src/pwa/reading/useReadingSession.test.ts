@@ -76,6 +76,21 @@ describe('Reading session authority', () => {
 		expect(h.rendered.current).toMatchObject({ cache: before.cache, pending: before.pending, error: before.error, url: before.url });
 	});
 
+	it('keeps the published queue when a refresh reads the same changes again', async () => {
+		const h = start();
+		await act(async () => { h.release(session); });
+		const op = { id: 'op', sessionId: session.id, action: 'retry', intent: { id: 'article' } } as const;
+		await act(async () => { h.rendered.current.publishPending(session, [op]); });
+		const published = h.rendered.current.pending;
+		await act(async () => {
+			h.rendered.current.publishSyncResult(session, { pending: [{ ...op }], completed: true });
+			h.rendered.current.publishPending(session, [{ ...op, intent: { ...op.intent } }]);
+		});
+		expect(h.rendered.current.pending).toBe(published);
+		await act(async () => { h.rendered.current.publishPending(session, [{ ...op, error: 'Offline' }]); });
+		expect(h.rendered.current.pending).toEqual([{ ...op, error: 'Offline' }]);
+	});
+
 	it('connects from Reminders, hydrates a saved draft, and saves edits after rerender', async () => {
 		vi.mocked(readReadingDraft).mockResolvedValueOnce({ url: 'https://saved.example/article' });
 		const h = start();
