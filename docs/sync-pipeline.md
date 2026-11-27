@@ -108,7 +108,7 @@ Entry point: `engine/lifecycle.ts:periodicCheck()`
 
 ### 2. Foreground Sync
 
-When `automaticSync` is enabled, the plugin checks for work when Obsidian comes back into focus, becomes visible, or the device reconnects to the network. Foreground triggers are debounced for 1 second and throttled by a 30-second cooldown. The check is the periodic check's, and a sync runs only when it finds something. On desktop, vault file events keep arriving while Obsidian is in the background, so the foreground check asks only the server and counts queued and unfinished uploads; it skips the vault walk. On mobile, where a suspended app can miss file events, it also walks the vault. A failed check still runs the sync, which reports the failure.
+When `automaticSync` is enabled, the plugin checks for work when Obsidian comes back into focus, becomes visible, or the device reconnects to the network. Foreground triggers are debounced for 1 second and throttled by a 30-second cooldown. The check is the periodic check's, and a sync runs only when it finds something. On desktop, vault file events keep arriving while Obsidian is in the background, so the foreground check asks only the server and counts queued and unfinished uploads; it skips the vault walk unless `syncInterval` is 0, when no periodic check walks instead. On mobile, where a suspended app can miss file events, it also walks the vault. That walk compares metadata only; the sync it starts reads and verifies content. A failed check, or an error an earlier sync left, still runs the sync, which reports or clears it.
 
 Entry point: `runtime.ts:triggerForegroundSync()`
 

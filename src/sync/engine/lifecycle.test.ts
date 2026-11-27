@@ -271,7 +271,7 @@ describe('SyncEngine periodic check backoff', () => {
 });
 
 describe('SyncEngine foreground check', () => {
-	it('walks the vault only when file events may have been missed', async () => {
+	it('walks the vault, comparing metadata only, when file events may have been missed', async () => {
 		const harness = createHarness();
 		harness.api.checkForChanges.mockResolvedValue({ hasChanges: false });
 		try {
@@ -280,11 +280,31 @@ describe('SyncEngine foreground check', () => {
 			await expect(harness.engine.foregroundSyncNeeded(false)).resolves.toBe(false);
 			expect(walk).not.toHaveBeenCalled();
 			await expect(harness.engine.foregroundSyncNeeded(true)).resolves.toBe(true);
-			expect(walk).toHaveBeenCalledOnce();
+			// The sync it starts reads content, so the check does not.
+			expect(walk).toHaveBeenCalledExactlyOnceWith(false);
 			harness.api.checkForChanges.mockResolvedValue({ hasChanges: true });
 			await expect(harness.engine.foregroundSyncNeeded(false)).resolves.toBe(true);
 		} finally {
 			harness.engine.destroy();
 		}
 	});
+
+	it('leaves the status to a sync that started while the check awaited', async () => {
+		const harness = createHarness();
+		const check = createDeferred<{ hasChanges: boolean }>();
+		harness.api.checkForChanges.mockReturnValue(check.promise);
+		try {
+			await harness.engine.initialize();
+			// A periodic check failed earlier, so a successful check would clear its error.
+			Object.assign(harness.engine, { periodicCheckFailed: true });
+			const pending = harness.engine.foregroundSyncNeeded(false);
+			Object.assign(harness.engine, { state: { ...harness.engine.getState(), status: 'syncing' } });
+			check.resolve({ hasChanges: false });
+			await expect(pending).resolves.toBe(false);
+			expect(harness.engine.getState().status).toBe('syncing');
+		} finally {
+			harness.engine.destroy();
+		}
+	});
 });
+

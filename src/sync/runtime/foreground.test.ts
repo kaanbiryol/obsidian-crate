@@ -85,7 +85,7 @@ describe('SyncRuntime foreground sync', () => {
 
 	it('skips the sync when the check finds nothing, and walks the vault only without background file events', async () => {
 		for (const fileEventsInBackground of [true, false]) {
-			const { runtime } = createRuntimeHarness({}, undefined, { fileEventsInBackground });
+			const { runtime } = createRuntimeHarness({ syncInterval: 300 }, undefined, { fileEventsInBackground });
 			const sync = vi.fn(async () => createEmptySyncResult());
 			const foregroundSyncNeeded = vi.fn(async () => false);
 			await initializeRuntime(runtime, {
@@ -112,4 +112,33 @@ describe('SyncRuntime foreground sync', () => {
 		await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
 		expect(sync).toHaveBeenCalledOnce();
 	});
+
+	it('walks on desktop when no periodic check walks instead', async () => {
+		const { runtime } = createRuntimeHarness({ syncInterval: 0 }, undefined, { fileEventsInBackground: true });
+		const foregroundSyncNeeded = vi.fn(async () => false);
+		await initializeRuntime(runtime, {
+			getState: () => ({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 }),
+			sync: vi.fn(async () => createEmptySyncResult()), foregroundSyncNeeded,
+		});
+
+		runtime.triggerForegroundSync('focus');
+		await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
+		expect(foregroundSyncNeeded).toHaveBeenCalledWith(true);
+	});
+
+	it('syncs without a check when an earlier sync left an error, so the sync can clear it', async () => {
+		const { runtime } = createRuntimeHarness({}, undefined, { fileEventsInBackground: true });
+		const sync = vi.fn(async () => createEmptySyncResult());
+		const foregroundSyncNeeded = vi.fn(async () => false);
+		await initializeRuntime(runtime, {
+			getState: () => ({ status: 'error', lastSync: null, lastError: 'Sync failed', pendingChanges: 0, conflictCount: 0 }),
+			sync, foregroundSyncNeeded,
+		});
+
+		runtime.triggerForegroundSync('focus');
+		await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
+		expect(foregroundSyncNeeded).not.toHaveBeenCalled();
+		expect(sync).toHaveBeenCalledOnce();
+	});
 });
+

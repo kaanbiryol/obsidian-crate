@@ -21,7 +21,8 @@ interface SyncEngineLifecycleDependencies {
 	getQueuedKeyCount(): number;
 	/** A standard sync must compare the whole server inventory, as after a removed exclusion. */
 	fullSyncRequested?(): boolean;
-	hasLocalFileChanges(): Promise<boolean>;
+	/** `verifyContent: false` compares metadata only. */
+	hasLocalFileChanges(verifyContent?: boolean): Promise<boolean>;
 	/** Advance the rotating content check without network access. */
 	verifyLocalContent?(): Promise<void>;
 	/** Seconds between server checks that never sync, while automatic sync is off; 0 is off. */
@@ -154,14 +155,14 @@ export class SyncEngineLifecycle {
 	}
 
 	/** Server changes, queued work or a requested full sync. `includeLocal` also walks the
-	 * vault for edits its file events missed. */
-	async syncNeeded(includeLocal: boolean): Promise<boolean> {
+	 * vault for edits its file events missed, reading content too unless `verifyContent` is false. */
+	async syncNeeded(includeLocal: boolean, verifyContent = true): Promise<boolean> {
 		const dependencies = this.dependencies;
 		const { hasChanges, cursorExpired } = await dependencies.checkForChanges(dependencies.getLastSeq());
 		// A sync walks the vault itself, so only look for missed local edits
 		// when nothing else would start one.
 		return hasChanges || cursorExpired === true || dependencies.getQueuedKeyCount() > 0
-			|| dependencies.fullSyncRequested?.() === true || (includeLocal && await dependencies.hasLocalFileChanges());
+			|| dependencies.fullSyncRequested?.() === true || (includeLocal && await dependencies.hasLocalFileChanges(verifyContent));
 	}
 
 	private stopPeriodicSync(): void {

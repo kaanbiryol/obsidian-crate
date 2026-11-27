@@ -60,13 +60,14 @@ export class LocalChangeDetection {
 		return this.d.trackWork(() => this.contentVerifier.verify(this.d.vault, this.d.manifest, files, this.d.lifecycle.abortSignal));
 	}
 
-	hasUnsyncedChanges(): Promise<boolean> {
+	/** Without `verifyContent` only metadata is compared, for a check whose sync verifies content itself. */
+	hasUnsyncedChanges(verifyContent = true): Promise<boolean> {
 		return this.d.trackWork(async () => hasLocalFileChanges(
 			this.d.vault,
 			this.d.manifest,
 			this.d.shouldIgnore,
 			await this.knownFileLimit(),
-			files => this.verifyContent(files),
+			verifyContent ? files => this.verifyContent(files) : undefined,
 			() => this.d.lifecycle.abortSignal.throwIfAborted(),
 		));
 	}

@@ -537,13 +537,17 @@ export class SyncRuntime {
 		else this.foregroundSync.trigger(reason);
 	}
 
-	/** Syncs only when the server, queued work or (without background file events) a vault
-	 * walk finds something; a failed check leaves the sync to report the failure. */
+	/** Syncs only when the server, queued work or a vault walk finds something. The walk is
+	 * skipped where file events arrive in the background, unless no periodic check walks
+	 * instead. A failed check, or an error a sync left, leaves the sync to report or clear it. */
 	private async foregroundSyncIfNeeded(): Promise<void> {
 		const engine = this.requireEngine();
-		let needed = true;
-		try { needed = await engine.foregroundSyncNeeded(!this.options.fileEventsInBackground); }
-		catch { /* The sync reports why the server is unavailable. */ }
+		let needed = engine.getState().status === 'error';
+		const walk = !this.options.fileEventsInBackground || this.settings.syncInterval === 0;
+		if (!needed) {
+			try { needed = await engine.foregroundSyncNeeded(walk); }
+			catch { needed = true; /* The sync reports why the server is unavailable. */ }
+		}
 		if (!needed || this.syncEngine !== engine || engine.getState().status === 'syncing') return;
 		await this.sync();
 	}

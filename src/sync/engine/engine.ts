@@ -143,7 +143,7 @@ export class SyncEngine {
 			getLastSeq: () => this.settings.lastSeq,
 			getQueuedKeyCount: () => this.queueController.getQueuedKeyCount(),
 			fullSyncRequested: () => this.settings.fullSyncRequested === true || !!this.settings.heldRecheckPaths?.length,
-			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await this.hasUnsyncedLocalChanges(),
+			hasLocalFileChanges: async (verifyContent = true) => this.localManifest.uploadJournal.pending().length > 0 || await this.hasUnsyncedLocalChanges(verifyContent),
 			verifyLocalContent: () => this.localChanges.verifyTracked(),
 			getManualCheckSeconds: () => this.settings.syncInterval,
 			manualCheckDue: () => this.hooks.onManualCheckDue?.(),
@@ -157,7 +157,8 @@ export class SyncEngine {
 				return result;
 			},
 			onCheckSuccess: () => {
-				if (this.periodicCheckFailed) this.updateState({ status: 'idle', lastError: null });
+				// A sync that started while the check awaited owns the status.
+				if (this.periodicCheckFailed && this.state.status !== 'syncing') this.updateState({ status: 'idle', lastError: null });
 			},
 			onCheckFailure: error => {
 				if (this.lifecycle.abortSignal.aborted || this.state.status === 'syncing') return;
@@ -471,16 +472,18 @@ export class SyncEngine {
 		return this.conflictStore.getActiveConflicts();
 	}
 
-	hasUnsyncedLocalChanges(): Promise<boolean> {
-		return this.localChanges.hasUnsyncedChanges();
+	hasUnsyncedLocalChanges(verifyContent = true): Promise<boolean> {
+		return this.localChanges.hasUnsyncedChanges(verifyContent);
 	}
 
 	/** Whether a foreground sync has work. Without `includeLocal` the vault is not walked:
-	 * only an unfinished upload counts as local work, since file events reported the rest. */
+	 * only an unfinished upload counts as local work, since file events reported the rest.
+	 * A walk compares metadata only; the sync it starts verifies content, so nothing is read twice. */
 	async foregroundSyncNeeded(includeLocal: boolean): Promise<boolean> {
 		if (this.localManifest.uploadJournal.pending().length > 0) return true;
-		const needed = await this.lifecycle.syncNeeded(includeLocal);
-		if (!needed && this.periodicCheckFailed) this.updateState({ status: 'idle', lastError: null });
+		const needed = await this.lifecycle.syncNeeded(includeLocal, false);
+		// A sync that started while the check awaited owns the status.
+		if (!needed && this.periodicCheckFailed && this.state.status !== 'syncing') this.updateState({ status: 'idle', lastError: null });
 		return needed;
 	}
 
