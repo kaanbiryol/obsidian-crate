@@ -32,6 +32,7 @@ const { armReminderDispatcher, revokeCoordinatedCredential, sendHostAlert } = aw
  * 	batch<T = unknown>(statements: LocalD1Statement[]): Promise<T[]>,
  * 	exec(query: string): Promise<unknown>,
  * }} LocalD1Database
+ * @typedef {{ get(key: string): Promise<{ body: AsyncIterable<Uint8Array> } | null> }} LocalR2Bucket
  */
 
 /**
@@ -162,12 +163,66 @@ function localDeploymentFingerprint({ worker, schema, release }) {
  * @param {string} [dataDir] The data directory being opened; omitted when checking a backup.
  */
 export function assertCompatibleLocalMetadata(previous, expected, dataDir) {
-	if (!previous || previous.format !== 1 || !Number.isSafeInteger(previous.serverRevision)
-		|| previous.serverRevision < 1 || typeof previous.instanceId !== 'string' || previous.schemaHash !== expected.schemaHash
-		|| previous.runtimeVersion !== expected.runtimeVersion || previous.serverRevision > expected.serverRevision) {
+	const compatible = previous && previous.format === 1 && Number.isSafeInteger(previous.serverRevision)
+		&& previous.serverRevision >= 1 && typeof previous.instanceId === 'string' && previous.schemaHash === expected.schemaHash
+		&& previous.serverRevision <= expected.serverRevision;
+	if (compatible && dataDir && runtimeAdvances(previous.runtimeVersion, expected.runtimeVersion)) {
+		throw new Error(`The server data in ${dataDir} was written by an older storage runtime. Stop the server and run upgrade with a new --output backup directory before starting. The update command and the Docker image do this for you.`);
+	}
+	if (!compatible || previous.runtimeVersion !== expected.runtimeVersion) {
 		throw new Error(dataDir
 			? `The server data in ${dataDir} is damaged or comes from a different Crate server version, so this version can't open it. To start fresh, choose another folder with --data-dir or move this one aside. To keep the data, run the version that created it. Don't edit server.json.`
 			: "This backup is damaged or comes from a different Crate server version, so this version can't restore it. Restore it with the version that created it.");
+	}
+}
+
+/** Whether `recorded` is an older Miniflare version than `current`, in semver order.
+ * Anything that is not a plain semver version never advances.
+ * @param {unknown} recorded @param {string} current */
+export function runtimeAdvances(recorded, current) {
+	const pattern = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
+	const [a, b] = [pattern.exec(String(recorded)), pattern.exec(current)];
+	if (!a || !b) return false;
+	for (const i of [1, 2, 3]) if (Number(a[i]) !== Number(b[i])) return Number(a[i]) < Number(b[i]);
+	// A release follows its prereleases; prerelease identifiers compare as semver specifies.
+	if (!a[4] || !b[4]) return Boolean(a[4]) && !b[4];
+	const [x, y] = [a[4].split('.'), b[4].split('.')];
+	for (let i = 0; i < Math.min(x.length, y.length); i++) {
+		const [p, q] = [String(x[i]), String(y[i])];
+		if (p === q) continue;
+		const [numericP, numericQ] = [/^\d+$/.test(p), /^\d+$/.test(q)];
+		if (numericP && numericQ) return Number(p) < Number(q);
+		return numericP === numericQ ? p < q : numericP;
+	}
+	return x.length < y.length;
+}
+
+/** Reads every current and retained file back through a new storage runtime and checks its
+ * size and SHA-256, so a runtime that cannot read the old layout fails before it owns the data.
+ * @param {LocalD1Database} db @param {LocalR2Bucket} bucket @param {string} backup */
+async function assertReadableFiles(db, bucket, backup) {
+	const page = 64;
+	for (const [table, order] of [['files', 'portable_path'], ['file_versions', 'id']]) {
+		/** @type {unknown} */
+		let after = null;
+		for (;;) {
+			/** @type {{ results: { position: unknown, storage_key: string, hash: string, size: number }[] }} */
+			const { results } = await db.prepare(`SELECT ${order} AS position, storage_key, hash, size FROM ${table}${after === null ? '' : ` WHERE ${order} > ?1`} ORDER BY ${order} LIMIT ${page}`)
+				.bind(...(after === null ? [] : [after])).all();
+			const unreadable = await Promise.all(results.map(async row => {
+				const object = await bucket.get(row.storage_key);
+				if (!object) return true;
+				const hash = createHash('sha256');
+				let size = 0;
+				for await (const chunk of object.body) { hash.update(chunk); size += chunk.byteLength; }
+				return size !== row.size || hash.digest('hex') !== row.hash;
+			}));
+			if (unreadable.includes(true)) {
+				throw new Error(`After the storage runtime update, a stored file is missing or does not match its checksum, so the data was not upgraded and the previous release still opens it. The backup made before this check is at ${backup}.`);
+			}
+			if (results.length < page) break;
+			after = results.at(-1)?.position;
+		}
 	}
 }
 
@@ -435,17 +490,21 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		const previous = previousText === null ? null : JSON.parse(previousText);
 
     const expected = { schemaHash: digest(schema), runtimeVersion, serverRevision: release.revision };
+    // Set when upgrade opens data written by an older Miniflare, which this start verifies before recording.
+    let runtimeUpgrade = false;
+    let usedBackup = '';
     if (previousText !== null) {
       // Damaged metadata (`null` included) fails the same way with or without an upgrade.
       if (!upgradeBackup || !previous) assertCompatibleLocalMetadata(previous, expected, dataDir);
       else {
         const current = /** @type {ServerMetadata} */ (previous);
         if (current.schemaHash !== expected.schemaHash) assertLocalMigrationPath(current.schemaVersion, release);
-        assertCompatibleLocalMetadata({ ...current, schemaHash: expected.schemaHash }, expected, dataDir);
+        runtimeUpgrade = runtimeAdvances(current.runtimeVersion, runtimeVersion);
+        assertCompatibleLocalMetadata({ ...current, schemaHash: expected.schemaHash, ...(runtimeUpgrade ? { runtimeVersion } : {}) }, expected, dataDir);
         const { backupLocalServer, prepareMigrationBackup } = await import('./local-server-backup.mjs');
         // A retried migration keeps the backup taken before its first attempt while it still holds this data.
-        if (reuseUpgradeBackup) await prepareMigrationBackup(dataDir, upgradeBackup);
-        else await backupLocalServer(dataDir, upgradeBackup, { alreadyLocked: true });
+        usedBackup = reuseUpgradeBackup ? await prepareMigrationBackup(dataDir, upgradeBackup)
+          : await backupLocalServer(dataDir, upgradeBackup, { alreadyLocked: true });
       }
     }
 
@@ -464,6 +523,7 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 			bindings: { CRATE_PUBLIC_ORIGIN: origin, CRATE_DEPLOYMENT_FINGERPRINT: localDeploymentFingerprint({ worker, schema, release }),
 				...(maxFileBytes ? { CRATE_MAX_FILE_BYTES: String(maxFileBytes) } : {}) },
 			d1Databases: { [bindings.database]: 'crate-local-db' },
+			...(runtimeUpgrade ? { r2Buckets: { [bindings.bucket]: 'crate-local-files' } } : {}),
 		};
 		// Validate and initialize with no Durable Objects registered: overdue
 		// alarms must not execute against an unverified database or during admin.
@@ -486,6 +546,9 @@ export async function openLocalRuntime({ dataDir, origin = 'http://localhost:878
 		} else {
 			if (!tables.some(table => table.name === 'crate_schema')) throw new Error('Refusing to initialize a non-empty, unrecognized database.');
 			const marker = await db.prepare('SELECT version FROM crate_schema WHERE id = 1').first();
+			// Before any migration and before server.json records the new runtime, so a failed check
+			// leaves the data as the previous release wrote it.
+			if (runtimeUpgrade) await assertReadableFiles(db, /** @type {LocalR2Bucket} */ (/** @type {unknown} */ (await mf.getR2Bucket(bindings.bucket))), usedBackup);
 			if (upgradeBackup) await migrateLocalDatabase(db, release);
  else if (marker?.version !== release.schemaVersion) throw new Error('Unsupported local database schema. Run the stopped-server upgrade command with a new backup directory.');
 		}

@@ -822,8 +822,9 @@ docker compose pull && docker compose up -d
 ```
 
 Before serving, the container runs the compatibility check. When the release
-needs a migration, it makes a verified backup to `/backups/before-migration-r<from>-to-r<to>`
-(or `/data/backups/…` when no backup folder is mounted), then migrates. A restart
+needs a migration or a newer storage runtime, it makes a verified backup to
+`/backups/before-migration-r<from>-to-r<to>`, with `-runtime-<version>` appended for a
+runtime update (or `/data/backups/…` when no backup folder is mounted), then upgrades. A restart
 that retries the migration reuses that backup while it is the latest one; otherwise
 it keeps it and makes a new one beside it with a time suffix. Data it
 cannot read stops startup with the reason, and Compose retries; pin the previous
@@ -833,16 +834,20 @@ hand with `docker compose run --rm crate upgrade --output /data/backups/before-m
 For a source installation: update the source, run `npm ci` and
 `npm run build:worker`, then run
 `npm run server -- check-upgrade --data-dir /path/to/crate-data`. If it reports
-that the database needs a migration, run
+that the database needs a migration or the newer storage runtime, run
 `npm run server -- upgrade --data-dir /path/to/crate-data --output /path/to/new-backup`
 before starting with the same directory and origin.
 
 The check does not change data. **upgrade** creates a verified backup, then
 applies the registered migrations in order. Updates with the same storage runtime
 and schema can advance the server revision. The launcher rejects older server
-revisions and different Miniflare versions. Normal startup rejects a different
-schema hash; only **upgrade** accepts one, and only with a registered migration
-from the data's recorded schema version. Stale generated Worker bundles are also
+revisions and older Miniflare versions than the one recorded in `server.json`.
+Normal startup also rejects a newer Miniflare version; only **upgrade** accepts one,
+after its backup. It then reads every current and retained file back through the
+new runtime and checks its size and SHA-256 before recording the new version, so a
+runtime that cannot read the stored data leaves it on the old one. Normal startup
+rejects a different schema hash; only **upgrade** accepts one, and only with a
+registered migration from the data's recorded schema version. Stale generated Worker bundles are also
 rejected; rebuilding does not reset data. Do not edit `server.json` to bypass
 checks. After an upgrade has written newer data, rollback needs the previous
 installation and its pre-upgrade backup.

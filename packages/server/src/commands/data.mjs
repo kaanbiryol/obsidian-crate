@@ -58,7 +58,7 @@ export async function restore({ dataDir, values }) {
 export async function checkUpgrade({ dataDir, values }) {
 	const checked = await checkLocalUpgrade(dataDir);
 	if (values.json) { console.log(JSON.stringify(checked)); return; }
-	console.log(`Compatible: server revision ${checked.from} → ${checked.to}, runtime ${checked.runtime}.${checked.requiresMigration ? ' The database needs a migration: run upgrade with a new --output backup directory before starting.' : ''} Back up before updating; no data was changed by this check.`);
+	console.log(`Compatible: server revision ${checked.from} → ${checked.to}, runtime ${checked.runtime}.${checked.requiresUpgrade ? ` ${checked.runtimeUpgrade ? 'The data needs the newer storage runtime' : 'The database needs a migration'}: run upgrade with a new --output backup directory before starting.` : ''} Back up before updating; no data was changed by this check.`);
 }
 
 /** Before Docker serves a newer image, migrates data that needs it, after a verified backup
@@ -68,10 +68,11 @@ export async function checkUpgrade({ dataDir, values }) {
 export async function migrateBeforeStart(dataDir, backupRoot) {
 	if (!await access(join(dataDir, 'server.json')).then(() => true, () => false)) return null;
 	const checked = await checkLocalUpgrade(dataDir);
-	if (!checked.requiresMigration) return null;
+	if (!checked.requiresUpgrade) return null;
 	// One backup per transition: Compose restarts a failing migration, which must not copy the data each time.
-	const output = join(backupRoot, `before-migration-r${checked.from}-to-r${checked.to}`);
-	console.log(`This release needs a database migration. Backing up to ${output} first, unless an earlier attempt already did.`);
+	// A storage runtime update can keep the server revision, so its name includes the runtime.
+	const output = join(backupRoot, `before-migration-r${checked.from}-to-r${checked.to}${checked.runtimeUpgrade ? `-runtime-${checked.runtime}` : ''}`);
+	console.log(`This release needs a ${checked.runtimeUpgrade ? 'storage runtime update' : 'database migration'}. Backing up to ${output} first, unless an earlier attempt already did.`);
 	const upgraded = await openLocalRuntime({ dataDir, administrative: true, handleSignals: false, upgradeBackup: output, reuseUpgradeBackup: true });
 	await upgraded.close();
 	console.log('Server data migrated.');

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { compareVersions, updateGlobalInstall } from '../src/commands/update.mjs';
 
 /** @param {Partial<import('../src/commands/update.mjs').UpdateSteps> & { check?: object }} overrides */
-function steps({ check = { requiresMigration: false }, ...overrides } = {}) {
+function steps({ check = { requiresUpgrade: false }, ...overrides } = {}) {
 	/** @type {string[]} */
 	const calls = [];
 	/** @type {import('../src/commands/update.mjs').UpdateSteps} */
@@ -40,7 +40,7 @@ test('stops, backs up, installs, checks and restarts the service', async () => {
 test('migrates from the before-update backup instead of copying the data again', async () => {
 	/** @type {string[][]} */
 	const commands = [];
-	const { calls, fake } = steps({ check: { requiresMigration: true } });
+	const { calls, fake } = steps({ check: { requiresUpgrade: true } });
 	const crate = fake.crate;
 	fake.crate = async args => { commands.push(args); return crate(args); };
 	await updateGlobalInstall(options, fake);
@@ -74,11 +74,31 @@ test('keeps the new release when a migration fails after it started', async () =
 	const { calls, fake } = steps({ crate: async args => {
 		calls.push(args.slice(0, 2).join(' '));
 		if (args[0] === 'upgrade') throw new Error('Migration step failed');
-		return JSON.stringify({ requiresMigration: true });
+		return JSON.stringify({ requiresUpgrade: true, migration: true });
 	} });
 	await assert.rejects(updateGlobalInstall(options, fake), /could not finish migrating[^]*upgrade --backup \/backups\/before-update[^]*restore \/backups\/before-update/);
 	assert.ok(!calls.includes('install 1.0.0'));
 	assert.ok(!calls.includes('start'));
+});
+
+test('reinstalls the previous release when a newer storage runtime fails its check', async () => {
+	const runtimeOnly = { requiresUpgrade: true, migration: false, runtimeUpgrade: true };
+	const failed = steps({ crate: async args => {
+		failed.calls.push(args.slice(0, 2).join(' '));
+		if (args[0] === 'upgrade') throw new Error('A stored file is missing or does not match its checksum');
+		return JSON.stringify(runtimeOnly);
+	} });
+	await assert.rejects(updateGlobalInstall(options, failed.fake), /stayed at 1.0.0 and your data is unchanged/);
+	assert.deepEqual(failed.calls.slice(-4), ['check-upgrade --json', 'upgrade --backup', 'install 1.0.0', 'start']);
+	// An upgrade that recorded the new runtime before failing keeps the new release.
+	let metadata = '{"runtimeVersion":"old"}';
+	const recorded = steps({ metadata: async () => metadata, crate: async args => {
+		recorded.calls.push(args.slice(0, 2).join(' '));
+		if (args[0] === 'upgrade') { metadata = '{"runtimeVersion":"new"}'; throw new Error('Interrupted'); }
+		return JSON.stringify(runtimeOnly);
+	} });
+	await assert.rejects(updateGlobalInstall(options, recorded.fake), /could not finish migrating/);
+	assert.ok(!recorded.calls.includes('install 1.0.0'));
 });
 
 test('leaves the server as it was when the backup fails', async () => {
@@ -91,7 +111,7 @@ test('rolls back a release that does not start, unless it already migrated the d
 	const plain = steps({ waitRunning: async () => false });
 	await assert.rejects(updateGlobalInstall(options, plain.fake), /stayed at 1.0.0/);
 	assert.deepEqual(plain.calls.slice(-4), ['start', 'stop', 'install 1.0.0', 'start']);
-	const migrated = steps({ waitRunning: async () => false, check: { requiresMigration: true } });
+	const migrated = steps({ waitRunning: async () => false, check: { requiresUpgrade: true, migration: true } });
 	await assert.rejects(updateGlobalInstall(options, migrated.fake), /migrated your data but did not start/);
 	assert.equal(migrated.calls.filter(call => call === 'install 1.0.0').length, 0);
 });

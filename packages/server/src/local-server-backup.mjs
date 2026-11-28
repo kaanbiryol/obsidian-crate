@@ -4,7 +4,7 @@ import { copyFile, link, lstat, mkdir, readFile, readdir, realpath, rename, rm, 
 import { pipeline } from 'node:stream/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { assertLocalMigrationPath } from './local-server-migrations.mjs';
-import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocalRuntime } from './local-server-runtime.mjs';
+import { assertCompatibleLocalMetadata, localBuildInfo, lockLocalData, openLocalRuntime, runtimeAdvances } from './local-server-runtime.mjs';
 
 /**
  * One backed-up file, relative to its directory.
@@ -60,8 +60,11 @@ export async function checkLocalUpgrade(dataDir) {
 	const next = await localBuildInfo();
 	const migration = current?.schemaHash !== next.schemaHash;
 	if (migration) assertLocalMigrationPath(current?.schemaVersion, next.release);
-  assertCompatibleLocalMetadata(migration ? { ...current, schemaHash: next.schemaHash } : current, next, dataDir);
-	return { from: current.serverRevision, to: next.serverRevision, runtime: next.runtimeVersion, requiresMigration: migration };
+	// A newer Miniflare opens the data only through upgrade, which backs up and verifies first.
+	const runtimeUpgrade = runtimeAdvances(current?.runtimeVersion, next.runtimeVersion);
+	assertCompatibleLocalMetadata({ ...current, ...(migration ? { schemaHash: next.schemaHash } : {}),
+		...(runtimeUpgrade ? { runtimeVersion: next.runtimeVersion } : {}) }, next, dataDir);
+	return { from: current.serverRevision, to: next.serverRevision, runtime: next.runtimeVersion, requiresUpgrade: migration || runtimeUpgrade, migration, runtimeUpgrade };
 }
 
 // Miniflare stores R2 object bytes in write-once files with unguessable names: a blob is

@@ -68,15 +68,16 @@ export async function updateGlobalInstall({ dataDir, current, backupRoot, now = 
 	try {
 		await steps.install(latest);
 		const check = JSON.parse(await steps.crate(['check-upgrade', '--json', '--data-dir', dataDir]));
-		if (check.requiresMigration) {
-			steps.log('Migrating the database from the verified backup made above.');
+		if (check.requiresUpgrade) {
+			steps.log('Upgrading the data from the verified backup made above.');
 			// The server stayed stopped since that backup, so the upgrade reuses it instead of copying the data again.
-			// Once the migration starts, the data may already be past what the old release reads.
-			migrated = true;
+			// Once a migration starts, the data may already be past what the old release reads. A runtime-only
+			// upgrade changes nothing until its check passes and server.json records the new runtime.
+			migrated = check.migration === true;
 			await steps.crate(['upgrade', '--backup', backup, '--data-dir', dataDir]);
 		}
 	} catch (error) {
-		if (migrated) throw new Error(`Crate ${latest} could not finish migrating your data: ${error.message}\nRun crate-server upgrade --backup ${backup} to resume with Crate ${latest}, or restore ${backup} into an empty directory with the restore command of Crate ${current}.`);
+		if (migrated || await steps.metadata() !== metadataBefore) throw new Error(`Crate ${latest} could not finish migrating your data: ${error.message}\nRun crate-server upgrade --backup ${backup} to resume with Crate ${latest}, or restore ${backup} into an empty directory with the restore command of Crate ${current}.`);
 		steps.log(`Update failed: ${error.message}\nReinstalling Crate ${current}.`);
 		const reinstalled = await steps.install(current).then(() => true, reinstallError => {
 			steps.log(`Could not reinstall Crate ${current}: ${reinstallError.message}`);

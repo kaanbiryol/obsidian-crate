@@ -48,10 +48,12 @@ contain the device token itself. The plugin receives a separate device token and
 saves it in Obsidian secret storage. The server stores only its hash.
 
 `update` makes a verified backup, installs the release, and runs its read-only
-compatibility check. If the database needs a migration, it runs `upgrade`, which
-backs up again before migrating. If a step fails before data changed, it
-reinstalls the previous release. Runtime changes, and schema changes without a
-registered migration, are rejected.
+compatibility check. If the database needs a migration or the release has a newer
+storage runtime, it runs `upgrade`, which backs up again first. A runtime update
+reads every stored file back and checks its checksum before the new runtime takes
+over the data. If a step fails before data changed, it reinstalls the previous
+release. Older runtimes, and schema changes without a registered migration, are
+rejected.
 
 Connected devices show the server's health in **Settings → Crate → Server**, and
 browsers enrolled for reminders get a push notification when an automatic backup

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { checkLocalUpgrade } from '../src/local-server-backup.mjs';
 import { assertLocalMigrationPath, migrateLocalDatabase } from '../src/local-server-migrations.mjs';
-import { issueLocalDevice, openLocalRuntime } from '../src/local-server-runtime.mjs';
+import { issueLocalDevice, openLocalRuntime, runtimeAdvances } from '../src/local-server-runtime.mjs';
 
 const release = JSON.parse(await readFile(new URL('../../../src/cloudflare/server-release.json', import.meta.url), 'utf8'));
 const sha256 = value => createHash('sha256').update(value).digest('hex');
@@ -116,11 +116,76 @@ test('data from a different server version names its folder and how to start fre
 		await runtime.close();
 		const metadataPath = join(dataDir, 'server.json');
 		const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
-		await writeFile(metadataPath, JSON.stringify({ ...metadata, runtimeVersion: '0.0.0-old' }));
+		await writeFile(metadataPath, JSON.stringify({ ...metadata, runtimeVersion: '999.0.0' }));
 		await assert.rejects(openLocalRuntime({ dataDir, administrative: true }), error => {
 			assert.ok(error.message.includes(dataDir), error.message);
 			assert.match(error.message, /different Crate server version.*--data-dir/);
 			return true;
 		});
 	} finally { await rm(dataDir, { recursive: true, force: true }); }
+});
+
+test('storage runtime versions advance in semver order', () => {
+	for (const [older, newer] of [['5.20261019.2-beta', '5.20261123.1-beta'], ['5.20261123.1-alpha', '5.20261123.1-beta'],
+		['5.20261123.1-beta', '5.20261123.1'], ['4.20251231.0', '5.20250101.0'], ['5.1.0-beta.2', '5.1.0-beta.10'], ['5.1.0-beta', '5.1.0-beta.1']]) {
+		assert.equal(runtimeAdvances(older, newer), true, `${older} → ${newer}`);
+		assert.equal(runtimeAdvances(newer, older), false, `${newer} → ${older}`);
+		assert.equal(runtimeAdvances(newer, newer), false);
+	}
+	for (const recorded of ['incompatible', '', undefined, null, '5.1']) assert.equal(runtimeAdvances(recorded, '5.20261123.1-beta'), false);
+});
+
+test('upgrade moves data to a newer storage runtime only after reading every stored file back', { timeout: 120_000 }, async () => {
+	const root = await mkdtemp(join(tmpdir(), 'crate-runtime-upgrade-test-'));
+	const dataDir = join(root, 'server');
+	const metadataPath = join(dataDir, 'server.json');
+	const recordRuntime = async (/** @type {string} */ runtimeVersion) => writeFile(metadataPath, JSON.stringify({ ...JSON.parse(await readFile(metadataPath, 'utf8')), runtimeVersion }));
+	const recorded = async () => JSON.parse(await readFile(metadataPath, 'utf8')).runtimeVersion;
+	let runtime;
+	try {
+		runtime = await openLocalRuntime({ dataDir });
+		const current = await recorded();
+		const bucket = await runtime.mf.getR2Bucket('BUCKET');
+		// More files than one verification page, so paging is covered.
+		for (let i = 0; i < 70; i++) {
+			await bucket.put(`note-${i}`, `body ${i}`);
+			await runtime.db.prepare('INSERT INTO files(path, portable_path, hash, size, storage_key) VALUES (?1, lower(?1), ?2, ?3, ?4)')
+				.bind(`Note ${i}.md`, sha256(`body ${i}`), Buffer.byteLength(`body ${i}`), `note-${i}`).run();
+		}
+		const version = "INSERT INTO file_versions(storage_key, path, hash, size, reason, kept_at) VALUES (?1, 'Note 0.md', ?2, ?3, 'replaced', 0)";
+		await bucket.put('old-copy', 'older body');
+		await runtime.db.prepare(version).bind('old-copy', sha256('older body'), Buffer.byteLength('older body')).run();
+		// A retained copy whose object the runtime can no longer read.
+		await runtime.db.prepare(version).bind('lost-copy', sha256('lost'), 4).run();
+		await runtime.close(); runtime = null;
+
+		await recordRuntime('0.0.1');
+		await assert.rejects(openLocalRuntime({ dataDir, administrative: true }), /older storage runtime.*run upgrade/);
+		const checked = await checkLocalUpgrade(dataDir);
+		assert.equal(checked.requiresUpgrade, true);
+		assert.equal(checked.runtimeUpgrade, true);
+		assert.equal(checked.migration, false);
+		await assert.rejects(openLocalRuntime({ dataDir, administrative: true, upgradeBackup: join(root, 'first-backup') }), /missing or does not match.*first-backup/);
+		assert.equal(await recorded(), '0.0.1', 'A failed check must leave the data on the runtime that wrote it');
+
+		await recordRuntime(current);
+		runtime = await openLocalRuntime({ dataDir, administrative: true });
+		await runtime.db.prepare("DELETE FROM file_versions WHERE storage_key = 'lost-copy'").run();
+		await runtime.close(); runtime = null;
+		await recordRuntime('0.0.1');
+		// Docker's start path: the backup is named for the runtime, since the server revision may not change.
+		const { migrateBeforeStart } = await import('../src/commands/data.mjs');
+		const backup = await migrateBeforeStart(dataDir, join(root, 'backups'));
+		assert.equal(backup, join(root, 'backups', `before-migration-r${release.revision}-to-r${release.revision}-runtime-${current}`));
+		assert.equal(await recorded(), current);
+		assert.equal(JSON.parse(await readFile(join(backup, 'backup.json'), 'utf8')).metadata.runtimeVersion, '0.0.1');
+		runtime = await openLocalRuntime({ dataDir, administrative: true });
+		assert.equal((await runtime.db.prepare('SELECT count(*) AS count FROM files').first()).count, 70);
+		await runtime.close(); runtime = null;
+
+		// An older runtime than the one that last wrote the data never opens it.
+		await recordRuntime('999.0.0');
+		await assert.rejects(checkLocalUpgrade(dataDir), /different Crate server version/);
+		await assert.rejects(openLocalRuntime({ dataDir, administrative: true, upgradeBackup: join(root, 'third-backup') }), /different Crate server version/);
+	} finally { await runtime?.close(); await rm(root, { recursive: true, force: true }); }
 });
