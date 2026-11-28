@@ -71,7 +71,7 @@ Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. An image that is to
 
 ## On a self-hosted server
 
-Self-hosted servers have some higher limits: files up to 1 GB on desktop, and history of 180 or 365 days. See [Other self-hosted limits](/docs/reference/self-hosting/#other-self-hosted-limits).
+Self-hosted servers can allow higher limits: files up to 1 GB on desktop (the default is still 25 MB), and history of 180 or 365 days. See [Other self-hosted limits](/docs/reference/self-hosting/#other-self-hosted-limits).
 
 - **A Quick Tunnel address changes every time Crate restarts.** Update the address on each device and connect the web app again. Use a [named tunnel or Tailscale Funnel](/docs/reference/self-hosting/#quick-tunnel) for a stable address.
 - **Cloudflare Tunnel caps one request at 100 MB.** Encrypted files and Markdown notes travel in one request, so over a tunnel they can sync only up to 100 MB.

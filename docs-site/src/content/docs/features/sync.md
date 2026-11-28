@@ -60,7 +60,7 @@ To hold a file back, uncheck it. It stays on this device, untouched by changes f
 
 ### Throw away local changes
 
-If you want to give up edits on this device, right-click the file and choose **Discard 1 item…** (or select several files first). Your device goes back to the server's version, and files you added on this device move to the trash. The server copy never changes.
+If you want to give up edits on this device, right-click the file and choose **Discard 1 item…** (or select several files first). The file goes back to the version this device last synced, and files you added on this device move to the trash. The server copy never changes.
 
 Check the file names in the confirmation before you continue. If you change your mind, Crate keeps a copy of what it replaced in `<vault config>/plugins/crate/discard-recovery/`.
 
@@ -73,6 +73,8 @@ Everything in your vault syncs: new files, edits, renames, deletions, and attach
 - Files over 25 MB. They stay on the device and show up as sync errors. A [self-hosted server](/docs/reference/self-hosting/#sync-larger-files) can raise this limit for desktop devices.
 
 Your other plugins and their settings sync too. After they download, restart Obsidian to load them.
+
+New attachments download on their own. When an existing image, PDF, or other attachment changes, Crate asks you to [review it](/docs/troubleshooting/conflicts/#attachments-and-binary-files) instead of overwriting it.
 
 ## Use one sync tool per vault
 
@@ -92,8 +94,6 @@ Until you sync, the device you updated lists the update in sync activity as a **
 
 To turn this off on a device, open **Settings → Crate → Sync → Sync options** and turn off **Sync Crate updates**.
 
-New attachments download on their own. When an existing image, PDF, or other attachment changes, Crate asks you to [review it](/docs/troubleshooting/conflicts/#attachments-and-binary-files) instead of overwriting it.
-
 ## Keep files on one device
 
 Some files shouldn't leave a device, such as private folders, huge design files, or plugins that store passwords or device-specific paths.
@@ -110,7 +110,7 @@ Private/
 
 This keeps the `Private` folder, all Photoshop files, and one plugin's files local. Use the real plugin folder name, and your own configuration folder if it isn't `.obsidian`.
 
-Crate never syncs hidden files or folders inside other folders, such as `Projects/.git/`. Hidden folders at the top of the vault, like `.obsidian`, do sync.
+Crate never syncs hidden files or folders inside other folders, such as `Projects/.git/`. Hidden files and folders at the top of the vault, like `.obsidian`, do sync.
 
 Exclusions apply to all your Obsidian devices. Adding a rule stops future syncing but leaves existing copies on the server. To remove those too, select **Review and remove** under **Remove excluded server files**. Your local files are kept, and the server copies stay recoverable for your history period.
 

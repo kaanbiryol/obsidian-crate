@@ -5,7 +5,7 @@ description: Review competing file versions, compare changes, and choose what to
 
 A conflict doesn't lose anything. Crate keeps both versions and waits for you to choose.
 
-When two devices edit different parts of the same note before they sync, Crate combines the edits on its own. A conflict happens when they changed the same lines, when the note is very large (over 1 MB or 20,000 lines), when Crate has no earlier synced copy to compare against, or when a non-text file such as an image or PDF changed in both places. Crate keeps the other version next to yours as a conflict copy, named like `Note (conflict 2026-11-21 14-05-09 a1b2).md`.
+When two devices edit different parts of the same note before they sync, Crate combines the edits on its own. A conflict happens when they changed the same lines, when the note is very large (over 1 MB or 20,000 lines), when Crate has no earlier synced copy to compare against, or when a file that isn't a Markdown note, such as an image, PDF or plugin setting, changed in both places. Crate keeps the other version next to yours as a conflict copy, named like `Note (conflict 2026-11-21 14-05-09 a1b2).md`.
 
 ## Resolve a conflict in a note
 

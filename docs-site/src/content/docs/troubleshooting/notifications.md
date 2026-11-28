@@ -20,7 +20,7 @@ Your device is registered, but alerts are paused for this vault.
 On iPhone or iPad, alerts only work from the Home Screen app.
 
 1. Open the connected app in Safari.
-2. Add it to the Home Screen.
+2. Add it to the Home Screen with **Open as Web App** on. Without it, the icon opens Safari, which can't receive alerts.
 3. Open the installed app and turn on notifications there.
 
 If the installed app asks you to connect again, follow the [installation steps](/docs/features/web-app/#install-on-your-phone).
@@ -31,6 +31,10 @@ If the installed app asks you to connect again, follow the [installation steps](
 2. Reopen Crate and register again.
 
 If Crate shows **Retry**, select it to finish registering the permission you already gave. Focus modes and device notification settings can still silence an alert that arrived.
+
+## The app says the subscription limit is reached
+
+A vault can have 20 notification devices, and each web app connection 5. In Obsidian, open **Settings → Crate → Notifications → Notification devices**, select **Remove notification subscription** on a device you no longer use, then select **Retry** in the web app.
 
 ## A reminder didn't send an alert
 

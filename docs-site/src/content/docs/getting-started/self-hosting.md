@@ -25,7 +25,7 @@ npx @kaanbiryol/crate-server
 Crate asks a few questions, and pressing Enter accepts each suggestion:
 
 1. **How your devices reach this computer.** Tailscale Funnel gives a permanent address for free. You need the [Tailscale app](https://tailscale.com/download) on this computer only, with **MagicDNS** and **HTTPS certificates** turned on in its [admin console](https://login.tailscale.com/admin/dns). You can also use your own domain on Cloudflare, or a temporary address to try Crate out.
-2. **Start Crate when you log in**, and restart it if it stops. Crate installs itself so it keeps running after you close the terminal.
+2. **Start Crate when you log in**, and restart it if it stops. Crate installs itself so it keeps running after you close the terminal. This isn't offered for a temporary address. Without it, Crate runs only while the terminal stays open. In the commands on this page, use `npx @kaanbiryol/crate-server` in place of `crate-server`. To update, stop Crate and run `npx @kaanbiryol/crate-server@latest`.
 3. **Keep this Mac awake** while Crate runs, so your devices can always sync.
 4. **Where to keep daily backups.** Crate suggests `~/crate_backups` on this computer. On a Mac with iCloud Drive, it also offers a folder there; backups contain your vault and server credentials, so pick it only if iCloud may store them.
 

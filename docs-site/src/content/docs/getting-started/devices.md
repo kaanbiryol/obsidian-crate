@@ -11,7 +11,7 @@ There are two ways to use Crate on another device:
 ## Another Obsidian device
 
 1. Let a sync finish on your first device.
-2. On the other device, open a vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy. If the vault already has files and the server does too, Crate asks before replacing them: everything in the vault moves to Obsidian's `.trash` folder and the server's contents download.
+2. On the other device, open a vault and [install Crate](/docs/getting-started/installation/). Use an empty vault for a fresh copy. When you connect, Crate asks to **Replace this vault**, even if it's empty. Select **Replace** to move everything in the vault to Obsidian's `.trash` folder and download the server's contents, or **Cancel** to keep the vault as it is.
 3. Connect to the **same server**:
    - **Cloudflare:** on your first device (one that has your Cloudflare sign-in saved), open **Settings → Crate → Account and devices** and select **Add a device**. Scan the code on the new device, or paste the link into **Pairing link** in Crate settings there, then select **Connect**.
    - **Your own server:** on the server computer, run the `pair` command from [Add another device](/docs/getting-started/self-hosting/#add-another-device). Scan its QR code with the new device, or open its link there, then select **Connect**. **Settings → Crate → Account and devices → Add a device** shows the right command.
@@ -33,13 +33,13 @@ Each unrelated vault needs [its own server](/docs/getting-started/hosting/#one-s
 
 ## Open the web app
 
-Once your vault has synced, open **Settings → Crate → Crate web app** and select **Open app**, or **Set up on phone** to show a QR code. The web app holds your reading list and reminders and talks to your server directly, so Obsidian doesn't need to stay open.
+Once your vault has synced, open **Settings → Crate → Crate web app** and select **Open app**, or **Set up on phone** to show a QR code. In Obsidian on a phone, that button is **Set up on another device**. The web app holds your reading list and reminders and talks to your server directly, so Obsidian doesn't need to stay open.
 
 [Use the web app](/docs/features/web-app/) covers connecting, installing it on your phone, and offline use.
 
 ## Disconnect a device
 
-**This device:** open **Settings → Crate → Account and devices** and select **Disconnect this device**. Your local files and server data are kept, and your other devices stay connected. On a Cloudflare server, Crate remembers the server so you can reconnect; select **Forget saved connection** in the confirmation if you don't want that. On a Docker server, disconnecting also removes this device's access, so you need a [new pairing code](/docs/getting-started/self-hosting/#add-another-device) to reconnect. If you use encryption, make sure you have your recovery key first: disconnecting removes this device's saved encryption keys.
+**This device:** open **Settings → Crate → Account and devices** and select **Disconnect this device**. Your local files and server data are kept, and your other devices stay connected. On a Cloudflare server, Crate remembers the server so you can reconnect; select **Forget saved connection** in the confirmation if you don't want that. On your own server, disconnecting also removes this device's access, so you need a [new pairing code](/docs/getting-started/self-hosting/#add-another-device) to reconnect. If you use encryption, make sure you have your recovery key first: disconnecting removes this device's saved encryption keys.
 
 **Another device:** find it under **Account and devices → Connected devices and sessions** and select **Disconnect device**, **Disconnect session** or **Disconnect shortcut**. Browsers and Home Screen apps are listed separately, even on the same phone. A disconnected iPhone shortcut needs pairing again. Disconnecting removes access but doesn't erase files already on that device.
 

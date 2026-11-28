@@ -11,17 +11,17 @@ Vault sync and the web app need a Crate server. You decide where it runs, and yo
 ```mermaid
 flowchart TB
   accTitle: Where your Crate server runs
-  accDescr: Obsidian and the Crate web app connect to one Crate server. With Cloudflare, the server and its file storage and database run in your Cloudflare account. With your own hardware, an HTTPS tunnel reaches the server running in Docker, which stores its data in a Docker volume on your machine.
+  accDescr: Obsidian and the Crate web app connect to one Crate server. With Cloudflare, the server and its file storage and database run in your Cloudflare account. With your own hardware, an HTTPS tunnel reaches the server running with Node.js or Docker, which stores its data in a folder or Docker volume on your machine.
   devices["`**Your devices**
   Obsidian with Crate,
   Crate web app`"]
   subgraph home["Your own hardware"]
     tunnel["`HTTPS tunnel
-    (Quick Tunnel or
-    Tailscale Funnel)`"]
+    (Tailscale Funnel or
+    Cloudflare Tunnel)`"]
     server["`Crate server
-    in Docker`"]
-    volume[("`Docker volume
+    (Node.js or Docker)`"]
+    volume[("`Folder or Docker volume
     on your machine`")]
     tunnel --> server --> volume
   end
@@ -62,7 +62,7 @@ Your machine needs to stay awake and online for sync and scheduled notifications
 
 ## One server for each vault
 
-Connect copies of the **same vault** to the same server, and give each unrelated vault its own server. Vault names don't keep data apart: when you connect a vault that has files to a server that already has files, Crate asks to replace the vault with the server's contents. Select **Cancel** to keep the vault as it is.
+Connect copies of the **same vault** to the same server, and give each unrelated vault its own server. Vault names don't keep data apart: when you connect a vault to a server that already has files, Crate asks to replace everything in the vault with the server's contents. Select **Cancel** to keep the vault as it is.
 
 ## Privacy
 

@@ -19,7 +19,7 @@ If signing in was interrupted, go back to Crate settings and select **Connect wi
 R2 is Cloudflare's file storage, and Crate needs it turned on.
 
 1. Select **Open R2 in Cloudflare**, or open the Cloudflare dashboard signed in to the same account you chose during setup.
-2. Finish turning on R2.
+2. Finish turning on R2. Cloudflare may ask for a payment method even if you stay within the free allowance.
 3. Try connecting again.
 
 Turning on R2 in a different Cloudflare account won't help this server. See the [R2 activation steps](/docs/getting-started/cloudflare/#before-you-connect).
@@ -49,11 +49,11 @@ Turning on R2 in a different Cloudflare account won't help this server. See the 
 
 Pairing codes work once and expire after ten minutes. [Create a new code](/docs/getting-started/self-hosting/#add-another-device), then enter it under **Connect to your server** in Obsidian.
 
-A pairing code is for Obsidian only. To connect the web app, connect Obsidian first, then use **Crate web app → Set up on phone**.
+A pairing code is for Obsidian only. To connect the web app, connect Obsidian first, then select **Set up on phone** next to **Crate web app**.
 
 ## The web app asks me to reconnect
 
-1. On a connected Obsidian device, open **Settings → Crate → Crate web app** and select **Set up on phone** or **Copy link**. Links expire after ten minutes.
+1. On a connected Obsidian device, open **Settings → Crate**, find **Crate web app**, and select **Set up on phone** (on a phone or tablet, **Set up on another device**). Scan the QR code, or select **Copy link**. Links expire after ten minutes.
 2. Open the link in the browser or installed app you want to use.
 3. Reconnect to the same server and folder, then follow the review and resume prompts.
 

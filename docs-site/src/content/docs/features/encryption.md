@@ -92,7 +92,7 @@ Encryption protects data from when you turn it on. Earlier exports, backups, and
 
 Your notes, attachments, file and folder names, file history, settings, reminder text, notification text, and Reading articles, links, tags and highlights are all encrypted.
 
-Your server can still see some details about your data, such as folder structure, file sizes, and when reminders are due. It can't read or change your notes, but someone who controls it could bring back an older version of a file or a note you deleted. The [encryption reference](/docs/reference/e2ee-implementation/#protection-boundary) lists exactly what the server can see.
+Your server can still see some details about your data, such as folder structure, file sizes, and when reminders are due. To get a page title for a pasted link, or to download an article saved from the web app, the server fetches that link without storing it. It can't read or change your notes, but someone who controls it could bring back an older version of a file or a note you deleted. The [encryption reference](/docs/reference/e2ee-implementation/#protection-boundary) lists exactly what the server can see.
 
 ## Turn encryption off
 

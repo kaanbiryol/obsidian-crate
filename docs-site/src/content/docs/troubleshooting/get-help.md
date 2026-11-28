@@ -19,7 +19,9 @@ Turn on **Debug logging** to write detailed sync and reminder logs to Obsidian's
 
 ## Repair an unfinished Cloudflare setup
 
-If setting up or updating a Cloudflare server stopped partway, a desktop shows **Repair server**. It finishes the setup without deleting anything already on the server. Reconnect this device when it finishes.
+If setting up a Cloudflare server stopped partway, a desktop shows **Repair server** here. It finishes the setup without deleting anything already on the server. Reconnect this device when it finishes.
+
+If an update stopped partway, open **Settings → Crate → Server** on a desktop and select **Check and recover update** next to **Interrupted server update**.
 
 ## Report a problem
 

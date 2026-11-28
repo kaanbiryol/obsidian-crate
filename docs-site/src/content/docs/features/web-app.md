@@ -27,7 +27,7 @@ With encryption, follow the [unlock instructions](/docs/features/encryption/#rea
 
 ## Install on your phone
 
-**iPhone or iPad:** open the connected app in Safari, select **Share → Add to Home Screen**, then open the new icon within ten minutes. If you miss that window, use a fresh link. The installed app may ask you to unlock encryption again, because Safari and the Home Screen app keep keys separately.
+**iPhone or iPad:** open the connected app in Safari and select **Share → View More → Add to Home Screen**. Keep **Open as Web App** on, select **Add**, then open the new icon within ten minutes. If you miss that window, use a fresh link. The installed app may ask you to unlock encryption again, because Safari and the Home Screen app keep keys separately.
 
 **Android:** use your browser's install or add-to-home-screen option, then open Crate from the new icon. The wording varies by browser. You can also just keep using the browser tab.
 

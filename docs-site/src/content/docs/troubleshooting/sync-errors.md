@@ -29,7 +29,9 @@ Encrypted vaults can't sync files nested that deep. Move the file higher in the 
 
 The first device to sync uploads the whole vault, and other devices wait until it finishes. Let it finish, then sync this device again.
 
-If you see this on the device that started the upload, for example after reconnecting it, select **Replace server files** under **Settings → Crate → Server → Advanced server actions** to finish. This replaces the server's files with this device's, so use it only on that device.
+If you see this on the device that started the upload, for example after reconnecting it, select **Replace server files** under **Settings → Crate → Server → Advanced server actions** to finish. This replaces the server's files with this device's and deletes files that exist only on the server, so use it only on that device.
+
+If the message says **The first upload of this vault has not finished**, sync on the device that started it, then sync here.
 
 ## Cloudflare's free daily database limit stopped this sync
 
@@ -47,9 +49,17 @@ Also shown as **This device's sync access is no longer valid**. It usually means
 
 Open **Settings → Crate → Account and devices** and select **Reconnect**, then sync again. On your own server, you need a [new pairing code](/docs/getting-started/self-hosting/#add-another-device). If encryption was just turned on or off, follow [those reconnect steps](/docs/features/encryption/#after-turning-encryption-on) instead.
 
+## The server denied this device access
+
+Open **Settings → Crate → Account and devices** and check this device's connection. Reconnect it, then sync again.
+
+## The server is temporarily limiting requests
+
+Wait a minute, then sync again. Your pending changes are retried.
+
 ## Crate could not reach the sync server
 
-Check your internet connection and that the server is running. For a server on your own hardware, its address may have changed. See [Connection problems](/docs/troubleshooting/connection/).
+Also shown as **The sync server could not complete this request**. Check your internet connection and that the server is running. For a server on your own hardware, its address may have changed. See [Connection problems](/docs/troubleshooting/connection/).
 
 ## The plugin and server need compatible versions
 
@@ -58,6 +68,14 @@ Update the Crate plugin and your server to the same version, then sync again. Se
 ## A file changed or moved while sync was running
 
 Finish editing or moving the file, then sync again. If both versions need keeping, Crate lists them under **Conflicts**; see [Conflict management](/docs/troubleshooting/conflicts/).
+
+## A deletion is waiting for other changes to finish syncing
+
+Fix the other errors listed, then sync again. Crate keeps the server copy until those changes are safe.
+
+## Crate could not finish recovering a previous sync
+
+Keep the vault and Crate's saved sync data as they are. Make sure the device has free space and the server is reachable, then sync again. If it keeps happening, follow [Get help](/docs/troubleshooting/get-help/).
 
 ## An incoming version of this file is waiting for review
 

@@ -65,11 +65,12 @@ Appears once a server is connected. **Sync options** holds everything except **A
 
 | Setting | What it does | Applies to | Default |
 | --- | --- | --- | --- |
+| **Sync status** | Shows whether this device is up to date and when it last synced. **Sync now** opens sync activity and starts a sync. | This device | - |
 | **Automatic sync** | Syncs after edits, on startup and resume, and at the check interval. Turning it off lets a running sync finish. | This device | Off |
 | **Sync delay after editing (seconds)** | How long to wait after a change before syncing. 0 syncs right away. | This device | 5 |
 | **Check for remote changes** | How often to look for edits from your other devices: **Off**, 1, 5 or 15 minutes, or a custom number of seconds. With automatic sync off, changes found show as **Changes on server** and are not synced. | All devices | 5 minutes |
 | **Sync Crate updates** | Shares the Crate version installed here with your other devices and installs newer ones they share. See [Crate updates](/docs/features/sync/#crate-updates). | This device | On |
-| **Keep history for** | How long the server keeps earlier file versions and saved vault states: 7, 14, 30, 60 or 90 days, and also 180 or 365 on a [self-hosted server](/docs/reference/self-hosting/#other-self-hosted-limits). | All devices | 30 days |
+| **Keep history for** | How long the server keeps earlier file versions and saved vault states: 7, 14, 30, 60 or 90 days, and also 180 or 365 on a [self-hosted server](/docs/reference/self-hosting/#other-self-hosted-limits). Choosing a shorter period asks first, then removes older versions from the server for good. | All devices | 30 days |
 | **Excluded files and folders** | Files that stay local, one pattern per line. See [Keep files on one device](/docs/features/sync/#keep-files-on-one-device). | All devices | Common temporary and system files, such as `.git/`, `.trash/` and `.DS_Store` |
 | **Remove excluded server files** | Removes server copies of files you've since excluded. | All devices | - |
 | **End-to-end encryption** | Turns encryption on or off and manages keys. See [Encryption](/docs/features/encryption/). | All devices | Off |
@@ -125,10 +126,11 @@ Appears once a server is connected and Reminders is on. See [Set up notification
 | **Account and devices → Add a device** | Shows a one-time code or link to connect another Obsidian device. See [Connect your devices](/docs/getting-started/devices/). |
 | **Account and devices → Connected devices and sessions** | Lists devices, browsers and shortcuts with access, and disconnects them. |
 | **Account and devices → Disconnect this device** | Stops sync here and keeps your files. See [Disconnect a device](/docs/getting-started/devices/#disconnect-a-device). |
-| **Usage** | Cloudflare's usage estimates compared with the free allowances. See [Cloudflare's free daily limits](/docs/getting-started/limits/#cloudflares-free-daily-limits). |
+| **Usage** | Cloudflare servers only. Cloudflare's usage estimates compared with the free allowances. See [Cloudflare's free daily limits](/docs/getting-started/limits/#cloudflares-free-daily-limits). |
+| **Usage → Warn before R2 billing** | About once a day, checks Cloudflare usage and shows a notice when R2 reaches 80% of its free allowance, and again when it passes it. Cloudflare bills R2 usage beyond the allowance. On by default, for this device only. |
 | **Server → Update server address** | Points this device at a server's new address. |
 | **Server → Server backup recovery** | Restores a Cloudflare server backup as a separate server. See [Keep a backup of your own](/docs/troubleshooting/recovery/#keep-a-backup-of-your-own). |
-| **Server → Advanced server actions** | **Replace server files** and **Delete server and all data**. Both remove data for good; read [Move or remove Crate](/docs/features/move-or-remove/) first. |
+| **Server → Advanced server actions** | **Replace server files** replaces the server copy with this device's files and deletes files found only on the server; they stay recoverable for your history period. **Delete server and all data** removes the Cloudflare server for good. Read [Move or remove Crate](/docs/features/move-or-remove/) first. |
 | **Troubleshooting** | **Run diagnostics**, **Export diagnostics** and **Debug logging**. See [Get help](/docs/troubleshooting/get-help/). |
 
 ### Web app settings

@@ -26,7 +26,7 @@ Some things stay behind on the old server: file history, saved vault states, dev
 This permanently deletes the server and everything stored on it: files, history, the web app, and device connections. Your local vault files, other Crate servers, and unrelated Cloudflare resources are kept.
 
 1. Sync every device you want to keep using, and back up your vault.
-2. On a desktop, open **Settings → Crate → Server → Advanced server actions** and select **Delete server and all data**.
+2. On a desktop connected with your Cloudflare account, open **Settings → Crate → Server → Advanced server actions** and select **Delete server and all data**. Devices added with a code from **Add a device** don't show this option.
 3. Check the account, server, database, and bucket names shown, type **delete**, and select **Delete server**.
 
 On a disconnected device, **Advanced server actions** appears at the bottom of Crate settings instead. If the deletion is interrupted, the same place offers **Resume server deletion**.
@@ -55,4 +55,4 @@ Your notes stay as they are. A few traces of Crate remain in them, all harmless:
 - **Reading:** notes in your Reading folder keep their `crate_reading_` properties, and saved article images stay in its `attachments` folder.
 - **Conflict copies:** files named `… (conflict <date>).md` are ordinary notes. Delete them once you've kept what you need.
 
-Uninstalling on one device doesn't affect your other devices or your server. To stop using Crate everywhere, uninstall it on each device, then [delete the server](#delete-a-cloudflare-server).
+Uninstalling on one device doesn't affect your other devices or your server. To stop using Crate everywhere, first [delete the server](#delete-a-cloudflare-server) from a device that can still reach it, then uninstall Crate on each device.

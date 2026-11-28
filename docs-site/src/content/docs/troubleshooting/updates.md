@@ -18,7 +18,7 @@ Your other devices get the same version on their next sync, because **Sync Crate
 
 ## Update a Cloudflare server
 
-When the plugin includes a newer server or web app, Crate settings shows an update notice.
+When the plugin includes a newer server or web app, Crate settings shows **Cloudflare update available**.
 
 1. Let sync finish, and let the web app send or save any pending work.
 2. On a desktop, open **Settings → Crate** and select **Update server**. Phones and tablets show the update but can't run it.
@@ -37,7 +37,7 @@ Obsidian shows **Server update available** when your plugin includes a newer ser
 
 The **Server update available** message names the command for your server. See [Update the server](/docs/getting-started/self-hosting/#update-the-server).
 
-Each way makes a backup first and checks that the new version can open your existing data before it starts.
+Each way checks that the new version can open your existing data before it starts, and makes a backup before it changes the database.
 
 If the check rejects an update, leave your data as it is and follow the [update and migrate steps](/docs/reference/self-hosting/#update-and-migrate). Don't delete storage to get past it.
 

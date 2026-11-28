@@ -63,6 +63,8 @@ A date without a time reads like `Nov 28, 2026`. A reminder with a time stores i
 
 You can type dates in your own words, such as "tomorrow at 9". Crate turns them into a fixed date once you move off the line, without moving your cursor.
 
+To make a reminder repeat, add a phrase such as `every day`, `every 2 weeks`, `every Mon, Wed` or `monthly on the 15th`. Reminders can repeat daily, weekly or monthly. Write intervals as digits, like `every 3 days`.
+
 Crate picks up every checkbox in the reminders folder except its **Archive** subfolder. Use a dedicated folder so checkboxes in your other notes don't become reminders.
 
 <details>

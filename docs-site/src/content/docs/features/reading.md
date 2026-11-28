@@ -46,7 +46,7 @@ Pages behind a login, pages that block downloads, and pages that rely on scripts
 - **Favorites** are pieces you want to come back to.
 - **Archive** is for finished reading. Archived articles stay in your library.
 
-Search your library or filter by tag. To tag an article, select **Tags** while reading it.
+Search your library or filter by tag. To tag an article, open it and select **+** beside its tags, under the title.
 
 Articles are regular Markdown notes, so they sync like the rest of your vault. Changing the Reading folder doesn't move existing notes.
 
@@ -75,7 +75,7 @@ You can highlight transcript passages and add notes, and saved transcripts stay 
 
 ## Highlight and revisit passages
 
-Select text while reading to highlight it. Tap or select a highlight to copy, share, delete, or resize it. To highlight an image, tap it and select **Highlight**; tap it again to add a note or delete the highlight. Each article's **Highlights** view shows your notes alongside a **View in article** action, with highlighted images as thumbnails.
+Select text while reading to highlight it. Tap or select a highlight to copy, share, add a note, delete, or resize it. To highlight an image, tap it and select **Highlight**; tap it again to add a note or delete the highlight. Each article's **Highlights** view shows your notes alongside a **View in article** action, with highlighted images as thumbnails.
 
 The library's **Highlights** view collects highlights from your inbox, favorites, and archive in one place. Search them, or filter by tag.
 

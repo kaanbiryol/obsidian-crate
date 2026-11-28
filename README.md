@@ -12,7 +12,7 @@ Crate is early self-hosted software. Review the code, understand the Cloudflare 
 
 ## Features
 
-- **Vault sync** across desktop and mobile, with attachments, deletes and renames, file history (30 days by default, 7 to 90 available), and conflict copies instead of silent overwrites
+- **Vault sync** across desktop and mobile, with attachments, deletes and renames, file history (30 days by default, 7 to 90 available, or up to a year on your own server), and conflict copies instead of silent overwrites
 - **Your infrastructure:** file contents in your R2 bucket, metadata in your D1 database, deployed through Cloudflare sign-in without giving the plugin an account API token
 - **Local hosting:** run the same server on your own computer or in Docker, with no Cloudflare account required
 - **Reminders** stored as Markdown in your vault, with `reminders`, `reminders-today` and `reminders-upcoming` query blocks, push notifications through your own Worker, and desktop notifications from Obsidian without a server

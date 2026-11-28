@@ -19,7 +19,7 @@ Select **Finish** to turn on what you chose. Crate saves the features you turned
 
 ## Run your first sync
 
-1. Open Obsidian's command palette and select **Crate: Sync now**. On a phone, keep Obsidian open until it finishes.
+1. Open Obsidian's command palette and select **Crate: Sync now**, or select **Sync now** in the **Get started** checklist at the top of Crate settings. On a phone, keep Obsidian open until it finishes.
 2. Run **Crate: Show sync activity** and check **History** for errors or conflicts.
 3. Open a synced note to make sure it looks right.
 
