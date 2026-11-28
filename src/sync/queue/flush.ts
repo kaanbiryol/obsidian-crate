@@ -11,6 +11,9 @@ import { namespaceConflictLookup } from '../namespace-conflicts';
 import { deferBlockedUploads, planQueueDeletes } from './delete-plan';
 import type { UploadPreparedFilesOptions } from '../transfer/upload';
 import type { DeleteRemoteFiles } from '../transfer/delete';
+import { pairMoves, type MoveRemoteFiles } from '../transfer/move';
+import { runConcurrentTasks } from '../concurrency';
+import { PREPARE_CONCURRENCY } from '../transfer/constants';
 import type { ConditionalDeleteCandidate } from '../transfer/delete-batches';
 import type { FileEntry, MutationFailure } from '../../protocol/sync-types';
 import type { SyncIssue, SyncResult, SyncState } from '../types';
@@ -35,6 +38,10 @@ export interface QueueFlushContext extends WorkflowCompletionContext {
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 	maxFileBytes(): number;
 	deleteRemoteFiles: DeleteRemoteFiles;
+	/** Moves renamed files on the server; without it, renames upload and delete. */
+	moveRemoteFiles?: MoveRemoteFiles;
+	/** Whether this vault can move files on the server rather than upload them again. */
+	canMoveRemoteFiles?(): boolean;
 	recoverUploads(): Promise<void>;
 	getQueuedKeyCount(): number;
 	beginBatch(): QueueFlushBatch;
@@ -103,6 +110,43 @@ async function deletePendingFiles(
 	}
 	for (const failure of failures) routeFailure(state, pendingChangeKey('delete', failure.path), failure);
 	return failures;
+}
+
+/** Moves each renamed file whose bytes are unchanged on the server, instead of uploading
+ * it again and deleting its old path. Only rename destinations are read, to compare their
+ * hash with the old path's baseline. Returns both paths of every move made; any other
+ * change, including a refused move, uploads and deletes as before. */
+async function moveRenamedFiles(
+	context: QueueFlushContext,
+	deletes: ConditionalDeleteCandidate[],
+	uploadPaths: readonly string[],
+	state: FlushState,
+): Promise<Set<string>> {
+	const uploads = new Set(uploadPaths);
+	const destinations = deletes.flatMap(file => {
+		const to = context.localManifest.renameDestination(file.path);
+		return to && uploads.has(to) && !context.localManifest.getEntry(to) ? [to] : [];
+	});
+	const move = context.moveRemoteFiles;
+	if (!destinations.length || !move || !context.canMoveRemoteFiles?.()) return new Set();
+	const created = (await runConcurrentTasks(destinations.map(path => async () => {
+		try {
+			const prepared = await context.prepareUploadFromPath(path);
+			return prepared && prepared.expectedHash === null ? [{ path, hash: prepared.hash }] : [];
+		} catch (error) {
+			// The upload reports anything that makes this file unreadable.
+			if (isAbortError(error)) throw error;
+			return [];
+		}
+	}), PREPARE_CONCURRENCY, context.signal)).flat();
+	const result = createEmptySyncResult();
+	try {
+		await move(pairMoves(deletes, created, path => context.localManifest.renameDestination(path)), result);
+	} finally {
+		for (const path of result.uploadedPaths) state.completedQueueKeys.add(pendingChangeKey('upload', path));
+		for (const path of result.deletedPaths) state.completedQueueKeys.add(pendingChangeKey('delete', path));
+	}
+	return new Set([...result.uploadedPaths, ...result.deletedPaths]);
 }
 
 /** Uploads the batch's files in pipelined chunks. Failed files return to the queue;
@@ -212,17 +256,20 @@ export async function flushQueueBatch(
 		});
 		const failures: Array<{ path: string; error: string; status?: number }> = [];
 		const failedUploads = new Set<string>();
+		const moved = await moveRenamedFiles(context, deletes, uploadPaths, state);
+		const remainingUploads = uploadPaths.filter(path => !moved.has(path));
+		const remainingDeletes = deletes.filter(file => !moved.has(file.path));
 		// The server cannot store a deleted path beside an upload in its namespace,
 		// as after a case-only or Unicode-only rename, so those deletes run first.
 		// An upload whose delete failed would only be refused, so it stays queued.
-		const uploadConflict = namespaceConflictLookup(uploadPaths);
-		const clearingDeletes = deletes.filter(file => uploadConflict(file.path) !== undefined);
-		let readyUploads = uploadPaths;
+		const uploadConflict = namespaceConflictLookup(remainingUploads);
+		const clearingDeletes = remainingDeletes.filter(file => uploadConflict(file.path) !== undefined);
+		let readyUploads = remainingUploads;
 		if (clearingDeletes.length > 0) {
 			const deleteFailures = await deletePendingFiles(context, clearingDeletes, state);
 			failures.push(...deleteFailures);
 			batch.requeue(deleteFailures.map(failure => pendingChangeKey('delete', failure.path)));
-			const blocked = deferBlockedUploads(uploadPaths, deleteFailures.map(failure => failure.path));
+			const blocked = deferBlockedUploads(remainingUploads, deleteFailures.map(failure => failure.path));
 			readyUploads = blocked.ready;
 			for (const { path, blocking } of blocked.deferred) {
 				batch.requeue([pendingChangeKey('upload', path)]);
@@ -230,11 +277,12 @@ export async function flushQueueBatch(
 				failures.push({ path, error: `Upload deferred until ${blocking} is deleted on the server` });
 			}
 		}
-		const { uploads, failures: uploadFailures } = await uploadQueuedChanges(context, batch, readyUploads, state);
+		const { uploads: sent, failures: uploadFailures } = await uploadQueuedChanges(context, batch, readyUploads, state);
+		const uploads = [...uploadPaths.filter(path => moved.has(path)).map(path => ({ path })), ...sent];
 		failures.push(...uploadFailures);
 		for (const failure of uploadFailures) failedUploads.add(failure.path);
 
-		const otherDeletes = deletes.filter(file => uploadConflict(file.path) === undefined);
+		const otherDeletes = remainingDeletes.filter(file => uploadConflict(file.path) === undefined);
 		const reconciling = reconciliationKeys.size > 0;
 		const { ready, deferred } = planQueueDeletes(otherDeletes, { failures, failedUploads, reconciling, hasTerminalFailure: state.hasTerminalFailure },
 			path => context.localManifest.renameDestination(path));

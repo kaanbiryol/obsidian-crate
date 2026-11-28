@@ -2,6 +2,7 @@ import { listSharedCheckpoints, createSharedCheckpoint } from '../sync/history-c
 import { handleFileVersionPreview } from '../sync/file-versions/preview';
 import {
 	handleBatchDelete,
+	handleBatchMove,
 	handleBatchUpload,
 	handleCheckChanges,
 	handleDownload,
@@ -77,6 +78,9 @@ export async function handleSyncRoute(
 	}
 	if (path === '/sync/batch-delete' && method === 'POST') {
 		return await handleBatchDelete(request, bucket, db, audit);
+	}
+	if (path === '/sync/batch-move' && method === 'POST') {
+		return await handleBatchMove(request, db);
 	}
 	if (path === '/sync/version-preview' && method === 'GET') {
 		return await handleFileVersionPreview(request, bucket, db);

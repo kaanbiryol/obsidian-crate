@@ -51,8 +51,8 @@ const EXPIRED_VERSION_BATCH = CLEANUP_BATCH_LIMIT;
 /** Deletes the objects of the oldest expired versions, then their rows. The expired row
  * is the cleanup intent: every reader already hides it, and a pass interrupted after the
  * R2 delete repeats it. The floor rises first, so a longer retention set meanwhile cannot
- * show a version whose object is gone. Keys are never reused, so only a live file can
- * still need one. Returns true when more may remain. */
+ * show a version whose object is gone. Keys are never reused, and a key that a move gave
+ * another path has a version only at that path, so only a live file can still need one. Returns true when more may remain. */
 export async function expireFileVersions(bucket: R2Bucket, db: D1Database, now = Date.now()): Promise<boolean> {
 	const rows = await queryRows<{ storage_key: string; path: string; kept_at: number }>(db.prepare(`SELECT storage_key, path, kept_at
     FROM file_versions WHERE kept_at <= ${FILE_VERSION_CUTOFF_SQL} ORDER BY kept_at LIMIT ${EXPIRED_VERSION_BATCH}`).bind(now));

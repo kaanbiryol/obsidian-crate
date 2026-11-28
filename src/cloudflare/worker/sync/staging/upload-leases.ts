@@ -52,6 +52,12 @@ export function uploadLeaseGuard(id: string, storageKey: string): SqlGuard {
     AND instr(l.keys, ?) > 0)`, args: [id, leasedKeyText(storageKey)] };
 }
 
+/** No lease, pending or being cleaned, names the object. Lease cleanup checks references at
+ * the lease's own path, so a committed key may change path only while no lease lists it. */
+export function noUploadLeaseGuard(storageKey: string): SqlGuard {
+	return { sql: 'NOT EXISTS (SELECT 1 FROM upload_leases l WHERE instr(l.keys, ?) > 0)', args: [leasedKeyText(storageKey)] };
+}
+
 export interface LeasedObject { path: string; objectKey: string; leaseId: string }
 
 /** Settles the objects a commit attempted, after its publishing statements and in the

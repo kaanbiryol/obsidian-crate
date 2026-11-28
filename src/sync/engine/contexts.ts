@@ -1,4 +1,6 @@
 import { deleteRemoteFiles, type DeleteRemoteFiles } from '../transfer/delete';
+import { moveRemoteFiles, recoverRemoteMoves, type MoveContext, type MoveRemoteFiles } from '../transfer/move';
+import { assertLocalFileAbsent } from '../local/local-absence';
 import type { EngineFileOperations } from './file-operations';
 import { PlannedContent } from '../planner/planned-content';
 import type { FileManager, Vault } from 'obsidian';
@@ -194,6 +196,8 @@ export class SyncEngineContexts {
 			uploadPreparedFiles: this.uploadPreparedFiles,
 			maxFileBytes: this.maxFileBytes,
 			deleteRemoteFiles: this.deleteRemoteFiles,
+			moveRemoteFiles: this.moveRemoteFiles,
+			canMoveRemoteFiles: this.canMoveRemoteFiles,
 			automaticSyncEnabled: () => d.getSettings().automaticSync,
 			recoverUploads: async () => {
 				void d.retryReminderScope();
@@ -245,6 +249,21 @@ export class SyncEngineContexts {
 		localManifest: this.dependencies.localManifest,
 		reportWork: this.reportWork,
 	}, files, result, options);
+
+	/** An encrypted path is bound into its ciphertext, so only a plaintext vault moves files on the server. */
+	readonly canMoveRemoteFiles = (): boolean => !this.encrypted();
+
+	private moveContext(): MoveContext {
+		return {
+			files: this.dependencies.files,
+			localManifest: this.dependencies.localManifest,
+			journal: this.dependencies.localManifest.moveJournal,
+			assertLocalFileAbsent: path => assertLocalFileAbsent(this.dependencies.vault, path),
+			reportWork: this.reportWork,
+		};
+	}
+
+	readonly moveRemoteFiles: MoveRemoteFiles = (moves, result) => moveRemoteFiles(this.moveContext(), moves, result);
 
 	/** Reconciles queued paths with the server. Version conflicts return their paths for another pass. */
 	readonly reconcileQueuePaths = (queueKeys: string[], onFailure?: (failure: MutationFailure) => void): Promise<SyncResult> => {
@@ -336,7 +355,8 @@ export class SyncEngineContexts {
 
 	private async replayUploads(): Promise<void> {
 		await this.dependencies.api.refreshFileLimit();
-		return this.dependencies.files.recoverUploads((current, total) => this.dependencies.updateState({ work: { phase: 'recovering', current, total } }));
+		await this.dependencies.files.recoverUploads((current, total) => this.dependencies.updateState({ work: { phase: 'recovering', current, total } }));
+		await recoverRemoteMoves(this.moveContext(), this.canMoveRemoteFiles());
 	}
 
 	private assertNoVaultReplacement(): void {
@@ -383,6 +403,8 @@ export class SyncEngineContexts {
 			getLocalDeletes: discoveredPaths => planLocalDeletes(this.localDiffPlanner, discoveredPaths, PREPARE_CONCURRENCY),
 			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles,
 			moveUnchangedLocalFile: (from, to, hash, revision) => moveUnchangedLocalFile(this.transfer, from, to, hash, revision),
+			moveRemoteFiles: this.moveRemoteFiles,
+			canMoveRemoteFiles: this.canMoveRemoteFiles,
 			processDiff: this.processDiff,
 			prepareUploadFromPath: this.prepareUploadFromPath,
 			uploadPreparedFiles: this.uploadPreparedFiles,

@@ -91,6 +91,8 @@ const routes: Readonly<Partial<Record<string, ApiRoutePolicy>>> = {
 	'POST /sync/batch-upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncBatchUpload } },
 	'POST /sync/batch-download': { scopes: VAULT },
 	'POST /sync/batch-delete': { scopes: VAULT, execution: COORDINATOR },
+	// Encrypted paths are bound into their ciphertext, so encrypted clients upload and delete.
+	'POST /sync/batch-move': { scopes: VAULT, execution: COORDINATOR, plaintextOnly: true },
 	'POST /sync/restore-version': { scopes: VAULT, execution: COORDINATOR },
 	'PUT /sync/upload': { scopes: VAULT, execution: { kind: 'transfer', path: TRANSFER_PATHS.syncUpload } },
 	// Self-hosted only: chunked uploads of large plaintext attachments, begin or complete (POST), one part (PUT).

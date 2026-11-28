@@ -114,6 +114,19 @@ CREATE TABLE IF NOT EXISTS file_versions (
 CREATE INDEX IF NOT EXISTS file_versions_kept_at_idx ON file_versions(kept_at);
 CREATE INDEX IF NOT EXISTS file_versions_path_created_key_idx ON file_versions(path, created_at DESC, storage_key DESC);
 
+-- A server move of a plaintext file (`sync/file-move.ts`), keyed by the stored copy it moved.
+-- The moved `files` row keeps its `live_from_seq`, so a checkpoint before `seq` rebuilds the
+-- copy at `from_path`, its path before its first move after that checkpoint. `to_portable`
+-- finds the copy's row from an old path. Shared checkpoint pruning removes moves no visible
+-- checkpoint precedes.
+CREATE TABLE IF NOT EXISTS file_moves (
+	storage_key TEXT NOT NULL,
+	seq INTEGER NOT NULL,
+	from_path TEXT NOT NULL,
+	to_portable TEXT NOT NULL,
+	PRIMARY KEY (storage_key, seq)
+) WITHOUT ROWID;
+
 -- Small values only: fences, cursors, floors and folder labels.
 CREATE TABLE IF NOT EXISTS maintenance_state (
 	key TEXT PRIMARY KEY,

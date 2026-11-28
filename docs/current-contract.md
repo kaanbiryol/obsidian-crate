@@ -17,6 +17,7 @@ Run `node scripts/check-contract-docs.mjs --write` after changing those contract
 | Registered migrations | None |
 | Upload batch | 32 files (self-hosted: 100) |
 | Delete batch | 32 files (self-hosted: 100) |
+| Move batch | 32 files |
 | Download batch | 50 files (self-hosted: 100) |
 | Upload batch bytes | 10485760 (self-hosted: 33554432) |
 | Download batch bytes | 8388608 (self-hosted: 33554432) |

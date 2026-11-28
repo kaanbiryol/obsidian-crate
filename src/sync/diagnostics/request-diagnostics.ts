@@ -7,7 +7,7 @@ import { REQUEST_ID_HEADER } from '../../protocol/http-headers';
 import type { RequestTimings } from './timings';
 const routes = new Set([
 	'/sync/import', '/sync/import/upload', '/sync/import/prune', '/sync/import/complete', '/.well-known/crate', '/health', '/settings', '/diagnostics', '/server/host-status',
-	...['manifest', 'metadata', 'upload', 'download', 'delete', 'changes', 'check', 'batch-upload', 'batch-download', 'batch-delete', 'versions', 'version-preview', 'restore-version'].map(route => `/sync/${route}`),
+	...['manifest', 'metadata', 'upload', 'download', 'delete', 'changes', 'check', 'batch-upload', 'batch-download', 'batch-delete', 'batch-move', 'versions', 'version-preview', 'restore-version'].map(route => `/sync/${route}`),
 	'/auth/tokens',
 	'/reminders/notification-policy', '/notifications/subscribe', '/notifications/subscriptions', '/notifications/test',
 ]);

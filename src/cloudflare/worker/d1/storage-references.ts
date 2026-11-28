@@ -3,8 +3,10 @@ import { portablePathKey } from '../../../protocol/portable-path';
 
 export interface ObjectReference { storageKey: string; path: string }
 
-/** Immutable keys are never reused or transferred to a different file. With
- * `versions` false, only live files count, for keys whose version is being removed. */
+/** Immutable keys are never reused. Only a server move gives a key another path, and only
+ * while a live file is its sole reference (`sync/file-move.ts`), so a reference is always
+ * found at its current path. With `versions` false, only live files count, for keys whose
+ * version is being removed. */
 export async function findReferencedStorageKeys(db: D1Database, objects: readonly ObjectReference[], { versions = true } = {}): Promise<Set<string>> {
 	const referenced = new Set<string>();
 	if (!objects.length) return referenced;

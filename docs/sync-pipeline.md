@@ -123,7 +123,7 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 5. Execute operations, preparing and uploading local files in bounded chunks
 6. Update local manifest and `lastSeq`
 
-Another device's rename arrives as a delete of the old path and a write at the new one. When the written hash matches the old path's synced baseline, the old path has no local change or delete, and nothing is at the new path, the planner moves the local file there (`local/local-move.ts`) instead of trashing it and downloading the same bytes. The move checks the old file's current hash first and records the new path like a download, without updating links in other notes. A pair it cannot move, including a case-only rename, is applied as a delete and a download. The renaming device still uploads the new path: the server has no copy operation, and an encrypted file's ciphertext is bound to its path.
+Another device's rename arrives as a delete of the old path and a write at the new one. When the written hash matches the old path's synced baseline, the old path has no local change or delete, and nothing is at the new path, the planner moves the local file there (`local/local-move.ts`) instead of trashing it and downloading the same bytes. The move checks the old file's current hash first and records the new path like a download, without updating links in other notes. A pair it cannot move, including a case-only rename, is applied as a delete and a download. In a plaintext vault the renaming device sends the rename as a server move (`POST /sync/batch-move`, see [Worker API](worker-api.md#post-syncbatch-move)) when the new file's bytes match the old path's baseline, so nothing is uploaded and the server keeps one stored copy. The queue pairs a rename the manifest recorded. Incremental sync also pairs a local delete with a new file of the same, unique hash, as after a rename while the app was closed. The moves are saved to `pending-moves.json` before the first request and removed once the manifest records them; a sync that finds the file resends them before planning anything, so a move whose response was lost is recorded even if the file was renamed again since. A move the server refuses, an edited file, a case-only rename and every rename in an encrypted vault, whose ciphertext is bound to its path, upload the new path and delete the old one as before.
 
 Returns `null` to signal fallback to full sync only when the changelog cannot be used: on cursor expiry or a non-transient error while reading it. Transport failures and retryable server statuses (408, 425, 429, 5xx) return a failed result instead, so the next sync retries incrementally without re-reading the vault. Any other error after the changelog is read, such as a local scan, apply or save error, also returns a failed result: a full sync would read the whole server inventory and then fail on the same local error.
 
@@ -440,7 +440,7 @@ File events (create, modify, delete, rename) are debounced before syncing:
 
 1. Events collected into the `pendingKeys` Set on `SyncQueueController` (`src/sync/queue/controller.ts`)
 2. Delete events are keyed with a `\0delete:` prefix (e.g. `\0delete:notes/old.md`). NUL cannot occur in a sync path, so delete keys never collide with a file literally named `delete:...`. Only `src/sync/pending/pending-change.ts` builds or parses these keys
-3. Rename events emit both a delete key for the old path and an upload key for the new path
+3. Rename events emit both a delete key for the old path and an upload key for the new path. A flush first moves each rename whose bytes are unchanged on the server, settling both keys, and uploads and deletes the rest
 4. Debounce timer (default 5s) resets with each new event, with a 30s maximum wait
 5. After the quiet period or maximum wait, `processPendingChanges()` flushes the queue. An edit to an already synced file of 1 MiB or more stays pending until the file has been quiet for one minute, for at most five minutes, because each upload sends the whole file again; other files in the queue still flush. File history already coalesces the copies these uploads replace (see **Remote recovery** below), so the hold only saves bandwidth. **Sync now**, periodic and foreground syncs, and full syncs upload it immediately
 6. Each event receives a revision so reconciliation cannot clear a newer edit that arrived while the sync was running; opposite upload/delete events for one path are coalesced
@@ -599,6 +599,9 @@ row records the sequence that made it current (`live_from_seq`), and every kept 
 also records the sequence that replaced or deleted it (`live_until_seq`), each written in
 the transaction of that change. The vault at checkpoint S is the current files with
 `live_from_seq <= S` plus the kept versions with `live_from_seq <= S < live_until_seq`.
+A server move keeps the row's `live_from_seq` and logs the stored key, its sequence and the
+old path in `file_moves`, so a copy moved after S is listed at the old path of its first
+move after S. Restoring an earlier checkpoint therefore undoes plaintext renames too.
 Checkpoints fall between transactions, so any sequence inside a change's own batch is
 exact for every checkpoint.
 

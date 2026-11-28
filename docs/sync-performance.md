@@ -170,6 +170,19 @@ Its separate 8,000-note benchmark, with notes inside the selected reminder folde
 measures 48,500 row writes on a new database. This is a regression check for normal
 uploads, not the cost of an initial import.
 
+## Rename write cost
+
+A plaintext rename of unchanged bytes is a server move (`POST /sync/batch-move`). For 32
+files, `sync/batch-move.integration.ts` measures 129 D1 row writes for the move and 32 more
+when maintenance prunes its log row, against 292 for the same renames sent as uploads and
+deletes and 33 more when their retained copies expire. The move writes no R2 object. That is
+about 4 rows per file at the move instead of 9: moving a folder of 10,000 notes writes about
+40,000 rows of the Free plan's daily 100,000 instead of about 91,000, and the moved files keep a
+single stored copy instead of a second one retained for the history period. A day holds
+about 20,000 moved files after normal use; a larger folder finishes after the daily reset at
+00:00 UTC. Encrypted vaults, reminder and Reading notes, and edited files still upload and
+delete.
+
 ## Normal upload benchmark
 
 The bulk new-file benchmark uploads 8,000 distinct Markdown notes of about 1 KiB

@@ -52,7 +52,7 @@ export interface CheckResponse {
 	storageId: string;
 }
 
-export const MUTATION_FAILURE_CODES = ['version_conflict', 'namespace_conflict', 'validation', 'operation_expired', 'operation_mismatch', 'storage', 'unknown'] as const;
+export const MUTATION_FAILURE_CODES = ['version_conflict', 'namespace_conflict', 'validation', 'operation_expired', 'operation_mismatch', 'storage', 'move_unsupported', 'unknown'] as const;
 type MutationFailureCode = typeof MUTATION_FAILURE_CODES[number];
 
 export interface UploadResult {
@@ -123,6 +123,29 @@ interface BatchDownloadFile {
 
 export interface BatchDownloadResponse {
 	files: BatchDownloadFile[];
+}
+
+export interface BatchMoveFile {
+	from: string;
+	to: string;
+	expectedHash: string;
+	expectedRevision: string;
+}
+
+/** One result per requested move, in request order. A failed move changed nothing. */
+export interface BatchMoveResponse {
+	success: boolean;
+	results: Array<{
+		from: string;
+		to: string;
+		success: boolean;
+		hash?: string;
+		revision?: string;
+		error?: string;
+		code?: MutationFailureCode;
+		status?: number;
+		currentHash?: string | null;
+	}>;
 }
 
 export interface BatchDeleteResponse {

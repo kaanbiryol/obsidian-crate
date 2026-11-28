@@ -30,7 +30,7 @@ describe('worker route tables', () => {
 		expect([...KEYLESS_ENCRYPTED_READ_PATHS].sort()).toEqual(['/features', '/reading/encryption', '/reading/session']);
 		expect([...PLAINTEXT_ONLY_PATHS].sort()).toEqual([
 			'/reading/capture', '/reading/delete', '/reading/file', '/reading/handoff', '/reading/item', '/reading/retry', '/reading/update',
-			'/reminders/create', '/reminders/delete', '/reminders/list', '/reminders/reorder', '/reminders/set-completed', '/reminders/update', '/sync/upload-session',
+			'/reminders/create', '/reminders/delete', '/reminders/list', '/reminders/reorder', '/reminders/set-completed', '/reminders/update', '/sync/batch-move', '/sync/upload-session',
 		]);
 		// Every method on a plaintext-only path is declared plaintext-only.
 		for (const { method, path } of apiRoutes()) {

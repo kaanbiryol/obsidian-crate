@@ -85,6 +85,7 @@ All sync routes require `vault`.
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 32 files, 10 MiB total; self-hosted: 100 files, 32 MiB) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 32 files; self-hosted: 100) |
+| `POST` | `/sync/batch-move` | Plaintext only: move up to 32 files to new paths, keeping their stored bytes `{ moves: [...] }` |
 | `POST` | `/sync/import` | Start or resume the initial import of a never-populated server; returns `{ import }` or `{ import: null }` |
 | `POST` | `/sync/import/upload` | Upload up to 32 base64 files into the open initial import |
 | `PUT` | `/sync/import/upload?path=<path>` | Upload one binary file into the open initial import |
@@ -262,6 +263,23 @@ Content is base64-encoded. The Worker rejects a batch before reading R2 if D1 me
 
 `{ files: [{ path, expectedHash, expectedRevision }, ...] }` (max 32, `BATCH_DELETE_MAX_FILES` in `src/protocol/sync-limits.ts`) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
 
+### POST /sync/batch-move
+
+`{ moves: [{ from, to, expectedHash, expectedRevision }, ...] }` (max 32, `BATCH_MOVE_MAX_FILES`) -> `{ success, results: [{ from, to, success, hash?, revision?, error?, code?, status?, currentHash? }] }`, one result per move in request order.
+
+A move gives the file's row its new path and keeps its storage key, revision and `live_from_seq`: nothing is uploaded, no copy is retained and the file count is unchanged. The changelog records a delete of `from` and a put of `to` with the same hash, the shape receivers already apply as a local move. The move also writes a `file_moves` row (stored key, sequence, old path), so checkpoints saved before the move list the copy at its old path, and `GET /sync/checkpoint-file` serves it there. Maintenance removes the row once no kept checkpoint precedes the move, at most 1,000 rows on the first pass of each episode (`FILE_MOVE_PRUNE_BATCH`), since finding them scans the log.
+
+The route runs under the coordinator lock and is refused in an encrypted vault (428), whose paths are bound into ciphertext. Each move commits only if `from` still has the expected hash and revision. These cases fail with `409` and change nothing:
+
+- `version_conflict`: the source changed, or the destination exists.
+- `move_unsupported`, for the client to upload and delete instead:
+  - either path is a reminder or Reading note, whose projection or index needs the bytes;
+  - the destination's namespace is taken;
+  - an upload lease or cleanup intent still names the key.
+- `validation` (`400`): case or Unicode-only renames, and paths named twice in one batch.
+
+A retry after a lost response finds the source gone and the destination holding the expected revision, and returns success without writing. Keys are never reused, so that revision proves the move committed. A move writes about four D1 rows per file and one more when its log row is pruned (`sync/batch-move.integration.ts` measures 129 and 32 for 32 files, against 292 and 33 for the same renames as uploads and deletes and their later expiry).
+
 Uploads compare the observed D1 content hash. Deletes also compare the original opaque revision, rejecting same-content recreations. Reminder edits compare a semantic revision captured by the client, then apply file-level preconditions. D1 commits the file row, changelog, retention, operation receipt, and notification projection intent atomically; stale writers receive `409`.
 
 ### GET /sync/check
@@ -346,7 +364,8 @@ The server advertises `shared-history-checkpoints-v1`. A checkpoint is one D1 ro
 changelog sequence; commits save one before their changes once the latest is ten minutes
 old, and `POST /sync/checkpoints` saves the current state. Reads rebuild the inventory
 from `files` and the versions kept since the checkpoint, streaming pages of 10,000 rows,
-so the Worker never holds the whole document. Expired IDs receive 410, and an unfinished
+so the Worker never holds the whole document. A copy a server move took elsewhere since the
+checkpoint is listed at its path then (`file_moves`). Expired IDs receive 410, and an unfinished
 initial import or empty vault receives 409 from `POST`. All routes require vault
 credentials and return private, non-cacheable responses. See
 [the sync pipeline](sync-pipeline.md#returning-to-a-history-checkpoint) for retention,

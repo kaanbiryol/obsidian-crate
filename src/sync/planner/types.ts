@@ -1,3 +1,4 @@
+import type { MoveRemoteFiles } from '../transfer/move';
 import type { PlannedContent } from './planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, FileEntry, MutationFailure } from '../../protocol/sync-types';
@@ -65,6 +66,8 @@ interface PlannerManifest {
 	setEntry(path: string, entry: FileEntry): void;
 	removeEntry(path: string): void;
 	save(): Promise<void>;
+	/** Where a file renamed since its last acknowledged upload now lives. */
+	renameDestination?(path: string): string | undefined;
 }
 
 interface PlannerApi {
@@ -127,6 +130,9 @@ export interface IncrementalSyncPlannerContext {
 	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void, onFailure?: (failure: MutationFailure) => void): Promise<void>;
 	/** Moves an unchanged local file to a remote rename's new path; false when it cannot. */
 	moveUnchangedLocalFile?(from: string, to: string, expectedHash: string, revision?: string): Promise<boolean>;
+	/** Moves local renames of unchanged files on the server; returns those it did not move. */
+	moveRemoteFiles?: MoveRemoteFiles;
+	canMoveRemoteFiles?(): boolean;
 	processDiff(
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,

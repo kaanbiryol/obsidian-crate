@@ -9,6 +9,8 @@
 export const BATCH_UPLOAD_MAX_FILES = 32;
 export const BATCH_DELETE_MAX_FILES = 32;
 export const BATCH_DOWNLOAD_MAX_FILES = 50;
+/** Renames one move batch carries. Its snapshot binds both paths of each, within 100 values. */
+export const BATCH_MOVE_MAX_FILES = 32;
 
 export const BATCH_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 export const BATCH_DOWNLOAD_MAX_BYTES = 8 * 1024 * 1024;

@@ -68,7 +68,7 @@ export function storedObjectMatchesMetadata(
 		&& (!object.customMetadata?.hash || object.customMetadata.hash === storedFile.hash);
 }
 
-export function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete', metadataMessage: string): string {
+export function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete' | 'Move', metadataMessage: string): string {
 	return `${actionLabel} outcome is unknown because the metadata response failed; reconcile before retrying: ${metadataMessage}`;
 }
 

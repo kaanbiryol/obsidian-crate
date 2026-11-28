@@ -9,6 +9,8 @@ export function syncStoragePaths(pluginDir: string) {
 		manifestTmp: `${manifest}.tmp`,
 		manifestLog: `${pluginDir}/file-manifest.log`,
 		uploadJournal: `${pluginDir}/pending-uploads`,
+		/** Server moves sent but not yet in a saved manifest (`transfer/move-journal.ts`). */
+		moveJournal: `${pluginDir}/pending-moves.json`,
 		conflicts,
 		conflictsTmp: `${conflicts}.tmp`,
 		contentVerification: `${pluginDir}/content-verification.json`,

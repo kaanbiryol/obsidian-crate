@@ -15,7 +15,7 @@ const READING_INDEX_TABLES = ['reading_items', 'note_terms', 'highlight_index', 
 export const ENCRYPTION_RESET_TABLES = {
 	// The sliced wipe empties tables in this order. The Reading index goes first, because
 	// the reset leaves it in place when it begins.
-	wiped: [...READING_INDEX_TABLES, 'files', 'file_versions', 'history_checkpoints', 'changelog', 'operations', 'operation_chunks',
+	wiped: [...READING_INDEX_TABLES, 'files', 'file_versions', 'file_moves', 'history_checkpoints', 'changelog', 'operations', 'operation_chunks',
 		'reminder_file_cache', 'reminder_identities', 'reminder_occurrences', 'reminder_sources', 'reminder_source_state',
 		'reminder_projections', 'notification_projection_jobs', 'notification_file_retries', 'notification_policy',
 		'grants', 'push_subscriptions', ...READING_POLICY_TABLES],
@@ -26,7 +26,7 @@ export const ENCRYPTION_RESET_TABLES = {
 /** The primary key of each `wiped` table. A reset deletes rows a slice at a time by key,
  * since most tables are WITHOUT ROWID; reset-tables.test.ts checks these against schema.sql. */
 export const WIPED_TABLE_KEYS: Record<(typeof ENCRYPTION_RESET_TABLES.wiped)[number], string> = {
-	files: 'portable_path', file_versions: 'id', history_checkpoints: 'seq', changelog: 'seq',
+	files: 'portable_path', file_versions: 'id', file_moves: 'storage_key, seq', history_checkpoints: 'seq', changelog: 'seq',
 	operations: 'kind, operation_id', operation_chunks: 'kind, operation_id, idx',
 	reminder_file_cache: 'folder_path, file_path', reminder_identities: 'reminder_id', reminder_occurrences: 'reminder_id, due_key',
 	reminder_sources: 'file_path, reminder_id', reminder_source_state: 'file_path', reminder_projections: 'reminder_id',

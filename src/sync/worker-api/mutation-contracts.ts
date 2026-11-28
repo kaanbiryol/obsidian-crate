@@ -1,5 +1,5 @@
 import { isRecord } from '../../platform/validation';
-import type { BatchDeleteResponse, BatchDownloadResponse, BatchUploadResponse, UploadResult } from '../../protocol/sync-types';
+import type { BatchDeleteResponse, BatchDownloadResponse, BatchMoveResponse, BatchUploadResponse, UploadResult } from '../../protocol/sync-types';
 
 /**
  * Shapes of write responses, checked when they arrive and before any field is read.
@@ -51,4 +51,13 @@ export function parseBatchDelete(value: unknown): BatchDeleteResponse {
 	if (!optional(value.errors, errors => Array.isArray(errors) && errors.every(error => isRecord(error) && isString(error.path) && isString(error.error)
 		&& isFailureFields(error)))) return invalid();
 	return value as unknown as BatchDeleteResponse;
+}
+
+export function parseBatchMove(value: unknown): BatchMoveResponse {
+	if (!isRecord(value) || typeof value.success !== 'boolean' || !Array.isArray(value.results)) return invalid();
+	for (const result of value.results) {
+		if (!isRecord(result) || !isString(result.from) || !isString(result.to) || typeof result.success !== 'boolean'
+			|| !optional(result.hash, isString) || !optional(result.revision, isString) || !isFailureFields(result)) return invalid();
+	}
+	return value as unknown as BatchMoveResponse;
 }

@@ -28,6 +28,7 @@ Run \`node scripts/check-contract-docs.mjs --write\` after changing those contra
 | Registered migrations | ${release.migrations.map(item => `\`${item.id}\` (${item.from} → ${item.to})`).join(', ') || 'None'} |
 | Upload batch | ${limits.BATCH_UPLOAD_MAX_FILES} files (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.uploadFiles}) |
 | Delete batch | ${limits.BATCH_DELETE_MAX_FILES} files (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.deleteFiles}) |
+| Move batch | ${limits.BATCH_MOVE_MAX_FILES} files |
 | Download batch | ${limits.BATCH_DOWNLOAD_MAX_FILES} files (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.downloadFiles}) |
 | Upload batch bytes | ${limits.BATCH_UPLOAD_MAX_BYTES} (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.uploadBytes}) |
 | Download batch bytes | ${limits.BATCH_DOWNLOAD_MAX_BYTES} (self-hosted: ${limits.SELF_HOSTED_BATCH_LIMITS.downloadBytes}) |

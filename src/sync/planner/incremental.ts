@@ -3,6 +3,7 @@ import { recordSyncError } from '../issues';
 import { uploadPipelined } from '../transfer/upload-pipeline';
 import { applyDiffs } from '../transfer/process';
 import { createDeleteCandidates, deleteRemoteFiles } from '../transfer/delete';
+import { pairMoves } from '../transfer/move';
 import { isAbortError } from "../abort";
 import { fileFailure, isAuthError, isTransientSyncFailure } from "../failures";
 import type { IncrementalSyncPlannerContext } from "./types";
@@ -78,15 +79,18 @@ export async function runIncrementalSync(
 			conflicts,
 		} = await reconcileIncrementalRemoteChanges(context, changesByPath, localChanges, localDeletes, result);
 
-		const localOnlyChanges = [...localChanges, ...discoveredLocalChanges].filter(
+		const localChangesToSend = [...localChanges, ...discoveredLocalChanges].filter(
 			(file) =>
 				(!changesByPath.has(file.path) || resurrectPaths.has(file.path) || reclassifiedPaths.has(file.path))
 				&& !context.shouldIgnore(file.path),
 		);
-		const localOnlyDeletes = localDeletes.filter(
+		const localDeletesToSend = localDeletes.filter(
 			(path) => (!changesByPath.has(path) || remoteUnchangedLocalDeletes.has(path))
 				&& !context.shouldIgnore(path),
 		);
+		const moved = await moveLocalRenames(context, localDeletesToSend, localChangesToSend.filter(file => !resurrectPaths.has(file.path)), result);
+		const localOnlyChanges = localChangesToSend.filter(file => !moved.has(file.path));
+		const localOnlyDeletes = localDeletesToSend.filter(path => !moved.has(path));
 		const total = changesByPath.size + localOnlyChanges.length + localOnlyDeletes.length;
 		let current = 0;
 		options.progressCallback?.(current, total);
@@ -210,6 +214,28 @@ export async function runIncrementalSync(
 		finalizeSyncResult(result);
 		return result;
 	}
+}
+
+/** Moves local renames on the server when the new file's bytes match the old path's
+ * baseline, as after a rename while the app was closed. Returns both paths of each move;
+ * any other change uploads and deletes as before. */
+async function moveLocalRenames(
+	context: Pick<IncrementalSyncPlannerContext, 'localManifest' | 'moveRemoteFiles' | 'canMoveRemoteFiles'>,
+	deletes: readonly string[],
+	changes: ReadonlyArray<{ path: string; hash: string }>,
+	result: SyncResult,
+): Promise<Set<string>> {
+	const move = context.moveRemoteFiles;
+	if (!deletes.length || !changes.length || !move || !context.canMoveRemoteFiles?.()) return new Set();
+	const candidates = deletes.flatMap(path => {
+		const entry = context.localManifest.getEntry(path);
+		return entry?.hash ? [{ path, expectedHash: entry.hash, expectedRevision: entry.revision }] : [];
+	});
+	const created = changes.filter(file => !context.localManifest.getEntry(file.path));
+	const moves = pairMoves(candidates, created, path => context.localManifest.renameDestination?.(path));
+	if (!moves.length) return new Set();
+	const unmoved = new Set((await move(moves, result)).map(entry => entry.from));
+	return new Set(moves.filter(entry => !unmoved.has(entry.from)).flatMap(entry => [entry.from, entry.to]));
 }
 
 /** Plan from the acknowledged baseline; all transfer policy lives in the shared executor. */

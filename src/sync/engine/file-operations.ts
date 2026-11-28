@@ -1,5 +1,5 @@
 import type { Vault } from 'obsidian';
-import type { BatchUploadFile, RemoteFileVersion } from '../../protocol/sync-types';
+import type { BatchMoveFile, BatchUploadFile, RemoteFileVersion } from '../../protocol/sync-types';
 import { DurableUploads } from '../durability/durable-uploads';
 import { DurableRestores } from '../durability/durable-restores';
 import { arrayBufferToBase64 } from '@/platform/base64';
@@ -37,6 +37,7 @@ export function createEngineFileOperations(
 			await assertRenamesPreserved(manifest, vault, paths, fileLimit());
 			return transport.batchDelete(paths, expectedHashes, expectedRevisions);
 		},
+		batchMove: (moves: BatchMoveFile[]) => transport.batchMove(moves),
 		downloadFile: (path: string, size?: number) => largeTransfers(size, () => transport.downloadFile(path, size)),
 		batchDownload: (paths: string[]) => transport.batchDownload(paths),
 		batchLimits: () => transport.batchLimits(),

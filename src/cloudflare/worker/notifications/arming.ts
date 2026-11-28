@@ -15,6 +15,8 @@ export async function notificationArming(request: Request, path: string, method:
 	const route = `${method} ${path}`;
 	// Reminder commands arm in `beginReminderOperation`, after the receipt check.
 	if (DEFERRED_ROUTES.has(route)) return 'deferred';
+	// A move never commits a reminder or Reading note: the route refuses those under this lock.
+	if (route === 'POST /sync/batch-move') return 'none';
 	if (route !== 'POST /sync/batch-delete' && route !== 'POST /sync/restore-version') return 'now';
 	// Deletions and restores commit only the paths they name, as their routes sanitize them.
 	const parsed = await parseJsonObject(request.clone());

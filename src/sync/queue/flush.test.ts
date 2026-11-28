@@ -14,6 +14,8 @@ import { HttpError } from '../worker-api/client';
 import { LocalFilePresentError } from '../local/local-absence';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
 import { AUTH_ERROR_MESSAGE, ReconnectNotice } from '../sync-outcome';
+import { moveRemoteFiles } from '../transfer/move';
+import type { BatchMoveFile, BatchMoveResponse } from '../../protocol/sync-types';
 
 type QueueState = SyncState;
 type UploadArgs = {
@@ -619,4 +621,66 @@ it('uploads a delete-prefixed filename while deleting its unprefixed neighbor', 
 		success: true, uploadedPaths: ['delete:note.md'], deletedPaths: ['note.md'],
 	}));
 	expect([...h.pendingKeys]).toEqual([]);
+});
+
+describe('queued renames', () => {
+	const baseline = { hash: 'd'.repeat(64), revision: 'version-1', size: 7, modified: '2026-02-15T00:00:00.000Z' };
+	function renameHarness(options: { hash?: string; answer?: (move: BatchMoveFile) => BatchMoveResponse['results'][number]; movable?: boolean } = {}) {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({ path, content: new ArrayBuffer(7), hash: options.hash ?? baseline.hash, size: 7, contentType: 'text/markdown', expectedHash: null }),
+		});
+		harness.context.localManifest.getEntry.mockImplementation(((path: string) => path.startsWith('old/') ? baseline : undefined) as never);
+		harness.context.localManifest.renameDestination.mockImplementation(path => path.startsWith('old/') ? path.replace('old/', 'new/') : undefined);
+		const batchMove = vi.fn(async (moves: BatchMoveFile[]): Promise<BatchMoveResponse> => ({ success: true, results: moves.map(move =>
+			options.answer?.(move) ?? { from: move.from, to: move.to, success: true, hash: move.expectedHash, revision: move.expectedRevision }) }));
+		const context: QueueFlushContext = {
+			...harness.context,
+			canMoveRemoteFiles: () => options.movable ?? true,
+			moveRemoteFiles: (moves, result) => moveRemoteFiles({ files: { batchMove }, localManifest: harness.context.localManifest,
+				journal: { pending: async () => [], record: async () => {}, clear: async () => {} }, assertLocalFileAbsent: async () => {} }, moves, result),
+		};
+		harness.pendingKeys.add(pendingChangeKey('delete', 'old/a.md'));
+		harness.pendingKeys.add('new/a.md');
+		return { harness, context, batchMove };
+	}
+
+	it('moves a renamed file with unchanged bytes instead of uploading and deleting it', async () => {
+		const { harness, context, batchMove } = renameHarness();
+		await flushQueueBatch(context);
+		expect(batchMove).toHaveBeenCalledExactlyOnceWith([{ from: 'old/a.md', to: 'new/a.md', expectedHash: baseline.hash, expectedRevision: 'version-1' }]);
+		expect(harness.uploadFile).not.toHaveBeenCalled();
+		expect(harness.batchDelete).not.toHaveBeenCalled();
+		expect(harness.setEntry).toHaveBeenCalledWith('new/a.md', expect.objectContaining({ hash: baseline.hash, revision: 'version-1', size: 7 }));
+		expect(harness.removeEntry).toHaveBeenCalledWith('old/a.md');
+		expect(harness.pendingKeys.size).toBe(0);
+		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({ success: true, uploadedPaths: ['new/a.md'], deletedPaths: ['old/a.md'] }));
+	});
+
+	it('uploads and deletes a rename the server will not move', async () => {
+		const { harness, context } = renameHarness({ answer: move => ({ from: move.from, to: move.to, success: false, code: 'move_unsupported', status: 409, error: 'no' }) });
+		await flushQueueBatch(context);
+		expect(harness.uploadFile).toHaveBeenCalledOnce();
+		expect(harness.batchDelete).toHaveBeenCalledExactlyOnceWith(['old/a.md'], expect.anything(), expect.anything());
+		expect(harness.pendingKeys.size).toBe(0);
+	});
+
+	it('uploads a renamed file edited before the flush, and every rename in a vault that cannot move', async () => {
+		for (const options of [{ hash: 'e'.repeat(64) }, { movable: false }]) {
+			const { harness, context, batchMove } = renameHarness(options);
+			await flushQueueBatch(context);
+			expect(batchMove).not.toHaveBeenCalled();
+			expect(harness.uploadFile).toHaveBeenCalledOnce();
+			expect(harness.batchDelete).toHaveBeenCalledOnce();
+		}
+	});
+
+	it('keeps both keys queued when the move request fails, so the retry can find the move done', async () => {
+		const { harness, context, batchMove } = renameHarness();
+		batchMove.mockRejectedValueOnce(new HttpError('Storage unavailable', 503));
+		await flushQueueBatch(context);
+		expect(harness.uploadFile).not.toHaveBeenCalled();
+		expect(harness.batchDelete).not.toHaveBeenCalled();
+		expect([...harness.pendingKeys].sort()).toEqual([pendingChangeKey('delete', 'old/a.md'), 'new/a.md'].sort());
+		expect(harness.context.retryAfterFailure).toHaveBeenCalledOnce();
+	});
 });

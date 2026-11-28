@@ -30,6 +30,7 @@ describe('old and future clients against the current Worker', () => {
 		for (const [path, method, body] of [
 			['/sync/upload?path=Note.md', 'PUT', 'Must not replace bytes'],
 			['/sync/batch-delete', 'POST', JSON.stringify({ files: [{ path: 'Note.md' }] })],
+			['/sync/batch-move', 'POST', JSON.stringify({ moves: [{ from: 'Note.md', to: 'Moved.md' }] })],
 			['/reminders/create', 'POST', JSON.stringify({ folderPath: 'Reminders', content: 'Must not create' })],
 			['/settings', 'PUT', '{}'],
 			['/notifications/reminders-exchange', 'POST', '{}'],

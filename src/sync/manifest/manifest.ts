@@ -1,6 +1,7 @@
 import { encodeCheckpoint, parseCheckpoint, sameCheckpointRecoveryState } from './manifest-checkpoint';
 import { diffOrdered, encodeLogHeader, encodeLogRecord, encodeLogState, replayManifestLog, type EncodedLogState } from './manifest-log';
 import { UploadJournal } from '../durability/upload-journal';
+import { MoveJournal } from '../transfer/move-journal';
 import { parseRestoreIntents, type RestoreIntent } from '../durability/restore-intent';
 import { parseInitialConfigPull, type InitialConfigPull } from './initial-config-pull';
 import { MAX_UPLOAD_DIAGNOSTICS, normalizeUploadDiagnostics, type UploadDiagnostic } from '../diagnostics/upload-diagnostics';
@@ -33,6 +34,7 @@ export type LocalManifestView = Readonly<Omit<FileManifest, 'files'>> & {
 
 export class LocalManifest {
 	readonly uploadJournal: UploadJournal;
+	readonly moveJournal: MoveJournal;
 	private renames = new RenameDependencies();
 	private lastFolderMove?: { source: string; destination: string; revision: number };
 	private app: Pick<App, 'vault'>;
@@ -69,6 +71,7 @@ export class LocalManifest {
 		this.app = app;
 		const paths = syncStoragePaths(pluginManifest.dir!);
 		this.uploadJournal = new UploadJournal(app.vault.adapter, paths.uploadJournal, authority);
+		this.moveJournal = new MoveJournal(app.vault.adapter, paths.moveJournal, authority);
 		this.manifestPath = paths.manifest;
 		this.tmpPath = paths.manifestTmp;
 		this.logPath = paths.manifestLog;

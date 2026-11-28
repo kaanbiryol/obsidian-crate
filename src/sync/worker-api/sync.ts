@@ -12,7 +12,7 @@ import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { requestFileVersions } from './version-contract';
 import { parseManifestPage, requestChangesCheck, requestFileMetadata } from './read-contracts';
 import { readRawChanges, readRawManifest } from './manifest-read';
-import { parseBatchDelete, parseBatchDownload, parseBatchUpload, parseUploadResult } from './mutation-contracts';
+import { parseBatchDelete, parseBatchDownload, parseBatchMove, parseBatchUpload, parseUploadResult } from './mutation-contracts';
 import { errorMessage } from '../../platform/logger';
 import { HOST_STATUS_PATH, parseHostStatusResponse, type HostStatus } from '../../protocol/host-status';
 import { refusedUploadResult } from '../failures';
@@ -20,6 +20,8 @@ import { runConcurrentTasks } from '../concurrency';
 import type {
 	BatchDeleteResponse,
 	BatchDeleteFile,
+	BatchMoveFile,
+	BatchMoveResponse,
 	BatchDownloadResponse,
 	BatchUploadFile,
 	BatchUploadResponse,
@@ -454,6 +456,13 @@ export class SyncWorkerApi {
 		return { ...response, deleted: response.deleted.map(plain),
 			...(response.results ? { results: response.results.map(result => ({ ...result, path: plain(result.path) })) } : {}),
 			...(response.errors ? { errors: response.errors.map(error => ({ ...error, path: plain(error.path) })) } : {}) };
+	}
+
+	/** Moves plaintext files on the server, keeping their stored bytes. An encrypted path is
+	 * bound into its ciphertext, so an encrypted vault uploads and deletes instead. */
+	async batchMove(moves: BatchMoveFile[]): Promise<BatchMoveResponse> {
+		if (this.encryption) throw new Error('An encrypted vault cannot move files on the server');
+		return parseBatchMove(await this.http.requestJson<unknown>('/sync/batch-move', { method: 'POST', body: JSON.stringify({ moves }) }));
 	}
 
 	async previewFileVersion(version: RemoteFileVersion): Promise<ArrayBuffer> {
