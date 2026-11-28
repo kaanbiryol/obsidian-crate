@@ -88,7 +88,7 @@ Playwright, and a diagram that fails to render fails the build.
   server["`**Crate server**
   in Docker`"]
   ````
-- Check the result in both themes with the static preview below, and on GitHub.
+- Check the result in both themes with the static preview above, and on GitHub.
 - Astro caches rendered Markdown in `docs-site/node_modules/.astro/`. After
   changing `scripts/mermaid.mjs`, delete that folder so unchanged pages render
   again.

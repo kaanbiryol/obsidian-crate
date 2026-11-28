@@ -1,8 +1,8 @@
 # Recover unreadable reminder sources
 
-The plugin shows **Some reminders could not be refreshed** when a reminder note cannot be read safely. Expand **Review affected files** to see the affected paths and reasons. Previously indexed reminders remain visible but may be stale; edits to those notes are paused. Healthy notes remain usable. A full scan is complete only when every source was read successfully.
+The plugin shows **Couldn’t read some reminders** when reminder notes cannot be read safely, listing each affected note and its reason; the web app shows **Some reminders are unavailable**, with the paths under **Review affected files**. Previously indexed reminders remain visible but may be stale; edits to those notes are paused. Healthy notes remain usable. A full scan is complete only when every source was read successfully.
 
-For a temporary storage error, wait until the vault is available and select **Refresh reminders**. A successful refresh clears the warning and reads the current task text. Renaming a note moves its warning to the new path; confirmed deletion removes its saved entries.
+For a temporary storage error, wait until the vault is available and select **Retry** (**Refresh reminders** in the web app). A successful refresh clears the warning and reads the current task text. Renaming a note moves its warning to the new path; confirmed deletion removes its saved entries.
 
 Crate writes ordinary descriptions as plain-text `<!-- crate-desc:details -->` comments, including multiline text. Literal percent signs such as `%20` stay as typed. Encoded `crate-desc:v1:` descriptions are also readable, and encoding is used for comment syntax (`--`), literal carriage returns and leading `v<number>:` prefixes. The parser reads both representations without changing the note. An unsupported version such as `v2:` or a damaged comment needs source repair; after repairing it, run **Crate: Sync now** to resume setup; uploaded files do not need to be sent again. In **Sync activity**, each source error identifies the note path and malformed
 description errors include a line number. Select **Open file** to open an available

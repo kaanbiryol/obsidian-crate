@@ -12,7 +12,7 @@ support, and issue links. The native builders, Worker metadata, save page, PWA
 setup, and contract documentation use this source.
 
 The capture contract is version 1; the template is revision 1. The app wire
-protocol in `src/protocol/server-info.ts`, server revision in `server-release.json`, and D1
+protocol in `src/protocol/server-info.ts`, server revision in `src/cloudflare/server-release.json`, and D1
 schema are separate numbers. Do not change the capture contract or native
 headers merely because one of those numbers changes.
 
@@ -34,7 +34,7 @@ with `409 shortcut_encrypted_vault`, since the server cannot encrypt the note.
   `{ url, title? }`. The server creates the immutable capture operation and a
   five-minute capability. Preparation is not a save receipt.
 - The public save page commits that capability using the live server's current
-  app protocol. It shows **Saved to Crate** only after a valid durable receipt.
+  app protocol. It shows **Saved** only after a valid durable receipt.
   Retry and reload reuse the same capability and operation.
 
 Only the versioned shortcut routes bypass the general app protocol. Other routes enforce the normal protocol checks.

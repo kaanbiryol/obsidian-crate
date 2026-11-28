@@ -11,7 +11,7 @@ export type RequestPlacement =
 	/** Coordinator routes authenticate under the lock every revocation also takes; an
 	 * unrecognized bearer is checked at the edge first, so it cannot queue on that lock. */
 	| 'forward-before-auth'
-	/** The shortcut capture authenticates at the edge, where an encrypted vault downloads its page. */
+	/** The shortcut capture authenticates at the edge before it is forwarded. */
 	| 'forward-after-auth'
 	/** Streamed to a transfer object after authentication, without reading the body here. */
 	| 'forward-transfer'

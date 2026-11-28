@@ -649,8 +649,7 @@ exercise the extracted storage owners with native IndexedDB and Web Locks.
 
 ### Sync shutdown
 
-`engine/checkpoint-lifecycle.test.ts` holds checkpoint writes and verification reads
-through shutdown. `runtime/operations.test.ts` checks that late saves cannot update
+`runtime/operations.test.ts` checks that late saves cannot update
 history, persist settings, or fall back through a replacement engine.
 
 `engine/background-lifecycle.test.ts` holds conflict writes, discovery reads and

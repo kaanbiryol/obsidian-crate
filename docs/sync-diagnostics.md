@@ -2,7 +2,7 @@
 
 Automatic event-queue and periodic synchronizations are recorded in **Sync activity → History**, including errors and conflict counts. Idle checks do not add empty history rows. History is bounded and local to the plugin. A failed connectivity check changes the current status without changing the last successful sync time.
 
-Select **Settings → Crate → Troubleshooting → Export diagnostics** to review and copy a JSON report. The report includes plugin/protocol versions, sync counts and timestamps, recent request status, and opaque operation, request and client-session IDs. Each sync-history row preserves the most recent 50 request records for correlation after restart. The current session also retains a bounded 50-request snapshot. Snapshots can overlap across history rows; they are diagnostic context, not a count of unique operations.
+Select **Settings → Crate → Troubleshooting → Export diagnostics** to review and copy a JSON report. The report includes plugin/protocol versions, sync counts and timestamps, recent request status, and opaque operation, request and client-session IDs. Each sync-history row preserves those of the most recent 50 request records that no other kept row holds, for correlation after restart, so rows do not repeat records. The current session also retains a bounded 50-request snapshot. They are diagnostic context, not a count of unique operations.
 
 The report omits vault names, Worker URLs, note paths/text, headers, tokens and free-form error messages. Inspect it before sharing; operation times and counts can still describe your activity. No report is sent automatically. Keep private local history when investigating a specific file: it contains the paths intentionally excluded from the shareable report.
 

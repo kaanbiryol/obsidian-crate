@@ -61,7 +61,7 @@ Crate saves PNG, JPEG, GIF, WebP and AVIF images, never SVG. An image that is to
 | 20 notification devices per vault, 5 per web app | Remove an old one under **Settings → Crate → Notifications → Notification devices** before adding another. |
 | Notifications need a supported browser | Alerts are delivered through Apple, Google, Mozilla or Microsoft push services. On iPhone and iPad, add the web app to the Home Screen first. |
 | A current Safari, Chrome or Firefox | Older browsers without Web Locks can read your library and reminders but can't send changes. |
-| Request limits | Each web app connection can make 500 Reading requests a day, and per minute it can save 30 links, select **Try again** 10 times and send 3 test notifications. Past that, it asks you to try again later. |
+| Request limits | Each web app connection can make 500 Reading requests a day, and per minute it can save 30 links and select **Try again** 10 times. Each Obsidian device can send 3 test notifications a minute. Past that, it asks you to try again later. |
 
 ## On a phone or tablet
 

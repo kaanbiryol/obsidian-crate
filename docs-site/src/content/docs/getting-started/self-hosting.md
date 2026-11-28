@@ -16,7 +16,7 @@ Run Crate on a computer or server you control, and your synced data is stored th
 
 ## With Node.js
 
-Install [Node.js](https://nodejs.org/) 26, then run:
+Install [Node.js](https://nodejs.org/) 26.8.2 or a later 26.x release, then run:
 
 ```sh
 npx @kaanbiryol/crate-server

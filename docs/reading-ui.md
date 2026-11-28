@@ -76,8 +76,8 @@ that order. The first three tabs keep their configured destinations, including
 Reading when it sits there. The displaced fourth destination returns to the menu,
 and the new fourth destination is excluded. Today and Upcoming are date views
 inside Reminders, so neither appears
-as a dock slot or expanded-menu choice. **Open app to** can open **Reminders — Today**
-or **Reminders — Upcoming** at launch. The dock contains one Reminders slot. Settings changes and resets immediately update the menu.
+as a dock slot or expanded-menu choice. **Open app to** can open **Today**
+or **Upcoming** at launch. The dock contains one Reminders slot. Settings changes and resets immediately update the menu.
 The feature shell routes explicit tab requests across feature mounts, while
 each feature owns its view, search, and list state. All PWA code, including
 encryption and article extraction, loads at startup, so no screen shows a
@@ -109,7 +109,7 @@ was already selected before the switch. Plugin icon emphasis follows that spring
 painted position; the PWA's icon colors use the indicator's duration and easing.
 Selection and keyboard semantics update immediately, while visible emphasis blends
 with the highlight and follows interruptions. Reminder tabs,
-Reading filters, and Reminders/Reading switches use the same 160 ms ease-out
+Reading filters, and Reminders/Reading switches use the same shared 270 ms
 stationary dissolve. Tab panels and feature layers use reversible CSS opacity
 transitions and retain their paint order until the switch settles, so a rapid
 reversal continues from the current blend. Feature layers stay mounted after the
@@ -125,9 +125,10 @@ feature lets the feature shell own the dissolve without adding a second tab fade
 Reduced motion switches tabs and features immediately.
 Both header gears open the same **Settings** sheet above the feature panels.
 The feature shell owns its visibility and preserves the underlying tab, search,
-scroll position, and focus. Settings use General, Reminders, and Reading sections,
-with separate Sync, Device storage, Encryption, and About sections. Settings actions use full-width
-text rows with shared spacing and touch targets. Device storage and version diagnostics stay visible alongside sync status.
+scroll position, and focus. Settings use Appearance, Tabs, Notifications, and Install sections,
+with separate Sync, Encryption, Device storage, and About sections. Settings actions use full-width
+text rows with shared spacing and touch targets. Version diagnostics stay visible alongside sync status;
+Device storage appears only while unsynced changes sit in storage the browser may clear.
 Reading has no general export action in Settings; unsynced reminder exports
 appear only when needed. Web app and server versions show directly without
 a separate build-comparison message. **Reset tabs**
@@ -172,7 +173,7 @@ The Reading panel accepts a host navigation renderer; the Obsidian panel keeps
 its shared navigation. Obsidian wide layouts retain their sidebar; PWA connection
 screens retain the header switch for enrollment.
 The feature shell preserves mounted state and browser locations and restores focus to
-its visible navigation control. The modes dissolve the outgoing panel over an opaque incoming panel over 160 ms;
+its visible navigation control. The modes dissolve the outgoing panel over an opaque incoming panel with the shared 270 ms fade;
 scrolling content, headers, and docks keep their geometry throughout the dissolve. Opening a PWA Reading
 article slides the reader over the stationary library and bottom bar. Both stay
 painted beneath the full-height article, with background controls inert. Toolbar
@@ -263,7 +264,7 @@ Chromium touch selection and pointer cancellation. Physical iPhone safe areas, V
 device acceptance checks.
 
 In Reading, releasing a text selection saves a highlight automatically and opens
-an inline action menu with **Copy**, **Share**, and **Delete highlight**. Copy and
+an inline action menu with **Copy**, **Share**, **Note**, and **Delete highlight**. Copy and
 Share use the passage text and remain available while a highlight save is pending.
 Share opens the device share sheet where supported, otherwise it copies the text
 with feedback. Cancellation is quiet; failed saves, copies and shares show an
@@ -311,8 +312,7 @@ JavaScript, Python, Bash, JSON, CSS, HTML/XML, SQL, and Swift.
 
 The PWA article reader keeps its actions visible in their existing positions.
 Back uses a circular surface, archive/favorite share a capsule, and the secondary
-actions use individual rounded surfaces beside the offline status. Article and
-Highlights use a rounded segmented control. These PWA-only styles use the dock's
+actions use individual rounded surfaces beside the offline status. These PWA-only styles use the dock's
 flat material and retain 44px targets. The iOS 27 opaque header
 workaround remains in place.
 
@@ -342,7 +342,8 @@ without restarting CSS easing on every frame. Reduced motion uses an immediate
 visibility change without translation. Closing the sheet
 restores the passage position; selecting **View in article** closes the sheet
 before smoothly scrolling to and focusing the highlight; reduced motion uses an
-instant scroll. Obsidian retains its reader tabs.
+instant scroll. Obsidian also opens article highlights from the floating button in a
+sheet, without hiding its navigation on scroll.
 
 Reading sheets portal into a dedicated, themed viewport layer directly under the
 body, outside the frozen article and feature-panel compositing layers. The body
@@ -371,8 +372,9 @@ compound field owns its focus outline and retains 44px touch targets.
 
 The library filters by tag from a single scrolling chip row under search, in every
 section and both hosts. **All** clears the filter, as does selecting the active tag
-again. The row lists every library tag and is hidden when there are none; the
-header has no tags button.
+again. The row lists the section's six most used tags, the selected one first, and
+**More** opens a searchable sheet of every tag; the row is hidden when there are none and
+the header has no tags button.
 
 All PWA sheet header buttons use the flat chrome surface through
 `_rounded-sheet-control.scss`, applied in `_sheet-headers.scss` to close/back
@@ -396,10 +398,8 @@ work. Covered library cards keep their resting surface on return.
 
 Reading articles follow the same divider-free [list style](ui-styling.md#list-style)
 preference as reminders. Highlight passages always use compact rows separated by
-inset hairlines, in both styles. The Highlights library groups passages by article,
-ordered by the newest highlight. Article disclosure headers use flat rows at rest
-with rounded hover/press feedback, or card surfaces when Cards is selected. The
-newest group starts expanded; older groups expand on selection. Article reader
+inset hairlines, in both styles. The Highlights library lists passages as one feed,
+newest first; each row names its article, which opens from that line. Article reader
 highlights use the same rows.
 
 Reading dialogs opened inside the Obsidian workspace portal into a pane-local

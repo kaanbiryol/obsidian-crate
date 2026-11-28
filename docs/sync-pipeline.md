@@ -102,7 +102,7 @@ flowchart TD
 
 ### 1. Periodic Check
 
-When `automaticSync` is enabled, every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>` and compares local file metadata with the local manifest. If the server reports changes, reports an expired cursor, queued paths exist, or any visible or hidden local file has changed, it triggers a sync. An expired cursor falls through to full reconciliation.
+When `automaticSync` is enabled, every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>` and compares local file metadata with the local manifest. If the server has changes this device lacks (after a first sync, counted as with automatic sync off above, so this device's own uploads do not count), reports an expired cursor, queued paths exist, or any visible or hidden local file has changed, it triggers a sync. An expired cursor falls through to full reconciliation.
 
 Entry point: `engine/lifecycle.ts:periodicCheck()`
 
@@ -395,7 +395,7 @@ Release and transfer values are also checked against source in [current contract
 | `UPLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `DOWNLOAD_CONCURRENCY` | 2 | `transfer/constants.ts` |
 | `PREPARE_CONCURRENCY` | 2 | `transfer/constants.ts` |
-| Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer/budget.ts` |
+| Transfer chunk budget | 48 MiB mobile / 128 MiB desktop (or the file limit plus 8 MiB when larger), max 128 files | `transfer/budget.ts` |
 | Large transfers on mobile | Files of 8 MiB or more transfer one at a time | `transfer/budget.ts` |
 | File transfer timeout | 120 s plus 1 s per 32 KiB of body, so an upload still completes at about 0.26 Mbit/s | `worker-api/http.ts` |
 | Batch upload concurrency | 2 mobile / 4 desktop | `transfer/budget.ts` |

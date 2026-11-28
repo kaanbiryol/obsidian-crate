@@ -579,13 +579,12 @@ more than a Cloudflare deployment, without any option to set:
 | | Cloudflare | Self-hosted |
 | --- | --- | --- |
 | **Keep history for** | 7 to 90 days | Also 180 and 365 days |
-| Saved vault states | 20 | 100 |
 | Cleanup of expired history | Up to 20,000 database writes a day | No daily cap |
 | Files per sync request | 32 uploads or deletes, 50 downloads | 100 each |
 | Bytes per batch request | 10 MB up, 8 MB down | 32 MB each way |
 
 Mobile devices keep the smaller batches. Plugins older than this release see the
-newest 20 saved vault states, and show **Could not read the history period** while
+newest 100 saved vault states, and show **Could not read the history period** while
 the server keeps history for 180 or 365 days.
 
 ## Start Crate automatically

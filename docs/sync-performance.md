@@ -107,9 +107,9 @@ JSON header, about a third larger plus about 1 KB per file, so 5.2 GB becomes ab
 When a reminder policy is configured, tracking and acknowledging initial reminder
 readiness adds **two row writes per vault**, independent of note count, in addition
 to the selected-folder scan and actual reminder processing. Pending readiness
-probes write zero rows and use bounded indexed reads. Schedule dispatch handles
-up to five commands in a separate invocation of the existing Durable Object class;
-it adds one internal request per coordinator pass and no extra D1 records.
+probes write zero rows and use bounded indexed reads. Projection writes each schedule into its `reminder_projections` row, and a coordinator
+pass that wrote one sends one internal request to the dispatcher role of the existing
+Durable Object class; it adds no extra D1 records.
 
 `files` is a `WITHOUT ROWID` table keyed by the normalized portable path. The
 original path remains metadata and is checked on exact-path reads and writes.

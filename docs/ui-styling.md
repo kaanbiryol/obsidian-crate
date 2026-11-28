@@ -201,7 +201,7 @@ and a count can only go down: after moving literals onto roles, run
 
 ### List style
 
-**Appearance → List style** in Obsidian and **General → List style** in the PWA
+**Appearance → List style** in Obsidian and in the PWA
 select **Flat** (the default) or **Cards** for reminders, projects, and Reading locally in each
 host. Existing saved choices are retained. The plugin setting applies immediately to open views,
 project lists, embedded notes, and Reading; the PWA stores its own preference and updates

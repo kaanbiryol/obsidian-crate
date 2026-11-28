@@ -77,13 +77,13 @@ All sync routes require `vault`.
 | `GET` | `/sync/check?since=<seq>` | Lightweight check: are there changes since this sequence? |
 | `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (5000 per page, 2000 in an encrypted vault) |
 | `GET` | `/sync/manifest?limit=<n>&after=<path>&snapshotSeq=<seq>` | Stable, cursor-paginated remote manifest |
-| `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths |
+| `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths (self-hosted: 100) |
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB unless the server advertises more) |
 | `POST` | `/sync/upload-session?action=begin\|complete` | Self-hosted: begin or complete a chunked upload of a plaintext attachment over 25 MB (`chunked-uploads-v1`) |
 | `PUT` | `/sync/upload-session?part=<n>` | Self-hosted: send one part of a chunked upload |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2; on a self-hosted server, `Range: bytes=a-b` returns one part) |
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 32 files, 10 MiB total; self-hosted: 100 files, 32 MiB) |
-| `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
+| `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded; self-hosted: 100 paths, 32 MiB) |
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 32 files; self-hosted: 100) |
 | `POST` | `/sync/batch-move` | Plaintext only: move up to 32 files to new paths, keeping their stored bytes `{ moves: [...] }` |
 | `POST` | `/sync/import` | Start or resume the initial import of a never-populated server; returns `{ import }` or `{ import: null }` |
@@ -373,7 +373,7 @@ thinning and restore validation.
 
 ### Changelog pruning
 
-Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Each pass deletes at most 5,000 entries from the start of the changelog and reads only those first 5,000 by sequence, so a long expired backlog costs the same per pass; the newest entry is always kept. Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Expired retained versions are deleted 500 per pass, oldest first: the R2 objects, then their rows, so the expired row is the cleanup intent until both are gone. Copies that were never kept drain from the cleanup queue at the same rate. While either advances, passes continue every five seconds beyond the ten-pass limit, up to 200 passes (100,000 objects) per episode. Cleanup writes at most about 20,000 D1 rows per UTC day (`MAINTENANCE_DAILY_WRITE_BUDGET`), a fifth of the Free plan's daily allowance; a backlog past it, or a D1 daily-limit error, resumes after 00:00 UTC. Failures are recorded for diagnostics.
+Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Each pass deletes at most 5,000 entries from the start of the changelog and reads only those first 5,000 by sequence, so a long expired backlog costs the same per pass; the newest entry is always kept. Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Expired retained versions are deleted 500 per pass, oldest first: the R2 objects, then their rows, so the expired row is the cleanup intent until both are gone. Copies that were never kept drain from the cleanup queue at the same rate. While either advances, passes continue every five seconds beyond the ten-pass limit, up to 200 passes (100,000 objects) per episode. Cleanup writes at most about 20,000 D1 rows per UTC day (`MAINTENANCE_DAILY_WRITE_BUDGET`), a fifth of the Free plan's daily allowance, with no cap on a self-hosted server; a backlog past it, or a D1 daily-limit error, resumes after 00:00 UTC. Failures are recorded for diagnostics.
 
 When a client's `since` cursor points to pruned entries, the `cursorExpired` flag is returned so the plugin falls back to full sync.
 
@@ -457,7 +457,7 @@ operations, saved content, library identity, and scoped credentials are retained
 
 ### History retention
 
-`GET /history-retention` returns `{ days }`, one of 7, 14, 30, 60 or 90 (30 until changed).
+`GET /history-retention` returns `{ days }`, one of 7, 14, 30, 60 or 90, or also 180 or 365 on a self-hosted server (30 until changed).
 Only vault credentials can read it or POST `{ days }` to change it; other values return
 400. Writes run in the coordinator and store only the value in `server_state`; kept file
 versions expire by the current value, so a change rewrites no history rows. See [history retention](sync-pipeline.md#history-retention).

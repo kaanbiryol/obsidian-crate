@@ -107,7 +107,7 @@ independent security review listed in [Reading and encryption](reading-e2ee-asse
 ## Web app
 
 - **Online**: the library, every section, search and the tag filter are server pages. The tag
-  picker lists tags on the pages it loaded.
+  picker lists the section's tags from `GET /reading/tags?section=`.
 - **Offline**: the library shows articles saved with **Save for offline**, and search matches
   their titles on the device.
 - **Stored on the device**: only articles saved for offline, the queue of changes not yet sent,

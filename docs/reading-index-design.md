@@ -149,7 +149,7 @@ Found in the same review; each grew with the library, the scroll depth or the ar
   by a fraction of a pixel and a restored scroll position by one, so they keep their layout); the
   Highlights rows are sorted once per loaded list instead of on each keystroke or edit; a page's
   encrypted cards open in parallel and no per-session map of listed notes grows; image object
-  URLs are released once no view shows them (the last 60 stay for reuse) and an abandoned image
+  URLs are released once no view shows them (the last 60, up to 40 MiB in all, stay for reuse) and an abandoned image
   download is cancelled; a search typed past is cancelled.
 - Plugin: the filename check walks only the folders on the new path instead of every vault file;
   `create` events are heard only after the layout is ready, past Obsidian's startup burst; a

@@ -65,7 +65,7 @@ Hook tests also check that automatic wakeups wait for the saved deadline.
 
 ## Storage protection and pending exports
 
-**Settings → Device storage** reports whether persistent storage is granted, best effort, or unavailable. **Protect offline data** asks the browser for persistence where supported; denial retains the best-effort status. Persistence reduces automatic eviction risk but cannot protect against clearing site data, device loss, or every platform policy. Pending mutations exist only on this device until their server outcome is confirmed.
+The installed app asks the browser for persistent storage once at launch; browser tabs never ask unprompted. **Settings → Device storage** appears only while unsynced changes sit in best-effort storage, and **Ask browser to keep data** requests persistence where supported; denial keeps the section shown. Persistence reduces automatic eviction risk but cannot protect against clearing site data, device loss, or every platform policy. Pending mutations exist only on this device until their server outcome is confirmed.
 
 **Settings → Sync → Export unsynced reminders** saves all current-session pending changes with their exact request bodies and operation IDs. The export contains private reminder text but no session credential. It does not discard anything or replay the export. Keep it outside browser storage and compare with current reminders before recovering text; uncertain operations may already have committed. Routine pending changes use the header sync indicator without a separate notice, including while offline.
 

@@ -115,11 +115,12 @@ validation, async actions, and persistence.
 Primary settings labels use the same 16px regular typography as the main lists,
 with readable 14px descriptions. **Open app to** belongs to **Tabs** and retains
 the saved opening preference; visible instructions explain replacing and reordering tabs.
-**Sync**, **Device storage**, and **About** are always-visible sections. Shortcut setup
+**Sync** and **About** are always-visible sections; **Device storage** appears only
+while unsynced changes sit in storage the browser may clear. Shortcut setup
 uses these same section surfaces, typography and shared action controls. Encryption
 uses compact per-feature status rows and one shared setup note; locked and setting-up
 guidance stays visible, while unlocked folder and notification details expand in place.
-**Web app → Add to home screen** pushes a dedicated instructions page with retained
+**Install → Add to home screen** pushes a dedicated instructions page with retained
 settings scroll/focus and browser Back/Forward. Installed apps hide this entry.
 
 `PwaPushStack` owns retained sheet pages, push/pop motion and focus return.
@@ -329,8 +330,8 @@ and focus, shared theme and preferences, Reading launch destinations, explicit-l
 precedence, shortcut and installation navigation, pending Reading warnings from Reminders, and shared
 logout. The test uses the built client, local synthetic APIs, and native browser
 storage; screenshots include light/dark, 320px phone, and desktop layouts.
-The navigation checks cover Open app to in Tabs, always-visible About, Sync,
-and Device storage sections, always-visible storage and version tools, conditional tab
+The navigation checks cover Open app to in Tabs, always-visible About and Sync
+sections, always-visible version tools, conditional tab
 reset, touch targets, retained settings scroll/focus, native Back/Forward, the
 header Back action, Escape, and shared edge-gesture eligibility. Motion checks
 sample full-page push/pop frames, including the moving header, opaque surface,
