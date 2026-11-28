@@ -32,7 +32,7 @@ export function ReminderListStyleFixture({ host, colorScheme }: { host: 'plugin'
   const [edited, setEdited] = useState('');
   const [openedProject, setOpenedProject] = useState('');
   const [committedOrder, setCommittedOrder] = useState<string[]>([]);
-  const render = (reminder: Reminder, index: number) => <WebReminderCard reminder={reminder} index={index} hideProject={false}
+  const render = (reminder: Reminder) => <WebReminderCard reminder={reminder} hideProject={false}
     listStyle={preferences.listStyle} colorScheme={colorScheme} onEdit={setEdited}
     onToggleComplete={id => setReminders(items => items.map(item => item.id === id ? { ...item, completed: !item.completed } : item))} />;
   return <>
@@ -44,12 +44,12 @@ export function ReminderListStyleFixture({ host, colorScheme }: { host: 'plugin'
       <TodayView reminders={reminders} colorScheme={colorScheme} renderCard={render} animationConfig={{ enabled: false }} hasFab={false} />
     </div>
     <div className="reminders-list-container" data-testid="embedded-list"><div className="reminders-list">
-      {reminders.slice(0, 2).map((reminder, index) => <Fragment key={reminder.id}>{render(reminder, index)}</Fragment>)}
+      {reminders.slice(0, 2).map(reminder => <Fragment key={reminder.id}>{render(reminder)}</Fragment>)}
     </div></div>
     <div className="reminders-view is-primary" data-testid="grouped-list">
       {[[reminders[0]!], reminders.slice(1)].map((group, index) => <section key={index}>
         <h3>Group {index + 1}</h3>
-        {group.map((reminder, index) => <div className="reminder-render-item" key={reminder.id}>{render(reminder, index)}</div>)}
+        {group.map(reminder => <div className="reminder-render-item" key={reminder.id}>{render(reminder)}</div>)}
       </section>)}
     </div>
     <div className="reminders-view is-primary" data-testid="reorderable-list">
