@@ -160,7 +160,7 @@ export async function runSyncNow(plugin: CratePlugin, held?: readonly string[]):
 }
 
 /** Stops sync the user asked to stop and turns automatic sync off on this device. */
-export async function stopSyncNow(plugin: CratePlugin): Promise<void> {
+async function stopSyncNow(plugin: CratePlugin): Promise<void> {
 	try {
 		await plugin.syncRuntime.stopSync();
 		plugin.refreshSettingsTab();
